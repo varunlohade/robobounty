@@ -2,7 +2,7 @@
 
 It stays a separate process because policy/crashlab and policy/highrise each have a module named world.
 Chat text arrives on stdin and goes only to the LLM layer. brief.py and scenarios.py validate what comes back.
-CRASHLAB_RECORDED_REPLIES names a folder of stored LLM replies, for offline checks. The replies pass the same validators.
+CRASHLAB_RECORDED_REPLIES names a folder of stored LLM replies, for checks. The replies pass the same validators. A reply missing from the folder is a live call.
 """
 import contextlib
 import json
@@ -23,8 +23,8 @@ INSTRUCTION_REASONS = {"code_or_instructions", "file_or_secret_request"}
 
 
 def _recorded(prompt, schema):
-    name = "scenarios.json" if "groups" in schema["properties"] else "brief.json"
-    return json.loads((Path(os.environ["CRASHLAB_RECORDED_REPLIES"]) / name).read_text())
+    path = Path(os.environ["CRASHLAB_RECORDED_REPLIES"]) / ("scenarios.json" if "groups" in schema["properties"] else "brief.json")
+    return json.loads(path.read_text()) if path.exists() else llm._claude(prompt, schema)
 
 
 def plan(req):
@@ -36,10 +36,11 @@ def plan(req):
         brief._check_top(raw)
         mapped = brief._spans(raw["mapped"], "factor", plugin.FACTORS, len(words))
         unbuildable = brief._spans(raw["unbuildable"], "reason", brief.REASONS, len(words))
-        if raw["verdict"] == "reject":
+        # A brief can name no value at all, such as "window robot for towers in Dubai". The planner calls that nothing_buildable, and the defaults stand.
+        if raw["verdict"] == "reject" and raw["reject_reason"] != "nothing_buildable":
             raise brief.Rejected(f"planner_{raw['reject_reason']}")
-        chosen = plugin.validate_plan(raw["plan"], mapped) if raw["plan"] else {}
-        # A brief can name no value at all, and then the defaults stand. Text that is only instructions is not a brief.
+        chosen = plugin.validate_plan(raw["plan"], mapped) if raw["verdict"] == "build" and raw["plan"] else {}
+        # Text that is only instructions is not a brief.
         if not chosen and {s["reason"] for s in unbuildable} & INSTRUCTION_REASONS:
             raise brief.Rejected("planner_nothing_buildable")
         return {"ok": True, "plan": chosen, "seconds": seconds, **brief.account(plugin, words, mapped, unbuildable)}

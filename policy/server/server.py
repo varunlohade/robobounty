@@ -131,6 +131,13 @@ def run_one(argv, stdout_file):
         SLOTS.give(1)
 
 
+def llm_label():
+    if not RECORDED:
+        return "claude headless"
+    stored = [n for n in ("brief", "scenarios") if (Path(RECORDED) / f"{n}.json").exists()]
+    return f"stored {' and '.join(stored)} reply, check only"
+
+
 def sim_hash():
     return hashlib.sha256((HIGHRISE / "sim.py").read_bytes()).hexdigest()
 
@@ -630,7 +637,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.refuse()
         parts = urlsplit(self.path).path.strip("/").split("/")
         if parts == ["api", "health"]:
-            return self.reply(200, {"ok": True, "sim_sha": sim_hash(), "llm": "recorded replies, check only" if RECORDED else "claude headless", "max_procs": MAX_PROCS})
+            return self.reply(200, {"ok": True, "sim_sha": sim_hash(), "llm": llm_label(), "max_procs": MAX_PROCS})
         if len(parts) >= 4 and parts[:2] == ["api", "sessions"]:
             s = self.session(parts[2])
             if s is None:
