@@ -1,0 +1,62 @@
+/* Every colour, font and size choice for the app lives here. Values follow design/final/app/app-*-dark.html. */
+:root {
+  --bg: #000000;
+  --surface: #111111;
+  --surface-2: #161616;
+  --text: #ffffff;
+  --text-2: #d2d2d2;
+  --text-3: #ababab;
+  --line: #2a2a2a;
+  --line-2: #404040;
+  --control-line: #6a6a6a;
+  --fail: #ff5247;
+  --light-off: #4a4a4a;
+
+  /* Chat panel: compact, like an AI code editor side chat. */
+  --chat-user-bg: #1e1e1e;
+  --chat-user-line: #2e2e2e;
+  --chat-input-bg: #141414;
+  --chat-input-line: #4a4a4a;
+  --chat-pill-bg: #262626;
+  --chat-card-line: #4a4a4a;
+  --chat-size: 14px;
+  --chat-line: 20px;
+  --chat-small: 13px;
+
+  /* Diff text grows with the window, so it stays readable on a projector. */
+  --diff-size: clamp(12px, 0.85vw, 22px);
+  --diff-bg: #0d0d0d;
+  --diff-line: #363636;
+  --diff-add-bg: #262626;
+  --diff-del-text: #8a8a8a;
+
+  --font-heading: Palatino, "Palatino Linotype", "Book Antiqua", "URW Palladio L", serif;
+  --font-ui: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-code: "SF Mono", ui-monospace, Menlo, monospace;
+
+  --size-body: 16px;
+  --size-small: 13px;
+  --size-h1: 32px;
+  --size-h2: 24px;
+  --size-h3: 20px;
+
+  --title-height: 30px;
+  --tabs-height: 34px;
+  --status-height: 24px;
+  --player-height: 40px;
+  --rail-width: 344px;
+  --chat-width: clamp(320px, 27.8vw, 720px);
+  --chat-width-min: 280px;
+  --chat-width-max: 800px;
+
+  /* Simulation view. Geom colours come from the MJCF model. */
+  --sim-sky: #000000;
+  --sim-dust: #8c8c84;
+  --sim-light: #fff4e6;
+  --sim-hemi: 0.5;
+  --sim-sun: 0.9;
+  --spark: #d2d2d2;
+  --cell-held: #000000;
+  --cell-dust: #4a4a4a;
+  --cell-robot: #ffffff;
+}

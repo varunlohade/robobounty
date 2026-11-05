@@ -1,0 +1,24 @@
+{
+ "id": "dubai-world-013",
+ "label": "Dubai world 013: slip_distance",
+ "area": {
+  "x0": 0.0,
+  "x1": 2.4,
+  "z0": 135.2,
+  "z1": 138.2
+ },
+ "hz": 20,
+ "nq": 11,
+ "frames": 1973,
+ "python_mujoco": "3.8.1",
+ "friction": 0.6128699958002753,
+ "dirt": {
+  "nx": 48,
+  "nz": 60,
+  "every_steps": 20,
+  "scale": 200,
+  "clean_below": 0.1,
+  "count": 99
+ },
+ "replay_match": true
+}
