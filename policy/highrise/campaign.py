@@ -59,6 +59,17 @@ LEDGE_INSIDE_SHARE = 0.3
 def sample_world(nominal, campaign_seed, index, vary):
     rng = np.random.default_rng([campaign_seed, index, 101])
     world = dict(nominal)
+    if vary == "moderate":
+        spec = json.loads((HERE / "worlds" / "moderate_ranges.json").read_text())
+        for name, (lo, hi) in spec["ranges"].items():
+            world[name] = round(float(rng.uniform(lo, hi)), 4)
+        world["gust_count"] = int(rng.integers(spec["gust_count"][0], spec["gust_count"][1] + 1))
+        h = world["area_height_m"]
+        if rng.uniform() < spec["ledge_inside_share"]:
+            world["ledge_below_top_m"] = round(float(rng.uniform(0.5, h)), 4)
+        else:
+            world["ledge_below_top_m"] = round(float(rng.uniform(h + 1.0, 14.0)), 4)
+        return W.validate(world)
     for name, (lo, hi) in WIND_RANGES.items():
         world[name] = round(float(rng.uniform(lo, hi)), 4)
     world["gust_count"] = int(rng.integers(0, 5))
@@ -80,7 +91,8 @@ def run_one(job):
             "fired": list(r["fired"]), "first_t": min([v["t"] for v in r["fired"].values()], default=None),
             "coverage": r["coverage"], "reported_done": r["reported_done"], "reported_coverage": r["reported_coverage"],
             "slip_m": r["slip_m"], "peak_tether_n": r["peak_tether_n"], "min_pressure_pa": r["min_pressure_pa"],
-            "time_s": r["time_s"], "wall_s": r["wall_s"], "world": world}
+            "time_s": r["time_s"], "wall_s": r["wall_s"], "outcome": r["outcome"], "hold_s": r["hold_s"],
+            "hold_mean_wind_ms": r["hold_mean_wind_ms"], "diverged_reason": r.get("diverged_reason"), "world": world}
 
 
 def wilson(k, n, z=1.96):
@@ -97,12 +109,17 @@ def table(rows):
     lines = []
     broken = [r["trial"] for r in rows if r["failure"] == "sim_diverged"]
     lines.append(f"numerical divergence, left out of the rates: {len(broken)} {broken[:8]}")
-    for kind in ("control", "varied"):
+    for kind in ("control", "benign", "varied"):
         sub = [r for r in rows if r["kind"] == kind and r["failure"] != "sim_diverged"]
         passed = sum(r["passed"] for r in sub)
         lo, hi = wilson(passed, len(sub))
         lines.append(f"{kind}: {passed}/{len(sub)} passed, 95% interval {lo:.2f}-{hi:.2f}")
-        first = Counter(r["failure"] for r in sub if not r["passed"])
+        holds = [r for r in sub if r.get("outcome") == "safe_hold"]
+        if holds:
+            mean_hold = sum(r["hold_s"] for r in holds) / len(holds)
+            mean_wind = sum(r["hold_mean_wind_ms"] for r in holds) / len(holds)
+            lines.append(f"  safe hold, not a failure: {len(holds)}, mean held {mean_hold:.0f} s at mean wind {mean_wind:.1f} m/s")
+        first = Counter(r["failure"] for r in sub if not r["passed"] and r["failure"])
         anyf = Counter(f for r in sub for f in r["fired"])
         lines.append(f"  {'failure type':<16}{'first':>7}{'any':>7}  example")
         for name, n in first.most_common():
@@ -112,6 +129,11 @@ def table(rows):
             if name not in first:
                 ex = next(r["trial"] for r in sub if name in r["fired"])
                 lines.append(f"  {name:<16}{0:>7}{n:>7}  {ex}")
+        finished = [r for r in sub if r["reported_done"]]
+        if finished:
+            by_gap = {g: sum(r["reported_coverage"] - r["coverage"] > g for r in finished) for g in (0.02, 0.05, 0.10, 0.15, 0.20)}
+            by_req = {q: sum(r["coverage"] < q for r in finished) for q in (0.85, 0.90, 0.95)}
+            lines.append(f"  of {len(finished)} reporting done, false_done by gap limit: {by_gap}; true coverage below: {by_req}")
     return "\n".join(lines)
 
 
@@ -119,7 +141,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, required=True)
     ap.add_argument("--seed", type=int, required=True)
-    ap.add_argument("--vary", choices=("wind", "all"), default="all")
+    ap.add_argument("--vary", choices=("wind", "all", "moderate"), default="all")
     ap.add_argument("--controls", type=int, default=None)
     ap.add_argument("--out")
     ap.add_argument("--procs", type=int, default=MAX_PROCS)
