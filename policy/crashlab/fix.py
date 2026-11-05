@@ -130,18 +130,12 @@ def run_sandboxed(argv, run_dir, controller, wall_s=TRIAL_WALL_S, rss_mb=TRIAL_R
     profile = run_dir / "sandbox.sb"
     profile.write_text(sandbox_profile(run_dir, controller))
     env = {"PATH": "/usr/bin:/bin", "HOME": str(run_dir), "TMPDIR": str(run_dir), "PYTHONDONTWRITEBYTECODE": "1", "OPENBLAS_NUM_THREADS": "1",
-           "OMP_NUM_THREADS": "1", "VECLIB_MAXIMUM_THREADS": "1", "MUJOCO_LOG": "0"}
+           "OMP_NUM_THREADS": "1", "VECLIB_MAXIMUM_THREADS": "1", "MUJOCO_LOG": "0",
+           "CRASHLAB_CPU_S": str(TRIAL_CPU_S), "CRASHLAB_FILE_MB": str(TRIAL_FILE_MB)}
 
-    def limits():
-        import resource
-        os.nice(10)
-        resource.setrlimit(resource.RLIMIT_CPU, (TRIAL_CPU_S, TRIAL_CPU_S))
-        resource.setrlimit(resource.RLIMIT_FSIZE, (TRIAL_FILE_MB * 2**20, TRIAL_FILE_MB * 2**20))
-        resource.setrlimit(resource.RLIMIT_NOFILE, (256, 256))
-        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     with (run_dir / "stderr.txt").open("wb") as err:
         p = subprocess.Popen(["sandbox-exec", "-f", str(profile), str(PY), *argv], cwd=run_dir, env=env, stdout=subprocess.DEVNULL, stderr=err,
-                             stdin=subprocess.DEVNULL, preexec_fn=limits, start_new_session=True)
+                             stdin=subprocess.DEVNULL, start_new_session=True)
         t0 = time.time()
         while p.poll() is None:
             time.sleep(0.25)
@@ -311,12 +305,20 @@ def diagnosis_summary(campaign):
     return diagnose.summary_of(d)
 
 
-def do_try(n, campaign, fix_dir, summary, feedback, sets, procs, patch_file, baseline):
+def load_baseline(fix_dir, sets, base_sha):
+    path = fix_dir / "baseline.json"
+    if not path.exists():
+        return None
+    stored = json.loads(path.read_text())
+    if stored["base_controller_sha256"] != base_sha or stored["worlds"] != {k: [t[0] for t in v] for k, v in sets.items()}:
+        return None
+    return {(name, "A"): rows for name, rows in stored["rows"].items()}
+
+
+def do_try(n, campaign, fix_dir, summary, feedback, sets, procs, patch_file, baseline, patch_note=None):
     try_dir = fix_dir / f"try_{n}"
     if try_dir.exists():
         shutil.rmtree(try_dir)
-    if (fix_dir / "baseline").exists() and not baseline:
-        shutil.rmtree(fix_dir / "baseline")
     try_dir.mkdir(parents=True)
     base_sha = hashlib.sha256(BASE.read_bytes()).hexdigest()
     report = {"try": n, "base_controller_sha256": base_sha, "llm": None, "validation": [], "ab": None, "verdict": None, "status": None}
@@ -326,7 +328,7 @@ def do_try(n, campaign, fix_dir, summary, feedback, sets, procs, patch_file, bas
     try:
         if patch_file:
             shutil.copyfile(patch_file, patched)
-            report["llm"] = {"error": None, "from_file": True}
+            report["llm"] = {"error": None, "from_file": True, "note": patch_note}
             diff = subprocess.run(["diff", "-u", str(BASE), str(patched)], capture_output=True, text=True).stdout
         else:
             wt = make_worktree(tmp)
@@ -354,7 +356,9 @@ def do_try(n, campaign, fix_dir, summary, feedback, sets, procs, patch_file, bas
         report["status"] = "rejected_by_validator"
     else:
         if not baseline:  # the base controller is deterministic, so every try shares one A side
-            baseline.update(run_side("A", BASE, fix_dir / "baseline", sets, procs))
+            baseline.update(load_baseline(fix_dir, sets, base_sha) or run_side("A", BASE, fix_dir / "baseline", sets, procs))
+            (fix_dir / "baseline.json").write_text(json.dumps({"base_controller_sha256": base_sha, "worlds": {k: [t[0] for t in v] for k, v in sets.items()},
+                                                               "rows": {k[0]: v for k, v in baseline.items()}}))
         rows = {**baseline, **run_side("B", patched, try_dir, sets, procs)}
         codes = {r["code_sha256"]["sim.py"] + r["code_sha256"]["judge.py"] for rows_ in rows.values() for r in rows_ if r.get("code_sha256")}
         if len(codes) > 1:
@@ -384,9 +388,14 @@ def cmd_run(a):
     seen, fresh, controls = world_sets(campaign, a.seen, a.fresh, a.fresh_seed, fix_dir)
     sets = {"seen": seen, "fresh": fresh, "controls": controls}
     tries, feedback, baseline = [], "", {}
-    for n in range(1, a.tries + 1):
-        r = do_try(n, campaign, fix_dir, summary, feedback, sets, min(a.procs, MAX_PROCS), a.patch, baseline)
-        tries.append({k: r.get(k) for k in ("try", "status", "validation", "verdict", "ab", "regressions", "llm", "diff_sha256")})
+    keys = ("try", "status", "validation", "verdict", "ab", "regressions", "llm", "diff_sha256")
+    for n in range(1, a.first_try):  # earlier tries stay on record, and the next try hears how the last one did
+        r = json.loads((fix_dir / f"try_{n}" / "report.json").read_text())
+        tries.append({k: r.get(k) for k in keys})
+        feedback = ("\nAn earlier try failed. Result of that try, in counts:\n" + json.dumps({k: r.get(k) for k in ("status", "validation", "verdict", "ab")}))
+    for n in range(a.first_try, a.first_try + a.tries):
+        r = do_try(n, campaign, fix_dir, summary, feedback, sets, min(a.procs, MAX_PROCS), a.patch, baseline, a.patch_note)
+        tries.append({k: r.get(k) for k in keys})
         print(json.dumps(tries[-1], indent=1))
         if r["status"] == "awaiting_human":
             break
@@ -432,11 +441,13 @@ def main():
     r = sub.add_parser("run")
     r.add_argument("campaign")
     r.add_argument("--tries", type=int, default=3)
+    r.add_argument("--first-try", type=int, default=1)
     r.add_argument("--seen", type=int, default=0)
     r.add_argument("--fresh", type=int, default=0)
     r.add_argument("--fresh-seed", type=int, default=777)
     r.add_argument("--procs", type=int, default=MAX_PROCS)
     r.add_argument("--patch")
+    r.add_argument("--patch-note")
     v = sub.add_parser("validate")
     v.add_argument("file")
     c = sub.add_parser("accept")

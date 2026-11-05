@@ -2,6 +2,9 @@
 # One command for the mechanical part of the loop on the current sim. Run from anywhere. Writes only under policy/runs.
 #   loop.sh <tag> [--live-chat] [--word] [--fix]
 # Default reuses the stored Dubai plan, with no LLM call. --live-chat asks the scenario agent again (1 call). --word words the diagnosis (1 call).
+# Other workers edit policy/highrise in this tree, so to pin the sim run this from a clean checkout:
+#   git worktree add /tmp/frozen <commit> && ln -s "$PWD/policy/.venv" /tmp/frozen/policy/.venv && ln -s "$PWD/policy/runs" /tmp/frozen/policy/runs
+#   /tmp/frozen/policy/crashlab/loop.sh <tag> --fix
 # --fix runs fix.py (up to 3 calls). Stops at the first failed step. Nothing here changes controller.py.
 set -e
 POLICY="$(cd "$(dirname "$0")/.." && pwd)"

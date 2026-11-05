@@ -2,9 +2,22 @@
 import hashlib
 import importlib.util
 import json
+import os
+import resource
 import subprocess
 import sys
 from pathlib import Path
+
+# Hard limits, set before any controller code loads. A process cannot raise its own hard limits.
+try:
+    os.nice(10)
+except PermissionError:  # the parent is already at the lowest priority macOS allows
+    pass
+_cpu, _file = int(os.environ["CRASHLAB_CPU_S"]), int(os.environ["CRASHLAB_FILE_MB"]) * 2**20
+resource.setrlimit(resource.RLIMIT_CPU, (_cpu, _cpu))
+resource.setrlimit(resource.RLIMIT_FSIZE, (_file, _file))
+resource.setrlimit(resource.RLIMIT_NOFILE, (256, 256))
+resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
 # mujoco's import asks sysctl about Rosetta, and the sandbox forbids new processes. Answer "not translated"; the check only guards x86_64 builds.
 _real_run = subprocess.run
