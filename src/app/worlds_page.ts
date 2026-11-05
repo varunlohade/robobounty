@@ -230,7 +230,7 @@ export class WorldsPage {
     const waiting = this.planned.length - runs.length - held;
     this.heading.textContent = runs.length ? `${failed} of ${runs.length} tested worlds failed` : `${this.planned.length} worlds proposed`;
     const notes = ['Simulated.'];
-    if (held) notes.push(`${held} held back.`);
+    if (held) notes.push(`${held} held back (bright dashes).`);
     if (waiting > 0) notes.push(`${waiting} not tested yet.`);
     this.sub.textContent = notes.join(' ');
     this.onCounts(runs.length ? `${failed} failed, ${runs.length - failed - this.excluded.size} no failure, ${waiting > 0 ? waiting : 0} not tested yet` : '');

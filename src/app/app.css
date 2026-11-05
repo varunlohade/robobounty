@@ -223,3 +223,4 @@ p { margin: 0; }
 .big-number span { font-size: 14px; color: var(--text-2); }
 .report p { max-width: 720px; }
 .fact-moved span { color: var(--text); font-weight: 700; }
+.worlds > * { flex: none; }

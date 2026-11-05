@@ -461,13 +461,15 @@ class Session:
             self.say("The campaign stopped with an error. Its log is campaign.log in the session folder. Results above are real but incomplete.", fail=True)
             self.phase = "review_campaign"
             return
-        self.emit(type="sim", sha=next((r["sim_sha"] for r in rows if r.get("sim_sha")), None), now=sim_hash())
+        recorded = next((r["sim_sha"] for r in rows if r.get("sim_sha")), None)
+        self.emit(type="sim", sha=recorded, now=sim_hash())
         self.pipeline("reproducing", diagnosing="same step")
         self.working("repeating failures and tracing them to code")
         diagnosis = self.diagnose(out)
         self.pipeline("report", diagnosing=None if diagnosis else "failed, see log")
         self.group_failures(diagnosis, chosen)
-        self.report(time.time() - started)
+        self.emit(type="sim", sha=recorded, now=sim_hash())
+        self.report(time.time() - started, recorded)
         self.phase = "done"
         self.chapter("find", None if self.types else "No failure type found")
         waiting = [i for i in range(len(worlds)) if i not in self.held and i not in self.results]
@@ -564,7 +566,7 @@ class Session:
                       items=[f"{r['failure_type']} in {r['count']} worlds: {r['needs']}" for r in routes],
                       actions=[{"label": "Send to a bounty", "action": "bounty", "keep": True}], note="Stub, not connected yet")
 
-    def report(self, seconds):
+    def report(self, seconds, recorded):
         run = len(self.results)
         real = sum(t["count"] for t in self.types)
         holds = sum(not r["passed"] and r["failure"] is None for r in self.results.values())
@@ -572,7 +574,7 @@ class Session:
                    {"n": len(self.excluded), "label": "flaky, excluded"}, {"n": len(self.held), "label": "held back"},
                    {"n": len(self.proposal["not_tested"]), "label": "not tested"}, {"n": 0, "label": "fixes validated (not connected)"}]
         self.emit(type="report", numbers=numbers, seconds=round(seconds, 1), safe_holds=holds, diverged=len(self.diverged),
-                  fixes="Fix and validation are not connected in this build, so no fix ran and no held-back world ran. Before and after: none yet.", sim=sim_hash())
+                  fixes="Fix and validation are not connected in this build, so no fix ran and no held-back world ran. Before and after: none yet.", sim_recorded=recorded)
 
 
 SESSIONS = {}

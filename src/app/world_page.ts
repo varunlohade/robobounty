@@ -45,11 +45,11 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
 
   const head = el('div', 'rail-head');
   const when = el('div', 'rail-note');
+  const lowest = `Lowest suction ${(Number(result.min_pressure_pa) / 1000).toFixed(2)} kPa`;
+  const outcome = String(result.outcome ?? 'unknown');
   head.append(
-    result.passed ? el('h2', '', 'Test held') : el('h2', 'fail', 'Test failed'),
-    el('p', '', result.passed
-      ? `Lowest suction ${(Number(result.min_pressure_pa) / 1000).toFixed(2)} kPa`
-      : `${result.failure}. Lowest suction ${(Number(result.min_pressure_pa) / 1000).toFixed(2)} kPa`),
+    result.passed ? el('h2', '', 'Test passed') : result.failure ? el('h2', 'fail', 'Test failed') : el('h2', '', 'Stopped and held on'),
+    el('p', '', result.passed ? lowest : `${result.failure ?? outcome}. ${lowest}`),
   );
 
   const col = (name: string) => trace.columns.indexOf(name);

@@ -1,7 +1,7 @@
 // Drives the live app end to end in headless Chrome, with no user input: node src/app/tools/check_live.mjs <out dir> [--recorded]
 // Needs `npx vite --port 5199` running. It starts its own run server on port 5198. Real LLM calls unless --recorded.
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
+import { createServer, request } from 'node:http';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -29,11 +29,14 @@ const timings = {};
 async function timed(name, fn) { const t0 = Date.now(); const out = await fn(); timings[name] = (Date.now() - t0) / 1000; console.log(`TIME ${name} ${timings[name]} s`); return out; }
 
 await wait(1000);
-for (const [what, init] of [['no origin', {}], ['other origin GET', { headers: { Origin: 'https://evil.example' } }], ['other origin POST', { method: 'POST', headers: { Origin: 'https://evil.example', 'Content-Type': 'application/json' }, body: '{}' }],
-  ['app origin with a wrong host', { headers: { Origin: 'http://localhost:5199', Host: 'evil.example' } }]]) {
-  const res = await fetch(`${SERVER}/api/${what.startsWith('other origin POST') ? 'sessions' : 'health'}`, init);
-  check(`server refuses ${what}`, what.includes('host') ? true : res.status === 403, `HTTP ${res.status}`);
+for (const [what, init] of [['no origin', {}], ['other origin GET', { headers: { Origin: 'https://evil.example' } }], ['other origin POST', { method: 'POST', headers: { Origin: 'https://evil.example', 'Content-Type': 'application/json' }, body: '{}' }]]) {
+  const res = await fetch(`${SERVER}/api/${what.endsWith('POST') ? 'sessions' : 'health'}`, init);
+  check(`server refuses ${what}`, res.status === 403, `HTTP ${res.status}`);
 }
+const wrongHost = await new Promise((done, fail) => {
+  request(`${SERVER}/api/health`, { headers: { Origin: 'http://localhost:5199', Host: 'evil.example' } }, res => { res.resume(); done(res.statusCode); }).on('error', fail).end();
+});
+check('server refuses the app origin with a wrong host', wrongHost === 403, `HTTP ${wrongHost}`);
 
 async function target() {
   for (let i = 0; i < 50; i++) {
@@ -107,12 +110,11 @@ check('chapter is Brief while asking', (await chapter()) === 'Brief');
 const questions = await js(`document.querySelectorAll('.card button[data-act]:not(:disabled)').length`);
 console.log('options on screen', questions);
 await timed('questions_build_normal_run', async () => {
-  for (let i = 0; i < 2 && (await js(hasButton('Use the default'))); i++) {
+  // Answers whatever quick questions came up, by their first option.
+  while (await js(hasButton('Use the default'))) {
     n = await idle();
-    await press('Windy');
-    if (!(await js(hasButton('Windy')))) await press('Use the default').catch(() => {});
+    await js(`document.querySelector('.chat-list .card:last-child button:not(:disabled)').click()`);
     await idleAfter(n);
-    if (await js(hasButton('Dry and clean'))) { n = await idle(); await press('Dry and clean'); await idleAfter(n); break; }
   }
   await until(hasButton('Looks right'), 'scene question');
 });

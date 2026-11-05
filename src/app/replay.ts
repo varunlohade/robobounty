@@ -4,7 +4,18 @@ import type { Trial } from './trial.ts';
 export type Xyz = [number, number, number];
 
 let wasm: Promise<any> | null = null;
-export const loadMujoco = () => (wasm ??= load());
+// Emscripten prints its "still waiting on wasm-instantiate" watchdog as an error every 10 s. It is a timing note, so it is counted and shown, not logged as a failure.
+export const wasmStats = { ms: 0, slowNotes: 0 };
+export function loadMujoco(): Promise<any> {
+  if (wasm) return wasm;
+  const t0 = performance.now();
+  const printErr = (line: string) => {
+    if (/run dependenc|wasm-instantiate|end of list/.test(line)) wasmStats.slowNotes++;
+    else console.error(line);
+  };
+  wasm = (load as (options: object) => Promise<any>)({ printErr }).then(mj => { wasmStats.ms = performance.now() - t0; return mj; });
+  return wasm;
+}
 
 // Holds the model and sets recorded states. It never calls mj_step: Python's MuJoCo version differs,
 // so stepping here would not reproduce the recorded run.

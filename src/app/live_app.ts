@@ -2,7 +2,7 @@
 import { el, icon } from './dom.ts';
 import { ChatPanel } from './chat/panel.ts';
 import { LiveBackend, SERVER, health, type ServerEvent } from './chat/live.ts';
-import { Replay, loadMujoco } from './replay.ts';
+import { Replay, loadMujoco, wasmStats } from './replay.ts';
 import { SimView } from './view.ts';
 import { worldPage } from './world_page.ts';
 import { WorldsPage } from './worlds_page.ts';
@@ -91,7 +91,6 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
   };
 
   async function showWorld(e: ServerEvent) {
-    const t0 = performance.now();
     const area = e.area as Trial['manifest']['area'];
     const mj = await loadMujoco();
     const t1 = performance.now();
@@ -132,7 +131,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
     title.replaceChildren(el('span', '', `World ${String(e.hash).slice(0, 12)}`));
     const cx = (area.x0 + area.x1) / 2, cz = (area.z0 + area.z1) / 2;
     const [rx, , rz] = replay.bodyPos('robot');
-    chat.addEvent({ type: 'tool', title: 'load_in_browser', meta: `${(t2 - t1).toFixed(0)} ms`, lines: [JSON.stringify({ wasm_module_ms: Math.round(t1 - t0), compile_and_draw_ms: Math.round(t2 - t1), nq })] });
+    chat.addEvent({ type: 'tool', title: 'load_in_browser', meta: `${(t2 - t1).toFixed(0)} ms`, lines: [JSON.stringify({ wasm_module_ms: Math.round(wasmStats.ms), compile_and_draw_ms: Math.round(t2 - t1), nq })] });
     chat.addEvent({
       type: 'views', title: 'look_at_world',
       note: 'Pictures of the model, drawn in your browser. The AI did not look at them. The checks above came from code.',
@@ -169,13 +168,14 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
     }
     reportPage.replaceChildren(
       el('h2', '', 'Report'), numbers,
-      el('p', '', `The campaign took ${e.seconds} s on this Mac. Stopped and held on: ${e.safe_holds}. Numerical divergence: ${e.diverged}.`),
+      el('p', '', `The campaign and its diagnosis took ${e.seconds} s on this Mac. Stopped and held on: ${e.safe_holds}. Numerical divergence: ${e.diverged}.`),
       el('p', '', e.fixes),
-      el('p', '', `Simulated. Hand-built physics, not checked against real hardware. Sim ${String(e.sim).slice(0, 8)}.`),
+      el('p', '', `Simulated. Hand-built physics, not checked against real hardware. Sim ${String(e.sim_recorded ?? 'unknown').slice(0, 8)} recorded these results.`),
     );
     chat.addEvent({ type: 'tool', title: 'report', meta: `${e.seconds} s`, lines: [(e.numbers as { n: number; label: string }[]).map(r => `${r.n} ${r.label}`).join(', '), e.fixes] });
   }
 
+  void loadMujoco();
   const backend = new LiveBackend(async e => {
     switch (e.type) {
       case 'chapter': bar.set(e.index, e.note); break;
