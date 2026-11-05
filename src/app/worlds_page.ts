@@ -36,6 +36,8 @@ function drawThumb(run: WorldRun): HTMLCanvasElement {
   return c;
 }
 
+// Worlds with scene elements run and show, but stay out of the headline numbers, the same as in campaign.py and diagnose.py.
+const apart = (r: WorldRun) => r.kind === 'elements';
 const failedRun = (r: WorldRun) => !r.passed && !!r.failure && r.failure !== 'sim_diverged';
 
 // One view of a batch. Squares start empty and fill in as results arrive. Recorded batches pass all their results at once.
@@ -128,7 +130,7 @@ export class WorldsPage {
     this.runs.set(run.name, run);
     const cell = this.cells.get(run.name);
     if (!cell) return;
-    cell.button.className = failedRun(run) ? 'cell cell-fail' : run.failure === 'sim_diverged' ? 'cell cell-excluded' : 'cell';
+    cell.button.className = apart(run) ? 'cell cell-excluded' : failedRun(run) ? 'cell cell-fail' : run.failure === 'sim_diverged' ? 'cell cell-excluded' : 'cell';
     const said = run.passed ? 'passed' : run.failure ?? run.outcome ?? 'unknown';
     cell.button.title = `${run.name}: ${said}`;
     cell.button.setAttribute('aria-label', cell.button.title);
@@ -200,9 +202,9 @@ export class WorldsPage {
       square.type = 'button';
       if (c !== undefined) square.style.background = `var(--f${Math.min(c + 1, 5)})`;
       else if (w.held) square.classList.add('map-held');
-      else if (this.excluded.has(w.name)) square.classList.add('map-excluded');
+      else if (this.excluded.has(w.name) || (run && apart(run))) square.classList.add('map-excluded');
       else if (run) square.classList.add('map-pass');
-      square.title = `${w.name}: ${c !== undefined ? types[c].rule : w.held ? 'held back' : this.excluded.has(w.name) ? 'excluded' : run ? 'no failure' : 'not tested yet'}`;
+      square.title = `${w.name}: ${c !== undefined ? types[c].rule : w.held ? 'held back' : this.excluded.has(w.name) ? 'excluded' : run && apart(run) ? 'scene elements, not counted' : run ? 'no failure' : 'not tested yet'}`;
       square.setAttribute('aria-label', square.title);
       square.addEventListener('click', () => this.select(w.name));
       grid.append(square);
@@ -224,22 +226,25 @@ export class WorldsPage {
   }
 
   private refresh() {
-    const runs = [...this.runs.values()];
+    const all = [...this.runs.values()];
+    const runs = all.filter(r => !apart(r));
     const failed = runs.filter(r => failedRun(r) && !this.excluded.has(r.name)).length;
     const held = this.planned.filter(w => w.held).length;
-    const waiting = this.planned.length - runs.length - held;
+    const waiting = this.planned.length - all.length - held;
     this.heading.textContent = runs.length ? `${failed} of ${runs.length} tested worlds failed` : `${this.planned.length} worlds proposed`;
     const notes = ['Simulated.'];
     if (held) notes.push(`${held} held back (bright dashes).`);
     if (waiting > 0) notes.push(`${waiting} not tested yet.`);
+    if (all.length > runs.length) notes.push(`${all.length - runs.length} with scene elements, not counted.`);
     this.sub.textContent = notes.join(' ');
     this.onCounts(runs.length ? `${failed} failed, ${runs.length - failed - this.excluded.size} no failure, ${waiting > 0 ? waiting : 0} not tested yet` : '');
     for (const [name, c] of this.cells) {
       const same = [...this.cells].filter(([, v]) => v.group === c.group).map(([n]) => n);
-      const done = same.map(n => this.runs.get(n)).filter((r): r is WorldRun => !!r);
+      const ran = same.map(n => this.runs.get(n)).filter((r): r is WorldRun => !!r);
+      const done = ran.filter(r => !apart(r));
       const bad = done.filter(r => failedRun(r) && !this.excluded.has(r.name)).length;
       c.count.className = bad ? 'group-count fail' : 'group-count';
-      c.count.textContent = done.length ? `${bad} of ${done.length}` : 'Not tested yet';
+      c.count.textContent = done.length ? `${bad} of ${done.length}` : ran.length ? 'Not counted' : 'Not tested yet';
       void name;
     }
   }
@@ -256,7 +261,8 @@ export class WorldsPage {
     }
     const flaky = this.excluded.has(name);
     const title = el('h2', failedRun(run) && !flaky ? 'fail' : '', `${run.group}, ${run.name}`);
-    const summary = run.passed ? 'Passed' : !run.failure ? `Stopped and held on: ${run.outcome ?? 'unknown'}` : flaky ? `Excluded: ${run.failure}` : `Failed: ${run.failure}`;
+    const note = apart(run) ? 'Scene elements: not counted in the headline numbers. ' : '';
+    const summary = note + (run.passed ? 'Passed' : !run.failure ? `Stopped and held on: ${run.outcome ?? 'unknown'}` : flaky ? `Excluded: ${run.failure}` : `Failed: ${run.failure}`);
     const actions = el('div', 'detail-actions');
     const replay = el('button', 'btn btn-large', 'Replay the recorded run');
     replay.type = 'button';

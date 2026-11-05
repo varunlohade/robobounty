@@ -9,7 +9,7 @@ import { join, resolve } from 'node:path';
 const OUT = resolve(process.argv[2] ?? '/tmp/crashlab-live-check');
 const flag = process.argv.indexOf('--recorded');
 const RECORDED = flag > 0;
-const REPLIES = RECORDED ? resolve(process.argv[flag + 1] ?? join(import.meta.dirname, '../../../policy/server/fixtures')) : null;
+const REPLIES = RECORDED ? resolve(process.argv[flag + 1]?.startsWith('--') ? join(import.meta.dirname, '../../../policy/server/fixtures') : process.argv[flag + 1] ?? join(import.meta.dirname, '../../../policy/server/fixtures')) : null;
 const LIVE_HOSTILE = !REPLIES || !REPLIES.endsWith('hybrid_replies');
 const ROOT = resolve(import.meta.dirname, '../../..');
 const SERVER = 'http://127.0.0.1:5198';

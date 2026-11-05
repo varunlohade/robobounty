@@ -401,7 +401,7 @@ class Session:
         to_run = reply["total_worlds"] - len(self.held)
         variations = []
         for g in reply["groups"]:
-            ranges = ", ".join(f"{k} {v['min']}-{v['max']}" for k, v in g["ranges"].items())
+            ranges = ", ".join([f"{k} {v['min']}-{v['max']}" for k, v in g["ranges"].items()] + [f"scene element {k}" for k in g.get("elements") or {}])
             variations.append(f"{g['name']} ({g['worlds_built']}): {ranges}")
         wall = self.normal["wall_s"] if self.normal else None
         estimate = f"about {wall * to_run / MAX_PROCS:.0f} s on this Mac, on {MAX_PROCS} processes. One normal run is the only sample behind this." if wall else "unknown"
@@ -414,7 +414,7 @@ class Session:
             {"head": "Objective", "lines": ["The robot cleans its glass, stays on, and reports the truth, in each world below."]},
             {"head": "Pass or fail, the same for every world", "lines": reqs},
             {"head": "Allowed variations", "lines": variations},
-            {"head": "World count", "lines": [f"{reply['total_worlds']} worlds: {to_run} to run, {len(self.held)} held back to check a fix.", reply["count_reason"]]},
+            {"head": "World count", "lines": [f"{reply['total_worlds']} worlds: {to_run} to run, {len(self.held)} held back to check a fix.", reply["count_reason"]] + ([reply["elements_note"]] if reply.get("worlds_with_elements") and reply.get("elements_note") else [])},
             {"head": "Expected compute", "lines": [estimate, "Cloud spend: none, it runs here.", f"LLM spend: unknown, capped at {LLM_CAP_USD} USD a call by llm.py."]},
             {"head": "Included in this model", "lines": [", ".join(sorted({k for g in reply["groups"] for k in g["ranges"]}))]},
             {"head": "Outside this model", "lines": [", ".join(t["factor"] for t in reply["not_tested"]) or "none listed"]},
@@ -509,19 +509,19 @@ class Session:
         for line in complete[seen:]:
             row = json.loads(line)
             rows.append(row)
-            if row["kind"] != "varied":
+            if row["kind"] == "control":
                 continue
             index = chosen[int(row["trial"][1:])]
             run = out / row["trial"]
             drawn = thumb_and_end(run)
             result = {k: row[k] for k in ("passed", "failure", "fired", "coverage", "time_s", "min_pressure_pa", "seed", "wall_s", "outcome", "group", "slip_m", "peak_tether_n")}
             full = json.loads((run / "result.json").read_text())
-            result.update(index=index, name=Path(self.proposal["worlds"][index]["file"]).stem, thumb=drawn["thumb"], end=drawn["end"], run=str(run), fired=full["fired"])
+            result.update(index=index, name=Path(self.proposal["worlds"][index]["file"]).stem, thumb=drawn["thumb"], end=drawn["end"], run=str(run), fired=full["fired"], kind=row["kind"])
             self.results[index] = result
             rows[-1]["sim_sha"] = full["code_sha256"]["sim.py"]
             self.emit(type="result", **{k: v for k, v in result.items() if k != "run"})
             done = [r for r in self.results.values() if r["index"] in chosen]
-            self.tool("run_trials", f"{time.time() - started:.0f} s", [json.dumps({"n": len(chosen), "done": len(done), "failed": sum(self.counts_as_failed(r) for r in done)})], tool_id=f"trials-{self.batches}")
+            self.tool("run_trials", f"{time.time() - started:.0f} s", [json.dumps({"n": len(chosen), "done": len(done), "failed": sum(self.counts_as_failed(r) for r in done if r["kind"] == "varied")})], tool_id=f"trials-{self.batches}")
         return len(complete)
 
     @staticmethod
@@ -574,12 +574,15 @@ class Session:
                       actions=[{"label": "Send to a bounty", "action": "bounty", "keep": True}], note="Stub, not connected yet")
 
     def report(self, seconds, recorded):
-        run = len(self.results)
+        run = sum(r["kind"] == "varied" for r in self.results.values())
+        apart = len(self.results) - run
         real = sum(t["count"] for t in self.types)
-        holds = sum(not r["passed"] and r["failure"] is None for r in self.results.values())
+        holds = sum(not r["passed"] and r["failure"] is None and r["kind"] == "varied" for r in self.results.values())
         numbers = [{"n": run, "label": "worlds run"}, {"n": len(self.types), "label": "failure types"}, {"n": real, "label": "worlds failed"},
                    {"n": len(self.excluded), "label": "flaky, excluded"}, {"n": len(self.held), "label": "held back"},
                    {"n": len(self.proposal["not_tested"]), "label": "not tested"}, {"n": 0, "label": "fixes validated (not connected)"}]
+        if apart:
+            numbers.append({"n": apart, "label": "with scene elements, not counted"})
         self.emit(type="report", numbers=numbers, seconds=round(seconds, 1), safe_holds=holds, diverged=len(self.diverged),
                   fixes="Fix and validation are not connected in this build, so no fix ran and no held-back world ran. Before and after: none yet.", sim_recorded=recorded)
 

@@ -18,7 +18,7 @@ export interface Trial {
 export interface WorldRun {
   name: string; group: string; reason: string; seed: number; passed: boolean; failure: string | null;
   fired: Record<string, { t: number; value: number }>; time_s: number; coverage: number; min_pressure_pa: number;
-  thumb: string[]; end: [number, number]; trial: string | null; outcome?: string; index?: number;
+  thumb: string[]; end: [number, number]; trial: string | null; outcome?: string; index?: number; kind?: string;
 }
 export interface WorldsData {
   total: number; count_reason: string; groups: { name: string; reason: string }[];
