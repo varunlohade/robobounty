@@ -23,3 +23,5 @@ design/*/real-frames-hd
 design/inspiration/zynoptes*
 design/film/ref
 design/film/frames
+design/cinematic/*.mp4
+design/cinematic/_cache
