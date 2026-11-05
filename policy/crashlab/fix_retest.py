@@ -13,8 +13,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import fix
+import world as W  # before scenarios, which puts this folder and its own world.py first on the path
 import scenarios as sc
-import world as W
 
 MAX_PROCS = 3
 GUARD_PA = 1500.0
