@@ -95,3 +95,6 @@ Unknown: seconds per episode; MuJoCo 3.16 wheel for Python; sandbox-exec network
 Adds: primitives-only MJCF readable in Python MuJoCo 3.8.1 and browser 3.16.0 (steve: real arm meshes may replace primitives if they load in both); per-step recorded qpos; App v1 split window by 06:00; local run server labelled as a demo shortcut (10:00); bounty = numeric world files only; pay per new failure fingerprint, with a cap and a top prize, pending owner confirmation. Cut order: Mac wrapper, 0G/World, contract to labelled local ledger, live streaming, diagnose-to-line falls back to phase.
 Demo, all inside the app: brief -> Test it -> failure at file:line -> AI diff and retest -> someone else's world file breaks it and gets paid -> limits.
 Robot basis changed by owner request: real arm-in-cradle facade robots. See docs/research/facade-robots.md.
+
+## Render decision (owner, 2026-11-06)
+Owner's words: "Use Blender for now." MuJoCo stays the physics source. Blender renders the recorded motion for hero shots. No GPU rental for now. Label it a re-render of recorded physics.
