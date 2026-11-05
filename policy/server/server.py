@@ -793,7 +793,7 @@ class Session:
         else:
             self.tool("fix_reject", "ok", [json.dumps({"real_controller_sha256": before[:12]})])
             self.emit(type="fix_decision", accepted=False, text="Rejected. Nothing changed.", real_sha=before[:12])
-        self.fix_summary = f"{self.fix_summary} You {self.fix_decision} it. policy/highrise/controller.py did not change."
+        self.fix_summary = f"{self.fix_summary.rstrip('.')}. You {self.fix_decision} it. policy/highrise/controller.py did not change."
         self.report()
 
     # Step 9: the bounty. A local ledger with the contract's states. No chain, wallet or key.
