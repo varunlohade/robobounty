@@ -6,6 +6,7 @@ run in .tmp and rename it into place. A kill leaves only .tmp behind, and the ne
 import argparse
 import fcntl
 import gc
+import hashlib
 import json
 import multiprocessing as mp
 import multiprocessing.connection as mpc
@@ -189,7 +190,9 @@ def run_batch(scenes_dir, out, workers, device):
         meta["generator"] = json.loads(generator.read_text())
     if meta["scenes"] != names:
         raise SystemExit(f"{scenes_dir} holds different scene files from this batch")
-    session = {"started": time.time(), "workers": workers, "to_run": len(todo), "scenes_dir": scenes_dir.name}
+    code = {f: hashlib.sha256((Path(__file__).parent / f).read_bytes()).hexdigest()
+            for f in ("batch.py", "run_scene.py", "scene.py", "sim.py")}
+    session = {"started": time.time(), "workers": workers, "to_run": len(todo), "scenes_dir": scenes_dir.name, "code": code}
     meta["sessions"].append(session)
     meta_path.write_text(json.dumps(meta, indent=1) + "\n")
     log(out, f"session start: {len(names)} scenes, {len(names) - len(todo)} complete, {len(todo)} to run, {workers} workers")
