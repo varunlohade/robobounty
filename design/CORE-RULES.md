@@ -14,3 +14,5 @@ Owner's words: "black is fine". Steve reads this as: set B, with black as the ac
 Chat on the left, simulation on the right. The 40 worlds as rows by risk type, harder to the right. A red line links the code line to the moment on the timeline.
 
 Correction, same day. Owner's full words: "black is fine as a background". The app uses a pure black background with white text, not a white page. Set B's layout stays. Red stays for failures only. All colours live in one token file so they can change.
+
+Left panel. Owner's words: "left window can look like cursor side window exacctly". The chat follows the familiar AI code editor side panel: compact sans, tool-step rows, inline diffs with Accept and Reject, input pinned at the bottom. No Cursor name, logo or assets. Palatino stays for headings outside the chat.
