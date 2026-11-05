@@ -10,3 +10,4 @@
 - Claude Code set up the LIBERO + SmolVLA run on Apple Silicon (policy/run_ep1.sh). The model itself is HuggingFaceVLA/smolvla_libero, not ours.
 - A Claude Code security agent wrote docs/security/THREAT-MODEL.md.
 - Claude Code (design-builder) and GPT (Codex, gpt-6-astra) produced design explorations in design/, from briefs written by Claude Code and directed by the human builder.
+- Claude Code wrote the CrashLab scene runner in policy/crashlab/ (scene schema, variation runner, action replay, scene generator). The policy is HuggingFaceVLA/smolvla_libero and the simulator is LIBERO on MuJoCo; neither is ours.
