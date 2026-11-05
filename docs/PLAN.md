@@ -57,3 +57,8 @@ This makes the bounty the escalation path, not an add-on.
 Owner's words: "let's have a AI robot cleaning the mirrors of a high-rise building ... why would there be an arm in a kitchen, right? ... Use that video which they have on their website as a reference and try to build something similar."
 The hero demo moves from the LIBERO kitchen arm to a simulated high-rise glass-cleaning robot in MuJoCo. The SmolVLA batch is stopped at the scenes it finished; results stay on disk and it can resume.
 Google is the owner's video service for the concept film.
+
+## Product shape (owner, 2026-11-06)
+Owner's words: "The split window thing would be the main software. I'm okay with it being a paid software, by the way, just saying like a macOS software ... it's something I want to continue building."
+Main software: a split window. One side takes a prompt and shows code. The other side shows the live simulation. "Test it" spawns many worlds. A bounty invites other people to find test cases that break the robot.
+For Saturday: a web app in the split-window layout, for one robot, wrapped as a Mac app only if time allows. The public website is the marketing page.
