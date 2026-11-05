@@ -20,3 +20,5 @@ Left panel. Owner's words: "left window can look like cursor side window exacctl
 Familiar first. Owner's words: "it should look familer". For the app, familiarity beats being distinctive. It should read at once as a modern code editor with a simulator pane. Do not invent new interface patterns.
 
 Reference. Owner's words: "let's build a platform for now where it looks like what they have built ... We have to build similar." Earlier words: "it should not be a direct copy ... it should look significantly different in terms of looks of people don't think we copy". Working rule: same kind of layout and quality (agent log beside the simulation, chapter timeline), with our own colours, wording, robot, name and assets. Never their text, footage, logo or exact styling.
+
+Left panel final. Owner delegated the pick ("whatever"). Steve chose option B with a rounded input box: mono agent log with short real tool results, the user's words highlighted, a chapter timeline (Brief, Worlds, Test, Find, Fix, Bounty). Source: design/final/app/app-3-term.html.
