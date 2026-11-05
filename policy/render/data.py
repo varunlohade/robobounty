@@ -83,6 +83,17 @@ class Run:
         self.tex_px_w = (self.nx + 2 * p) * UPSAMPLE
         self.tex_px_h = (self.nz + 2 * p) * UPSAMPLE
         self._cache = {}
+        wind_file = d / "wind.json"
+        self.wind = np.array(json.loads(wind_file.read_text())) if wind_file.exists() else None
+
+    # ---- recorded wind, used only to move scenery haze
+
+    def wind_run(self, t0, t):
+        """Metres of air that passed between t0 and t, from the recorded wind speed at the sim's rate."""
+        if self.wind is None:
+            return max(self.world["steady_wind_ms"], 1.0) * (t - t0)
+        i0, i1 = int(np.clip(t0 * self.hz, 0, len(self.wind))), int(np.clip(t * self.hz, 0, len(self.wind)))
+        return float(self.wind[i0:i1].sum()) / self.hz
 
     # ---- poses
 

@@ -43,30 +43,56 @@ class Mesh:
 
 
 def tower(m, rng, cx, cy, w, d, h, rot, col, near):
-    """One building: podium, tiers, roof clutter."""
+    """One building: podium, tiers, parapet, roof plant, sometimes a crown."""
     kind = float(rng.choice([0.0, 0.2, 0.4], p=[0.45, 0.25, 0.3]))
     if h > 90:
         kind = float(rng.choice([0.2, 0.4], p=[0.3, 0.7]))
+    c, s = math.cos(rot), math.sin(rot)
+
+    def at(ox, oy):
+        return cx + c * ox - s * oy, cy + s * ox + c * oy
+
+    z = 0.0
+    W, D = w, d
+    if h > 45 and rng.random() < 0.5:
+        # A wider podium with its own facade.
+        pod = float(rng.uniform(10, 22))
+        m.box(cx, cy, w * 1.12, d * 1.12, 0.0, pod, rot, tuple(float(x) for x in np.array(col) * 1.15), 0.0)
+        z = pod
     tiers = 1
     if h > 60 and rng.random() < 0.55:
         tiers = 2 if rng.random() < 0.6 else 3
-    z = 0.0
-    W, D = w, d
     for t in range(tiers):
         top = h if t == tiers - 1 else z + (h - z) * rng.uniform(0.45, 0.72)
         m.box(cx, cy, W, D, z, top, rot, col, kind)
         z = top
-        W *= rng.uniform(0.62, 0.84)
-        D *= rng.uniform(0.62, 0.84)
-    if near:
-        # Parapet line and plant on the roof.
-        rc = tuple(float(x) for x in np.array(col) * 0.7)
-        for _ in range(rng.integers(1, 4)):
-            bw, bd = rng.uniform(3, W * 0.38 + 3), rng.uniform(3, D * 0.38 + 3)
-            ox = rng.uniform(-0.3, 0.3) * W
-            oy = rng.uniform(-0.3, 0.3) * D
-            c, s = math.cos(rot), math.sin(rot)
-            m.box(cx + c * ox - s * oy, cy + s * ox + c * oy, bw, bd, z, z + rng.uniform(2, 6), rot, rc, 1.0)
+        if t < tiers - 1:
+            W *= rng.uniform(0.62, 0.84)
+            D *= rng.uniform(0.62, 0.84)
+    if not near:
+        return
+    rc = tuple(float(x) for x in np.array(col) * 0.8)
+    # Parapet: four low walls around the roof.
+    pw = 0.5
+    for ox, oy, bw, bd in ((0, D / 2 - pw / 2, W, pw), (0, -D / 2 + pw / 2, W, pw), (W / 2 - pw / 2, 0, pw, D), (-W / 2 + pw / 2, 0, pw, D)):
+        bx, by = at(ox, oy)
+        m.box(bx, by, bw, bd, z, z + 1.1, rot, rc, 1.0)
+    # Plant rooms, ducts and tanks on the roof.
+    for _ in range(rng.integers(2, 6)):
+        bw, bd = rng.uniform(2, W * 0.32 + 2), rng.uniform(2, D * 0.32 + 2)
+        bx, by = at(rng.uniform(-0.32, 0.32) * W, rng.uniform(-0.32, 0.32) * D)
+        m.box(bx, by, bw, bd, z, z + rng.uniform(1.5, 5), rot, rc, 1.0)
+    if rng.random() < 0.3:
+        # A water tank on legs reads at any distance.
+        bx, by = at(rng.uniform(-0.3, 0.3) * W, rng.uniform(-0.3, 0.3) * D)
+        m.box(bx, by, 4.5, 4.5, z + 3.2, z + 7.5, rot + 0.5, (0.2, 0.17, 0.14), 1.0)
+    if h > 120:
+        bx, by = at(0, 0)
+        crown = rng.random()
+        if crown < 0.5:
+            m.box(bx, by, W * 0.55, D * 0.55, z, z + rng.uniform(6, 14), rot, col, kind)
+        else:
+            m.box(bx, by, 1.4, 1.4, z, z + rng.uniform(14, 34), rot, (0.2, 0.2, 0.21), 1.0)
 
 
 def layout(run, rng):
@@ -122,7 +148,9 @@ def layout(run, rng):
                 bx, by = cx + c * lx - s * ly, cy + s * lx + c * ly
                 base = float(rng.lognormal(math.log(26), 0.55))
                 h = min(base + heat * rng.uniform(0.25, 1.0), 270.0)
-                col = tuple(float(v) for v in palette[rng.integers(len(palette))] * rng.uniform(0.85, 1.15))
+                # Each building keeps a slight hue of its own, cool stone to warm brick, then the post grade pulls it back.
+                hue = np.array([1.0 + rng.normal(0, 0.05), 1.0, 1.0 + rng.normal(0, 0.05)])
+                col = tuple(float(v) for v in palette[rng.integers(len(palette))] * hue * rng.uniform(0.8, 1.2))
                 tower(b, rng, bx, by, w, d, h, ang, col, near)
             if r < 700:
                 # Street trees along the block edge.
@@ -138,7 +166,7 @@ def layout(run, rng):
 
 def tree(m, rng, x, y):
     r = float(rng.uniform(3.0, 5.2))
-    h = r * 1.6
+    h = 1.0
     g = float(rng.uniform(0.07, 0.13))
     col = (g * 0.72, g, g * 0.62)
     # A squat dome of quads: seen from 130 m it only has to read as a soft crown.
@@ -208,7 +236,7 @@ def city_material(haze, focus, N, out, new_mat):
     # Roofs: gravel and membrane, lighter than the walls, whatever colour the building is.
     pos0 = geo.outputs["Position"]
     roof_n = n.noise(pos0, 0.35, 6.0, 0.65)
-    roof_col = n.mix(n.smooth(0.3, 0.7, roof_n), (0.20, 0.195, 0.185, 1), (0.34, 0.335, 0.32, 1))
+    roof_col = n.mix(n.smooth(0.3, 0.7, roof_n), (0.13, 0.128, 0.122, 1), (0.23, 0.226, 0.215, 1))
     is_roof = n.math("GREATER_THAN", kind, 0.95)
     flat = n.smooth(0.8, 0.95, n.split(geo.outputs["Normal"])[2])
     wall_col = n.mix(n.mul(is_roof, flat), wall_col, roof_col)

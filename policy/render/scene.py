@@ -504,30 +504,74 @@ def fillet(z0, z1, inset0, inset1, seg=6):
 def robot_materials():
     shell = new_mat("shell")
     n = N(shell)
-    geo = n.add("ShaderNodeNewGeometry")
-    tex = n.noise(geo.outputs["Position"], 900.0, 3.0, 0.5)
+    coord = n.add("ShaderNodeTexCoord")
+    p = coord.outputs["Object"]
+    px, py, pz = n.split(p)
+    micro = n.noise(p, 900.0, 3.0, 0.5)
+    # Wear: fine scuffs along the travel axis, a dull grey film low on the walls and in the corners.
+    scuff = n.smooth(0.60, 0.70, n.noise(n.xyz(n.mul(px, 22.0), n.mul(py, 240.0), n.mul(pz, 240.0)), 1.0, 4.0, 0.6))
+    blotch = n.noise(p, 26.0, 6.0, 0.6)
+    low = n.sub(1.0, n.smooth(0.03, 0.085, pz))
+    soil = n.clamp01(n.add_(n.mul(0.45, low), n.mul(0.40, n.smooth(0.46, 0.68, blotch))))
+    col = n.mix(soil, (0.50, 0.505, 0.50, 1), (0.31, 0.31, 0.295, 1))
+    col = n.mix(n.mul(scuff, 0.22), col, (0.62, 0.62, 0.61, 1))
     b = n.add("ShaderNodeBsdfPrincipled")
-    b.inputs["Base Color"].default_value = (0.50, 0.505, 0.50, 1)
-    n.set(b.inputs["Roughness"], n.add_(0.26, n.mul(0.08, tex)))
+    n.link(col, b.inputs["Base Color"])
+    n.set(b.inputs["Roughness"], n.add_(n.add_(0.26, n.mul(0.08, micro)), n.add_(n.mul(0.18, soil), n.mul(0.2, scuff))))
     b.inputs["Specular IOR Level"].default_value = 0.5
-    b.inputs["Coat Weight"].default_value = 0.6
+    n.set(b.inputs["Coat Weight"], n.sub(0.55, n.mul(0.4, soil)))
     b.inputs["Coat Roughness"].default_value = 0.12
     out(n, b.outputs[0])
 
     panel = new_mat("panel")
     n = N(panel)
+    coord = n.add("ShaderNodeTexCoord")
+    p = coord.outputs["Object"]
+    dust = n.noise(p, 60.0, 5.0, 0.55)
     b = n.add("ShaderNodeBsdfPrincipled")
-    b.inputs["Base Color"].default_value = (0.135, 0.14, 0.145, 1)
-    b.inputs["Roughness"].default_value = 0.34
-    b.inputs["Coat Weight"].default_value = 0.3
+    n.link(n.mix(n.mul(0.22, n.smooth(0.42, 0.7, dust)), (0.135, 0.14, 0.145, 1), (0.22, 0.22, 0.215, 1)), b.inputs["Base Color"])
+    n.set(b.inputs["Roughness"], n.add_(0.30, n.mul(0.14, n.smooth(0.42, 0.7, dust))))
+    b.inputs["Coat Weight"].default_value = 0.25
     b.inputs["Coat Roughness"].default_value = 0.2
     out(n, b.outputs[0])
 
-    skirt = new_mat("skirt")
-    n = N(skirt)
+    rubber = new_mat("rubber")
+    n = N(rubber)
     b = n.add("ShaderNodeBsdfPrincipled")
-    b.inputs["Base Color"].default_value = (0.05, 0.052, 0.055, 1)
-    b.inputs["Roughness"].default_value = 0.8
+    b.inputs["Base Color"].default_value = (0.022, 0.023, 0.025, 1)
+    b.inputs["Roughness"].default_value = 0.62
+    out(n, b.outputs[0])
+
+    track = new_mat("track")
+    n = N(track)
+    coord = n.add("ShaderNodeTexCoord")
+    px, py, pz = n.split(coord.outputs["Object"])
+    # Cross tread every 12 mm along the belt.
+    tread = n.math("SINE", n.mul(px, 2 * math.pi / 0.012))
+    bump = n.add("ShaderNodeBump")
+    bump.inputs["Distance"].default_value = 0.0015
+    n.link(tread, bump.inputs["Height"])
+    b = n.add("ShaderNodeBsdfPrincipled")
+    b.inputs["Base Color"].default_value = (0.03, 0.031, 0.032, 1)
+    b.inputs["Roughness"].default_value = 0.55
+    n.link(bump.outputs[0], b.inputs["Normal"])
+    out(n, b.outputs[0])
+
+    fibre = new_mat("fibre")
+    n = N(fibre)
+    coord = n.add("ShaderNodeTexCoord")
+    nz = n.noise(coord.outputs["Object"], 500.0, 3.0, 0.7)
+    b = n.add("ShaderNodeBsdfPrincipled")
+    n.link(n.mix(n.smooth(0.4, 0.62, nz), (0.15, 0.15, 0.145, 1), (0.42, 0.42, 0.40, 1)), b.inputs["Base Color"])
+    b.inputs["Roughness"].default_value = 0.92
+    out(n, b.outputs[0])
+
+    metal = new_mat("fastener")
+    n = N(metal)
+    b = n.add("ShaderNodeBsdfPrincipled")
+    b.inputs["Base Color"].default_value = (0.18, 0.18, 0.185, 1)
+    b.inputs["Metallic"].default_value = 1.0
+    b.inputs["Roughness"].default_value = 0.42
     out(n, b.outputs[0])
 
     cable = new_mat("cable")
@@ -536,26 +580,76 @@ def robot_materials():
     b.inputs["Base Color"].default_value = (0.55, 0.56, 0.56, 1)
     b.inputs["Roughness"].default_value = 0.5
     out(n, b.outputs[0])
-    return shell, panel, skirt, cable
+    return shell, panel, rubber, track, fibre, metal, cable
+
+
+def stadium_track(y_center, width, half_len, radius, z_center, seg=16):
+    """A belt from the MJCF's roller line: rounded ends along x, swept across y."""
+    ring = []
+    for cx, a0 in ((half_len, -90.0), (-half_len, 90.0)):
+        for i in range(seg + 1):
+            a = math.radians(a0 + 180.0 * i / seg)
+            ring.append((cx + radius * math.cos(a), z_center + radius * math.sin(a)))
+    v, f = [], []
+    n = len(ring)
+    for y in (y_center - width / 2, y_center + width / 2):
+        for x, z in ring:
+            v.append((x, y, z))
+    for i in range(n):
+        j = (i + 1) % n
+        f.append((i, j, j + n, i + n))
+    f.append(tuple(range(n - 1, -1, -1)))
+    f.append(tuple(range(n, 2 * n)))
+    return v, f
 
 
 def build_robot(run):
     """Square body at the sim's size: 0.36 m side, chassis from 0.02 to 0.10 m off the glass.
-    Local z points out of the glass, as in the MJCF, so the MuJoCo pose applies unchanged."""
-    shell, panel, skirt, cable = robot_materials()
+    Local z points out of the glass, as in the MJCF, so the MuJoCo pose applies unchanged.
+    Tracks sit on the MJCF's roller lines. The pad bar sits at the sim's PAD_X."""
+    shell, panel, rubber, track, fibre, metal, cable = robot_materials()
     S, R = run.body_side, 0.052
     zlo = run.ride_clear
     ztop = run.ride_clear + run.body_height
+    rng = random.Random(11)
+    parts = []
 
     def ring(inset, z, min_r=0.006):
         return rounded_ring(S - 2 * inset, max(R - inset, min_r), z)
 
-    # Dark skirt that almost touches the glass.
-    skirt_rings = [ring(0.012, 0.0015), ring(0.008, 0.004), ring(0.006, zlo + 0.004)]
-    v, f = loft(skirt_rings, close_top=False)
-    skirt_ob = mesh_obj("robot_skirt", v, f, skirt, smooth=True)
+    # Dark belly. The 2 cm ride gap stays open, so tracks and the pad edge show under the body.
+    v, f = loft([ring(0.006, zlo + 0.001), ring(0.007, zlo + 0.001)], close_top=True)
+    parts.append(mesh_obj("robot_belly", v, f, rubber, smooth=True))
+    # Soft seal, set in from the tracks.
+    v, f = loft([ring(0.065, 0.0012, 0.03), ring(0.062, 0.004, 0.03), ring(0.062, zlo + 0.002, 0.03)], close_top=False)
+    parts.append(mesh_obj("robot_seal", v, f, rubber, smooth=True))
 
-    # Shell: side wall with a seam, soft shoulder, narrow rim, sharp drop to the panel.
+    # Tracks on the sim's roller lines, y = +/-0.15, touching the glass.
+    for y in (0.15, -0.15):
+        v, f = stadium_track(y, 0.05, 0.145, 0.035, 0.035)
+        parts.append(mesh_obj("robot_track", v, f, track, smooth=True))
+
+    # Pad bar at the sim's PAD_X, with a worn microfibre edge.
+    pad_x = -0.13
+    pv, pf = [], []
+    add_box(pv, pf, pad_x - 0.045, -0.118, 0.0015, pad_x + 0.04, 0.118, 0.018)
+    pad_fibres = []
+    for k in range(1500):
+        side = rng.random()
+        if side < 0.72:
+            bx, by, dx, dy = pad_x - 0.045, rng.uniform(-0.118, 0.118), -1.0, rng.uniform(-0.5, 0.5)
+        else:
+            sgn = 1 if rng.random() < 0.5 else -1
+            bx, by, dx, dy = rng.uniform(pad_x - 0.045, pad_x + 0.04), sgn * 0.118, rng.uniform(-0.5, 0.5), sgn * 1.0
+        L = rng.uniform(0.004, 0.013)
+        w = rng.uniform(0.0008, 0.0016)
+        z = rng.uniform(0.002, 0.016)
+        b = len(pv)
+        pv += [(bx, by - w, z), (bx, by + w, z), (bx + dx * L, by + dy * L, z + rng.uniform(-0.004, 0.003))]
+        pf.append((b, b + 1, b + 2))
+    parts.append(mesh_obj("robot_pad", pv, pf, fibre))
+
+    # Shell: side wall, shoulder, narrow rim, sharp drop to the panel. A rubber gasket fills the seam.
     rim = 0.027
     sect = [(0.004, zlo), (0.0012, zlo + 0.002), (0.0, zlo + 0.006), (0.0, zlo + 0.0205),
             (0.0006, zlo + 0.0212), (0.0026, zlo + 0.0218), (0.0026, zlo + 0.0232), (0.0006, zlo + 0.0238), (0.0, zlo + 0.0245),
@@ -565,13 +659,38 @@ def build_robot(run):
     rings = [ring(i, z, 0.030) for i, z in sect]
     v, f = loft(rings, close_top=False)
     shell_ob = mesh_obj("robot_shell", v, f, shell, smooth=True)
+    v, f = loft([ring(0.0016, zlo + 0.0214), ring(0.0013, zlo + 0.0225), ring(0.0016, zlo + 0.0236)], close_top=False)
+    parts.append(mesh_obj("robot_gasket", v, f, rubber, smooth=True))
 
-    # Inset panel with a thin shadow gap and concentric corners.
+    # Inset panel with concentric corners and a gasket in the shadow gap.
     pz = ztop - 0.0065
     pin = rim + 0.0012
     rings = [ring(pin, ztop - 0.012, 0.028), ring(pin + 0.0008, pz - 0.0012, 0.028), ring(pin + 0.002, pz, 0.028), ring(pin + 0.006, pz, 0.028)]
     v, f = loft(rings, close_top=True)
     panel_ob = mesh_obj("robot_panel", v, f, panel, smooth=True)
+    v, f = loft([ring(rim + 0.0002, pz - 0.0005, 0.028), ring(rim + 0.0012, pz + 0.0014, 0.028), ring(pin + 0.0024, pz + 0.0003, 0.028)], close_top=False)
+    panel_gasket = mesh_obj("robot_panel_gasket", v, f, rubber, smooth=True)
+
+    # Fasteners and intake slots on the panel. Details only, sized to the body.
+    fv, ff = [], []
+    seg = 16
+    for cx, cy in ((0.118, 0.118), (-0.118, 0.118), (0.118, -0.118), (-0.118, -0.118)):
+        b = len(fv)
+        for r, z in ((0.0058, pz + 0.0002), (0.0052, pz + 0.0012), (0.0028, pz + 0.0014)):
+            for i in range(seg):
+                a = 2 * math.pi * i / seg
+                fv.append((cx + r * math.cos(a), cy + r * math.sin(a), z))
+        for k in range(2):
+            for i in range(seg):
+                j = (i + 1) % seg
+                ff.append((b + k * seg + i, b + k * seg + j, b + (k + 1) * seg + j, b + (k + 1) * seg + i))
+        ff.append(tuple(b + 2 * seg + i for i in range(seg)))
+    fast_ob = mesh_obj("robot_fasteners", fv, ff, metal, smooth=False)
+    sv, sf = [], []
+    for k in range(7):
+        y = -0.03 + k * 0.01
+        add_box(sv, sf, -0.112, y - 0.0016, pz, -0.066, y + 0.0016, pz + 0.0004)
+    slot_ob = mesh_obj("robot_slots", sv, sf, rubber)
 
     # Tether boot at the sim's tether point, centre of the body.
     hv, hf = [], []
@@ -590,11 +709,12 @@ def build_robot(run):
     root = bpy.data.objects.new("robot", None)
     bpy.context.scene.collection.objects.link(root)
     root.rotation_mode = "QUATERNION"
-    for ob in (skirt_ob, shell_ob, panel_ob, hub_ob):
+    top_parts = [shell_ob, panel_ob, hub_ob, panel_gasket, fast_ob, slot_ob]
+    for ob in parts + top_parts:
         ob.parent = root
     # The white body mirrored 10 cm away reads as a second plate and breaks the silhouette.
-    # Only the dark skirt stays in the glass, which grounds the robot. An art choice, like the sky.
-    for ob in (shell_ob, panel_ob, hub_ob):
+    # Only what sits low stays in the glass, which grounds the robot. An art choice, like the sky.
+    for ob in top_parts:
         ob.visible_glossy = False
 
     # Tether, as a unit cylinder scaled along its length each frame.
@@ -640,12 +760,12 @@ def build_cloud_deck(haze):
     return ob
 
 
-def drift_deck(deck, run, t):
-    """The haze layer moves with the run's steady wind setting. Scenery only."""
+def drift_deck(deck, run, t0, t):
+    """The haze layer moves with the recorded wind speed and direction. Scenery only, not simulated."""
     a = math.radians(run.world["wind_dir_deg"])
-    v = max(run.world["steady_wind_ms"], 1.0)
+    d = run.wind_run(t0, t)
     c = shot_list.DECK_CENTER
-    deck.location = (c[0] + v * math.cos(a) * t, c[1] - abs(v * math.sin(a)) * t, c[2])
+    deck.location = (c[0] + d * math.cos(a), c[1] + d * math.sin(a), c[2])
 
 
 # ---------------------------------------------------------------- render set-up
@@ -680,6 +800,11 @@ def setup_render(args):
     sc.cycles.sample_clamp_indirect = 6.0
     sc.cycles.filter_width = 1.3
     sc.render.film_transparent = False
+    if args.mode == "clip":
+        # A half-open shutter. Blur comes only from the recorded poses keyed each frame.
+        sc.render.use_motion_blur = True
+        sc.render.motion_blur_shutter = 0.5
+        sc.render.motion_blur_position = "CENTER"
     w, h = args.res.split("x")
     sc.render.resolution_x, sc.render.resolution_y = int(w), int(h)
     sc.render.resolution_percentage = 100
@@ -764,9 +889,8 @@ def main():
     end = args.end_frame if args.end_frame is not None else n_frames
     log = []
     timing = []
-    for fi in range(args.start_frame, end):
-        t = t0 + fi / args.fps if args.mode == "clip" else t0
-        sc.frame_set(fi + 1)
+
+    def apply_pose(t):
         pos, quat = run.pose(t)
         robot.location = pos
         robot.rotation_quaternion = quat
@@ -774,14 +898,30 @@ def main():
         # tip of the boot so the line clears the rim.
         q = Quaternion(quat)
         tp = Vector(pos) + q @ Vector((0, 0, boot_z))
-        anchor = Vector(run.anchor)
-        d = anchor - tp
+        d = Vector(run.anchor) - tp
         tether.location = tp
         tether.rotation_quaternion = d.to_track_quat("Z", "Y")
         tether.scale = (run.tether_radius, run.tether_radius, d.length)
 
+    if args.mode == "clip":
+        # Key the recorded pose on each frame, so the shutter blurs only recorded motion.
+        bpy.context.preferences.edit.keyframe_new_interpolation_type = "LINEAR"
+        for fi in range(max(args.start_frame - 1, 0), end + 1):
+            apply_pose(t0 + fi / args.fps)
+            for ob, paths in ((robot, ("location", "rotation_quaternion")),
+                              (tether, ("location", "rotation_quaternion", "scale"))):
+                for path in paths:
+                    ob.keyframe_insert(data_path=path, frame=fi + 1)
+
+    for fi in range(args.start_frame, end):
+        t = t0 + fi / args.fps if args.mode == "clip" else t0
+        if args.mode == "clip":
+            sc.frame_set(fi + 1)
+        else:
+            apply_pose(t)
+
         if deck is not None:
-            drift_deck(deck, run, t)
+            drift_deck(deck, run, t0, t)
         grid = run.dirt_image(t)
         img.pixels.foreach_set(np.repeat(grid.ravel()[:, None], 4, axis=1).ravel())
         # With persistent data Cycles keeps the first texture unless both tags are set. A frozen lane
@@ -795,7 +935,7 @@ def main():
             r0, r1 = np.array(run.pose(t0)[0]), np.array(run.pose(t0 + (n_frames - 1) / args.fps)[0])
         else:
             r0 = r1 = np.array(run.pose(t0)[0])
-        camp = shot_list.camera_at(shot, u, r0, r1)
+        camp = shot_list.camera_at(shot, u, r0, r1, np.array(run.pose(t)[0]))
         place_camera(cam, camp["pos"], camp["target"], camp["lens"], camp["focus"], camp["fstop"], camp.get("roll", 0.0))
 
         path = out_dir / ("frame_%04d.exr" % fi if args.mode == "clip" else "still.exr")
