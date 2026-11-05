@@ -317,8 +317,10 @@ def load_baseline(fix_dir, sets, base_sha):
 
 def do_try(n, campaign, fix_dir, summary, feedback, sets, procs, patch_file, baseline, patch_note=None):
     try_dir = fix_dir / f"try_{n}"
-    if try_dir.exists():
-        shutil.rmtree(try_dir)
+    if try_dir.exists():  # old tries stay as evidence
+        attempts = fix_dir / "attempts" / time.strftime("%Y-%m-%dT%H%M%S")
+        attempts.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(try_dir), str(attempts / try_dir.name))
     try_dir.mkdir(parents=True)
     base_sha = hashlib.sha256(BASE.read_bytes()).hexdigest()
     report = {"try": n, "base_controller_sha256": base_sha, "llm": None, "validation": [], "ab": None, "verdict": None, "status": None}
@@ -357,6 +359,8 @@ def do_try(n, campaign, fix_dir, summary, feedback, sets, procs, patch_file, bas
     else:
         if not baseline:  # the base controller is deterministic, so every try shares one A side
             baseline.update(load_baseline(fix_dir, sets, base_sha) or run_side("A", BASE, fix_dir / "baseline", sets, procs))
+            if not all(r["passed"] for r in baseline[("controls", "A")]):
+                raise SystemExit("the base controller failed its controls in the sandbox, so the harness or the sim is broken. No result recorded.")
             (fix_dir / "baseline.json").write_text(json.dumps({"base_controller_sha256": base_sha, "worlds": {k: [t[0] for t in v] for k, v in sets.items()},
                                                                "rows": {k[0]: v for k, v in baseline.items()}}))
         rows = {**baseline, **run_side("B", patched, try_dir, sets, procs)}
@@ -403,7 +407,7 @@ def cmd_run(a):
     final = "awaiting_human" if tries[-1]["status"] == "awaiting_human" else "no_fix_helped"
     report = {"schema": "crashlab.fix.v1", "campaign": campaign.name, "status": final, "tries": tries, "applied": False, "fresh_seed": a.fresh_seed,
               "seen_worlds": len(seen), "fresh_worlds": len(fresh), "control_worlds": len(controls), "full_rerun_of_campaign": not a.seen,
-              "held_back_worlds_shown_to_llm": 0, "still_failing_after_best_try": still_failing(tries), "base_controller_sha256": hashlib.sha256(BASE.read_bytes()).hexdigest(),
+              "held_back_worlds_shown_to_llm": 0, "earlier_attempts": sorted(p.name for p in (fix_dir / "attempts").glob("*")) if (fix_dir / "attempts").exists() else [], "still_failing_after_best_try": still_failing(tries), "base_controller_sha256": hashlib.sha256(BASE.read_bytes()).hexdigest(),
               "limits": ["In this simulation only. The physics is uncalibrated.", "sandbox-exec is not a VM. It shares the kernel with the host.",
                          "applied stays false until a human runs fix.py accept at a terminal."]}
     (fix_dir / "report.json").write_text(json.dumps(report, indent=1, allow_nan=False) + "\n")
