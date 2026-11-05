@@ -32,6 +32,11 @@ DIRT_SCALE = 200  # stored byte = dirt level * scale
 THUMB_NX, THUMB_NZ = 16, 20
 
 
+def scene_elements(world):
+    """Names of the scene elements in a world, for the label. Plain worlds have none."""
+    return sorted({e["type"] if isinstance(e, dict) and "type" in e else str(e) for e in world.get("elements") or []})
+
+
 def read_gz_json(path):
     with gzip.open(path, "rt") as f:
         return json.load(f)
@@ -93,6 +98,7 @@ def cmd_trial(a):
     (out / "manifest.json").write_text(json.dumps({
         "id": a.id, "label": a.label, "area": W.area(world), "hz": qpos["hz"], "nq": qpos["nq"],
         "frames": len(qpos["frames"]), "python_mujoco": result["versions"]["mujoco"], "friction": W.friction(world),
+        "sim_sha256": result["code_sha256"]["sim.py"], "elements": scene_elements(world),
         "dirt": {"nx": grid["nx"], "nz": grid["nz"], "every_steps": DIRT_EVERY_STEPS, "scale": DIRT_SCALE,
                  "clean_below": S.CLEAN_THRESHOLD, "count": len(dirt)},
         "replay_match": True,
@@ -157,7 +163,7 @@ def cmd_worlds(a):
             "name": name, "group": w["group"], "reason": w["reason"], "seed": r["seed"], "passed": r["passed"], "failure": r["failure"],
             "fired": r["fired"], "time_s": r["time_s"], "coverage": r["coverage"], "min_pressure_pa": r["min_pressure_pa"],
             **thumb_and_end(run),
-            "trial": links.get(name),
+            "trial": links.get(name), "kind": "elements" if w.get("has_elements") else "varied",
         })
     if len(codes) != 1:
         sys.exit("worlds were recorded with different sim code")
