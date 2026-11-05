@@ -8,6 +8,7 @@ import json
 import random
 from pathlib import Path
 
+import elements_plan
 from world import WorldError, _integer, _number
 
 _spec = importlib.util.spec_from_file_location("highrise_world", Path(__file__).resolve().parent.parent / "highrise" / "world.py")
@@ -15,7 +16,8 @@ hw = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(hw)
 
 FIELDS = hw.FIELDS
-FACTORS = tuple(FIELDS)
+E = hw.E
+FACTORS = tuple(FIELDS) + tuple(elements_plan.token(k) for k in E.SPECS)
 # field: (default low, default high, meaning for the planner). Defaults sit around policy/highrise/worlds/nominal.json.
 GUIDE = {
     "steady_wind_ms": (1.0, 3.0, "steady wind. Calm 0-1, windy 6-10, very windy 10-15."),
@@ -78,6 +80,19 @@ VOCABULARY = {
     "humidity_pct": ("humid", "moisture", "condens", "fog", "muggy", "dry"),
     "dust_gm2": ("dust", "sand", "dirt", "grit", "powder"),
     "sun_level": ("light", "sun", "evening", "dusk", "dark", "night", "noon", "dawn", "bright", "dim", "morning", "glare"),
+    "element_pane_grid": ("pane", "grid", "panel", "mullion", "glazing", "curtain"),
+    "element_ledge": ("ledge", "shelf", "overhang", "cornice"),
+    "element_sill": ("sill", "windowsill", "lip"),
+    "element_fin": ("fin", "louver", "louvre", "blade", "shade"),
+    "element_sign": ("sign", "logo", "banner", "billboard"),
+    "element_balcony": ("balcon", "terrace", "slab"),
+    "element_frame_step": ("frame", "step", "cladding", "trim", "panel"),
+    "element_vent": ("vent", "grille", "louver", "louvre", "intake", "exhaust"),
+    "element_corner": ("corner", "edge", "end"),
+    "element_setback": ("setback", "terrace", "stepped", "step"),
+    "element_wet_patch": ("wet", "patch", "puddle", "streak", "damp", "leak"),
+    "element_dirt_patch": ("dirt", "dirty", "patch", "grime", "stain", "bird", "droppings"),
+    "element_cradle": ("cradle", "gondola", "platform", "maintenance", "moving"),
 }
 LIMITS = [
     f"The tower is fixed: roof at {hw.ROOF_Z:.0f} m, floors {hw.TRANSOM_SPACING} m apart, so about {hw.ROOF_Z / hw.TRANSOM_SPACING:.0f} floors. A brief cannot change it.",
@@ -85,6 +100,7 @@ LIMITS = [
     "Each world compiles in MuJoCo. No robot ran, so whether it survives or cleans in these values is unknown.",
     "Most physics numbers are assumptions, listed in policy/highrise/PARAMETERS.md. Nothing is calibrated to a real robot.",
     "Airborne sand has no physics. Only dust already on the glass does.",
+    elements_plan.NOTE,
 ]
 
 
@@ -93,13 +109,16 @@ def plan_schema():
         kind = "integer" if name in hw.INTEGER_FIELDS else "number"
         limit = {"type": kind, "minimum": f[0], "maximum": f[1]}
         return {"type": "object", "additionalProperties": False, "required": ["min", "max"], "properties": {"min": limit, "max": limit}}
-    return {"type": "object", "additionalProperties": False, "properties": {name: bounds(name, f) for name, f in FIELDS.items()}}
+    return {"type": "object", "additionalProperties": False,
+            "properties": {**{name: bounds(name, f) for name, f in FIELDS.items()}, "elements": elements_plan.plan_schema(E)}}
 
 
 def catalog_text():
     lines = ["Catalog: one suction robot on a safety tether cleans an area of glass on one fixed tower, with pads. Set a min and a max only for "
              "the fields the brief asks about, and leave out every other field."]
     lines += [f"- {name}: limits {f[0]} to {f[1]}. {GUIDE[name][2]}" for name, f in FIELDS.items()]
+    lines += elements_plan.catalog_lines(E)
+    lines.append("Put scene elements under the plan key elements. In mapped, cite each one with the factor element_ plus its type, such as element_vent.")
     lines.append(f"Fixed and not in the plan: the tower has its roof at {hw.ROOF_Z:.0f} m and floors {hw.TRANSOM_SPACING} m apart. A tower height or "
                  "storey count is fixed, so cite it as unbuildable with reason fixed_in_this_world and do not set drop_below_roof_m from it.")
     lines.append("Also absent: rain, snow, ice, airborne sand, salt, birds, people, other robots, sun direction or angle, light colour, cameras, building shape.")
@@ -111,6 +130,8 @@ def vocabulary(factor):
 
 
 def unbacked(plan, factor):
+    if factor.startswith("element_"):
+        return factor[len("element_"):] not in plan.get("elements", {})
     return factor not in plan
 
 
@@ -119,7 +140,7 @@ def _check(name, f, value):
 
 
 def validate_plan(raw, mapped):
-    if not isinstance(raw, dict) or not set(raw) <= set(FIELDS):
+    if not isinstance(raw, dict) or not set(raw) <= set(FIELDS) | {"elements"}:
         raise WorldError("plan fields wrong")
     cited = {s["factor"] for s in mapped}
     plan = {}
@@ -135,6 +156,10 @@ def validate_plan(raw, mapped):
         if low > high:
             raise WorldError("plan range reversed")
         plan[name] = {"min": low, "max": high}
+    if "elements" in raw:
+        plan["elements"] = elements_plan.validate(raw["elements"], E, WorldError)
+        if any(elements_plan.token(k) not in cited for k in plan["elements"]):
+            raise WorldError("plan added an element that no brief phrase cites")
     if not plan:
         raise WorldError("plan sets no field")
     return plan
@@ -160,6 +185,9 @@ def expand(plan, seed):
         for name in FIELDS:
             low, high = (plan[name]["min"], plan[name]["max"]) if name in plan else GUIDE[name][:2]
             spec[name] = rng.randint(low, high) if name in hw.INTEGER_FIELDS else round(rng.uniform(low, high), 4)
+        if "elements" in plan:
+            spec["schema"] = hw.SCHEMA_V4
+            spec["elements"] = elements_plan.sample(plan["elements"], E, rng)
         yield spec
 
 
@@ -193,10 +221,17 @@ def finish(worlds, plan, out):
                        "world_min": min(values), "world_mean": round(mean, 4), "world_max": max(values),
                        "moved": "default" if name not in plan else "above default" if mean > high else
                                 "below default" if mean < low else "within default"}
+    with_elements = sum(bool(r.get("elements")) for r in worlds)
+    if with_elements:
+        table["scene_elements"] = {"worlds_with_elements": with_elements, "worlds": len(worlds), "note": elements_plan.NOTE}
     lines = [f"{'field':20} {'default':>16} {'worlds min..max':>20}  moved"]
     for name, row in table.items():
+        if name == "scene_elements":
+            continue
         lines.append(f"{name:20} {row['default_range'][0]:>7}..{row['default_range'][1]:<7} "
                      f"{row['world_min']:>9.3f}..{row['world_max']:<9.3f}  {row['moved']}")
+    if with_elements:
+        lines.append(f"{with_elements} of {len(worlds)} worlds hold scene elements. {elements_plan.NOTE}")
     (Path(out) / "values.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     return table

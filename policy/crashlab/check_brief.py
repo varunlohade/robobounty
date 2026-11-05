@@ -23,7 +23,7 @@ from scene import SceneError
 
 CANARY = "CANARYZULU"
 HR_PLAN = {"gust_speed_ms": {"min": 15.0, "max": 25.0}, "mullion_depth_m": {"min": 0.02, "max": 0.04}}
-HR_MAPPED = [{"factor": "gust_speed_ms"}, {"factor": "mullion_depth_m"}, {"factor": "gust_count"},
+HR_MAPPED = [{"factor": "element_vent"}, {"factor": "element_ledge"}, {"factor": "gust_speed_ms"}, {"factor": "mullion_depth_m"}, {"factor": "gust_count"},
              {"factor": "cable_length_m"}, {"factor": "fan_power_n"}, {"factor": "brush_pressure_n"}]
 LB_PLAN = {"arenas": ["kitchen"], "styles": ["base"],
            "goals": [{"predicate": "on", "object_type": "akita_black_bowl", "target_type": "plate", "part": "none",
@@ -55,6 +55,20 @@ BAD_HR = {
     "extra key": {"gust_speed_ms": {"min": 1.0, "max": 2.0, "note": CANARY}},
     "float as integer": {"gust_count": {"min": 1.5, "max": 2.5}},
     "uncited field": {"suction_pa": {"min": 1000.0, "max": 2000.0}},
+    "unknown element": {"elements": {"forklift": {"count": {"min": 1, "max": 1}}}},
+    "code as an element type": {"elements": {"__import__('os')": {"count": {"min": 1, "max": 1}}}},
+    "xml in an element type": {"elements": {"<geom/>": {"count": {"min": 1, "max": 1}}}},
+    "uncited element": {"elements": {"fin": {"count": {"min": 1, "max": 1}}}},
+    "element over its cap": {"elements": {"vent": {"count": {"min": 1, "max": 99}}}},
+    "element count zero": {"elements": {"vent": {"count": {"min": 0, "max": 1}}}},
+    "element without a count": {"elements": {"vent": {}}},
+    "text on an element": {"elements": {"vent": {"count": {"min": 1, "max": 1}, "note": CANARY}}},
+    "unknown element field": {"elements": {"vent": {"count": {"min": 1, "max": 1}, "fields": {"file": {"min": 1, "max": 2}}}}},
+    "string as an element value": {"elements": {"vent": {"count": {"min": 1, "max": 1}, "fields": {"width_m": {"min": CANARY, "max": 1.0}}}}},
+    "element value over limit": {"elements": {"ledge": {"count": {"min": 1, "max": 1}, "fields": {"depth_m": {"min": 0.1, "max": 900.0}}}}},
+    "nan element value": {"elements": {"ledge": {"count": {"min": 1, "max": 1}, "fields": {"depth_m": {"min": float("nan"), "max": 0.2}}}}},
+    "elements not an object": {"elements": [CANARY]},
+    "no elements": {"elements": {}},
     "removed field cable_length_m": {"cable_length_m": {"min": 10.0, "max": 18.0}},
     "removed field fan_power_n": {"fan_power_n": {"min": 100.0, "max": 200.0}},
     "removed field brush_pressure_n": {"brush_pressure_n": {"min": 50.0, "max": 70.0}},
@@ -116,7 +130,7 @@ def offline():
     for name, f in hr.FIELDS.items():
         if not f[0] <= hr.GUIDE[name][0] <= hr.GUIDE[name][1] <= f[1]:
             failures.append(f"default range outside the highrise limits: {name}")
-    if set(hr.GUIDE) != set(hr.FIELDS) or set(hr.VOCABULARY) != set(hr.FIELDS):
+    if set(hr.GUIDE) != set(hr.FIELDS) or set(hr.VOCABULARY) != set(hr.FACTORS):
         failures.append("highrise guide or vocabulary does not match the world fields")
     nominal = hr.validate(json.loads((HERE.parent / "highrise" / "worlds" / "nominal.json").read_text()))
     for name in hr.FIELDS:
@@ -170,12 +184,44 @@ def offline():
             failures.append(f"brief accepted, expected {code}")
         except brief.Rejected:
             pass
+    failures += element_checks()
     print(f"{len(BAD_HR)} bad highrise plans, {len(BAD_LB)} bad libero plans, {good}/50 libero specs")
     return failures
 
 
+def element_checks():
+    failures = []
+    plan = hr.validate_plan({"elements": {"vent": {"count": {"min": 3, "max": 4}}, "ledge": {"count": {"min": 1, "max": 1}, "fields": {"depth_m": {"min": 0.2, "max": 0.3}}}}}, HR_MAPPED)
+    specs = hr.expand(plan, 7)
+    good = 0
+    names = {*hr.E.SPECS, *(n for s_ in hr.E.SPECS.values() for n in s_["fields"]), "type", "elements"}
+    for _ in range(40):
+        spec = next(specs)
+        if set(strings_in(spec)) - set(spec) - names - {hr.hw.SCHEMA_V4}:
+            failures.append("an element holds a free string")
+        try:
+            world = hr.validate(spec)
+        except SceneError:
+            continue
+        good += 1
+        if world["schema"] != hr.hw.SCHEMA_V4 or not 4 <= len(world["elements"]) <= 5:
+            failures.append("element count wrong")
+        if not all(0.2 <= e["depth_m"] <= 0.3 for e in world["elements"] if e["type"] == "ledge"):
+            failures.append("an element range was ignored")
+    if good < 20:
+        failures.append(f"only {good}/40 element worlds valid")
+    if set(hr.E.SPECS) != set(hr.elements_plan.MEANING) or not all(f"element_{k}" in hr.VOCABULARY for k in hr.E.SPECS):
+        failures.append("an allowlisted element has no catalog row")
+    text = hr.catalog_text()
+    if "not a finding" not in text or not all(k in text for k in hr.E.SPECS):
+        failures.append("catalog text misses elements or the controller note")
+    if not any("not a finding" in x for x in hr.LIMITS):
+        failures.append("limits miss the controller note")
+    return failures
+
+
 def catalog_tokens():
-    tokens = {*w.ARENAS, *w.MOVABLE, *w.FIXED, *w.PARTS, *w.DRAWERS, *w.PREDICATES, *lb.STATE_TOKENS, *lb.PART_TOKENS,
+    tokens = {*hr.E.SPECS, *(n for s_ in hr.E.SPECS.values() for n in s_["fields"]), "elements", hr.hw.SCHEMA_V4,*w.ARENAS, *w.MOVABLE, *w.FIXED, *w.PARTS, *w.DRAWERS, *w.PREDICATES, *lb.STATE_TOKENS, *lb.PART_TOKENS,
               "schema", "arena", "style", "seed", "light", "fixtures", "objects", "clutter", "goal", "type", "region", "yaw", "state",
               "predicate", "object", "target", "part", "x", "y", "half_size", "rgb", *hr.FIELDS, hr.hw.SCHEMA}
     for arena in w.ARENAS.values():

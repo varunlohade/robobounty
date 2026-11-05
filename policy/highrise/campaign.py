@@ -120,11 +120,14 @@ def table(rows):
         lines.append(f"group {g}: {sum(r['passed'] for r in sub)}/{len(sub)} passed, first failures {dict(kinds)}")
     broken = [r["trial"] for r in rows if r["failure"] == "sim_diverged"]
     lines.append(f"numerical divergence, left out of the rates: {len(broken)} {broken[:8]}")
-    for kind in ("control", "benign", "varied"):
+    for kind in ("control", "benign", "varied", "elements"):
         sub = [r for r in rows if r["kind"] == kind and r["failure"] != "sim_diverged"]
         passed = sum(r["passed"] for r in sub)
         lo, hi = wilson(passed, len(sub))
-        lines.append(f"{kind}: {passed}/{len(sub)} passed, 95% interval {lo:.2f}-{hi:.2f}")
+        if kind == "elements" and not sub:
+            continue
+        lines.append(f"{kind}: {passed}/{len(sub)} passed, 95% interval {lo:.2f}-{hi:.2f}" + (
+            ". Not a headline number: the controller knows nothing about elements, so failures are expected and not a finding." if kind == "elements" else ""))
         for label, note in (("wind_hold", "paused for wind, grip intact"), ("battery_stop", "low voltage, grip intact, job incomplete")):
             holds = [r for r in sub if r.get("outcome") == label]
             if holds:
@@ -184,7 +187,8 @@ def main():
         jobs.append((f"control{i:03d}", nominal, 1000 + i, "control", str(out), None))
     for i in range(a.n):
         world, group = planned[i] if planned else (sample_world(nominal, a.seed, i, a.vary), None)
-        jobs.append((f"t{i:04d}", world, a.seed * 100000 % 2**31 + i, "varied", str(out), group))
+        # Worlds with scene elements have their own kind, so they stay out of the varied pass rate and of diagnosis.
+        jobs.append((f"t{i:04d}", world, a.seed * 100000 % 2**31 + i, "elements" if world.get("elements") else "varied", str(out), group))
     jobs = [j for j in jobs if j[0] not in done]
     print(f"{len(done)} done, {len(jobs)} to run on {procs} processes", flush=True)
     t0 = time.time()

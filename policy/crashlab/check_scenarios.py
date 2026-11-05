@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import scenarios as s
 
 CANARY = "CANARYZULU"
+HERE_RUNS = Path(__file__).resolve().parent.parent / "runs" / "scenarios"
 GOOD = {"verdict": "build", "reject_reason": "none", "count_reason": "Two wind ideas, so few worlds.",
         "groups": [{"name": "High steady wind", "reason": "Sandstorm: high wind tested; dust on seal and sensors not tested.", "worlds": 5,
                     "ranges": {"steady_wind_ms": {"min": 10.0, "max": 20.0}}},
@@ -31,7 +32,27 @@ def group(**fields):
     return reply
 
 
+def scene(elements, **fields):
+    return group(ranges={}, name="Vents and a ledge", reason="Vents leak suction and a ledge blocks travel.", elements=elements, **fields)
+
+
+ONE_VENT = {"count": {"min": 1, "max": 1}}
 BAD = {
+    "unknown element": scene({"forklift": ONE_VENT}),
+    "code as an element type": scene({"__import__('os')": ONE_VENT}),
+    "xml as an element type": scene({"<geom/>": ONE_VENT}),
+    "path as an element type": scene({"../../etc/passwd": ONE_VENT}),
+    "text on an element": scene({"vent": {**ONE_VENT, "note": CANARY}}),
+    "unknown element field": scene({"vent": {**ONE_VENT, "fields": {CANARY: {"min": 1, "max": 2}}}}),
+    "element over its cap": scene({"vent": {"count": {"min": 1, "max": 99}}}),
+    "element count zero": scene({"vent": {"count": {"min": 0, "max": 1}}}),
+    "element count as text": scene({"vent": {"count": {"min": "1", "max": 2}}}),
+    "element value over limit": scene({"ledge": {**ONE_VENT, "fields": {"depth_m": {"min": 0.1, "max": 900.0}}}}),
+    "element value as text": scene({"ledge": {**ONE_VENT, "fields": {"depth_m": {"min": CANARY, "max": 0.2}}}}),
+    "nan element value": scene({"ledge": {**ONE_VENT, "fields": {"depth_m": {"min": float("nan"), "max": 0.2}}}}),
+    "bool element value": scene({"ledge": {**ONE_VENT, "fields": {"depth_m": {"min": True, "max": 0.2}}}}),
+    "elements as a list": scene([CANARY]),
+    "empty elements and no ranges": scene({}),
     "extra top field": changed(notes=CANARY),
     "extra group field": group(notes=CANARY),
     "unknown field": group(ranges={CANARY: {"min": 1, "max": 2}}),
@@ -114,6 +135,40 @@ def offline():
                                                       "ranges": {"steady_wind_ms": {"min": 3.0 + i, "max": 20.0}}} for i in range(12)]))
         if many["total_worlds"] > s.MAX_TOTAL_WORLDS or not many["capped"]:
             failures.append(f"cap broken: {many['total_worlds']}")
+
+        # Scene elements: numbers and allowlisted types only, labelled, and plain plans sample as before.
+        ask = {"vent": {"count": {"min": 3, "max": 4}, "fields": {"open_frac": {"min": 0.3, "max": 0.6}}}, "ledge": {"count": {"min": 1, "max": 1}, "fields": {"depth_m": {"min": 0.2, "max": 0.3}}}}
+        built = s.run("x", tmp, reply=changed(groups=[GOOD["groups"][0], {"name": "Vents and a ledge", "reason": "Vents leak suction.", "worlds": 6, "ranges": {}, "elements": ask}]))
+        if built["worlds_with_elements"] != 6 or built["worlds_plain"] != 5 or "not a finding" not in (built["elements_note"] or ""):
+            failures.append(f"element worlds not labelled: {built['worlds_with_elements']} {built['worlds_plain']}")
+        allowed = {*s.hw.E.SPECS, "type"} | {n for spec in s.hw.E.SPECS.values() for n in spec["fields"]}
+        for w in built["worlds"]:
+            world = s.hw.load(Path(tmp) / w["file"])
+            if w["has_elements"] != bool(world.get("elements")) or (w["has_elements"] and world["schema"] != s.hw.SCHEMA_V4):
+                failures.append("has_elements label is wrong")
+            for e in world.get("elements", ()):
+                if set(e) - allowed or not isinstance(e["type"], str) or any(isinstance(v, str) for k, v in e.items() if k != "type"):
+                    failures.append("an element holds a free string")
+                if e["type"] == "vent" and not 0.3 <= e["open_frac"] <= 0.6:
+                    failures.append("an element range was ignored")
+        rebuilt = s.run("x", tmp, reply=built["llm_reply"])
+        if [w["world_hash"] for w in rebuilt["worlds"]] != [w["world_hash"] for w in built["worlds"]]:
+            failures.append("replay of an element plan differs")
+        if not built["groups"][1]["has_elements"] or "not a finding" not in " ".join(built["limits"]):
+            failures.append("group label or limit missing")
+        plain = s.run("x", tmp, reply=GOOD)
+        if plain["worlds_with_elements"] or plain["elements_note"] or any(s.hw.load(Path(tmp) / w["file"])["schema"] != s.hw.SCHEMA for w in plain["worlds"]):
+            failures.append("a plain plan changed schema")
+        stored = HERE_RUNS / "dubai_v3" / "scenarios.json"
+        if stored.exists():
+            old = json.loads(stored.read_text())
+            again = s.run("x", tmp, seed=old["seed"], reply=old["llm_reply"])
+            if [w["world_hash"] for w in again["worlds"]] != [w["world_hash"] for w in old["worlds"]]:
+                failures.append("the stored Dubai plan no longer gives the same worlds")
+        if "element_range" in json.dumps(s.plan_schema(fields)) or "vent" not in json.dumps(s.plan_schema(fields)):
+            failures.append("schema misses elements")
+        if not all(k in s._prompt(["x"], fields, nominal) for k in s.hw.E.SPECS) or "not a finding" not in s._prompt(["x"], fields, nominal):
+            failures.append("prompt misses elements or the controller note")
 
         hostile_chat = s.run("x‮y", tmp, reply=GOOD)
         if hostile_chat["rejection"] != "brief_has_control_characters" or not hostile_chat["not_tested"]:

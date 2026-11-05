@@ -23,6 +23,7 @@ import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import elements_plan
 import llm
 from brief import Rejected, words_of
 
@@ -44,6 +45,7 @@ BAD_TEXT = re.compile(r"[<>{}\[\]`$\\|=^~*#@&\"]|://|www\.|__|\.(com|net|org|io|
 LIMITS = [
     "No robot ran. Each world only passed the validator, so whether the robot survives it is unknown.",
     "Physics is hand-built and not validated against real hardware. Any result from these worlds is simulated.",
+    elements_plan.NOTE,
 ]
 
 
@@ -119,7 +121,8 @@ def plan_schema(fields):
              "properties": {"name": text("name"), "reason": text("reason"),
                             "worlds": {"type": "integer", "minimum": 1, "maximum": MAX_TOTAL_WORLDS},
                             "ranges": {"type": "object", "additionalProperties": False,
-                                       "properties": {name: bounds(name, f) for name, f in fields.items()}}}}
+                                       "properties": {name: bounds(name, f) for name, f in fields.items()}},
+                            "elements": elements_plan.plan_schema(hw.E)}}
     gap = {"type": "object", "additionalProperties": False, "required": ["factor", "reason"],
            "properties": {"factor": text("factor"), "reason": text("reason")}}
     return {"type": "object", "additionalProperties": False,
@@ -138,12 +141,16 @@ def _prompt(words, fields, nominal):
     missing = [h.factor for h in HAZARDS if not any(h.covered_by(name) for name in fields)]
     numbered = " ".join(f"{i}:{w}" for i, w in enumerate(words))
     table = "\n".join(rows)
+    scene = "\n".join(elements_plan.catalog_lines(hw.E))
     return f"""You plan a robot test campaign. From the user's chat, work out what could go wrong for this robot in this place, \
 then fill the JSON schema and nothing else.
 
 The one simulated robot is a suction window cleaner on a safety tether, on one glass facade. These are the only physics values that \
 exist. A value you do not set stays at nominal.
 {table}
+
+{scene}
+A group may set elements, ranges or both. Put elements in their own groups, so the plain worlds still test the robot on plain glass. A group that sets elements has empty ranges unless a range belongs to the same idea.
 
 Factors with no physics today: {", ".join(missing) or "none listed"}.
 
@@ -202,11 +209,11 @@ def _check_reply(raw, fields):
         raise Rejected("not_tested_wrong")
     groups = []
     for g in raw["groups"]:
-        if not isinstance(g, dict) or set(g) != {"name", "reason", "worlds", "ranges"} or not isinstance(g["ranges"], dict):
+        if not isinstance(g, dict) or not {"name", "reason", "worlds", "ranges"} <= set(g) <= {"name", "reason", "worlds", "ranges", "elements"} or not isinstance(g["ranges"], dict):
             raise Rejected("group_wrong")
         if type(g["worlds"]) is not int or not 1 <= g["worlds"] <= MAX_TOTAL_WORLDS:
             raise Rejected("group_count_wrong")
-        if not set(g["ranges"]) <= set(fields) or not g["ranges"]:
+        if not set(g["ranges"]) <= set(fields) or not (g["ranges"] or g.get("elements")):
             raise Rejected("group_fields_wrong")
         ranges = {}
         for name, entry in g["ranges"].items():
@@ -216,7 +223,10 @@ def _check_reply(raw, fields):
             if low > high:
                 raise Rejected("range_reversed")
             ranges[name] = {"min": low, "max": high}
-        groups.append({"name": g["name"], "reason": g["reason"], "worlds": g["worlds"], "ranges": ranges})
+        group = {"name": g["name"], "reason": g["reason"], "worlds": g["worlds"], "ranges": ranges}
+        if "elements" in g:
+            group["elements"] = elements_plan.validate(g["elements"], hw.E, Rejected)
+        groups.append(group)
     return groups
 
 
@@ -227,7 +237,7 @@ def _claims(text, moved):
 def _honest_text(group):
     """Our words replace any model text that fails the check or claims a factor this group does not move."""
     moved = sorted(group["ranges"])
-    plain = f"Changes {', '.join(moved)}"
+    plain = f"Changes {', '.join(moved + sorted(group.get('elements', {})))}"
     name, reason, named = _text(group["name"], "name"), _text(group["reason"], "reason"), set()
     if name is None or _claims(name, moved):
         named.update(_claims(name or "", moved))
@@ -282,6 +292,8 @@ def _build_group(index, group, count, nominal, seed, seen, dropped):
         if len(built) >= count:
             break
         values = candidates[tried] if tried < count else _samples(ranges, 1, rng)[0]
+        if "elements" in group:  # after the ranges, so a plan with no elements samples the same worlds as before
+            values = {**values, "schema": hw.SCHEMA_V4, "elements": elements_plan.sample(group["elements"], hw.E, rng)}
         try:
             world = hw.validate({**nominal, **values})
         except hw.WorldError:
@@ -321,7 +333,7 @@ def plan_and_build(raw, nominal, fields, seed, out):
     groups = _check_reply(raw, fields)
     named, kept, dropped_groups = set(), [], 0
     for g in groups:
-        if all(r["min"] == r["max"] == nominal[name] for name, r in g["ranges"].items()):
+        if not g.get("elements") and all(r["min"] == r["max"] == nominal[name] for name, r in g["ranges"].items()):
             dropped_groups += 1
             continue
         name, reason, claims = _honest_text(g)
@@ -341,12 +353,14 @@ def plan_and_build(raw, nominal, fields, seed, out):
     for index, (g, count) in enumerate(zip(kept, counts)):
         built = _build_group(index, g, count, nominal, seed, seen, dropped)
         report_groups.append({"name": g["name"], "reason": g["reason"], "ranges": g["ranges"], "worlds_requested": g["worlds"],
-                              "worlds_built": len(built)})
+                              "worlds_built": len(built), "elements": g.get("elements"), "has_elements": bool(g.get("elements"))})
         for world in built:
             changes = ", ".join(f"{f} {world[f]} (nominal {nominal[f]})" for f in sorted(g["ranges"]))
+            if world.get("elements"):
+                changes = ", ".join(x for x in (changes, f"elements: {elements_plan.describe(world['elements'])}") if x)
             path = folder / f"world_{len(worlds):03d}.json"
             path.write_text(json.dumps(world, indent=1, sort_keys=True, allow_nan=False))
-            worlds.append({"file": str(path.relative_to(out)), "world_hash": hw.world_hash(world), "group": g["name"],
+            worlds.append({"file": str(path.relative_to(out)), "world_hash": hw.world_hash(world), "group": g["name"], "has_elements": bool(world.get("elements")),
                            "reason": f"{g['reason']} This world: {changes}."})
 
     built_moves = [f for g, c in zip(report_groups, kept) if g["worlds_built"] for f in c["ranges"]]
@@ -358,11 +372,14 @@ def plan_and_build(raw, nominal, fields, seed, out):
         count_reason = f"{len(worlds)} worlds across {len(kept)} groups, chosen by the agent."
     elif not NOT_TESTED_WORDS.search(count_reason):
         count_reason += "".join(f" {h.factor} not tested." for h in _claims(count_reason, moved_all))
-    return {"verdict": "build", "total_worlds": len(worlds), "worlds_requested": sum(requested), "capped": sum(requested) > MAX_TOTAL_WORLDS,
+    with_elements = sum(w["has_elements"] for w in worlds)
+    return {"verdict": "build", "total_worlds": len(worlds), "worlds_with_elements": with_elements, "worlds_plain": len(worlds) - with_elements,
+            "elements_note": elements_plan.NOTE if with_elements else None, "worlds_requested": sum(requested), "capped": sum(requested) > MAX_TOTAL_WORLDS,
             "count_reason": count_reason, "groups": report_groups, "worlds": worlds, "not_tested": not_tested,
             "dropped": {**dropped, "groups_that_move_nothing": dropped_groups, "not_tested_items": not_tested_dropped},
             "llm_reply": {"verdict": "build", "reject_reason": "none", "count_reason": count_reason,
-                          "groups": [{"name": g["name"], "reason": g["reason"], "worlds": g["worlds"], "ranges": g["ranges"]} for g in kept],
+                          "groups": [{"name": g["name"], "reason": g["reason"], "worlds": g["worlds"], "ranges": g["ranges"],
+                                      **({"elements": g["elements"]} if "elements" in g else {})} for g in kept],
                           "not_tested": [{"factor": i["factor"], "reason": i["reason"]} for i in not_tested if i["source"] == "agent"]}}
 
 
@@ -372,7 +389,7 @@ def run(chat, out, seed=1, reply=None):
     out.mkdir(parents=True, exist_ok=True)
     fields = physics_fields()
     report = {"scenarios_schema": 1, "world_schema": hw.SCHEMA, "chat_sha256": hashlib.sha256(chat.encode()).hexdigest(), "seed": seed,
-              "cap": MAX_TOTAL_WORLDS, "verdict": "reject", "rejection": None, "total_worlds": 0, "worlds_requested": 0, "capped": False,
+              "cap": MAX_TOTAL_WORLDS, "verdict": "reject", "rejection": None, "total_worlds": 0, "worlds_with_elements": 0, "worlds_plain": 0, "elements_note": None, "worlds_requested": 0, "capped": False,
               "count_reason": None, "groups": [], "worlds": [], "not_tested": [], "dropped": {}, "llm_reply": None,
               "llm": {"backend": "reply_file" if reply is not None else "claude", "seconds": 0.0},
               "physics_fields": sorted(fields), "fields_without_physics": sorted(set(hw.FIELDS) - set(fields)), "limits": LIMITS}
@@ -411,13 +428,15 @@ def main():
     args = ap.parse_args()
     reply = json.loads(Path(args.reply).read_text())["llm_reply"] if args.reply else None
     report = run(args.chat, args.out, args.seed, reply)
-    print(f"verdict={report['verdict']} rejection={report['rejection']} worlds={report['total_worlds']} "
+    print(f"verdict={report['verdict']} rejection={report['rejection']} worlds={report['total_worlds']} with_elements={report['worlds_with_elements']} "
           f"asked={report['worlds_requested']} capped={report['capped']} llm_seconds={report['llm']['seconds']}")
     print(f"WHY THIS COUNT: {report['count_reason']}")
     for g in report["groups"]:
         print(f"{g['worlds_built']:3d} {g['name']}: {g['reason']} {json.dumps(g['ranges'])}")
     for item in report["not_tested"]:
         print(f"NOT TESTED ({item['source']}): {item['factor']}: {item['reason']}")
+    if report["elements_note"]:
+        print(f"NOTE: {report['elements_note']}")
     print(f"dropped={report['dropped']}")
     return 0
 
