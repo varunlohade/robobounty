@@ -62,3 +62,31 @@ Google is the owner's video service for the concept film.
 Owner's words: "The split window thing would be the main software. I'm okay with it being a paid software, by the way, just saying like a macOS software ... it's something I want to continue building."
 Main software: a split window. One side takes a prompt and shows code. The other side shows the live simulation. "Test it" spawns many worlds. A bounty invites other people to find test cases that break the robot.
 For Saturday: a web app in the split-window layout, for one robot, wrapped as a Mac app only if time allows. The public website is the marketing page.
+
+## Re-cut task list for the high-rise demo (planner agent, Fri 01:55; edited by steve)
+Steve's edits: the planner wrote this before the split-window decision, so tasks A and 8 replace its site-first order and its solver-code gate. Its draft line "a real neural policy ran by link, 6 of 60" was wrong: SmolVLA ran locally, and the batch had 40 scenes with 6 finished. Use the true facts in the README.
+
+Honest wording: "a simulated robot we built in MuJoCo for this hackathon, with a scripted Python controller we wrote. The AI is in the test loop, not in the robot."
+
+1. High-rise world + controller (running) | 20 headless episodes, seconds per episode measured | by 02:00 start
+2. llm.py + brief.py on high-rise schema (running) | 3 briefs give 20+ valid worlds; injection gives schema only
+3. Commit controller BEFORE any campaign, as no-plant proof; campaign report with counts, Wilson interval, fingerprints, code hash | check passes on 20 worlds | start by 05:00
+4. Glass judge + per-step metrics; controller logs phase and line | replay matches; 3 distinct reasons | 06:00
+5. Campaign 1, 100-300 worlds | report with counts | 08:00
+6. Diagnose to line with factor table; prose numbers checked against the table | real file:line with counts | 09:00
+7. AI fix on controller.py only: import allowlist, sandbox-exec, limits, paired A/B, human approves the diff | `import os` diff rejected; A/B counts | 11:00
+A. Split-window app (main product): prompt + code on one side, live browser sim on the other, worlds grid, failure view, bounty panel | design bake-off for layout, then junior-dev | full flow with real data, recorded states | start by 09:00
+8. Test-world bounty gate (if owner confirms): numeric world file, limits set by company, reference passes, repeat 3 of 3, new failure fingerprint | security-researcher | hostile world files rejected | 13:00
+9. Contract: propose, dispute window, finalize, pull claim, 6-decimal USDC, testnet | needs owner keys | txs shown | 14:00
+10. CLI or app end to end on 2 briefs | 17:00
+11. Security review of 7-9 | Criticals fixed | 19:00
+12. Campaign 2 with the fix and a submitted world | before and after counts | 20:00
+13. Marketing site with real numbers | every number traces to a report | 21:00
+14. 0G backend and World IDKit | needs owner keys | 22:00
+15. README, AI-USE, limits | Sat 03:00
+16. Video | Sat 04:30
+17. Submission | Sat 07:30
+
+Cut order: 14, then 9 (local ledger, labelled undeployed), browser live sim (use rendered video), concept film, diagnose-to-line falls back to phase.
+Top risks: controller never or always fails; AI patch does not pass; last-10-hour crunch across contract and app.
+Unknown: seconds per episode; MuJoCo 3.16 wheel for Python; sandbox-exec network block on macOS 26; testnet USDC.
