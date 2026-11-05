@@ -103,6 +103,8 @@ p { margin: 0; }
 .sim-tag { position: absolute; background: var(--bg); font-size: var(--size-small); padding: 1px 8px; border-radius: 4px; pointer-events: none; color: var(--text); }
 .sim-label { left: 10px; top: 10px; }
 .sim-key { left: 10px; bottom: 10px; color: var(--text-2); }
+.sim-off { left: 10px; top: 40px; color: var(--fail); }
+.sim-off[hidden] { display: none; }
 .sim-error { padding: 24px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fail); position: absolute; inset: 0; }
 
 .player { height: var(--player-height); flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-top: 1px solid var(--line-2); font-size: var(--size-small); color: var(--text-2); }

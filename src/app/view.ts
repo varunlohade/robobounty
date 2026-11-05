@@ -20,7 +20,6 @@ export class SimView {
   private dustColor: THREE.Color;
   private anchorSite: number; private robotSite: number;
   private dirty = true;
-  private follow = new THREE.Vector3();
 
   constructor(private host: HTMLElement, private replay: Replay, private trial: Trial) {
     const area = trial.manifest.area;
@@ -137,22 +136,9 @@ export class SimView {
     pos.setXYZ(0, s[this.anchorSite * 3], s[this.anchorSite * 3 + 1], s[this.anchorSite * 3 + 2]);
     pos.setXYZ(1, s[this.robotSite * 3], s[this.robotSite * 3 + 1], s[this.robotSite * 3 + 2]);
     pos.needsUpdate = true;
-    this.keepRobotInView();
     this.path?.geometry.setDrawRange(this.pathStart, Math.max(0, this.replay.frame + 1 - this.pathStart));
     this.syncDust();
     this.dirty = true;
-  }
-
-  // A robot that leaves the work area, such as after a detach, stays in frame: the camera shifts by the overshoot.
-  private keepRobotInView() {
-    const { area } = this.trial.manifest;
-    const [x, , z] = this.replay.bodyPos('robot');
-    const over = (v: number, lo: number, hi: number) => (v < lo ? v - lo : v > hi ? v - hi : 0);
-    const next = new THREE.Vector3(over(x, area.x0, area.x1), 0, over(z, area.z0, area.z1));
-    const step = next.clone().sub(this.follow);
-    this.camera.position.add(step);
-    this.controls.target.add(step);
-    this.follow.copy(next);
   }
 
   // The dirt grid is stored once per simulated second, from a replay that matched the recorded run.

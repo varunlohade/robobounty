@@ -5,6 +5,7 @@ import type { Trial } from './trial.ts';
 
 export const LABEL = 'Simulated. Replay of a recorded run.';
 const SPARK_POINTS = 96;
+const OFF_GLASS_M = 0.5;
 const NS = 'http://www.w3.org/2000/svg';
 
 export const fmtTime = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
@@ -101,6 +102,9 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
   rail.append(facts);
 
   viewport.append(el('div', 'sim-tag sim-label', LABEL), el('div', 'sim-tag sim-key', 'Grey is dirt from this run. Bare glass is clean.'));
+  const offGlass = el('div', 'sim-tag sim-off fail', 'Robot off the glass. The red line is its recorded path.');
+  offGlass.hidden = true;
+  viewport.append(offGlass);
   body.append(rail, viewport);
 
   const player = el('div', 'player');
@@ -163,6 +167,9 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
       statusTime.textContent = `Frame ${f} of ${maxFrame}`;
       slider.value = String(f);
       slider.style.setProperty('--done', `${(f / maxFrame) * 100}%`);
+      const { area } = manifest;
+      offGlass.hidden = !(Math.abs(robot[1]) > OFF_GLASS_M || robot[0] < area.x0 - OFF_GLASS_M || robot[0] > area.x1 + OFF_GLASS_M
+        || robot[2] < area.z0 - OFF_GLASS_M || robot[2] > area.z1 + OFF_GLASS_M);
       position.x.textContent = `${robot[0].toFixed(3)} m`;
       position.z.textContent = `${robot[2].toFixed(3)} m`;
       // trace row i describes the state after step i, which is frame i + 1.

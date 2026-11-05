@@ -203,6 +203,7 @@ await open('?trial=dubai-world-009');
 const end = await js(`document.querySelector('.scrub input').max`);
 await scrubTo(Number(end));
 await shot('failed-run-end.png');
+check('failed run says the robot left the glass', !(await js(`document.querySelector('.sim-off').hidden`)));
 await js(`[...document.querySelectorAll('.tab')].find(t => t.textContent.endsWith(' worlds')).click()`);
 await wait(200);
 await shot('worlds-default.png');
