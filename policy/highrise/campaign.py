@@ -1,4 +1,5 @@
 """Runs many trials: campaign.py --n N --seed S [--vary wind|all] [--out DIR] [--procs P]
+Or on the worlds of a scenario plan: campaign.py --scenarios DIR --seed S --out DIR
 
 Resumable: a rerun with the same arguments skips trials already in results.jsonl.
 The first trials are controls on the nominal world. Each trial stores its world, action log and qpos.
@@ -84,15 +85,20 @@ def sample_world(nominal, campaign_seed, index, vary):
     return W.validate(world)
 
 
+def scenario_worlds(folder):
+    plan = json.loads((Path(folder) / "scenarios.json").read_text())
+    return [(W.load(Path(folder) / w["file"]), w["group"]) for w in plan["worlds"]]
+
+
 def run_one(job):
-    trial, world, seed, kind, out = job
+    trial, world, seed, kind, out, group = job
     r = run_trial.run(world, seed, Path(out) / trial)
     return {"trial": trial, "kind": kind, "seed": seed, "passed": r["passed"], "failure": r["failure"],
             "fired": list(r["fired"]), "first_t": min([v["t"] for v in r["fired"].values()], default=None),
             "coverage": r["coverage"], "reported_done": r["reported_done"], "reported_coverage": r["reported_coverage"],
             "slip_m": r["slip_m"], "peak_tether_n": r["peak_tether_n"], "min_pressure_pa": r["min_pressure_pa"],
             "time_s": r["time_s"], "wall_s": r["wall_s"], "outcome": r["outcome"], "hold_s": r["hold_s"],
-            "hold_mean_wind_ms": r["hold_mean_wind_ms"], "diverged_reason": r.get("diverged_reason"), "world": world}
+            "hold_mean_wind_ms": r["hold_mean_wind_ms"], "diverged_reason": r.get("diverged_reason"), "group": group, "world": world}
 
 
 def wilson(k, n, z=1.96):
@@ -107,6 +113,11 @@ def wilson(k, n, z=1.96):
 
 def table(rows):
     lines = []
+    groups = sorted({r["group"] for r in rows if r.get("group")})
+    for g in groups:
+        sub = [r for r in rows if r.get("group") == g]
+        kinds = Counter(r["failure"] for r in sub if not r["passed"])
+        lines.append(f"group {g}: {sum(r['passed'] for r in sub)}/{len(sub)} passed, first failures {dict(kinds)}")
     broken = [r["trial"] for r in rows if r["failure"] == "sim_diverged"]
     lines.append(f"numerical divergence, left out of the rates: {len(broken)} {broken[:8]}")
     for kind in ("control", "benign", "varied"):
@@ -139,18 +150,25 @@ def table(rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--n", type=int, required=True)
+    ap.add_argument("--n", type=int)
+    ap.add_argument("--scenarios")
     ap.add_argument("--seed", type=int, required=True)
     ap.add_argument("--vary", choices=("wind", "all", "moderate"), default="all")
     ap.add_argument("--controls", type=int, default=None)
     ap.add_argument("--out")
     ap.add_argument("--procs", type=int, default=MAX_PROCS)
     a = ap.parse_args()
+    if (a.n is None) == (a.scenarios is None):
+        ap.error("give --n or --scenarios")
+    planned = scenario_worlds(a.scenarios) if a.scenarios else None
+    a.n = len(planned) if planned else a.n
     procs = min(a.procs, MAX_PROCS)
     out = Path(a.out) if a.out else RUNS / f"campaign_{a.vary}_{a.seed}"
     out.mkdir(parents=True, exist_ok=True)
     controls = a.controls if a.controls is not None else max(5, a.n // 20)
-    meta = {"n": a.n, "seed": a.seed, "vary": a.vary, "controls": controls}
+    meta = {"n": a.n, "seed": a.seed, "vary": "scenarios" if planned else a.vary, "controls": controls}
+    if planned:
+        meta["scenarios"] = str(Path(a.scenarios).resolve())
     meta_path = out / "campaign.json"
     if meta_path.exists() and json.loads(meta_path.read_text()) != meta:
         raise SystemExit(f"{out} holds a different campaign")
@@ -162,10 +180,10 @@ def main():
     done = {r["trial"] for r in rows}
     jobs = []
     for i in range(controls):
-        jobs.append((f"control{i:03d}", nominal, 1000 + i, "control", str(out)))
+        jobs.append((f"control{i:03d}", nominal, 1000 + i, "control", str(out), None))
     for i in range(a.n):
-        world = sample_world(nominal, a.seed, i, a.vary)
-        jobs.append((f"t{i:04d}", world, a.seed * 100000 % 2**31 + i, "varied", str(out)))
+        world, group = planned[i] if planned else (sample_world(nominal, a.seed, i, a.vary), None)
+        jobs.append((f"t{i:04d}", world, a.seed * 100000 % 2**31 + i, "varied", str(out), group))
     jobs = [j for j in jobs if j[0] not in done]
     print(f"{len(done)} done, {len(jobs)} to run on {procs} processes", flush=True)
     t0 = time.time()

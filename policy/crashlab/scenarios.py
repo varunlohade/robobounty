@@ -59,8 +59,11 @@ class Hazard:
 
 
 HAZARDS = (
-    Hazard("Sand and dust", "sand|dust|haboob|shamal|ash\\b", ("sand", "dust"),
+    Hazard("Dust on the glass", "dust|ash\\b", ("dust",),
            "No world field adds dust to the seal, the glass friction or the sensors. High wind alone does not test this."),
+    Hazard("Airborne sand", "sand|haboob|shamal", (),
+           "Only dust already on the glass has physics. Sand carried by the wind has no model, so a storm here is wind plus surface dust.",
+           always=True),
     Hazard("Temperature", "temperature|heat|hot\\b|cold\\b|freez|thermal|\\d+\\s*°?\\s*c\\b", ("temperature", "temp", "thermal"),
            "No world field changes air density, battery output or seal stiffness with temperature.", always=True),
     Hazard("Humidity and condensation", "humid|moisture|condens|fog|mist\\b", ("humid", "condens"),
@@ -132,7 +135,7 @@ def _prompt(words, fields, nominal):
     _, comments = _read_fields()
     rows = [f"- {name}: limits {f[0]} to {f[1]}, nominal {nominal[name]}." + (f" {comments[name]}." if name in comments else "")
             for name, f in fields.items()]
-    missing = [h.factor for h in HAZARDS if h.fields and not any(h.covered_by(name) for name in fields)]
+    missing = [h.factor for h in HAZARDS if not any(h.covered_by(name) for name in fields)]
     numbered = " ".join(f"{i}:{w}" for i, w in enumerate(words))
     table = "\n".join(rows)
     return f"""You plan a robot test campaign. From the user's chat, work out what could go wrong for this robot in this place, \
@@ -307,7 +310,9 @@ def _not_tested(raw_items, tested, named):
     said = " ".join(f"{i['factor']} {i['reason']}" for i in items)
     for h in HAZARDS:
         if (h.always or h in named) and h not in tested and h.factor.lower() not in keys and not h.terms.search(said):
-            items.append({"factor": h.factor, "reason": h.reason, "source": "code"})
+            has_physics = any(h.covered_by(f) for f in physics_fields())
+            items.append({"factor": h.factor, "source": "code",
+                          "reason": "The world has physics for this, but this campaign did not move it." if has_physics else h.reason})
     return items, dropped
 
 

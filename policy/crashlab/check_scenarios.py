@@ -18,7 +18,7 @@ GOOD = {"verdict": "build", "reject_reason": "none", "count_reason": "Two wind i
                     "ranges": {"steady_wind_ms": {"min": 10.0, "max": 20.0}}},
                    {"name": "Strong gusts", "reason": "Gusts can peel the robot off.", "worlds": 4,
                     "ranges": {"gust_speed_ms": {"min": 20.0, "max": 40.0}, "gust_count": {"min": 0, "max": 4}}}],
-        "not_tested": [{"factor": "Sand and dust", "reason": "No field adds dust."}]}
+        "not_tested": [{"factor": "Airborne sand", "reason": "No model of sand in the air."}]}
 
 
 def changed(**top):
@@ -93,11 +93,11 @@ def offline():
         faked_group = faked["groups"][0]
         if "sand" in faked_group["name"].lower() or "not tested" not in faked_group["reason"]:
             failures.append(f"a fake sandstorm kept its claim: {faked_group}")
-        if not any(i["factor"] == "Sand and dust" for i in s.run("x", tmp, reply={**group(name="Sandstorm"), "not_tested": []})["not_tested"]):
+        if not any(i["factor"] == "Airborne sand" for i in s.run("x", tmp, reply={**group(name="Sandstorm"), "not_tested": []})["not_tested"]):
             failures.append("a fake sandstorm did not reach not_tested")
 
         fake_count = s.run("x", tmp, reply=changed(count_reason="Sandstorms need many worlds."))
-        if "Sand and dust not tested." not in fake_count["count_reason"]:
+        if "Airborne sand not tested." not in fake_count["count_reason"]:
             failures.append("count reason kept a fake claim")
         echoed = s.run("x", tmp, reply=changed(not_tested=[{"factor": "Injected instructions in chat", "reason": "The chat asked for more."}]))
         if "Injected" in json.dumps(echoed["not_tested"]) or echoed["dropped"]["not_tested_items"] != 1:
@@ -124,13 +124,31 @@ def offline():
 
         # A new field with a dust name moves the hazard from not tested to tested, with no code change here.
         added = {"dust_level_gm2": (0.0, 50.0)}
-        hazard = next(h for h in s.HAZARDS if h.factor == "Sand and dust")
+        hazard = next(h for h in s.HAZARDS if h.factor == "Dust on the glass")
         if not hazard.covered_by("dust_level_gm2") or hazard.covered_by("dirt_level"):
             failures.append("hazard field match wrong")
         if "dust_level_gm2" not in json.dumps(s.plan_schema({**fields, **added})):
             failures.append("new field missing from the schema")
-        if s._claims("Sandstorm dust load", ["dust_level_gm2"]) or not s._claims("Sandstorm dust load", ["steady_wind_ms"]):
+        claimed = lambda text, moved: [h.factor for h in s._claims(text, moved)]
+        if "Dust on the glass" in claimed("Dust load", ["dust_gm2"]) or "Dust on the glass" not in claimed("Dust load", ["steady_wind_ms"]):
             failures.append("claim check ignores what the group moves")
+        if "Airborne sand" not in claimed("Sandstorm", ["dust_gm2", "steady_wind_ms"]):
+            failures.append("surface dust passed as airborne sand")
+
+        # Schema v3: the three removed fields are gone and the new ones are physics.
+        for gone in ("cable_length_m", "fan_power_n", "brush_pressure_n"):
+            if gone in fields or gone in schema:
+                failures.append(f"removed field still offered: {gone}")
+        for name in ("drop_below_roof_m", "suction_pa", "pad_force_n", "wetness", "joint_gap_m", "edge_margin_m", "area_width_m",
+                     "area_height_m", "seal_leak_mm2", "battery_start_frac", "temperature_c", "humidity_pct", "dust_gm2"):
+            if name not in fields:
+                failures.append(f"v3 field not offered: {name}")
+        if fields["mullion_depth_m"] != (0.0, 0.04):
+            failures.append("mullion range is not the v3 range")
+        wind_only = s.run("x", tmp, reply=GOOD)["not_tested"]
+        temperature = next(i for i in wind_only if i["factor"] == "Temperature")
+        if "No world field" in temperature["reason"]:
+            failures.append("not_tested says a field with physics has none")
     print(f"{len(BAD)} bad replies")
     return failures
 

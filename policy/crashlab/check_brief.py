@@ -22,8 +22,9 @@ import world as w
 from scene import SceneError
 
 CANARY = "CANARYZULU"
-HR_PLAN = {"gust_speed_ms": {"min": 15.0, "max": 25.0}, "mullion_depth_m": {"min": 0.08, "max": 0.12}}
-HR_MAPPED = [{"factor": "gust_speed_ms"}, {"factor": "mullion_depth_m"}, {"factor": "gust_count"}]
+HR_PLAN = {"gust_speed_ms": {"min": 15.0, "max": 25.0}, "mullion_depth_m": {"min": 0.02, "max": 0.04}}
+HR_MAPPED = [{"factor": "gust_speed_ms"}, {"factor": "mullion_depth_m"}, {"factor": "gust_count"},
+             {"factor": "cable_length_m"}, {"factor": "fan_power_n"}, {"factor": "brush_pressure_n"}]
 LB_PLAN = {"arenas": ["kitchen"], "styles": ["base"],
            "goals": [{"predicate": "on", "object_type": "akita_black_bowl", "target_type": "plate", "part": "none",
                       "object_zones": ["edge_left"], "target_zones": ["anywhere"]}],
@@ -53,7 +54,11 @@ BAD_HR = {
     "bool as number": {"gust_speed_ms": {"min": False, "max": 25.0}},
     "extra key": {"gust_speed_ms": {"min": 1.0, "max": 2.0, "note": CANARY}},
     "float as integer": {"gust_count": {"min": 1.5, "max": 2.5}},
-    "uncited field": {"fan_power_n": {"min": 100.0, "max": 200.0}},
+    "uncited field": {"suction_pa": {"min": 1000.0, "max": 2000.0}},
+    "removed field cable_length_m": {"cable_length_m": {"min": 10.0, "max": 18.0}},
+    "removed field fan_power_n": {"fan_power_n": {"min": 100.0, "max": 200.0}},
+    "removed field brush_pressure_n": {"brush_pressure_n": {"min": 50.0, "max": 70.0}},
+    "mullion over the v3 limit": {"mullion_depth_m": {"min": 0.08, "max": 0.12}},
     "no fields": {},
     "not an object": [CANARY],
 }
@@ -111,7 +116,12 @@ def offline():
     for name, f in hr.FIELDS.items():
         if not f[0] <= hr.GUIDE[name][0] <= hr.GUIDE[name][1] <= f[1]:
             failures.append(f"default range outside the highrise limits: {name}")
-    hr.validate(json.loads((HERE.parent / "highrise" / "worlds" / "nominal.json").read_text()))
+    if set(hr.GUIDE) != set(hr.FIELDS) or set(hr.VOCABULARY) != set(hr.FIELDS):
+        failures.append("highrise guide or vocabulary does not match the world fields")
+    nominal = hr.validate(json.loads((HERE.parent / "highrise" / "worlds" / "nominal.json").read_text()))
+    for name in hr.FIELDS:
+        if not hr.GUIDE[name][0] <= nominal[name] <= hr.GUIDE[name][1]:
+            failures.append(f"default range misses the nominal world: {name}")
     plan = hr.validate_plan(HR_PLAN, HR_MAPPED)
     specs = hr.expand(plan, 7)
     first = [next(specs) for _ in range(50)]
