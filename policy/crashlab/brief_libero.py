@@ -42,6 +42,7 @@ LIMITS = [
     "The left and right bounds are 20 cm from it, because the main camera does not see further.",
     "likely_out_of_reach and too_close_to_base are geometry guesses. No arm moved.",
     "Whether a goal judges properly in motion is unknown. No policy ran.",
+    "When a brief names no task, the planner picks the goal. The mapped list then has no goal entry.",
 ]
 
 

@@ -12,3 +12,4 @@
 - Claude Code (design-builder) and GPT (Codex, gpt-6-astra) produced design explorations in design/, from briefs written by Claude Code and directed by the human builder.
 - Claude Code wrote the CrashLab scene runner in policy/crashlab/ (scene schema, variation runner, action replay, scene generator). The policy is HuggingFaceVLA/smolvla_libero and the simulator is LIBERO on MuJoCo; neither is ours.
 - Claude Code wrote the CrashLab world builder in policy/crashlab/ (world.py schema v2 and BDDL writer, build_world.py, check_world.py, sample_worlds/). The assets, arenas and predicates come from LIBERO; they are not ours.
+- Claude Code wrote the CrashLab brief pipeline in policy/crashlab/ (llm.py, brief.py, brief_libero.py, brief_highrise.py, check_brief.py). A headless Claude Code call with no tools turns a brief into numbers and allowlisted tokens. Our code then samples, validates and builds the worlds.
