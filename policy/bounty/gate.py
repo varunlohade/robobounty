@@ -1,6 +1,6 @@
 """CrashLab bounty gate: decides if one submitted world file counts as a new, valid failure. See README.md.
 
-gate.py --world W --spec S --paid P --salt-file F --submitter 0x.. [--seed N] [--out DIR]
+gate.py --world W --spec S --paid P --salt-file F --submitter 0x.. [--seed N] [--out DIR] [--human-id 0x.. --human-used K --human-cap N]
 Writes verdict.json into a new run folder. Exit 0 means accepted, 1 means rejected. It sends nothing on chain.
 """
 import argparse
@@ -36,16 +36,19 @@ MAX_PAID_BYTES = 1 << 20
 MAX_PROCS = 2
 NICE = 10
 RUN_TIMEOUT_S = 300
-RERUNS = 3
+RERUNS = 8
+REPEAT_NEED = 7  # at least this many of the RERUNS must end in the claim's failure type
 JITTER_SHARE = 0.01  # each re-run moves a field by up to this share of its schema range
 REFERENCE_KEEP = 0.25  # the reference twin keeps this share of the world's distance from nominal
 MIN_GUST_FOR_LOAD_S = 2.0  # a shorter gust may pass before the robot lifts, so the hardware check skips it
 HASH32 = re.compile(r"0x[0-9a-f]{64}")
 ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}")
+COUNT = re.compile(r"[0-9]{1,6}")
 PROPOSE = "propose(uint256,address,bytes32,bytes32,bool)"
 HOLDS = {"wind_hold", "battery_stop"}
+HUMAN_CAP_LABEL = "World ID is NOT connected. The human id and the count come from the caller and nothing verifies them, so one person can use many ids."
 NOT_CHECKED = [
-    "World ID of the submitter (risk 12): the backend must check it before the resolver proposes.",
+    "World ID of the submitter (risk 12): the backend must check it before the resolver proposes. The human cap trusts the caller's id and count.",
     "Collusion between submitter and company or solver (risk 11).",
     "Money left in the bounty and its deadline: the contract checks both.",
     "Top prize: isTopPrize stays false. The company decides a top prize.",
@@ -162,6 +165,24 @@ def current_frozen():
 def check_frozen(spec):
     if current_frozen() != spec["frozen"]:
         raise Rejected("code_mismatch", "The controller, sim, judge, gate or MuJoCo version differs from the frozen values in the spec.")
+
+
+def check_human_cap(human_id, used, cap):
+    """Returns the verdict row. The caller counts earlier submissions from this human that reached the sim, the same way it supplies the paid list."""
+    row = {"world_id_connected": False, "label": HUMAN_CAP_LABEL, "human_id": None, "used": None, "cap": None}
+    if human_id is None and used is None and cap is None:
+        return row
+    if not isinstance(human_id, str) or not HASH32.fullmatch(human_id):
+        raise Rejected("bad_human_cap", "The human id must be a 0x-prefixed lowercase 32-byte hash.")
+    numbers = []
+    for value in (used, cap):
+        if isinstance(value, str) and COUNT.fullmatch(value):
+            value = int(value)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise Rejected("bad_human_cap", "The human cap and the used count must be whole numbers of 0 or more.")
+        numbers.append(value)
+    row.update(human_id=human_id, used=numbers[0], cap=numbers[1])
+    return row
 
 
 def hardware_hold(world):
@@ -330,10 +351,19 @@ def new_folder(root, stem):
             n += 1
 
 
-def run_gate(world_path, spec_path, paid_path, salt_path, submitter, seed, out_root=RUNS):
+def accept_chance(rate, need=REPEAT_NEED, of=RERUNS):
+    """Chance that a world clears the re-runs when it gives the claim's failure type at this rate on each independent draw."""
+    return sum(math.comb(of, k) * rate**k * (1 - rate) ** (of - k) for k in range(need, of + 1))
+
+
+def repeats_enough(labels, failure):
+    return labels.count(failure) >= REPEAT_NEED
+
+
+def run_gate(world_path, spec_path, paid_path, salt_path, submitter, seed, out_root=RUNS, human_id=None, human_used=None, human_cap=None):
     """Always writes one verdict. Returns (verdict, folder). Every check before stage "sim" costs no sim time."""
     verdict = {"schema": VERDICT_SCHEMA, "accepted": False, "code": None, "reason": None, "stage": "file", "fingerprint": None, "result_hash": None,
-               "propose": None, "submission_hash": None, "spec_hash": None, "submitter": None, "claim_seed": None, "runs": [], "limits_of_this_result": "Simulation only. The physics is hand-built and not calibrated to a real robot."}
+               "propose": None, "submission_hash": None, "spec_hash": None, "submitter": None, "claim_seed": None, "human_cap": {"world_id_connected": False, "label": HUMAN_CAP_LABEL}, "runs": [], "limits_of_this_result": "Simulation only. The physics is hand-built and not calibrated to a real robot."}
     folder = None
     state = {}
     try:
@@ -353,6 +383,9 @@ def run_gate(world_path, spec_path, paid_path, salt_path, submitter, seed, out_r
         if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**31:
             raise Rejected("bad_seed", "The seed must be a whole number from 0 to 2147483647.")
         verdict["claim_seed"] = seed
+        human = verdict["human_cap"] = check_human_cap(human_id, human_used, human_cap)
+        if human["cap"] is not None and human["used"] >= human["cap"]:
+            raise Rejected("human_cap", f"This human id already used {human['used']} of {human['cap']} submissions for this bounty. World ID is not connected, so the caller supplied this id and count.")
 
         verdict["stage"] = "world"
         world = check_world(read_json(world_path, MAX_SUBMISSION_BYTES, "world"))
@@ -403,9 +436,10 @@ def run_gate(world_path, spec_path, paid_path, salt_path, submitter, seed, out_r
                 record_run(rows, f"rerun{k}", job[1], job[0], job[2], result, spec)
             labels = [label_of(r) for r in done]
             same = labels.count(failure)
-            verdict["repeat"] = {"failure": failure, "same": same, "of": RERUNS, "labels": labels}
-            if same < RERUNS:
-                raise Rejected("not_repeatable", f"The {failure} failure came back in {same} of {RERUNS} jittered re-runs. The gate needs {RERUNS} of {RERUNS}.")
+            verdict["repeat"] = {"failure": failure, "same": same, "of": RERUNS, "need": REPEAT_NEED, "labels": labels,
+                                 "accept_chance_if_rate": {str(rate): round(accept_chance(rate), 4) for rate in (0.7, 0.9)}}
+            if not repeats_enough(labels, failure):
+                raise Rejected("not_repeatable", f"The {failure} failure came back in {same} of {RERUNS} jittered re-runs. The gate needs {REPEAT_NEED} of {RERUNS}.")
 
             twin = reference_twin(world, reference)
             twin_seed = derived_seed(salt, submission, "reference")
@@ -419,7 +453,7 @@ def run_gate(world_path, spec_path, paid_path, salt_path, submitter, seed, out_r
         verdict["result_hash"] = result_hash_of(verdict["spec_hash"], submission, rows)
         verdict["accepted"], verdict["code"] = True, "accepted"
         verdict["stage"] = "done"
-        verdict["reason"] = f"New {failure} failure: it repeated {RERUNS} of {RERUNS} on jittered re-runs and the reference twin passed."
+        verdict["reason"] = f"New {failure} failure: it repeated {same} of {RERUNS} on jittered re-runs and the reference twin passed."
         verdict["recorded_run"] = str(folder / "claim")
         verdict["propose"] = {"function": PROPOSE, "args": [spec["bounty_id"], submitter, fingerprint, verdict["result_hash"], False],
                               "named": {"bountyId": spec["bounty_id"], "submitter": submitter, "fingerprint": fingerprint, "resultHash": verdict["result_hash"], "isTopPrize": False},
@@ -442,8 +476,11 @@ def main():
     ap.add_argument("--submitter", required=True)
     ap.add_argument("--seed", default="0")
     ap.add_argument("--out", default=str(RUNS))
+    ap.add_argument("--human-id", help="NOT verified: World ID is not connected. A 32-byte hash from the caller.")
+    ap.add_argument("--human-used", help="NOT verified: earlier submissions by this id that reached the sim, counted by the caller.")
+    ap.add_argument("--human-cap", help="Most submissions per human id. Needs --human-id and --human-used. World ID is not connected.")
     a = ap.parse_args()
-    verdict, folder = run_gate(a.world, a.spec, a.paid, a.salt_file, a.submitter, a.seed, a.out)
+    verdict, folder = run_gate(a.world, a.spec, a.paid, a.salt_file, a.submitter, a.seed, a.out, a.human_id, a.human_used, a.human_cap)
     print(json.dumps({"accepted": verdict["accepted"], "code": verdict["code"], "reason": verdict["reason"], "verdict": str(folder / "verdict.json")}, indent=1))
     sys.exit(0 if verdict["accepted"] else 1)
 

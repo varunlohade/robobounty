@@ -102,8 +102,8 @@ def main():
     out = root / "gates"
     t0 = time.time()
 
-    def gate(world, paid=no_paid, seed=0, spec_path=spec, salt_path=salt, submitter=SUBMITTER):
-        return G.run_gate(str(world), str(spec_path), str(paid), str(salt_path), submitter, seed, out)
+    def gate(world, paid=no_paid, seed=0, spec_path=spec, salt_path=salt, submitter=SUBMITTER, **human):
+        return G.run_gate(str(world), str(spec_path), str(paid), str(salt_path), submitter, seed, out, **human)
 
     def rejected_without_sim(name, code, world, **kw):
         before = time.time()
@@ -138,6 +138,28 @@ def main():
     bad_paid = write_json(work / "paid_bad.json", ["not a hash"])
     rejected_without_sim("bad paid list", "bad_paid_list", FIXTURES / "failing.json", paid=bad_paid)
 
+    # Human cap. World ID is not connected, so these only prove the gate obeys the caller's numbers.
+    human = "0x" + "77" * 32
+    rejected_without_sim("human at the cap", "human_cap", FIXTURES / "failing.json", human_id=human, human_used=3, human_cap=3)
+    rejected_without_sim("human over the cap, numbers as CLI text", "human_cap", FIXTURES / "failing.json", human_id=human, human_used="4", human_cap="3")
+    rejected_without_sim("zero cap", "human_cap", FIXTURES / "failing.json", human_id=human, human_used=0, human_cap=0)
+    for label, bad in {"no id": {"human_used": 0, "human_cap": 3}, "no count": {"human_id": human, "human_cap": 3}, "no cap": {"human_id": human, "human_used": 0}, "id not a hash": {"human_id": "alice", "human_used": 0, "human_cap": 3},
+                       "negative count": {"human_id": human, "human_used": -1, "human_cap": 3}, "bool count": {"human_id": human, "human_used": False, "human_cap": 3}, "count as float text": {"human_id": human, "human_used": "1.5", "human_cap": 3}}.items():
+        rejected_without_sim(f"bad human cap arguments: {label}", "bad_human_cap", FIXTURES / "failing.json", **bad)
+    below, _ = gate(impossible, human_id=human, human_used=2, human_cap=3)
+    check("one below the cap gets past the cap check", below["code"] == "impossible_world" and below["human_cap"]["used"] == 2, f"code={below['code']}")
+    uncapped, _ = gate(impossible)
+    labelled = all(v["human_cap"]["world_id_connected"] is False and "NOT connected" in v["human_cap"]["label"] for v in (below, uncapped))
+    check("every verdict says World ID is not connected", labelled, below["human_cap"]["label"])
+
+    # The repeat rule.
+    chance = {rate: G.accept_chance(rate) for rate in (0.7, 0.9, 1.0, 0.0)}
+    old = G.accept_chance(0.7, 3, 3)
+    check("repeat rule is 7 of 8", (G.REPEAT_NEED, G.RERUNS) == (7, 8))
+    check("stated accept chance", round(chance[0.7], 4) == 0.2553 and round(chance[0.9], 4) == 0.8131 and chance[1.0] == 1.0 and chance[0.0] == 0.0, f"70%: {chance[0.7]:.4f} (3 of 3 gave {old:.4f}), 90%: {chance[0.9]:.4f}")
+
+    check("7 of 8 same type clears, 6 of 8 does not, another failure type does not count", G.repeats_enough(["detach"] * 7 + ["pass"], "detach") and not G.repeats_enough(["detach"] * 6 + ["pass"] * 2, "detach") and not G.repeats_enough(["detach"] * 6 + ["coverage"] * 2, "detach"))
+
     # Pure checks of jitter and fingerprint.
     failing_world = W.load(FIXTURES / "failing.json")
     h = "0x" + "11" * 32
@@ -163,7 +185,7 @@ def main():
     # Real runs.
     failing_seed = json.loads((FIXTURES / "meta.json").read_text())
     accepted, folder = gate(FIXTURES / "failing.json", seed=failing_seed["failing_seed"])
-    check("real failing world is accepted", accepted["accepted"] and accepted["code"] == "accepted" and accepted["repeat"]["same"] == 3, f"{accepted['code']}: {accepted['reason']}")
+    check("real failing world is accepted", accepted["accepted"] and accepted["code"] == "accepted" and accepted["repeat"]["same"] >= G.REPEAT_NEED, f"{accepted['code']}: {accepted['reason']}")
     fingerprint = accepted["fingerprint"]
     print(f"      verdict {folder / 'verdict.json'}", flush=True)
     if accepted["accepted"]:
@@ -196,12 +218,12 @@ def main():
         v, _ = gate(high, paid=paid_edge, seed=failing_seed["edge_seed"])
         check("tiny change across a bucket edge is a duplicate", v["code"] == "duplicate" and v["fingerprint"] != first["fingerprint"], f"code={v['code']} primary_differs={v['fingerprint'] != first['fingerprint']} {v['reason']}")
     else:
-        check("tiny change across a bucket edge is a duplicate", False, f"edge fixture did not fail 3 of 3: {first['code']} {first['reason']}")
+        check("tiny change across a bucket edge is a duplicate", False, f"edge fixture did not clear the re-runs: {first['code']} {first['reason']}")
 
     v, _ = gate(FIXTURES / "nominal_pass.json", seed=failing_seed["pass_seed"])
     check("passing world is rejected as no failure", v["code"] == "no_failure" and len(v["runs"]) == 1, f"code={v['code']} {v['reason']}")
     v, _ = gate(FIXTURES / "flaky.json", seed=failing_seed["flaky_seed"])
-    check("flaky world, failing 1 of 3, is rejected", v["code"] == "not_repeatable" and v["repeat"]["same"] == 1, f"code={v['code']} {v.get('repeat')}")
+    check("flaky world is rejected", v["code"] == "not_repeatable" and v["repeat"]["same"] < G.REPEAT_NEED and len(v["runs"]) == 1 + G.RERUNS, f"code={v['code']} {v.get('repeat')}")
     v, _ = gate(FIXTURES / "twin_fails.json", seed=failing_seed["twin_seed"])
     check("world whose reference twin fails is rejected", v["code"] == "reference_failed", f"code={v['code']} {v['reason']} twin={v.get('reference_check', {}).get('label')}")
 
