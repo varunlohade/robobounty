@@ -40,27 +40,18 @@ def video_frame(obs):
     return np.concatenate([pixels["image"][::-1, ::-1], pixels["image2"][::-1, ::-1]], axis=1)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("scene")
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--device", default="mps")
-    args = ap.parse_args()
+def env_config(task_id):
+    from lerobot.envs.configs import LiberoEnv as LiberoEnvConfig
+    import sim
+    return LiberoEnvConfig(task=sim.SUITE, task_ids=[task_id], observation_height=sim.IMAGE_SIZE,
+                           observation_width=sim.IMAGE_SIZE, fps=sim.CONTROL_HZ)
 
-    try:
-        scene = scene_schema.load(args.scene)
-    except (scene_schema.SceneError, OSError) as e:
-        print(f"REJECTED {args.scene}: {e}", file=sys.stderr)
-        return 2
-    out = Path(args.out)
-    if (out / "result.json").exists():
-        print(f"REFUSED: {out} already holds a result", file=sys.stderr)
-        return 2
 
+def run_episode(scene, out, device, loaded=None):
+    """Writes the run files to out and returns the result. loaded is a load_policy() tuple, which batch.py reuses."""
     started = time.time()
     import numpy as np
     import torch
-    from lerobot.envs.configs import LiberoEnv as LiberoEnvConfig
     from lerobot.envs.utils import preprocess_observation
     from lerobot.utils.constants import ACTION
     from lerobot.utils.io_utils import write_video
@@ -74,7 +65,7 @@ def main():
     result = {
         "status": "scene_invalid", "success": None, "steps": 0, "reason": "scene_invalid",
         "scene_sha256": digest, "model_id": MODEL_ID, "model_revision": MODEL_REVISION,
-        "device": args.device, "control_hz": sim.CONTROL_HZ, **sim.versions(),
+        "device": device, "control_hz": sim.CONTROL_HZ, **sim.versions(),
     }
 
     set_seed(scene["seed"])
@@ -89,11 +80,9 @@ def main():
         (out / "result.json").write_text(json.dumps(result, indent=1) + "\n")
         print(f"SCENE INVALID: {settle['problems']}", file=sys.stderr)
         wrapper.close()
-        return 3
+        return result
 
-    env_cfg = LiberoEnvConfig(task=sim.SUITE, task_ids=[scene["task_id"]], observation_height=sim.IMAGE_SIZE,
-                              observation_width=sim.IMAGE_SIZE, fps=sim.CONTROL_HZ)
-    policy, pre, post, env_pre, env_post = load_policy(args.device, env_cfg)
+    policy, pre, post, env_pre, env_post = loaded or load_policy(device, env_config(scene["task_id"]))
     policy.reset()
     set_seed(scene["seed"])
 
@@ -138,8 +127,31 @@ def main():
         "action_chain_head": head, "final_state_sha256": sim.state_sha(inner.sim),
     })
     (out / "result.json").write_text(json.dumps(result, indent=1) + "\n")
-    print(json.dumps({k: result[k] for k in ("status", "success", "steps", "reason", "wall_s", "scene_sha256")}))
     wrapper.close()
+    return result
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("scene")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--device", default="mps")
+    args = ap.parse_args()
+
+    try:
+        scene = scene_schema.load(args.scene)
+    except (scene_schema.SceneError, OSError) as e:
+        print(f"REJECTED {args.scene}: {e}", file=sys.stderr)
+        return 2
+    out = Path(args.out)
+    if (out / "result.json").exists():
+        print(f"REFUSED: {out} already holds a result", file=sys.stderr)
+        return 2
+
+    result = run_episode(scene, out, args.device)
+    if result["status"] == "scene_invalid":
+        return 3
+    print(json.dumps({k: result[k] for k in ("status", "success", "steps", "reason", "wall_s", "scene_sha256")}))
     return 0
 
 

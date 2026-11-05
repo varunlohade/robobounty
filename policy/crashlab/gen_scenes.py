@@ -1,5 +1,11 @@
-"""Reproducible scene batch: gen_scenes.py --n N --seed S --out <dir>. Scene i does not depend on N."""
+"""Reproducible scene batch: gen_scenes.py --n N --seed S --out <dir>. Scene i does not depend on N.
+
+--pairs-per-task P replaces --n with a control group. Each task gets P pairs. A pair is a varied scene and a
+control with the same init state and seed, so the two differ only by the edits.
+Files sort by repeat, so the first 20 files are repeat 0 of every task.
+"""
 import argparse
+import json
 import random
 import sys
 from pathlib import Path
@@ -13,9 +19,10 @@ SUPPORT_BY_TASK = {3: COOKIES, 5: RAMEKIN}  # moving these drops the target
 TARGET_OFFSET_M, DISTRACTOR_OFFSET_M = 0.05, 0.04
 
 
-def make_scene(batch_seed, index):
+def make_scene(batch_seed, index, task=None):
     rng = random.Random(f"crashlab:{batch_seed}:{index}")
-    task = rng.randrange(10)
+    drawn = rng.randrange(10)
+    task = drawn if task is None else task
     scene = {
         "schema": 1,
         "task_id": task,
@@ -58,16 +65,40 @@ def make_scene(batch_seed, index):
     return scene_schema.validate(scene)
 
 
+def make_pair(batch_seed, task, repeat):
+    attempt = 0
+    while True:
+        varied = make_scene(batch_seed, f"pair:{task}:{repeat}:{attempt}", task)
+        if varied["objects"] or varied["colours"] or varied["clutter"] or varied["light"] != 1.0:
+            break
+        attempt += 1
+    control = scene_schema.validate({k: varied[k] for k in ("schema", "task_id", "init_state", "seed")})
+    return control, varied
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--n", type=int, required=True)
+    ap.add_argument("--n", type=int)
+    ap.add_argument("--pairs-per-task", type=int)
     ap.add_argument("--seed", type=int, required=True)
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
-    if args.n < 1 or not 0 <= args.seed <= scene_schema.MAX_SEED:
-        ap.error("--n must be at least 1 and --seed must be in [0, 2^31-1]")
+    if (args.n is None) == (args.pairs_per_task is None):
+        ap.error("give exactly one of --n and --pairs-per-task")
+    if (args.n or args.pairs_per_task) < 1 or not 0 <= args.seed <= scene_schema.MAX_SEED:
+        ap.error("the count must be at least 1 and --seed must be in [0, 2^31-1]")
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    if args.pairs_per_task:
+        for repeat in range(args.pairs_per_task):
+            for task in range(10):
+                control, varied = make_pair(args.seed, task, repeat)
+                for name, scene in (("control", control), ("varied", varied)):
+                    (out / f"r{repeat}_t{task}_{name}.json").write_text(scene_schema.canonical(scene) + "\n")
+        (out / "GENERATOR").write_text(json.dumps({"tool": "gen_scenes.py", "seed": args.seed,
+                                                   "pairs_per_task": args.pairs_per_task}) + "\n")
+        print(f"wrote {args.pairs_per_task * 20} scenes to {out}")
+        return
     for i in range(args.n):
         scene = make_scene(args.seed, i)
         (out / f"scene_{i:05d}.json").write_text(scene_schema.canonical(scene) + "\n")
