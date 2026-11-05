@@ -51,7 +51,15 @@ BANNED_NAMES = {"open", "exec", "eval", "compile", "__import__", "getattr", "set
 # Every numpy route to a file, a process or native code that we know of. The sandbox is the layer behind this list.
 BANNED_ATTRS = {"load", "save", "savez", "savez_compressed", "loadtxt", "savetxt", "genfromtxt", "fromfile", "tofile", "dump", "dumps", "memmap", "fromregex",
                 "DataSource", "ctypeslib", "ctypes", "f2py", "distutils", "testing", "lib", "open_memmap", "system", "popen", "frombuffer", "get_include", "show_config",
-                "show_runtime", "info", "lookfor", "source", "who", "format", "format_map", "mgrid", "setbufsize", "seterrcall"}
+                "show_runtime", "info", "lookfor", "source", "who", "format", "format_map", "mgrid", "setbufsize", "seterrcall",
+                "core", "compat", "add_newdoc", "add_docstring", "os", "sys", "subprocess", "builtins", "modules", "importlib", "pickle",
+                "mro", "gi_frame", "gi_code", "cr_frame", "ag_frame", "f_globals", "f_locals", "f_builtins", "f_back", "f_code", "tb_frame", "tb_next", "co_code"}
+
+
+def base_private_names():
+    """The `self._x` helpers of the base controller. A patch may only keep using these: every other attribute that starts with `_` is rejected."""
+    return {n.attr for n in ast.walk(ast.parse(BASE.read_text())) if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == "self"
+            and n.attr.startswith("_") and not n.attr.startswith("__")}
 
 
 def validate_source(text):
@@ -64,6 +72,7 @@ def validate_source(text):
         return ["does not parse"]
     bad = []
     has_step = False
+    helpers = base_private_names()
     for node in ast.walk(tree):
         where = f"line {getattr(node, 'lineno', '?')}"
         if isinstance(node, ast.Import):
@@ -74,15 +83,15 @@ def validate_source(text):
             if node.level or node.module not in ALLOWED_IMPORTS:
                 bad.append(f"{where}: from {node.module} import is not allowed")
             for a in node.names:
-                if a.name == "*" or a.name in BANNED_ATTRS:
+                if a.name == "*" or a.name.startswith("_") or a.name in BANNED_ATTRS:
                     bad.append(f"{where}: from {node.module} import {a.name} is not allowed")
         elif isinstance(node, ast.Name) and (node.id in BANNED_NAMES or node.id.startswith("__")):
             bad.append(f"{where}: name {node.id} is not allowed")
-        elif isinstance(node, ast.Attribute) and (node.attr.startswith("_") and node.attr.startswith("__") or node.attr in BANNED_ATTRS):
+        elif isinstance(node, ast.Attribute) and (node.attr in BANNED_ATTRS or node.attr.startswith("_") and not (isinstance(node.value, ast.Name) and node.value.id == "self" and node.attr in helpers)):
             bad.append(f"{where}: attribute {node.attr} is not allowed")
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and "__" in node.value:
             bad.append(f"{where}: a string holds a double underscore")
-        elif isinstance(node, (ast.Global, ast.Nonlocal, ast.AsyncFunctionDef, ast.Await, ast.Yield, ast.YieldFrom, ast.With, ast.AsyncWith, ast.AsyncFor)):
+        elif isinstance(node, (ast.Match, ast.Global, ast.Nonlocal, ast.AsyncFunctionDef, ast.Await, ast.Yield, ast.YieldFrom, ast.With, ast.AsyncWith, ast.AsyncFor)):
             bad.append(f"{where}: {type(node).__name__} is not allowed")
         elif isinstance(node, ast.ClassDef) and node.name == "Controller":
             has_step = any(isinstance(b, ast.FunctionDef) and b.name == "step" for b in node.body)
@@ -291,7 +300,7 @@ def prompt_for(summary, feedback):
     return f"""policy/highrise/controller.py is in this folder as controller.py. It drives a simulated suction window robot. Read it, then edit it to lower the failures in this \
 diagnosis. Make the smallest general change you can justify from the table. Your change will be tested on new worlds you have not seen, and on nominal controls that must keep passing.
 
-Rules: edit controller.py only. Imports: math and numpy only. No files, no network, no dunder names, no getattr or eval. Keep the Controller class, __init__(mission) and step(o). \
+Rules: edit controller.py only. Imports: math and numpy only. No files, no network, no dunder names, no getattr or eval, no match statements. No attribute may start with an underscore, except the self._x helpers already in the file, so name any new helper without one. Keep the Controller class, __init__(mission) and step(o). \
 Keep obs and action formats. Do not lower the safety behaviour to gain coverage: a detach is the worst outcome. If you think no controller change can help a failure, leave that failure alone.
 
 Diagnosis table (simulation only, physics uncalibrated):

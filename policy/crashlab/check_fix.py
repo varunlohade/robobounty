@@ -4,12 +4,15 @@ check_fix.py [--keep DIR]
 """
 import hashlib
 import json
+import math
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+import numpy as np
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -41,6 +44,19 @@ BAD = {
     "dunder import": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        __import__('os')\n"),
     "getattr": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        getattr(self, 'x')\n"),
     "dunder attribute": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = ().__class__\n"),
+    "single underscore on numpy": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = np._core\n"),
+    "single underscore on a value": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = t._private\n"),
+    "known helper name on another object": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = np._set\n"),
+    "new private name on self": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = self._secret\n"),
+    "self rebound, then private name": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        self = np\n        x = self._core\n"),
+    "dunder attribute on self": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = self.__dict__\n"),
+    "from numpy import private": with_change(IMPORT_MATH, "import math\nfrom numpy import _core\n"),
+    "numpy core": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = np.core\n"),
+    "generator frame": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = (i for i in ()).gi_frame\n"),
+    "frame globals": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = t.f_globals\n"),
+    "traceback frame": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = t.tb_frame\n"),
+    "class mro": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = t.mro\n"),
+    "attribute read by a match pattern": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        match t:\n            case float(__class__=c):\n                pass\n"),
     "dunder in a string": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        x = '{0.__class__}'\n"),
     "numpy load": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        np.load('x')\n"),
     "numpy tofile": with_change("        t = o[\"t\"]\n", "        t = o[\"t\"]\n        a.tofile('x')\n"),
@@ -96,6 +112,21 @@ def main():
     ok = with_change(IMPORT_MATH, "import math\nimport numpy as np\n").replace("WIND_RESUME_MS = 7.0", "WIND_RESUME_MS = 8.0")
     if fix.validate_source(ok):
         failures.append(f"a harmless diff was rejected: {fix.validate_source(ok)}")
+    helpers = fix.base_private_names()
+    if not helpers or any(h.startswith("__") for h in helpers):
+        failures.append(f"helper names look wrong: {helpers}")
+    reachable = [(h, str(o)) for h in helpers for o in (np, np.zeros(1), np.random, np.linalg, math, 1.0, 1, "", [], {}, (), set()) if hasattr(o, h)]
+    if reachable:
+        failures.append(f"an allowed helper name exists on another object: {reachable}")
+    print(f"allowed self helpers: {sorted(helpers)}, reachable elsewhere: {reachable}")
+    tried = fix.HIGHRISE.parent / "runs" / "highrise" / "campaign_dubai_v4" / "fix" / "try_2" / "controller.py"
+    if tried.exists():
+        reasons = fix.validate_source(tried.read_text())
+        print(f"previously tested try 2 patch: {'valid' if not reasons else reasons}")
+        if reasons:
+            failures.append(f"the try 2 patch fails the validator: {reasons}")
+    else:
+        print("previously tested try 2 patch: NOT CHECKED, the file is not on this machine")
     for name, text in BAD.items():
         if not fix.validate_source(text):
             failures.append(f"validator accepted: {name}")
