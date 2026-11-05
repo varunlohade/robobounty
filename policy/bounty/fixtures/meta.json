@@ -1,0 +1,9 @@
+{
+ "failing_seed": 3100024,
+ "twin_seed": 4200015,
+ "flaky_seed": 4200171,
+ "pass_seed": 2001,
+ "edge_seed": 3100024,
+ "edge_field": "edge_margin_m",
+ "edge_value": 1.5
+}
