@@ -18,3 +18,5 @@ Correction, same day. Owner's full words: "black is fine as a background". The a
 Left panel. Owner's words: "left window can look like cursor side window exacctly". The chat follows the familiar AI code editor side panel: compact sans, tool-step rows, inline diffs with Accept and Reject, input pinned at the bottom. No Cursor name, logo or assets. Palatino stays for headings outside the chat.
 
 Familiar first. Owner's words: "it should look familer". For the app, familiarity beats being distinctive. It should read at once as a modern code editor with a simulator pane. Do not invent new interface patterns.
+
+Reference. Owner's words: "let's build a platform for now where it looks like what they have built ... We have to build similar." Earlier words: "it should not be a direct copy ... it should look significantly different in terms of looks of people don't think we copy". Working rule: same kind of layout and quality (agent log beside the simulation, chapter timeline), with our own colours, wording, robot, name and assets. Never their text, footage, logo or exact styling.
