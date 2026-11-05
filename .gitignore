@@ -18,3 +18,6 @@ design/astra/.session
 design/astra/_brief
 design/*/inspiration
 policy/crashlab/__pycache__
+design/real-frames*
+design/*/real-frames-hd
+design/inspiration/zynoptes*
