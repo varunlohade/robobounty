@@ -98,3 +98,7 @@ Robot basis changed by owner request: real arm-in-cradle facade robots. See docs
 
 ## Render decision (owner, 2026-11-06)
 Owner's words: "Use Blender for now." MuJoCo stays the physics source. Blender renders the recorded motion for hero shots. No GPU rental for now. Label it a re-render of recorded physics.
+
+
+## Update: gate repeat rule
+The bounty gate now needs at least 7 of 8 re-runs (policy/bounty/gate.py), replacing 3 of 3. It clears a 70% world 25.5% of the time, and a 90% world 81.3%.
