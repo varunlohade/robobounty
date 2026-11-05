@@ -26,3 +26,16 @@ A factor counts only if it changes the physics in code, with the equation or the
 
 ## Demo limits for Saturday
 One robot. Hand-built physics, not validated against real hardware. Weather effects are simplified models. Results are simulated and must say so.
+
+## Product steps added after studying a reference product film (2026-11-06)
+Owner's words: "Go on their website and watch that video. It's so helpful." Ideas and flow only, in our own words and form.
+1. Ask only what the AI cannot infer: one or two quick questions with options, before building.
+2. The AI looks at what it built before running anything, and shows it.
+3. It writes numbered pass/fail requirements first, and every world is judged the same way.
+4. One normal run first. Then the human check: "Does the scene look right?"
+5. A campaign review before spending: objective, requirements, allowed variations, world count, worlds held back, expected compute cost. The human approves.
+6. A visible pipeline: queued, running, reproducing, diagnosing, fixing, validating, report. Worlds fill in, then collapse into a map coloured by failure type.
+7. Failures are grouped into a few failure types, each with severity, count, worst world and code line. Flaky results that do not reproduce are excluded and shown as excluded.
+8. Each fix is validated on held-back worlds, with no regressions, and the whole set is re-run. Before and after side by side.
+9. What the code cannot fix is handed on. Ours: it goes to a bounty or to the right owner.
+10. A short final report with a few big numbers.
