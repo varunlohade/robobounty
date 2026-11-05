@@ -188,7 +188,19 @@ check('the grid collapsed to a map', (await js(`!!document.querySelector('.map')
 await shot('05-find-map-failures.png');
 console.log('failure types', await js(`[...document.querySelectorAll('.failure-row')].map(e => e.textContent).join(' || ')`));
 console.log('excluded', await js(`[...document.querySelectorAll('.excluded-row')].map(e => e.textContent).join(' || ')`));
-check('no broken event rows', !(await js(`document.querySelector('.worlds').textContent`)).includes('NaN'));
+// Every world with a result: its timeline rows need a real time and a real value.
+const badRows = await js(`(async () => {
+  const bad = [];
+  for (const cell of document.querySelectorAll('.cell')) {
+    cell.click();
+    for (const row of document.querySelectorAll('.worlds-foot .event')) if (/NaN|undefined|null/.test(row.textContent) || !/^\\d+:\\d\\d/.test(row.textContent)) bad.push(cell.title + ' ' + row.textContent);
+  }
+  return bad;
+})()`);
+check('no broken event rows in any world', badRows.length === 0, badRows.slice(0, 3).join(' | '));
+const rowCount = await js(`[...document.querySelectorAll('.cell-fail')].length`);
+console.log('failed cells checked', rowCount);
+await js(`document.querySelector('.failure-row')?.click()`);
 check('real numbers in the heading', /^\d+ of \d+ tested worlds failed$/.test(await js(`document.querySelector('.worlds-head h1').textContent`)));
 check('fix stage says not connected', (await js(`document.querySelector('.pipeline').textContent`)).includes('not connected'));
 
