@@ -136,6 +136,27 @@ await shot('02-worlds-normal-run.png');
 await js(`document.querySelector('.chat-list').scrollTop = 0`);
 await shot('02b-log-top.png');
 
+if (process.argv.includes('--rebuild-only')) {
+  // A chat change after the first world. It rebuilds the model in WASM from the new values and frees the old one.
+  const before = await js(`document.querySelector('.tool .tool-line') && document.querySelector('.title-label').textContent`);
+  n = await idle();
+  await type('The glass is also very dusty');
+  await idleAfter(n);
+  while (await js(hasButton('Use the default'))) {
+    n = await idle();
+    await js(`document.querySelector('.chat-list .card:last-child button:not(:disabled)').click()`);
+    await idleAfter(n);
+  }
+  await until(`document.querySelector('.title-label').textContent !== ${JSON.stringify(before)}`, 'world changed', 120);
+  await until(hasButton('Looks right'), 'second scene question');
+  check('the world rebuilt with a new hash', (await js(`document.querySelector('.title-label').textContent`)) !== before, before);
+  console.log('load lines', await js(`[...document.querySelectorAll('.tool')].filter(t => t.textContent.startsWith('load_in_browser')).map(t => t.textContent).join(' || ')`));
+  check('no console errors', problems.filter(p => !p.includes('ReadPixels')).length === 0, problems.slice(0, 4).join(' | '));
+  console.log(failed ? `${failed} checks failed` : 'all checks passed');
+  bye();
+  process.exit(failed ? 1 : 0);
+}
+
 // 5. Campaign review.
 n = await idle();
 await timed('scenario_agent_llm', async () => { await press('Looks right'); await idleAfter(n); });
