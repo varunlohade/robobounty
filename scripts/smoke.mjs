@@ -1,0 +1,10 @@
+import load from '@mujoco/mujoco';
+import fs from 'node:fs';
+const mj = await load();
+const m = mj.MjModel.from_xml_string(fs.readFileSync('public/robots/acme-arm.xml','utf8'));
+const d = new mj.MjData(m);
+console.log('nbody',m.nbody,'ngeom',m.ngeom,'nu',m.nu, 'step fn', typeof mj.mj_step);
+for (let i=0;i<1000;i++) mj.mj_step(m,d);
+const cid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY.value, 'cube');
+console.log('cube id',cid,'pos after 2s', Array.from(d.xpos.slice(cid*3,cid*3+3)).map(x=>x.toFixed(3)));
+console.log('grip site', Array.from(d.site_xpos.slice(0,3)).map(x=>x.toFixed(3)));
