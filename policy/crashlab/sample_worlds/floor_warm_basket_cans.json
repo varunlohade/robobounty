@@ -1,0 +1,67 @@
+{
+ "schema": 2,
+ "arena": "floor",
+ "style": "warm",
+ "seed": 107,
+ "objects": [
+  {
+   "type": "alphabet_soup",
+   "region": [
+    -0.16,
+    -0.24,
+    -0.04,
+    -0.1
+   ]
+  },
+  {
+   "type": "basket",
+   "region": [
+    -0.04,
+    0.18,
+    0.04,
+    0.26
+   ]
+  },
+  {
+   "type": "cream_cheese",
+   "region": [
+    0.04,
+    -0.14,
+    0.16,
+    0.0
+   ],
+   "yaw": [
+    -0.5,
+    0.5
+   ]
+  },
+  {
+   "type": "bbq_sauce",
+   "region": [
+    -0.22,
+    -0.04,
+    -0.1,
+    0.08
+   ]
+  },
+  {
+   "type": "chocolate_pudding",
+   "region": [
+    0.06,
+    -0.28,
+    0.18,
+    -0.16
+   ],
+   "yaw": [
+    -0.5,
+    0.5
+   ]
+  }
+ ],
+ "goal": {
+  "predicate": "in",
+  "object": "alphabet_soup_1",
+  "target": "basket_1",
+  "part": "contain_region"
+ }
+}

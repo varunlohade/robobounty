@@ -1,0 +1,80 @@
+{
+ "schema": 2,
+ "arena": "tabletop",
+ "seed": 101,
+ "fixtures": [
+  {
+   "type": "wooden_cabinet",
+   "region": [
+    -0.04,
+    -0.34,
+    0.02,
+    -0.3
+   ],
+   "yaw": [
+    3.0,
+    3.14
+   ]
+  },
+  {
+   "type": "flat_stove",
+   "region": [
+    -0.38,
+    0.28,
+    -0.34,
+    0.32
+   ]
+  }
+ ],
+ "objects": [
+  {
+   "type": "akita_black_bowl",
+   "region": [
+    -0.2,
+    -0.05,
+    -0.02,
+    0.12
+   ],
+   "yaw": [
+    -0.6,
+    0.6
+   ]
+  },
+  {
+   "type": "plate",
+   "region": [
+    0.04,
+    0.08,
+    0.16,
+    0.26
+   ]
+  },
+  {
+   "type": "glazed_rim_porcelain_ramekin",
+   "region": [
+    -0.24,
+    0.14,
+    -0.14,
+    0.24
+   ]
+  },
+  {
+   "type": "cookies",
+   "region": [
+    0.08,
+    -0.14,
+    0.18,
+    -0.04
+   ],
+   "yaw": [
+    -0.4,
+    0.4
+   ]
+  }
+ ],
+ "goal": {
+  "predicate": "on",
+  "object": "akita_black_bowl_1",
+  "target": "plate_1"
+ }
+}

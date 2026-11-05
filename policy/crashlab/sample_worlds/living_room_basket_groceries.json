@@ -1,0 +1,63 @@
+{
+ "schema": 2,
+ "arena": "living_room",
+ "seed": 105,
+ "light": 1.3,
+ "objects": [
+  {
+   "type": "tomato_sauce",
+   "region": [
+    -0.18,
+    -0.28,
+    -0.04,
+    -0.1
+   ]
+  },
+  {
+   "type": "basket",
+   "region": [
+    -0.08,
+    0.16,
+    0.02,
+    0.26
+   ]
+  },
+  {
+   "type": "milk",
+   "region": [
+    0.04,
+    -0.08,
+    0.16,
+    0.06
+   ]
+  },
+  {
+   "type": "butter",
+   "region": [
+    -0.26,
+    -0.06,
+    -0.12,
+    0.06
+   ],
+   "yaw": [
+    -0.6,
+    0.6
+   ]
+  },
+  {
+   "type": "orange_juice",
+   "region": [
+    0.08,
+    -0.32,
+    0.18,
+    -0.18
+   ]
+  }
+ ],
+ "goal": {
+  "predicate": "in",
+  "object": "tomato_sauce_1",
+  "target": "basket_1",
+  "part": "contain_region"
+ }
+}

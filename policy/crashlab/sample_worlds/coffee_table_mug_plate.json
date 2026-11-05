@@ -1,0 +1,57 @@
+{
+ "schema": 2,
+ "arena": "coffee_table",
+ "style": "warm",
+ "seed": 108,
+ "objects": [
+  {
+   "type": "porcelain_mug",
+   "region": [
+    -0.14,
+    -0.22,
+    0.0,
+    -0.06
+   ],
+   "yaw": [
+    -0.5,
+    0.5
+   ]
+  },
+  {
+   "type": "plate",
+   "region": [
+    -0.04,
+    0.1,
+    0.08,
+    0.26
+   ]
+  },
+  {
+   "type": "white_bowl",
+   "region": [
+    0.06,
+    -0.28,
+    0.18,
+    -0.14
+   ]
+  },
+  {
+   "type": "popcorn",
+   "region": [
+    -0.2,
+    0.02,
+    -0.08,
+    0.14
+   ],
+   "yaw": [
+    -0.5,
+    0.5
+   ]
+  }
+ ],
+ "goal": {
+  "predicate": "on",
+  "object": "porcelain_mug_1",
+  "target": "plate_1"
+ }
+}

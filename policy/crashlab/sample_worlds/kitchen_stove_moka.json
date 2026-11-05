@@ -1,0 +1,60 @@
+{
+ "schema": 2,
+ "arena": "kitchen",
+ "seed": 103,
+ "fixtures": [
+  {
+   "type": "flat_stove",
+   "region": [
+    -0.26,
+    0.2,
+    -0.2,
+    0.28
+   ],
+   "state": "off"
+  }
+ ],
+ "objects": [
+  {
+   "type": "moka_pot",
+   "region": [
+    -0.06,
+    -0.2,
+    0.08,
+    -0.04
+   ],
+   "yaw": [
+    -0.5,
+    0.5
+   ]
+  },
+  {
+   "type": "chefmate_8_frypan",
+   "region": [
+    0.02,
+    0.12,
+    0.12,
+    0.24
+   ],
+   "yaw": [
+    -0.4,
+    0.4
+   ]
+  },
+  {
+   "type": "ketchup",
+   "region": [
+    -0.28,
+    -0.2,
+    -0.16,
+    -0.08
+   ]
+  }
+ ],
+ "goal": {
+  "predicate": "on",
+  "object": "moka_pot_1",
+  "target": "flat_stove_1",
+  "part": "cook_region"
+ }
+}

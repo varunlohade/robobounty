@@ -11,3 +11,4 @@
 - A Claude Code security agent wrote docs/security/THREAT-MODEL.md.
 - Claude Code (design-builder) and GPT (Codex, gpt-6-astra) produced design explorations in design/, from briefs written by Claude Code and directed by the human builder.
 - Claude Code wrote the CrashLab scene runner in policy/crashlab/ (scene schema, variation runner, action replay, scene generator). The policy is HuggingFaceVLA/smolvla_libero and the simulator is LIBERO on MuJoCo; neither is ours.
+- Claude Code wrote the CrashLab world builder in policy/crashlab/ (world.py schema v2 and BDDL writer, build_world.py, check_world.py, sample_worlds/). The assets, arenas and predicates come from LIBERO; they are not ours.

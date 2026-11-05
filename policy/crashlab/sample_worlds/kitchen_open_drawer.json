@@ -1,0 +1,63 @@
+{
+ "schema": 2,
+ "arena": "kitchen",
+ "seed": 104,
+ "fixtures": [
+  {
+   "type": "white_cabinet",
+   "region": [
+    -0.06,
+    0.3,
+    0.02,
+    0.34
+   ],
+   "yaw": [
+    -0.1,
+    0.1
+   ],
+   "state": "open_top"
+  }
+ ],
+ "objects": [
+  {
+   "type": "akita_black_bowl",
+   "region": [
+    -0.14,
+    -0.2,
+    0.04,
+    -0.04
+   ],
+   "yaw": [
+    -0.6,
+    0.6
+   ]
+  },
+  {
+   "type": "plate",
+   "region": [
+    0.06,
+    -0.3,
+    0.18,
+    -0.12
+   ]
+  },
+  {
+   "type": "butter",
+   "region": [
+    -0.28,
+    -0.06,
+    -0.16,
+    0.08
+   ],
+   "yaw": [
+    -0.6,
+    0.6
+   ]
+  }
+ ],
+ "goal": {
+  "predicate": "close",
+  "object": "white_cabinet_1",
+  "part": "top_region"
+ }
+}
