@@ -750,6 +750,7 @@ class Session:
             self.tool("fix", "failed", [f"fix.py exit {code}. No result. Log: fix.log in the session folder."])
             self.fix_summary = "fix.py stopped with an error, so no fix was tested."
             self.report()
+            self.offer_recorded()
             return
         overall = json.loads((out / "fix" / "report.json").read_text())
         attempt = overall["tries"][-1]
@@ -764,6 +765,7 @@ class Session:
         if not (try_dir / "patch.diff").exists() or not ab:
             self.say(f"No fix to review: {conclusion}", fail=True)
             self.report()
+            self.offer_recorded()
             return
         self.offer_fix(try_dir, False, {
             "title": "Check run, stored patch" if stored else "Live result", "source": "This campaign. fix.py ran now." if not stored else "This campaign. fix.py ran now on a stored patch, with no AI call.",
@@ -773,6 +775,10 @@ class Session:
             "changed": [], "limits": overall["limits"][0], "sim_recorded": (self.last_recorded or "unknown")[:8], "sim_now": sim_hash()[:8],
         }, "Accept writes a copy for this session only. controller.py does not change.")
         self.report()
+
+    def offer_recorded(self):
+        self.emit(type="card", title="See a recorded fix instead", body="This shows a stored result from an earlier campaign. No AI runs.", actions=[{"label": "Show the recorded result", "action": "fix_recorded"}])
+        self.emit(type="card", title="Send it on", body="No fix is ready for review.", actions=[{"label": "Send to a bounty", "action": "bounty", "keep": True}])
 
     def decide_fix(self, accepted):
         before = sha_file(CONTROLLER)

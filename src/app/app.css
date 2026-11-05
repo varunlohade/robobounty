@@ -230,7 +230,7 @@ p { margin: 0; }
 .fix p, .bounty p { max-width: 860px; }
 .fix-tag, .ledger-label { display: inline-block; align-self: flex-start; border: 1px solid var(--text); padding: 1px 8px; font-size: var(--size-small); margin: 6px 0; }
 .fix-conclusion { color: var(--text); font-size: 18px; }
-.fix-caveat { color: var(--fail); margin-top: 6px; }
+.fix-caveat { color: var(--text); font-weight: 600; margin-top: 6px; }
 .ab { border-collapse: collapse; font-size: 14px; }
 .ab th, .ab td { text-align: left; padding: 4px 16px 4px 0; border-top: 1px solid var(--line-2); }
 .ab th { color: var(--text-3); font-weight: 400; }

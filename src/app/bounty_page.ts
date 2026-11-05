@@ -124,6 +124,7 @@ export class BountyPage {
     if (e.reference_check) box.append(el('p', '', `Reference twin: ${e.reference_check.label}. ${e.reference_check.meaning}`));
     box.append(el('p', 'excluded-row', `${e.runs ?? 0} sim runs, ${e.wall} s. Simulated. Not checked: ${((e.not_checked ?? []) as string[]).join(' ')}`));
     this.verdicts.prepend(box);
+    box.scrollIntoView({ block: 'center' });
     if (this.gate) this.runBtn.disabled = false;
   }
 

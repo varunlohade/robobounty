@@ -19,7 +19,7 @@ export interface ServerInfo { sim_sha: string; llm: string; max_procs: number }
 export const health = async (): Promise<ServerInfo> => (await (await fetch(`${SERVER}/api/health`)).json());
 
 export type ServerEvent = { type: string; [key: string]: any };
-const CHAT_TYPES = new Set(['user', 'text', 'tool', 'card', 'working', 'retire', 'review', 'requirements']);
+const CHAT_TYPES = new Set(['user', 'text', 'tool', 'card', 'working', 'retire', 'review', 'requirements', 'diff']);
 
 export class LiveBackend implements ChatBackend {
   readonly isStub = false;

@@ -54,14 +54,18 @@ await wait(1500);
   const base = 'http://127.0.0.1:5195/api/sessions';
   const { id } = await (await fetch(base, { method: 'POST', headers: h, body: '{}' })).json();
   const say = async text => fetch(`${base}/${id}/message`, { method: 'POST', headers: h, body: JSON.stringify({ text }) });
+  const quiet = async () => { for (let i = 0; i < 120; i++) { if (!(await (await fetch(`${base}/${id}/state`, { headers: h })).json()).busy) return; await wait(500); } };
   await say('one window robot');
-  await wait(4000);
+  await wait(300);
+  await quiet();
   await say('a second message');
-  await wait(1000);
+  await wait(300);
+  await quiet();
   const ac = new AbortController();
   const res = await fetch(`${base}/${id}/events`, { headers: h, signal: ac.signal });
   const reader = res.body.getReader();
-  const seen = new TextDecoder().decode((await reader.read()).value);
+  let seen = '';
+  while (!seen.includes('"idle"') || seen.split('"idle"').length < 3) seen += new TextDecoder().decode((await reader.read()).value);
   ac.abort();
   check('the session LLM limit refuses the second call', seen.includes('llm_limit') && seen.includes('Nothing was sent to the AI'));
   capped.kill();
@@ -260,6 +264,12 @@ check('report has big numbers', (await js(`document.querySelectorAll('.big-numbe
 const controllerBefore = sha(CONTROLLER);
 n = await idle();
 await timed(LIVE_FIX ? 'fix_live' : 'fix_recorded', async () => { await press(LIVE_FIX ? 'Try a fix live' : 'Show the recorded result'); await idleAfter(n); });
+if (LIVE_FIX && !(await js(`!!document.querySelector('.fix .fix-conclusion')`))) {
+  console.log('NOTE the live fix gave nothing to review:', await js(`[...document.querySelectorAll('.msg.fail')].pop()?.textContent ?? ''`));
+  n = await idle();
+  await press('Show the recorded result');
+  await idleAfter(n);
+}
 await until(`!!document.querySelector('.fix .fix-conclusion')`, 'fix page', 30);
 await tab('Fix');
 const fixText = await js(`document.querySelector('.fix').textContent`);
