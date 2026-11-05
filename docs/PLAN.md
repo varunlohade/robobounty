@@ -46,3 +46,9 @@ Loop: plain-English brief -> worlds -> run -> judge -> diagnose -> fix -> re-run
 3. Custom BDDL on Mac is untested. Timebox 2 h, then fall back to schema v1 worlds.
 
 Unknown: which suites the checkpoint trained on; 0G request-ID exposure; World verify without a chain; drawer and microwave goal judging.
+
+## Product decision (owner, 2026-11-06)
+Owner's words: "I think we can have AI fix those failures, or the user can also ask a user can also ask a experienced engineer do it. Like, yeah, they can have a bounty saying, hey, we are not able to fix it, can you figure"
+
+Flow: the AI tries a fix first. If the fix does not pass, the company posts a bounty for experienced engineers, with the failure pack attached. A solver's fix runs through the same worlds. The contract pays only on a passing result, after the dispute window.
+This makes the bounty the escalation path, not an add-on.
