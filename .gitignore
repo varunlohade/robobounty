@@ -4,3 +4,11 @@ dist
 .env.*
 !.env.example
 .DS_Store
+policy/.venv
+policy/runs
+policy/.libero
+design/astra/_brief/inspiration
+design/inspiration
+design/astra/_brief/real-frames
+design/*/real-frames
+design/blind*
