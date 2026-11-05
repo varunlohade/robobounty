@@ -108,7 +108,10 @@ Field names: `temperature_c`, `humidity_pct`, `dust_gm2`. Each changes the physi
 | Coverage required | 0.90 | | ASSUMPTION: chosen before the campaign |
 | Slide limit, gap for detach | 0.30, 0.03 | m | ASSUMPTION |
 | Time limit | 600 | s | ASSUMPTION |
-| Safe hold | stationary on glass at least 30 s at the time limit, with no safety rule fired | s | ASSUMPTION: own outcome, not a failure |
+| Hold at the time limit | stationary on glass at least 30 s, with no safety rule fired | s | ASSUMPTION |
+| `wind_hold` | no 30 s calm spell below 7 m/s in the final hold | | ASSUMPTION: not a failure, not a pass |
+| `battery_stop` | a calm spell, and half or more of the hold below 12.8 V | | ASSUMPTION: not a safety failure, not a pass |
+| `stalled` | neither reason | | ASSUMPTION: a failure. Includes the controller stuck in phase None, `controller.py:213,264`, a real finding left in place |
 | False done gap | reported minus true coverage above 0.10 | | ASSUMPTION: same as the 10% coverage tolerance, and chosen knowing nominal gaps reach 0.08. Sensitivity in each table |
 | Sanity limits | 2 cm inside glass, 30 m/s, 10 kN, 0.5 m tether stretch, MuJoCo bad-acceleration warning | | Numerical limits: the trial is thrown out and counted separately |
 
@@ -149,4 +152,5 @@ Made after seeing the first formal campaigns (seeds 11, 12, 21, 22), which are w
 - `controller.py` constants `PIVOT_SAG_M_PER_RAD` and `LANE_OVERRUN_M` were set from the nominal world, before af0424f, and were not reset for later physics changes.
 - The nominal control therefore proves little by itself. `worlds/benign.json` is a second control, written by hand and not used for tuning.
 
-Frozen before the audit-fix campaigns: see the commit that records this line. No physics or judge change after it.
+- `worlds/moderate_ranges.json` came after seeing the earlier `all` runs. It was committed before the runs that use it, but it is not blind.
+- Frozen sim and judge at 6fbbb8d. Later, after seeing those results, `safe_hold` was split into `wind_hold`, `battery_stop` and `stalled`, because most moderate holds happened at low wind and were not safe holds. Physics did not change, and runs were re-scored from stored logs.

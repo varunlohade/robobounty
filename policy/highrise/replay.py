@@ -53,6 +53,7 @@ def replay(run_dir, keep=None):
         result["failure"], result["passed"] = "sim_diverged", False
     keys = ("failure", "passed", "coverage", "reported_done", "slip_m", "peak_tether_n", "time_s")
     report.update({
+        "judge_result": result,
         "steps_replayed": len(rows) - 1, "first_divergent_step": first_divergence,
         "final_state_match": sim.state_sha() == stored["final_state_sha256"],
         "outcome": {k: {"stored": stored[k], "replay": result[k]} for k in keys},

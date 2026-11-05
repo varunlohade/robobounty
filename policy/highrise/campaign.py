@@ -125,11 +125,12 @@ def table(rows):
         passed = sum(r["passed"] for r in sub)
         lo, hi = wilson(passed, len(sub))
         lines.append(f"{kind}: {passed}/{len(sub)} passed, 95% interval {lo:.2f}-{hi:.2f}")
-        holds = [r for r in sub if r.get("outcome") == "safe_hold"]
-        if holds:
-            mean_hold = sum(r["hold_s"] for r in holds) / len(holds)
-            mean_wind = sum(r["hold_mean_wind_ms"] for r in holds) / len(holds)
-            lines.append(f"  safe hold, not a failure: {len(holds)}, mean held {mean_hold:.0f} s at mean wind {mean_wind:.1f} m/s")
+        for label, note in (("wind_hold", "paused for wind, grip intact"), ("battery_stop", "low voltage, grip intact, job incomplete")):
+            holds = [r for r in sub if r.get("outcome") == label]
+            if holds:
+                mean_hold = sum(r["hold_s"] for r in holds) / len(holds)
+                mean_wind = sum(r["hold_mean_wind_ms"] for r in holds) / len(holds)
+                lines.append(f"  {label} ({note}): {len(holds)}, mean held {mean_hold:.0f} s at mean wind {mean_wind:.1f} m/s")
         first = Counter(r["failure"] for r in sub if not r["passed"] and r["failure"])
         anyf = Counter(f for r in sub for f in r["fired"])
         lines.append(f"  {'failure type':<16}{'first':>7}{'any':>7}  example")
