@@ -28,3 +28,4 @@ design/cinematic/_cache
 design/render/
 *.blend
 *.blend1
+policy/render/__pycache__
