@@ -6,3 +6,4 @@
 - Claude Code wrote the shared simulation core (src/sim/core.ts: episode runner, IK, safety clamps,
   judging, evaluation) and the seed challenge controllers (src/challenges/acme.ts), plus scripts/eval.ts
   and scripts/trace.ts used to debug them.
+- Claude Code wrote the browser viewer (index.html, src/main.ts, src/view/scene3d.ts) and Vite/TS config.
