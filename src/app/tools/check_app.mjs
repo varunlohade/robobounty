@@ -167,7 +167,7 @@ await js(`[...document.querySelectorAll('.tab')].find(t => t.textContent.endsWit
 await wait(100);
 const worldsData = JSON.parse(readFileSync(join(ROOT, 'public/trials/worlds.json'), 'utf8'));
 check('worlds tab shows one square per recorded world', (await js(`document.querySelectorAll('.cell').length`)) === worldsData.worlds.length);
-check('worlds tab heading uses the recorded count', (await js(`document.querySelector('.worlds-head h1').textContent`)) === `${worldsData.worlds.filter(w => !w.passed).length} of ${worldsData.worlds.length} tested worlds failed`);
+check('worlds tab heading uses the recorded count', (await js(`document.querySelector('.worlds-head h1').textContent`)) === `${worldsData.worlds.filter(w => !w.passed && w.failure && w.failure !== 'sim_diverged').length} of ${worldsData.worlds.length} tested worlds failed`);
 await shot('tab-worlds.png');
 await js(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'World').click()`);
 await wait(200);

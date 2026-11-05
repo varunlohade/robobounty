@@ -5,10 +5,22 @@
  },
  {
   "id": "dubai-world-013",
-  "label": "Dubai world 013: slip_distance"
+  "label": "Dubai world 013: detach"
  },
  {
   "id": "dubai-world-009",
-  "label": "Dubai world 009: detach"
+  "label": "Dubai world 009: slip_distance"
+ },
+ {
+  "id": "dubai-v4-world-007",
+  "label": "Dubai v4 world_007: slip_distance"
+ },
+ {
+  "id": "dubai-v4-world-008",
+  "label": "Dubai v4 world_008: false_done"
+ },
+ {
+  "id": "dubai-v4-world-011",
+  "label": "Dubai v4 world_011: detach"
  }
 ]

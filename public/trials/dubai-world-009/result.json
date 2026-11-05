@@ -1,43 +1,51 @@
 {
+ "outcome": "fail",
+ "hold_s": 65.3,
+ "hold_mean_wind_ms": 10.75,
  "passed": false,
- "failure": "detach",
+ "failure": "slip_distance",
  "fired": {
+  "slip_distance": {
+   "t": 73.1,
+   "value": 0.3479
+  },
   "detach": {
-   "t": 72.25,
-   "value": 0.1398
+   "t": 342.7,
+   "value": 0.1014
   },
   "coverage": {
-   "t": 80.25,
-   "value": 0.25
+   "t": 342.7,
+   "value": 0.5364
   }
  },
- "coverage": 0.25,
+ "coverage": 0.5364,
  "reported_done": false,
- "reported_coverage": 0.2323,
- "slip_m": 0.1535,
- "peak_tether_n": 815.17,
+ "reported_coverage": 0.7509,
+ "slip_m": 0.8247,
+ "peak_tether_n": 199.87,
  "peak_chassis_contact_n": 0.0,
- "min_pressure_pa": 0.0,
- "time_s": 80.25,
- "end_battery": 0.9799,
+ "min_pressure_pa": 182.6,
+ "time_s": 342.7,
+ "end_battery": 0.8982,
  "status": "ok",
  "seed": 1009,
  "world_sha256": "f76d0f17454d06832e936069398717b2a5841f8929662b6216cf2fd50403cf7b",
  "model_sha256": "b79c94a123601ec1728ed2e7562be6d73b6187a2175e7ae56798d3f0f1fbb9e9",
  "start_state_sha256": "7ce1b32db3fe3825a4869b806dd87841fbd53addd81cc4d386c20ba51c37d9db",
- "final_state_sha256": "8aa05f6c6b48c777a385b3c64935ad32157ff92da3eb7d27a703273af98393ca",
- "action_chain_head": "002fc6f7836a5660e6c13651b7f8913b3e9432c47bc8f8da5ca80c11f62606c2",
- "steps": 1605,
- "wall_s": 0.627,
+ "final_state_sha256": "7843ad04ab7edddc214ed97310a52e3a29b7a09f89d90f6f51fbe24fe230f9ab",
+ "action_chain_head": "21dc7eaef2cbcc52711be6b879fe93dac604b3ec77d524417194dd19d07a852e",
+ "steps": 6854,
+ "wall_s": 8.632,
  "versions": {
   "mujoco": "3.8.1",
   "numpy": "2.2.6"
  },
  "code_sha256": {
   "controller.py": "85e7220d4a09c7dd8c89ed5335542ede770d697c239e2d8ab9f5fd8a20f60ad6",
-  "sim.py": "984be8d23f219c3129a14ac1642b35ff9190edcf8d0b713efdabaf10dc4172af",
-  "world.py": "e832ee763ed7343a819f890d0c580f0adddd7ce87d28c10308f363b9ebc470f5",
-  "judge.py": "1bf5310fe29237ffd5e8fa090b70a781c1d334de661afe4e3d41684c0369bb9a",
-  "run_trial.py": "26118b1a7876c34ba00cbc54196182c31f678682d79fecf101e667555aeceac0"
+  "sim.py": "0e36d3bf97fe99a5d96f3229a579d6fdd2748c4bccabb6b1c76eb2af6b5fe2ac",
+  "world.py": "0db7f46e3c01a156f29ead71846ddb964344a73c89b85264612a9bc8cc85d2db",
+  "elements.py": "906a8a7c2ce4bb939e5558dd2f8d3c38d8071282bde2c5b774af314430625179",
+  "judge.py": "135131fad8267778d0dc19b9f788d78fd5f9021e203bfaa6406da27b3fcfa702",
+  "run_trial.py": "03aef573b49464f37ab9aaa03012cb036441c6c3f7a9eb3e8d433d3d1ecedea5"
  }
 }

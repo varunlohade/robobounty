@@ -1,51 +1,47 @@
 {
+ "outcome": "fail",
+ "hold_s": 4.4,
+ "hold_mean_wind_ms": 9.45,
  "passed": false,
- "failure": "slip_distance",
+ "failure": "detach",
  "fired": {
-  "slip_distance": {
-   "t": 90.4,
-   "value": 0.4509
-  },
   "detach": {
-   "t": 90.6,
-   "value": 0.1191
-  },
-  "tether_load": {
-   "t": 96.7,
-   "value": 4496.6935
+   "t": 90.35,
+   "value": 0.1889
   },
   "coverage": {
-   "t": 98.6,
-   "value": 0.2837
+   "t": 90.35,
+   "value": 0.2841
   }
  },
- "coverage": 0.2837,
+ "coverage": 0.2841,
  "reported_done": false,
- "reported_coverage": 0.2587,
- "slip_m": 0.7326,
- "peak_tether_n": 4496.69,
+ "reported_coverage": 0.2595,
+ "slip_m": 0.2577,
+ "peak_tether_n": 0.0,
  "peak_chassis_contact_n": 0.0,
- "min_pressure_pa": 0.0,
- "time_s": 98.6,
- "end_battery": 0.9743,
+ "min_pressure_pa": 42.8,
+ "time_s": 90.35,
+ "end_battery": 0.9752,
  "status": "ok",
  "seed": 1013,
  "world_sha256": "6e15e3f75996be410bc7f8d002913b1377432ad4002a2381ad2bf5f7690b9e91",
  "model_sha256": "b79c94a123601ec1728ed2e7562be6d73b6187a2175e7ae56798d3f0f1fbb9e9",
  "start_state_sha256": "9656ae19f9263a82960a42a1782a5b1cc3d1b0717214f697ed714ef146768028",
- "final_state_sha256": "6a0e5cbabc71a646e664e66eba705d424a58ef2ae6338993976c7d423a9b6133",
- "action_chain_head": "d6aebf5f4067653593072c67b9e3c848ce169d3710afe260a0207b0f5ad31a66",
- "steps": 1972,
- "wall_s": 0.807,
+ "final_state_sha256": "55ba5039a9e4117fa015bb9d26a37ef3bc9d5de1c30c5f90d6926b0d3b576bed",
+ "action_chain_head": "80137e39b49312f74ab02640a74506f174bc6f37939b6b890bfeeea4535be0ec",
+ "steps": 1807,
+ "wall_s": 1.6,
  "versions": {
   "mujoco": "3.8.1",
   "numpy": "2.2.6"
  },
  "code_sha256": {
   "controller.py": "85e7220d4a09c7dd8c89ed5335542ede770d697c239e2d8ab9f5fd8a20f60ad6",
-  "sim.py": "984be8d23f219c3129a14ac1642b35ff9190edcf8d0b713efdabaf10dc4172af",
-  "world.py": "e832ee763ed7343a819f890d0c580f0adddd7ce87d28c10308f363b9ebc470f5",
-  "judge.py": "1bf5310fe29237ffd5e8fa090b70a781c1d334de661afe4e3d41684c0369bb9a",
-  "run_trial.py": "26118b1a7876c34ba00cbc54196182c31f678682d79fecf101e667555aeceac0"
+  "sim.py": "0e36d3bf97fe99a5d96f3229a579d6fdd2748c4bccabb6b1c76eb2af6b5fe2ac",
+  "world.py": "0db7f46e3c01a156f29ead71846ddb964344a73c89b85264612a9bc8cc85d2db",
+  "elements.py": "906a8a7c2ce4bb939e5558dd2f8d3c38d8071282bde2c5b774af314430625179",
+  "judge.py": "135131fad8267778d0dc19b9f788d78fd5f9021e203bfaa6406da27b3fcfa702",
+  "run_trial.py": "03aef573b49464f37ab9aaa03012cb036441c6c3f7a9eb3e8d433d3d1ecedea5"
  }
 }
