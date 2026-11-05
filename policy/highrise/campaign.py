@@ -116,7 +116,7 @@ def table(rows):
     groups = sorted({r["group"] for r in rows if r.get("group")})
     for g in groups:
         sub = [r for r in rows if r.get("group") == g]
-        kinds = Counter(r["failure"] for r in sub if not r["passed"])
+        kinds = Counter(r["failure"] or r.get("outcome") for r in sub if not r["passed"])
         lines.append(f"group {g}: {sum(r['passed'] for r in sub)}/{len(sub)} passed, first failures {dict(kinds)}")
     broken = [r["trial"] for r in rows if r["failure"] == "sim_diverged"]
     lines.append(f"numerical divergence, left out of the rates: {len(broken)} {broken[:8]}")
