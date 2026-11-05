@@ -25,7 +25,16 @@ design/film/ref
 design/film/frames
 design/cinematic/*.mp4
 design/cinematic/_cache
+design/film/real
+design/film/.session
+design/film/astra-film*.log
+policy/.venv-newton
 design/render/
 *.blend
 *.blend1
 policy/render/__pycache__
+design/cinematic/*
+!design/cinematic/*.md
+design/film/*/
+cache/
+**/__pycache__/
