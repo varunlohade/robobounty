@@ -52,3 +52,8 @@ Owner's words: "I think we can have AI fix those failures, or the user can also 
 
 Flow: the AI tries a fix first. If the fix does not pass, the company posts a bounty for experienced engineers, with the failure pack attached. A solver's fix runs through the same worlds. The contract pays only on a passing result, after the dispute window.
 This makes the bounty the escalation path, not an add-on.
+
+## Demo change (owner, 2026-11-06)
+Owner's words: "let's have a AI robot cleaning the mirrors of a high-rise building ... why would there be an arm in a kitchen, right? ... Use that video which they have on their website as a reference and try to build something similar."
+The hero demo moves from the LIBERO kitchen arm to a simulated high-rise glass-cleaning robot in MuJoCo. The SmolVLA batch is stopped at the scenes it finished; results stay on disk and it can resume.
+Google is the owner's video service for the concept film.
