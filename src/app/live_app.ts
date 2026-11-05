@@ -6,6 +6,8 @@ import { Replay, loadMujoco, wasmStats } from './replay.ts';
 import { SimView } from './view.ts';
 import { worldPage } from './world_page.ts';
 import { WorldsPage } from './worlds_page.ts';
+import { FixPage } from './fix_page.ts';
+import { BountyPage } from './bounty_page.ts';
 import { loadTrialFrom, type Trial, type WorldRun } from './trial.ts';
 
 const CHAPTERS = ['Brief', 'Worlds', 'Test', 'Find', 'Fix', 'Bounty'];
@@ -38,11 +40,11 @@ function chapterBar() {
 }
 
 // Each run shows the code that produced it. The tab fills in after the first run.
-function codeInto(page: HTMLElement, trial: Trial) {
+function codeText(page: HTMLElement, text: string, head: string) {
   const pre = el('pre', 'code');
   pre.tabIndex = 0;
-  for (const line of trial.controller.replace(/\n$/, '').split('\n')) pre.append(el('span', 'code-line', line));
-  page.replaceChildren(el('div', 'code-head', 'controller.py, read only. This copy recorded the run on the World tab.'), pre);
+  for (const line of text.replace(/\n$/, '').split('\n')) pre.append(el('span', 'code-line', line));
+  page.replaceChildren(el('div', 'code-head', head), pre);
 }
 
 export async function liveApp(app: HTMLElement, title: HTMLElement) {
@@ -50,6 +52,8 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
   const counts = el('span');
   const simLine = el('span', '', 'sim unknown');
   const llmLine = el('span', '', 'LLM unknown');
+  const llmCount = el('span');
+  const bountyLabel = el('span', 'status-ledger');
   statusEnd.append(counts, simLine);
 
   const worldHost = el('div', 'page');
@@ -62,7 +66,15 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
   const codePage = el('div', 'page page-text');
   codePage.append(el('h2', '', 'No run yet'), el('p', '', 'The code shows here after the normal run.'));
 
-  const pages: [string, HTMLElement][] = [['World', worldHost], ['Worlds', worldsView.page], ['Report', reportPage], ['controller.py', codePage]];
+  const fixView = new FixPage();
+  let lastFailedWorld: unknown = null;
+  const bountyView = new BountyPage({
+    act: action => backend.act(action),
+    submit: (world, seed) => backend.submit(world, seed),
+    sampleWorld: () => (lastFailedWorld ? JSON.stringify(lastFailedWorld, null, 1) : null),
+  });
+  const pages: [string, HTMLElement][] = [['World', worldHost], ['Worlds', worldsView.page], ['Fix', fixView.page], ['Bounty', bountyView.page], ['Report', reportPage], ['controller.py', codePage]];
+  const TAB = { worlds: 1, fix: 2, bounty: 3, report: 4, code: 5 };
   const tabs = el('nav', 'tabs');
   tabs.setAttribute('role', 'tablist');
   const pane = el('main', 'pane');
@@ -151,7 +163,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
     world.viewport.dataset.tid = tid;
     bar.play.disabled = false;
     bar.play.onclick = () => world.toggle();
-    codeInto(codePage, trial);
+    codeText(codePage, trial.controller, 'controller.py, read only. This copy recorded the run on the World tab.');
     if (!open) show(1);
   }
 
@@ -192,16 +204,29 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
         break;
       case 'pipeline':
         worldsView.setPipeline(e.stages);
-        show(1);
+        if (e.stages.every((x: { name: string; state: string }) => x.name !== 'fixing' || x.state !== 'now')) show(TAB.worlds);
         break;
-      case 'result': worldsView.addResult(e as never); break;
+      case 'result':
+        worldsView.addResult(e as never);
+        if (!e.passed && e.failure && e.kind !== 'elements') lastFailedWorld = e.world;
+        break;
+      case 'llm_count': llmCount.textContent = `AI calls ${e.used} of ${e.cap}`; break;
+      case 'fix': fixView.show(e); show(TAB.fix); break;
+      case 'fix_decision':
+        fixView.decided(e);
+        if (e.code) codeText(codePage, e.code, `controller.py, session copy ${e.copy_sha}. The real file did not change (${e.real_sha}). Runs here still use the real file.`);
+        break;
+      case 'bounty_draft': bountyView.showDraft(e); bountyLabel.textContent = e.label; show(TAB.bounty); break;
+      case 'ledger': bountyView.showLedger(e); break;
+      case 'gate_running': bountyView.gateRunning(e); break;
+      case 'verdict': bountyView.showVerdict(e); break;
       case 'failures': worldsView.setFailures(e as never); break;
       case 'report': report(e); break;
       case 'idle': app.dataset.idle = String(Number(app.dataset.idle ?? 0) + 1); break;
     }
   });
 
-  const chat = new ChatPanel(backend, tab => show(tab === 'worlds' ? 1 : 3), 'Simulated');
+  const chat = new ChatPanel(backend, tab => show(tab === 'worlds' ? TAB.worlds : TAB.code), 'Simulated');
   const chatHead = el('div', 'chat-head');
   chatHead.append(el('span', '', 'Chat'));
   const newChat = el('button', 'icon-btn');
@@ -212,7 +237,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
   chatHead.append(newChat);
 
   const status = el('footer', 'status');
-  status.append(el('span', '', 'Simulated'), llmLine, el('span', '', 'Hand-built physics, not checked against real hardware'), statusEnd);
+  status.append(el('span', '', 'Simulated'), llmLine, llmCount, bountyLabel, el('span', '', 'Hand-built physics, not checked against real hardware'), statusEnd);
   app.classList.add('live');
   app.append(chatHead, el('div', 'head-rule'), tabs, chat.root, divider(), pane, bar.root, status);
 

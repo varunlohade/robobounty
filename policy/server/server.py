@@ -11,6 +11,8 @@ import hashlib
 import json
 import os
 import re
+import secrets
+import shutil
 import signal
 import subprocess
 import sys
@@ -24,6 +26,9 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import ledger as ledger_module
+
 POLICY = HERE.parent
 HIGHRISE = POLICY / "highrise"
 CRASHLAB = POLICY / "crashlab"
@@ -38,6 +43,15 @@ MAX_BRIEF_CHARS = 1800
 QUICK_WORLDS = 12
 HELD_BACK_SHARE = 5  # one world in this many, from each group of 3 or more
 LLM_CAP_USD = "0.50"
+MAX_LLM_PER_SESSION = 10
+MAX_LLM_PER_HOUR = 40  # across all sessions
+MAX_SUBMIT_BODY_BYTES = 64 * 1024  # the gate applies its own lower limit to the world file
+STORED_FIX = POLICY / "runs" / "highrise" / "campaign_dubai_v4" / "fix"
+GATE = POLICY / "bounty" / "gate.py"
+CONTROLLER = HIGHRISE / "controller.py"
+# Local test addresses for the ledger's separate roles. They have no key and no wallet.
+COMPANY, RESOLVER, ARBITER = ("0x" + c * 40 for c in "abc")
+_FINGERPRINT = re.compile(r"^0x[0-9a-f]{64}$")
 TRIAL_FILES = {"manifest.json", "model.xml", "qpos.json", "result.json", "world.json", "controller.py.txt", "trace.json", "wind.json", "dirt.bin"}
 _ID = re.compile(r"^[a-z0-9-]{1,40}$")
 _SID = re.compile(r"^[0-9a-f]{32}$")
@@ -93,6 +107,30 @@ LIVE_LOCK = threading.Lock()
 RECORDED = None
 
 
+class LlmLimit:
+    """Counts every LLM call before it starts: per session and, over the last hour, across all sessions."""
+
+    def __init__(self):
+        self.session_cap, self.hour_cap = MAX_LLM_PER_SESSION, MAX_LLM_PER_HOUR
+        self.lock, self.times = threading.Lock(), []
+
+    def take(self, session):
+        with self.lock:
+            now = time.time()
+            self.times = [t for t in self.times if now - t < 3600]
+            if session.llm_used >= self.session_cap:
+                return "session"
+            if len(self.times) >= self.hour_cap:
+                return "global"
+            session.llm_used += 1
+            self.times.append(now)
+        session.emit(type="llm_count", used=session.llm_used, cap=self.session_cap)
+        return None
+
+
+LLM_LIMIT = LlmLimit()
+
+
 def spawn(argv, **kw):
     # Own process group, so shutdown can stop a campaign and its pool. Low priority, so the Mac stays usable.
     env = {**os.environ, "CRASHLAB_RECORDED_REPLIES": RECORDED} if RECORDED else None
@@ -138,6 +176,32 @@ def llm_label():
     return f"stored {' and '.join(stored)} reply, check only"
 
 
+def sha_file(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def ab_rows(ab, names):
+    """One table row per world set, from fix.py's own counts."""
+    rows = []
+    for key, label in names:
+        b = ab.get(key)
+        if b:
+            rows.append({"set": label, "n": b["n"], "pass_a": b["A"]["pass"], "pass_b": b["B"]["pass"], "fail_a": b["A"]["fail"], "fail_b": b["B"]["fail"], "better": b["better"], "worse": b["worse"],
+                         "same": b["same"], "p": b["sign_test_p_one_sided"], "limits_hit": b["limits_hit_B"], "replay_mismatch": b["replay_mismatch_B"]})
+    return rows
+
+
+def retest_conclusion(r):
+    """The three conclusions fixed in retest_2026-11-06/PLAN.md, before the run."""
+    required = r["sign_test_pass"] and r["controls_all_pass"] and not r["detach_or_slip_rose"]
+    floor = r["blind_point"]["floor"]
+    if not required:
+        return "did not help"
+    if floor["lowest_estimate_pa"] >= floor["guard_pa"]:
+        return "helped on the counts but removed the low-pressure guard in the clean phase. Not recommended as it stands."
+    return "helped on the counts and kept the guard"
+
+
 def sim_hash():
     return hashlib.sha256((HIGHRISE / "sim.py").read_bytes()).hexdigest()
 
@@ -163,6 +227,19 @@ class Session:
         self.results, self.batches, self.excluded, self.diverged, self.types = {}, 0, {}, [], []
         self.held, self.round = set(), 0
         self.exports = {}
+        self.llm_used = 0
+        self.last_campaign, self.fix_try, self.fix_summary, self.fix_decision = None, None, None, None
+        self.ledger, self.bounty_salt, self.spec_path, self.gate_info, self.verdicts = None, None, None, None, []
+        self.last_seconds, self.last_recorded = None, None
+        self.tester = "0x" + hashlib.sha256(self.id.encode()).hexdigest()[:40]
+
+    def llm_allowed(self):
+        hit = LLM_LIMIT.take(self)
+        if hit:
+            words = f"This chat used its {LLM_LIMIT.session_cap} AI calls." if hit == "session" else f"The run server reached its limit of {LLM_LIMIT.hour_cap} AI calls an hour."
+            self.tool("llm_limit", "refused", [json.dumps({"limit": hit})])
+            self.say(f"{words} Nothing was sent to the AI.", fail=True)
+        return not hit
 
     def emit(self, **event):
         with self.cond:
@@ -223,10 +300,18 @@ class Session:
         if name == "replay" and type(value) is int and value in self.results:
             threading.Thread(target=self.replay, args=(value,), daemon=True).start()
             return 202, {"ok": True}
+        if name == "fix_recorded" and self.proposal:
+            return self.start(self.fix_recorded)
+        if name == "fix_live" and self.last_campaign:
+            return self.start(self.fix_live)
+        if name in ("fix_accept", "fix_reject") and self.fix_try and not self.fix_decision:
+            return self.start(self.decide_fix, name == "fix_accept")
         if name == "bounty" and self.proposal:
-            self.chapter("bounty", "Stub: nothing was sent")
-            self.say("Bounty stub. Nothing was sent and no contract ran. This button is not connected yet.")
-            return 200, {"ok": True}
+            return self.start(self.bounty_draft)
+        if name == "fund" and self.gate_info and self.ledger is None and isinstance(value, dict):
+            return self.start(self.fund, value)
+        if name in ("ledger_reject", "ledger_finalize", "ledger_claim") and self.ledger and isinstance(value, str) and _FINGERPRINT.match(value):
+            return self.ledger_step(name, value)
         return 409, {"error": "not_now"}
 
     # Steps 1 to 4: quick questions, build, look, requirements, one normal run.
@@ -237,6 +322,8 @@ class Session:
             self.say(REJECTION_WORDS["brief_too_long"], fail=True)
             return
         self.chapter("brief")
+        if not self.llm_allowed():
+            return
         self.working("reading the brief")
         reply = job(HERE / "plan_job.py", {"text": joined}, "plan")
         if reply is None:
@@ -373,6 +460,9 @@ class Session:
     # Step 5: scenario agent and the campaign review.
     def scene_ok(self):
         self.emit(type="retire")
+        if not self.llm_allowed():
+            self.phase = "review_scene"
+            return
         self.working("working out what could go wrong")
         folder = self.dir / f"scenarios_{self.round}"
         t0 = time.time()
@@ -423,8 +513,8 @@ class Session:
     # Steps 6, 7 and 10: the pipeline, failure groups, excluded runs and the report.
     def pipeline(self, now, **notes):
         at = STAGES.index(now)
-        off = {"fixing": "not connected", "validating": "not run"}
-        self.emit(type="pipeline", stages=[{"name": s, "state": "off" if s in off and (i <= at or now == s) else "done" if i < at else "now" if i == at else "todo",
+        off = {} if now == "fixing" or notes.get("fixing") else {"fixing": "not tried", "validating": "not run"}
+        self.emit(type="pipeline", stages=[{"name": s, "state": "off" if s in off and i <= at else "done" if i < at else "now" if i == at else "todo",
                                             "note": notes.get(s) or off.get(s)} for i, s in enumerate(STAGES)])
 
     def approve(self, limit):
@@ -440,7 +530,7 @@ class Session:
         self.batches += 1
         batch = self.proposal["folder"] / f"batch_{self.batches}"
         batch.mkdir()
-        plan = {"worlds": [{"file": str(Path("..") / worlds[i]["file"]), "group": worlds[i]["group"]} for i in chosen]}
+        plan = {"worlds": [{"file": str(Path("..") / worlds[i]["file"]), "group": worlds[i]["group"]} for i in chosen], "llm_reply": self.proposal.get("llm_reply")}
         (batch / "scenarios.json").write_text(json.dumps(plan))
         out = batch / "campaign"
         self.working(f"waiting for {MAX_PROCS} free processes")
@@ -476,16 +566,20 @@ class Session:
         self.pipeline("report", diagnosing=None if diagnosis else "failed, see log")
         self.group_failures(diagnosis, chosen)
         self.emit(type="sim", sha=recorded, now=sim_hash())
-        self.report(time.time() - started, recorded)
+        self.last_campaign, self.last_seconds, self.last_recorded = out, time.time() - started, recorded
+        self.report()
         self.phase = "done"
         self.chapter("find", None if self.types else "No failure type found")
+        if self.types:
+            self.emit(type="card", title="Try a fix", body="fix.py edits a copy of controller.py in a sandbox, then tests it on the same worlds and on held-back worlds the AI never saw.",
+                      actions=[{"label": "Show the recorded result", "action": "fix_recorded"}, {"label": "Try a fix live (1 AI call)", "action": "fix_live"}])
         waiting = [i for i in range(len(worlds)) if i not in self.held and i not in self.results]
         if waiting:
             self.emit(type="card", title=f"{len(waiting)} worlds not run yet", body="You approved part of the campaign.",
                       actions=[{"label": f"Run the other {len(waiting)}", "action": "approve"}])
         if self.proposal["not_tested"]:
             self.emit(type="card", title="Not tested", body="No physics for these here, so they get no pass.", items=[t["factor"] for t in self.proposal["not_tested"]],
-                      actions=[{"label": "Send to a bounty", "action": "bounty", "keep": True}], note="Stub, not connected yet")
+                      actions=[{"label": "Send to a bounty", "action": "bounty", "keep": True}])
 
     def spread(self, waiting, limit):
         """Takes worlds from each group in turn, so a short run still covers every risk."""
@@ -516,7 +610,7 @@ class Session:
             drawn = thumb_and_end(run)
             result = {k: row[k] for k in ("passed", "failure", "fired", "coverage", "time_s", "min_pressure_pa", "seed", "wall_s", "outcome", "group", "slip_m", "peak_tether_n")}
             full = json.loads((run / "result.json").read_text())
-            result.update(index=index, name=Path(self.proposal["worlds"][index]["file"]).stem, thumb=drawn["thumb"], end=drawn["end"], run=str(run), fired=full["fired"], kind=row["kind"])
+            result.update(index=index, name=Path(self.proposal["worlds"][index]["file"]).stem, thumb=drawn["thumb"], end=drawn["end"], run=str(run), fired=full["fired"], kind=row["kind"], world=row["world"])
             self.results[index] = result
             rows[-1]["sim_sha"] = full["code_sha256"]["sim.py"]
             self.emit(type="result", **{k: v for k, v in result.items() if k != "run"})
@@ -571,20 +665,235 @@ class Session:
         if routes:
             self.emit(type="card", title="Code cannot fix these", body="The robot was already at its limit when they began. They need a person or a bounty.",
                       items=[f"{r['failure_type']} in {r['count']} worlds: {r['needs']}" for r in routes],
-                      actions=[{"label": "Send to a bounty", "action": "bounty", "keep": True}], note="Stub, not connected yet")
+                      actions=[{"label": "Send to a bounty", "action": "bounty", "keep": True}])
 
-    def report(self, seconds, recorded):
+    def report(self):
         run = sum(r["kind"] == "varied" for r in self.results.values())
         apart = len(self.results) - run
         real = sum(t["count"] for t in self.types)
         holds = sum(not r["passed"] and r["failure"] is None and r["kind"] == "varied" for r in self.results.values())
         numbers = [{"n": run, "label": "worlds run"}, {"n": len(self.types), "label": "failure types"}, {"n": real, "label": "worlds failed"},
                    {"n": len(self.excluded), "label": "flaky, excluded"}, {"n": len(self.held), "label": "held back"},
-                   {"n": len(self.proposal["not_tested"]), "label": "not tested"}, {"n": 0, "label": "fixes validated (not connected)"}]
+                   {"n": len(self.proposal["not_tested"]), "label": "not tested"}]
         if apart:
             numbers.append({"n": apart, "label": "with scene elements, not counted"})
-        self.emit(type="report", numbers=numbers, seconds=round(seconds, 1), safe_holds=holds, diverged=len(self.diverged),
-                  fixes="Fix and validation are not connected in this build, so no fix ran and no held-back world ran. Before and after: none yet.", sim_recorded=recorded)
+        self.emit(type="report", numbers=numbers, seconds=round(self.last_seconds, 1), safe_holds=holds, diverged=len(self.diverged),
+                  fixes=self.fix_summary or "No fix tried yet. Before and after: none yet.", sim_recorded=self.last_recorded)
+
+    # Step 8: fix.py, live or its stored report. Nothing here writes policy/highrise/controller.py.
+    @staticmethod
+    def diff_lines(path):
+        lines = []
+        for line in Path(path).read_text().splitlines()[:200]:
+            if line.startswith(("---", "+++", "diff ", "index ")):
+                continue
+            kind = "add" if line.startswith("+") else "del" if line.startswith("-") else "same"
+            lines.append({"kind": kind, "text": line[1:] if kind != "same" or line.startswith(" ") else line})
+        return lines
+
+    def offer_fix(self, try_dir, recorded, payload, decided_note):
+        self.fix_try = Path(try_dir)
+        self.fix_decision = None
+        self.chapter("fix", "Recorded result" if recorded else None)
+        lines = self.diff_lines(self.fix_try / "patch.diff")
+        added = sum(l["kind"] == "add" for l in lines)
+        self.emit(type="fix", recorded=recorded, **payload)
+        self.emit(type="diff", file="policy/highrise/controller.py", meta=f"+{added} -{sum(l['kind'] == 'del' for l in lines)}", lines=lines, live=True,
+                  note=decided_note)
+
+    def fix_recorded(self):
+        self.working("reading the stored fix report")
+        retest = json.loads((STORED_FIX / "retest_2026-11-06" / "report.json").read_text())
+        overall = json.loads((STORED_FIX / "report.json").read_text())
+        attempt = json.loads((STORED_FIX / "try_2" / "report.json").read_text())
+        conclusion = retest_conclusion(retest)
+        floor = retest["blind_point"]["floor"]
+        changed = [{"world": w["trial"], "before": w["A_failure"] or w["A"], "after": w["B_failure"] or w["B"]} for w in retest["per_world"] if (w["A_failure"] or w["A"]) != (w["B_failure"] or w["B"])]
+        fresh = retest["fresh"]
+        self.fix_summary = (f"Recorded result: {fresh['better']} better, {fresh['worse']} worse on {retest['fresh_worlds']} held-back worlds. Conclusion: {conclusion}")
+        self.tool("fix_report", "Recorded result", [json.dumps({"better": fresh["better"], "worse": fresh["worse"], "p": fresh["sign_test_p_one_sided"], "controls": f"{retest['controls']['B']['pass']}/{retest['controls']['n']}"})])
+        self.offer_fix(STORED_FIX / "try_2", True, {
+            "title": "Recorded result", "source": "campaign_dubai_v4, try 2, then the larger test written down in retest_2026-11-06/PLAN.md before it ran. No AI call was made now.",
+            "tables": [{"head": "Larger test, new held-back worlds", "rows": ab_rows(retest, (("fresh", "Held-back worlds"), ("controls", "Controls")))},
+                       {"head": "First test of the same patch", "rows": ab_rows(attempt["ab"], (("seen", "Seen worlds"), ("fresh", "Held-back worlds"), ("controls", "Controls")))}],
+            "failing_base": retest["baseline_failing_worlds"], "conclusion": conclusion,
+            "first_verdict": attempt["verdict"]["reasons"], "first_status": overall["status"],
+            "caveats": [f"The patch raises clean-phase suction to {floor['suction_clean']}. At that speed the lowest pressure estimate is {floor['lowest_estimate_pa']} Pa, and the guard fires only under {floor['guard_pa']} Pa. So the low-pressure guard can no longer fire in the clean phase.",
+                        *overall["notes"]],
+            "sandbox": {"validation": attempt["validation"] or ["AST check passed"], "limits_hit": fresh["limits_hit_B"], "replay_mismatch": fresh["replay_mismatch_B"], "held_back_shown_to_ai": overall["held_back_worlds_shown_to_llm"],
+                        "note": overall["limits"][1]},
+            "changed": changed, "limits": overall["limits"][0], "sim_recorded": "0e36d3bf", "sim_now": sim_hash()[:8],
+        }, "Recorded result. Accept writes a copy for this session only. controller.py does not change.")
+        self.report()
+
+    def fix_live(self):
+        out = self.last_campaign
+        stored = RECORDED is not None
+        if not stored and not self.llm_allowed():
+            return
+        self.emit(type="retire")
+        self.pipeline("fixing", diagnosing=None, fixing="AI call" if not stored else "stored patch, no AI call", validating="next")
+        self.working("fix.py: editing a copy, then testing it in the sandbox")
+        t0 = time.time()
+        argv = [PYTHON, str(CRASHLAB / "fix.py"), "run", str(out), "--tries", "1", "--fresh", str(max(QUICK_WORLDS, 12)), "--fresh-seed", str(777 + self.batches), "--procs", str(MAX_PROCS)]
+        if stored:
+            argv += ["--patch", str(STORED_FIX / "try_2" / "controller.py"), "--patch-note", "Check run: stored patch, no AI call."]
+        SLOTS.take(MAX_PROCS)
+        try:
+            with open(self.dir / "fix.log", "ab") as log:
+                p = spawn(argv, stdout=log, stderr=subprocess.STDOUT)
+                code = p.wait()
+                finish(p)
+        finally:
+            SLOTS.give(MAX_PROCS)
+        if code != 0:
+            self.tool("fix", "failed", [f"fix.py exit {code}. No result. Log: fix.log in the session folder."])
+            self.fix_summary = "fix.py stopped with an error, so no fix was tested."
+            self.report()
+            return
+        overall = json.loads((out / "fix" / "report.json").read_text())
+        attempt = overall["tries"][-1]
+        try_dir = out / "fix" / f"try_{attempt['try']}"
+        self.pipeline("report", diagnosing=None, fixing="done", validating=attempt["status"])
+        helped = attempt["status"] == "awaiting_human"
+        ab = attempt.get("ab")
+        reasons = (attempt.get("verdict") or {}).get("reasons") or []
+        conclusion = "helped on the counts. The low-pressure guard check did not run on this patch, so whether the guard still works is unknown." if helped else "did not help" if ab else "The patch did not pass validation, so it was not tested."
+        self.tool("fix", f"{time.time() - t0:.0f} s", [json.dumps({"status": attempt["status"], "validation": attempt["validation"], "reasons": reasons})])
+        self.fix_summary = f"Fix test on this campaign: {conclusion}"
+        if not (try_dir / "patch.diff").exists() or not ab:
+            self.say(f"No fix to review: {conclusion}", fail=True)
+            self.report()
+            return
+        self.offer_fix(try_dir, False, {
+            "title": "Check run, stored patch" if stored else "Live result", "source": "This campaign. fix.py ran now." if not stored else "This campaign. fix.py ran now on a stored patch, with no AI call.",
+            "tables": [{"head": "Paired test", "rows": ab_rows(ab, (("seen", "Seen worlds"), ("fresh", "Held-back worlds"), ("controls", "Controls")))}],
+            "conclusion": conclusion, "first_verdict": reasons, "first_status": attempt["status"], "caveats": ["Small sample: this used the 12-world campaign and 12 held-back worlds drawn by fix.py, not the worlds marked held back on the grid."],
+            "sandbox": {"validation": attempt["validation"] or ["AST check passed"], "limits_hit": ab["fresh"]["limits_hit_B"], "replay_mismatch": ab["fresh"]["replay_mismatch_B"], "held_back_shown_to_ai": overall["held_back_worlds_shown_to_llm"], "note": overall["limits"][1]},
+            "changed": [], "limits": overall["limits"][0], "sim_recorded": (self.last_recorded or "unknown")[:8], "sim_now": sim_hash()[:8],
+        }, "Accept writes a copy for this session only. controller.py does not change.")
+        self.report()
+
+    def decide_fix(self, accepted):
+        before = sha_file(CONTROLLER)
+        self.fix_decision = "accepted" if accepted else "rejected"
+        if accepted:
+            copy = self.dir / "controller_session_copy.py"
+            shutil.copyfile(self.fix_try / "controller.py", copy)
+            after = sha_file(CONTROLLER)
+            self.tool("fix_accept", "session copy only", [json.dumps({"session_copy_sha256": sha_file(copy)[:12], "real_controller_sha256": after[:12], "real_controller_changed": before != after})])
+            self.emit(type="fix_decision", accepted=True, text="Accepted for this session only. policy/highrise/controller.py did not change, and runs here still use it.",
+                      code=copy.read_text(), real_sha=after[:12], copy_sha=sha_file(copy)[:12])
+        else:
+            self.tool("fix_reject", "ok", [json.dumps({"real_controller_sha256": before[:12]})])
+            self.emit(type="fix_decision", accepted=False, text="Rejected. Nothing changed.", real_sha=before[:12])
+        self.fix_summary = f"{self.fix_summary} You {self.fix_decision} it. policy/highrise/controller.py did not change."
+        self.report()
+
+    # Step 9: the bounty. A local ledger with the contract's states. No chain, wallet or key.
+    def bounty_job(self, command, request):
+        SLOTS.take(1)
+        try:
+            p = spawn([PYTHON, str(HERE / "bounty_job.py"), command], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            out, _ = p.communicate(json.dumps(request).encode())
+            finish(p)
+            return json.loads(out) if p.returncode == 0 else None
+        finally:
+            SLOTS.give(1)
+
+    def bounty_draft(self):
+        self.chapter("bounty", "Local ledger")
+        self.working("reading the gate's rules")
+        self.gate_info = self.bounty_job("constants", {})
+        preview = self.bounty_job("spec", {"groups": self.proposal["groups"], "salt": "00" * 32, "preview": True})
+        if not self.gate_info or not preview:
+            self.gate_info = None
+            self.say("The gate would not load, so I cannot draft the bounty. It may be mid-edit. Try again.", fail=True)
+            return
+        unresolved = [{"id": t["id"], "rule": t["rule"], "severity": t["severity"], "count": t["count"]} for t in self.types]
+        self.emit(type="bounty_draft", not_tested=self.proposal["not_tested"], unresolved=unresolved, limits=preview["limits"], narrowed=preview["narrowed"], gate=self.gate_info,
+                  label=ledger_module.LABEL, min_window=ledger_module.MIN_DISPUTE_WINDOW, defaults={"cap": 1000, "per_failure": 100, "window": ledger_module.MIN_DISPUTE_WINDOW}, tester=self.tester,
+                  fix=self.fix_summary)
+        self.tool("bounty_draft", ledger_module.LABEL, [json.dumps({"not_tested": len(self.proposal["not_tested"]), "unresolved_failure_types": len(unresolved), "gate_needs": f"{self.gate_info['repeat_need']} of {self.gate_info['reruns']}"})])
+
+    def ledger_event(self):
+        self.emit(type="ledger", bounty=self.ledger.bounty, failures=self.ledger.failures, now=time.time(), label=ledger_module.LABEL)
+
+    def fund(self, value):
+        amounts = [value.get(k) for k in ("cap", "per_failure", "window")]
+        if not all(type(v) is int and 0 < v < 10**12 for v in amounts):
+            self.say("The amounts must be whole positive numbers.", fail=True)
+            return
+        folder = self.dir / "bounty"
+        folder.mkdir(exist_ok=True)
+        self.bounty_salt = secrets.token_hex(32)
+        (folder / "salt.hex").write_text(self.bounty_salt)
+        self.spec_path = folder / "spec.json"
+        spec = self.bounty_job("spec", {"groups": self.proposal["groups"], "salt": self.bounty_salt, "out": str(self.spec_path)})
+        if not spec:
+            self.say("The spec did not build.", fail=True)
+            return
+        ledger = ledger_module.Ledger(folder / "ledger.json")
+        try:
+            ledger.fund(spec["spec_hash"], amounts[0], amounts[1], amounts[2], COMPANY, RESOLVER, ARBITER)
+        except ledger_module.LedgerError as e:
+            self.say(f"The ledger refused that: {e}. The contract has the same rule.", fail=True)
+            return
+        self.ledger = ledger
+        self.ledger_event()
+        self.tool("fund_bounty", ledger_module.LABEL, [json.dumps({"cap": amounts[0], "per_failure": amounts[1], "dispute_window_s": amounts[2], "spec_hash": spec["spec_hash"][:18]})])
+
+    def submit(self, text, seed):
+        """The pasted text goes into a file with a fixed name, and only the gate reads it. It never reaches an argv or a reply."""
+        n = len(self.verdicts) + 1
+        folder = self.dir / "bounty" / f"submission_{n}"
+        folder.mkdir(parents=True)
+        (folder / "world.json").write_bytes(text.encode("utf-8", "replace"))
+        paid = folder / "paid.json"
+        paid.write_text(json.dumps(self.ledger.paid_list()))
+        self.emit(type="gate_running", n=n)
+        self.working(f"gate.py: up to {self.gate_info['reruns'] + 2} runs")
+        t0 = time.time()
+        SLOTS.take(2)
+        try:
+            with open(self.dir / "gate.log", "ab") as log:
+                p = spawn([PYTHON, str(GATE), "--world", str(folder / "world.json"), "--spec", str(self.spec_path), "--paid", str(paid), "--salt-file", str(self.dir / "bounty" / "salt.hex"),
+                           "--submitter", self.tester, "--seed", seed, "--out", str(folder)], stdout=log, stderr=subprocess.STDOUT)
+                code = p.wait()
+                finish(p)
+        finally:
+            SLOTS.give(2)
+        found = sorted(folder.glob("*/verdict.json"))
+        if code not in (0, 1) or not found:
+            self.tool("gate", "failed", [f"gate.py exit {code}. No verdict."])
+            self.emit(type="verdict", n=n, accepted=False, code="gate_crashed", reason="The gate stopped with an error, so there is no verdict.", repeat=None, wall=round(time.time() - t0, 1))
+            return
+        v = json.loads(found[-1].read_text())
+        self.verdicts.append(v)
+        keep = {k: v.get(k) for k in ("accepted", "code", "reason", "stage", "repeat", "fingerprint", "result_hash", "reference_check", "hardware_check", "not_checked", "human_cap")}
+        self.emit(type="verdict", n=n, wall=round(time.time() - t0, 1), runs=len(v.get("runs") or []), **keep)
+        self.tool("gate", f"{time.time() - t0:.1f} s", [json.dumps({"accepted": v["accepted"], "code": v["code"], "runs": len(v.get("runs") or [])})])
+        if v["accepted"]:
+            try:
+                self.ledger.propose(self.tester, v["fingerprint"], v["result_hash"])
+            except ledger_module.LedgerError as e:
+                self.say(f"The local ledger refused the proposal: {e}.", fail=True)
+            self.ledger_event()
+
+    def ledger_step(self, name, fingerprint):
+        try:
+            if name == "ledger_reject":
+                self.ledger.reject(fingerprint)
+            elif name == "ledger_finalize":
+                self.ledger.finalize(fingerprint)
+            else:
+                self.ledger.claim(fingerprint, self.tester)
+        except ledger_module.LedgerError as e:
+            self.ledger_event()
+            return 409, {"error": str(e)}
+        self.ledger_event()
+        self.tool(name, ledger_module.LABEL, [json.dumps({"fingerprint": fingerprint[:18], "status": self.ledger.failures[fingerprint]["status"]})])
+        return 200, {"ok": True}
 
 
 SESSIONS = {}
@@ -640,7 +949,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.refuse()
         parts = urlsplit(self.path).path.strip("/").split("/")
         if parts == ["api", "health"]:
-            return self.reply(200, {"ok": True, "sim_sha": sim_hash(), "llm": llm_label(), "max_procs": MAX_PROCS})
+            return self.reply(200, {"ok": True, "sim_sha": sim_hash(), "llm": llm_label(), "max_procs": MAX_PROCS, "llm_session_cap": LLM_LIMIT.session_cap})
         if len(parts) >= 4 and parts[:2] == ["api", "sessions"]:
             s = self.session(parts[2])
             if s is None:
@@ -683,7 +992,8 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "-1"))
         except ValueError:
             length = -1
-        if not 0 <= length <= MAX_BODY_BYTES:
+        limit = MAX_SUBMIT_BODY_BYTES if self.path.endswith("/submit") else MAX_BODY_BYTES
+        if not 0 <= length <= limit:
             self.close_connection = True
             return self.reply(413, {"error": "too_large"})
         try:
@@ -707,6 +1017,13 @@ class Handler(BaseHTTPRequestHandler):
             if parts[3] == "message" and isinstance(body.get("text"), str) and body["text"].strip():
                 status, out = s.message(body["text"][:MAX_BRIEF_CHARS + 1])
                 return self.reply(status, out)
+            if parts[3] == "submit" and isinstance(body.get("world"), str) and isinstance(body.get("seed"), str):
+                if s.ledger is None:
+                    return self.reply(409, {"error": "no_bounty"})
+                if not re.fullmatch(r"[0-9]{1,10}", body["seed"]):
+                    return self.reply(400, {"error": "bad_seed"})
+                status, out = s.start(s.submit, body["world"], body["seed"])
+                return self.reply(status, out)
             if parts[3] == "action" and isinstance(body.get("action"), str):
                 status, out = s.action(body["action"], body.get("value"))
                 return self.reply(status, out)
@@ -718,7 +1035,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=5198)
     ap.add_argument("--recorded", help="folder of stored LLM replies. For offline checks only, and the status line says so.")
+    ap.add_argument("--llm-session-cap", type=int, default=MAX_LLM_PER_SESSION)
+    ap.add_argument("--llm-hour-cap", type=int, default=MAX_LLM_PER_HOUR)
     a = ap.parse_args()
+    LLM_LIMIT.session_cap, LLM_LIMIT.hour_cap = a.llm_session_cap, a.llm_hour_cap
     RECORDED = str(Path(a.recorded).resolve()) if a.recorded else None
     RUNS.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer((HOST, a.port), Handler)

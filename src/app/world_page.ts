@@ -102,6 +102,7 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
   rail.append(facts);
 
   viewport.append(el('div', 'sim-tag sim-label', LABEL), el('div', 'sim-tag sim-key', 'Grey is dirt from this run. Bare glass is clean.'));
+  if (manifest.elements?.length) viewport.append(el('div', 'sim-tag sim-elements', `Scene elements: ${manifest.elements.join(', ')}. Not counted in the headline numbers.`));
   const offGlass = el('div', 'sim-tag sim-off fail', 'Robot off the glass. The red line is its recorded path.');
   offGlass.hidden = true;
   viewport.append(offGlass);

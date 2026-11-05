@@ -131,6 +131,7 @@ export class WorldsPage {
     const cell = this.cells.get(run.name);
     if (!cell) return;
     cell.button.className = apart(run) ? 'cell cell-excluded' : failedRun(run) ? 'cell cell-fail' : run.failure === 'sim_diverged' ? 'cell cell-excluded' : 'cell';
+    if (apart(run)) cell.button.dataset.kind = 'elements';
     const said = run.passed ? 'passed' : run.failure ?? run.outcome ?? 'unknown';
     cell.button.title = `${run.name}: ${said}`;
     cell.button.setAttribute('aria-label', cell.button.title);

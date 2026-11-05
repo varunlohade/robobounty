@@ -77,6 +77,13 @@ export class LiveBackend implements ChatBackend {
     if (!res.ok) this.push({ type: 'text', fail: true, text: res.status === 409 ? 'That step is no longer open, or I am still working.' : `The run server refused that: HTTP ${res.status}.` });
   }
 
+  /** Returns a problem to show, or null when the gate started. The world text is posted as data and shown back nowhere. */
+  async submit(world: string, seed: string): Promise<string | null> {
+    const res = await post(`/api/sessions/${this.id}/submit`, { world, seed });
+    if (res.ok) return null;
+    return res.status === 409 ? 'I am still working, or the bounty is not funded yet.' : res.status === 413 ? 'That file is too large.' : res.status === 400 ? 'The seed must be a whole number.' : `The run server refused that: HTTP ${res.status}.`;
+  }
+
   reset() {
     remember(null);
     location.reload();

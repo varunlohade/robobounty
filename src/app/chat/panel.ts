@@ -208,7 +208,8 @@ export class ChatPanel {
     accept.type = reject.type = 'button';
     const answer = (word: string) => {
       accept.disabled = reject.disabled = true;
-      note.textContent = `${word}. This is a stub, so nothing changed.`;
+      if (event.live) void this.backend.act?.({ label: word, action: word === 'Accepted' ? 'fix_accept' : 'fix_reject' });
+      else note.textContent = `${word}. This is a stub, so nothing changed.`;
     };
     accept.addEventListener('click', () => answer('Accepted'));
     reject.addEventListener('click', () => answer('Rejected'));

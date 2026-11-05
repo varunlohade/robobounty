@@ -2,7 +2,7 @@
 export interface Manifest {
   id: string; label: string; hz: number; nq: number; frames: number; python_mujoco: string;
   area: { x0: number; x1: number; z0: number; z1: number };
-  friction: number;
+  friction: number; elements?: string[]; sim_sha256?: string;
   dirt: { nx: number; nz: number; every_steps: number; scale: number; clean_below: number; count: number };
 }
 export interface TrialResult {
