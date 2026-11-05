@@ -13,3 +13,8 @@ design/astra/_brief/real-frames
 design/*/real-frames
 design/blind*
 policy/crashlab/__pycache__
+design/astra-round*.log
+design/astra/.session
+design/astra/_brief
+design/*/inspiration
+policy/crashlab/__pycache__
