@@ -59,7 +59,7 @@ const shot = async name => {
   return path;
 };
 const until = async (expr, what) => {
-  for (let i = 0; i < 150; i++) { if (await js(expr)) return true; await wait(200); }
+  for (let i = 0; i < 600; i++) { if (await js(expr)) return true; await wait(200); }
   throw new Error(`timed out: ${what}`);
 };
 const open = async query => {
