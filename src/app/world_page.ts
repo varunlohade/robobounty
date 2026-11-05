@@ -170,7 +170,7 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
       slider.value = String(f);
       slider.style.setProperty('--done', `${(f / maxFrame) * 100}%`);
       const { area } = manifest;
-      offGlass.hidden = !(Math.abs(robot[1]) > OFF_GLASS_M || robot[0] < area.x0 - OFF_GLASS_M || robot[0] > area.x1 + OFF_GLASS_M
+      offGlass.hidden = !result.failure || !(Math.abs(robot[1]) > OFF_GLASS_M || robot[0] < area.x0 - OFF_GLASS_M || robot[0] > area.x1 + OFF_GLASS_M
         || robot[2] < area.z0 - OFF_GLASS_M || robot[2] > area.z1 + OFF_GLASS_M);
       position.x.textContent = `${robot[0].toFixed(3)} m`;
       position.z.textContent = `${robot[2].toFixed(3)} m`;

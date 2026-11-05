@@ -515,10 +515,10 @@ class Session:
             run = out / row["trial"]
             drawn = thumb_and_end(run)
             result = {k: row[k] for k in ("passed", "failure", "fired", "coverage", "time_s", "min_pressure_pa", "seed", "wall_s", "outcome", "group", "slip_m", "peak_tether_n")}
-            result.update(index=index, name=Path(self.proposal["worlds"][index]["file"]).stem, thumb=drawn["thumb"], end=drawn["end"], run=str(run))
+            full = json.loads((run / "result.json").read_text())
+            result.update(index=index, name=Path(self.proposal["worlds"][index]["file"]).stem, thumb=drawn["thumb"], end=drawn["end"], run=str(run), fired=full["fired"])
             self.results[index] = result
-            if not rows[-1].get("sim_sha"):
-                rows[-1]["sim_sha"] = json.loads((run / "result.json").read_text())["code_sha256"]["sim.py"]
+            rows[-1]["sim_sha"] = full["code_sha256"]["sim.py"]
             self.emit(type="result", **{k: v for k, v in result.items() if k != "run"})
             done = [r for r in self.results.values() if r["index"] in chosen]
             self.tool("run_trials", f"{time.time() - started:.0f} s", [json.dumps({"n": len(chosen), "done": len(done), "failed": sum(self.counts_as_failed(r) for r in done)})], tool_id=f"trials-{self.batches}")

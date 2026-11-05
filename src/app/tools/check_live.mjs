@@ -167,6 +167,7 @@ check('the grid collapsed to a map', (await js(`!!document.querySelector('.map')
 await shot('05-find-map-failures.png');
 console.log('failure types', await js(`[...document.querySelectorAll('.failure-row')].map(e => e.textContent).join(' || ')`));
 console.log('excluded', await js(`[...document.querySelectorAll('.excluded-row')].map(e => e.textContent).join(' || ')`));
+check('no broken event rows', !(await js(`document.querySelector('.worlds').textContent`)).includes('NaN'));
 check('real numbers in the heading', /^\d+ of \d+ tested worlds failed$/.test(await js(`document.querySelector('.worlds-head h1').textContent`)));
 check('fix stage says not connected', (await js(`document.querySelector('.pipeline').textContent`)).includes('not connected'));
 
@@ -196,7 +197,11 @@ await js(`document.querySelector('.chat-list').scrollTop = 1e9`);
 await shot('08-bounty-stub.png');
 check('bounty says it is a stub', (await js(`document.querySelector('.chat-list').textContent`)).includes('Bounty stub. Nothing was sent'));
 
-check('no console errors', problems.length === 0, problems.slice(0, 6).join(' | '));
+// Taking screenshots in this headless GL makes the driver warn about ReadPixels. It is noted, not hidden.
+const driverNotes = problems.filter(p => p.includes('GPU stall due to ReadPixels'));
+const realProblems = problems.filter(p => !driverNotes.includes(p));
+console.log(`driver performance warnings: ${driverNotes.length}`);
+check('no console errors', realProblems.length === 0, realProblems.slice(0, 6).join(' | '));
 writeFileSync(join(OUT, 'timings.json'), JSON.stringify(timings, null, 1));
 console.log(failed ? `${failed} checks failed` : 'all checks passed');
 bye();

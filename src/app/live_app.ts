@@ -113,7 +113,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
     for (const [name, value] of Object.entries(e.world as Record<string, unknown>)) {
       if (name === 'schema') continue;
       const row = el('div', moved.has(name) ? 'fact fact-moved' : 'fact');
-      row.append(el('span', '', name), el('span', '', String(value)));
+      row.append(el('span', '', name), el('span', '', typeof value === 'object' ? JSON.stringify(value) : String(value)));
       facts.append(row);
     }
     rail.append(facts);
