@@ -17,4 +17,5 @@ It binds to 127.0.0.1 only and refuses any other origin. Chat text goes only to 
     policy/.venv/bin/python policy/server/server.py
 
 Open `http://localhost:5199/app.html`. `app.html?trial=<id>` still shows a recorded run with the stub chat.
-Check: `node src/app/tools/check_live.mjs <out dir>`. It makes real LLM calls. Add `--recorded` to use the stored replies in `policy/server/fixtures/`.
+Check: `node src/app/tools/check_live.mjs <out dir>`. It makes real LLM calls. Add `--recorded` to use the stored replies in `policy/server/fixtures/`. Add `--live-fix` to run `fix.py` in place of the stored report.
+LLM calls have a limit of 10 a session and 40 an hour across sessions. The bounty uses `policy/server/ledger.py`, a local ledger with the contract's states. It is not on chain and needs no wallet or key.
