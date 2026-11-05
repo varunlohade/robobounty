@@ -2,6 +2,7 @@ import { el, icon } from './dom.ts';
 import { ChatPanel } from './chat/panel.ts';
 import { StubBackend } from './chat/backend.ts';
 import { LABEL, worldPage } from './world_page.ts';
+import { liveApp } from './live_app.ts';
 import { worldsPage } from './worlds_page.ts';
 import { loadTrial, loadWorlds, trialIndex, type Trial, type TrialEntry, type WorldsData } from './trial.ts';
 
@@ -62,6 +63,17 @@ function codePage(trial: Trial) {
 
 async function main() {
   const params = new URLSearchParams(location.search);
+  if (!params.has('trial')) {
+    const title = el('header', 'title');
+    const label = el('div', 'title-label');
+    const lights = el('div', 'lights');
+    lights.setAttribute('aria-hidden', 'true');
+    lights.append(el('i'), el('i'), el('i'));
+    title.append(lights, el('div', 'brand', 'CrashLab'), label);
+    app.append(title);
+    await liveApp(app, label);
+    return;
+  }
   let trials: TrialEntry[];
   let trial: Trial;
   try {

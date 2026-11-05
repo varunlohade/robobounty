@@ -146,6 +146,8 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
 
   const statusTime = el('span');
   statusRight.prepend(statusTime);
+  let stop = () => { statusTime.remove(); };
+  let toggleRun = () => {};
 
   async function start() {
     const replay = await Replay.open(trial);
@@ -208,14 +210,25 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
       row.addEventListener('click', () => jump(Math.min(maxFrame, Math.round(hit.t * manifest.hz))));
       events.append(row);
     }
-    addEventListener('keydown', e => {
+    const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (e.code !== 'Space' || page.hidden || t.closest('textarea, select, button, summary')) return;
       e.preventDefault();
       toggle();
-    });
+    };
+    addEventListener('keydown', onKey);
+    toggleRun = toggle;
+    let stopped = false;
+    stop = () => {
+      stopped = true;
+      removeEventListener('keydown', onKey);
+      view.dispose();
+      replay.dispose();
+      statusTime.remove();
+    };
 
     const tick = (now: number) => {
+      if (stopped) return;
       if (playing) {
         at += ((now - last) / 1000) * manifest.hz * Number(speed.value);
         if (at >= maxFrame) { at = maxFrame; setPlaying(false); }
@@ -231,5 +244,5 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
     return replay;
   }
 
-  return { page, start, viewport };
+  return { page, start, viewport, stop: () => stop(), toggle: () => toggleRun() };
 }

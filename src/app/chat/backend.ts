@@ -1,11 +1,16 @@
 import type { Trial, WorldsData } from '../trial.ts';
 
-export interface ChatAction { label: string; primary?: boolean; open?: 'worlds' | 'code'; disabled?: boolean }
+export interface ChatAction { label: string; primary?: boolean; open?: 'worlds' | 'code'; disabled?: boolean; action?: string; value?: number; keep?: boolean }
 
 export type ChatEvent =
   | { type: 'user'; text: string }
   | { type: 'text'; text: string; fail?: boolean }
-  | { type: 'tool'; title: string; meta?: string; lines: string[]; open?: boolean }
+  | { type: 'tool'; title: string; meta?: string; lines: string[]; id?: string | null }
+  | { type: 'working'; text: string | null }
+  | { type: 'retire' }
+  | { type: 'requirements'; rows: { id: string; rule: string; severity: string; text: string }[]; note: string; limits: string }
+  | { type: 'review'; title: string; sections: { head: string; lines: string[] }[]; actions: ChatAction[] }
+  | { type: 'views'; title: string; note: string; images: { label: string; src: string }[] }
   | { type: 'diff'; file: string; meta: string; lines: { kind: 'add' | 'del' | 'same'; text: string }[]; note: string }
   | { type: 'actions'; actions: ChatAction[]; note?: string }
   | { type: 'card'; title: string; body?: string; items?: string[]; actions?: ChatAction[]; note?: string }
@@ -17,6 +22,8 @@ export interface ChatBackend {
   readonly notice: string;
   open(): AsyncIterable<ChatEvent>;
   send(text: string): AsyncIterable<ChatEvent>;
+  act?(action: ChatAction): Promise<void>;
+  reset?(): void;
 }
 
 const WORLD_DIFF_FIELDS = ['steady_wind_ms', 'gust_speed_ms', 'wetness', 'temperature_c', 'humidity_pct', 'dust_gm2', 'mullion_depth_m', 'suction_pa', 'seal_leak_mm2', 'pad_force_n'];
@@ -52,7 +59,7 @@ export class StubBackend implements ChatBackend {
 
   private *batch(w: WorldsData): Iterable<ChatEvent> {
     const failed = w.worlds.filter(r => !r.passed);
-    yield { type: 'tool', title: `Scenario agent: why ${w.total}`, meta: '1 step', lines: [w.count_reason], open: true };
+    yield { type: 'tool', title: `Scenario agent: why ${w.total}`, meta: '1 step', lines: [w.count_reason] };
     yield {
       type: 'card', title: `Tested on ${w.total} worlds`, body: `${failed.length} failed and ${w.worlds.length - failed.length} held. Same robot, same code in each.`,
       actions: [{ label: `See the ${w.total} worlds`, primary: true, open: 'worlds' }],

@@ -3,6 +3,9 @@ import type { Trial } from './trial.ts';
 
 export type Xyz = [number, number, number];
 
+let wasm: Promise<any> | null = null;
+export const loadMujoco = () => (wasm ??= load());
+
 // Holds the model and sets recorded states. It never calls mj_step: Python's MuJoCo version differs,
 // so stepping here would not reproduce the recorded run.
 export class Replay {
@@ -21,7 +24,12 @@ export class Replay {
   }
 
   static async open(trial: Trial): Promise<Replay> {
-    return new Replay(await load(), trial);
+    return new Replay(await loadMujoco(), trial);
+  }
+
+  dispose() {
+    this.data.delete();
+    this.model.delete();
   }
 
   seek(frame: number) {

@@ -1,6 +1,6 @@
 """Exports recorded high-rise runs for the browser app. Run with policy/.venv/bin/python at low priority.
 
-app_export.py trial <run dir> <id> "<label>"     one replay: public/trials/<id>/
+app_export.py trial <run dir> <id> "<label>" [--out DIR]  one replay: public/trials/<id>/, or DIR with no change to the index
 app_export.py run-worlds <scenarios dir> <out>   runs every world in scenarios.json with run_trial
 app_export.py worlds <scenarios dir> <runs dir> [--trials a=id ...]  the worlds tab: public/trials/worlds.json
 
@@ -79,7 +79,7 @@ def cmd_trial(a):
     if not report["match"]:
         sys.exit(f"replay does not match the recorded run: {json.dumps(report)[:400]}")
 
-    out = PUBLIC / a.id
+    out = Path(a.out) if a.out else PUBLIC / a.id
     out.mkdir(parents=True, exist_ok=True)
     (out / "model.xml").write_text(W.build_xml(world))
     (out / "qpos.json").write_text(json.dumps(qpos, separators=(",", ":")))
@@ -98,6 +98,9 @@ def cmd_trial(a):
         "replay_match": True,
     }, indent=1) + "\n")
 
+    if a.out:
+        print("exported", out, len(qpos["frames"]), "frames, replay MATCH")
+        return
     index_path = PUBLIC / "index.json"
     index = json.loads(index_path.read_text()) if index_path.exists() else []
     index = [t for t in index if t["id"] != a.id] + [{"id": a.id, "label": a.label}]
@@ -130,6 +133,16 @@ def thumb(run):
     return rows
 
 
+def thumb_and_end(run):
+    """The end-of-run glass and where the robot ended, as fractions of the work area."""
+    area = W.area(W.load(run / "world.json"))
+    rows = read_gz_json(run / "trace.json.gz")
+    cols = rows["columns"]
+    last = rows["rows"][-1]
+    return {"thumb": thumb(run), "end": [(last[cols.index("x")] - area["x0"]) / (area["x1"] - area["x0"]),
+                                         (last[cols.index("z")] - area["z0"]) / (area["z1"] - area["z0"])]}
+
+
 def cmd_worlds(a):
     plan = json.loads((Path(a.scenarios) / "scenarios.json").read_text())
     links = dict(t.split("=") for t in a.trials)
@@ -140,15 +153,10 @@ def cmd_worlds(a):
         run = Path(a.runs) / name
         r = json.loads((run / "result.json").read_text())
         codes.add(r["code_sha256"]["sim.py"])
-        area = W.area(W.load(run / "world.json"))
-        rows = read_gz_json(run / "trace.json.gz")
-        cols = rows["columns"]
-        last = rows["rows"][-1]
         worlds.append({
             "name": name, "group": w["group"], "reason": w["reason"], "seed": r["seed"], "passed": r["passed"], "failure": r["failure"],
             "fired": r["fired"], "time_s": r["time_s"], "coverage": r["coverage"], "min_pressure_pa": r["min_pressure_pa"],
-            "thumb": thumb(run), "end": [(last[cols.index("x")] - area["x0"]) / (area["x1"] - area["x0"]),
-                                         (last[cols.index("z")] - area["z0"]) / (area["z1"] - area["z0"])],
+            **thumb_and_end(run),
             "trial": links.get(name),
         })
     if len(codes) != 1:
@@ -168,6 +176,7 @@ def main():
     t.add_argument("run_dir")
     t.add_argument("id")
     t.add_argument("label")
+    t.add_argument("--out")
     t.set_defaults(fn=cmd_trial)
     r = sub.add_parser("run-worlds")
     r.add_argument("scenarios")

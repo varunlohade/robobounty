@@ -8,6 +8,7 @@ p { margin: 0; }
 .fail { color: var(--fail); }
 
 #app { display: grid; grid-template-columns: var(--chat-width) 1px minmax(0, 1fr); grid-template-rows: var(--title-height) var(--tabs-height) minmax(0, 1fr) var(--status-height); }
+#app.live { grid-template-rows: var(--title-height) var(--tabs-height) minmax(0, 1fr) var(--chapter-height) var(--status-height); }
 
 /* Title bar */
 .title { grid-column: 1 / -1; position: relative; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--line); font-size: var(--size-small); color: var(--text-2); }
@@ -147,3 +148,78 @@ p { margin: 0; }
 /* Status line */
 .status { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 14px; background: var(--surface); border-top: 1px solid var(--line); font-size: var(--size-small); color: var(--text-2); white-space: nowrap; overflow: hidden; }
 .status-end { margin-left: auto; display: flex; gap: 18px; }
+
+/* Mono agent log, from design/final/app/app-3-term.html, with a rounded input. */
+.chat { font: var(--log-size)/var(--log-line) var(--font-code); color: var(--log-text); }
+.chat-list { gap: 9px; padding: 10px 14px; overflow-x: hidden; }
+.msg-user { background: var(--log-user-bg); color: var(--log-user-text); border: 0; border-radius: 0; padding: 6px 9px; font-weight: 500; flex: none; }
+.msg { flex: none; }
+.tool { background: var(--log-tool-bg); border-left: 2px solid var(--log-tool-line); padding: 6px 8px 7px 9px; color: var(--log-tool-text); font-size: inherit; flex: none; }
+.tool-head { display: flex; justify-content: space-between; gap: 10px; }
+.tool-head b { color: var(--text); font-weight: 600; }
+.tool-meta { color: var(--text-3); margin-left: auto; white-space: nowrap; }
+.tool-line { padding-left: 0; line-height: inherit; overflow-wrap: anywhere; }
+.card { border: 1px solid var(--log-card-line); border-radius: 0; background: none; font-size: inherit; padding: 8px 9px; }
+.card h4 { font-size: inherit; line-height: inherit; }
+.tb { min-height: 26px; line-height: 24px; padding: 0 9px; border: 1px solid var(--log-card-line); background: none; color: var(--text); font: inherit; text-align: left; }
+.tb-primary { background: var(--text); border-color: var(--text); color: var(--bg); font-weight: 500; }
+.tb:disabled { opacity: .45; cursor: default; }
+.req-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 6px; }
+.req-row b { color: var(--text); font-weight: 600; }
+.review-part { border-top: 1px solid var(--line); padding-top: 5px; }
+.review-head { color: var(--text); }
+.views { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 5px 0; }
+.views figure { margin: 0; }
+.views img { width: 100%; display: block; }
+.views figcaption { color: var(--text-3); }
+.working { flex: none; margin: 0 14px 6px; display: flex; align-items: center; gap: 8px; color: var(--text-3); white-space: nowrap; overflow: hidden; }
+.working[hidden] { display: none; }
+.working u { flex: 1; height: 1px; background: var(--log-card-line); display: block; }
+.chat-input { font-family: var(--font-code); }
+.title-label { color: var(--text-2); }
+
+/* Chapter timeline */
+.chapters { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-top: 1px solid var(--line); }
+.chapter-line { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); }
+.chapter { position: relative; border-top: 1px solid var(--control-line); padding-top: 8px; font-size: 14px; line-height: 20px; color: var(--text-3); }
+.chapter i { position: absolute; left: 0; top: -5px; width: 1px; height: 9px; background: var(--control-line); }
+.chapter.done, .chapter.now { border-top-color: var(--text); color: var(--text); }
+.chapter.done i, .chapter.now i { background: var(--text); }
+.chapter.now { font-weight: 700; border-top-color: var(--control-line); }
+.chapter-step { font-size: var(--size-small); color: var(--text-2); max-width: 260px; }
+.icon-btn:disabled { opacity: .45; cursor: default; }
+
+/* Pipeline, map, failure types and report */
+.pipeline { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-size: var(--size-small); }
+.pipeline:empty { display: none; }
+.stage { padding: 1px 8px; border: 1px solid var(--line-2); color: var(--text-3); display: flex; gap: 6px; }
+.stage-done { color: var(--text-2); }
+.stage-now { background: var(--text); color: var(--bg); border-color: var(--text); }
+.stage-off { border-style: dashed; }
+.stage-note { opacity: .8; }
+.map-bar { min-height: 0; margin-bottom: 8px; }
+.map-host[hidden], .map-bar button[hidden] { display: none; }
+.cell-empty, .cell-held { border: 1px dashed var(--line-2); background: none; }
+.cell-held { border-color: var(--text-3); }
+.cell-excluded { border: 1px dashed var(--text-3); opacity: .55; }
+.map { display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 4px; margin-bottom: 10px; }
+.map-cell { width: 44px; height: 44px; padding: 0; border: 1px dashed var(--line-2); background: none; }
+.map-pass { background: var(--map-pass); border: 0; }
+.map-held { border-color: var(--text-3); }
+.map-excluded { border: 1px solid var(--text-3); background: repeating-linear-gradient(45deg, transparent 0 4px, var(--line-2) 4px 5px); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: var(--size-small); color: var(--text-2); margin-bottom: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 12px; height: 12px; display: inline-block; flex: none; }
+.legend .map-cell { width: 12px; height: 12px; }
+.failures h2 { font-size: var(--size-h3); line-height: 28px; margin: 8px 0 4px; }
+.failure-row { width: 100%; display: grid; grid-template-columns: 12px minmax(120px, 1fr) 60px 80px minmax(180px, 1.4fr) minmax(160px, 1.2fr); gap: 10px; align-items: center; background: none; border: 0; border-top: 1px solid var(--line-2); padding: 6px 0; text-align: left; font-size: 14px; color: var(--text-2); }
+.failure-row b { color: var(--text); font-weight: 500; }
+.failure-row code { font: var(--size-small) var(--font-code); overflow-wrap: anywhere; }
+.failure-row:hover { background: var(--surface); }
+.excluded-row { font-size: var(--size-small); color: var(--text-3); margin-top: 4px; }
+.big-numbers { display: flex; flex-wrap: wrap; gap: 40px; margin: 18px 0 24px; }
+.big-number { display: flex; flex-direction: column; }
+.big-number b { font: 400 56px/1.1 var(--font-heading); }
+.big-number span { font-size: 14px; color: var(--text-2); }
+.report p { max-width: 720px; }
+.fact-moved span { color: var(--text); font-weight: 700; }

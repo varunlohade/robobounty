@@ -1,0 +1,233 @@
+{
+ "verdict": "build",
+ "reject_reason": "none",
+ "count_reason": "Eight groups cover the user's named hazards. Wind, gusts and edges are the harshest and widest, so they get most worlds. Friction, heat and dust get fewer. Total is 52, below the cap of 60.",
+ "groups": [
+  {
+   "name": "High steady wind",
+   "reason": "Tall towers see strong sustained wind; tests tether and suction hold. Height-based wind profile itself not tested.",
+   "worlds": 7,
+   "ranges": {
+    "steady_wind_ms": {
+     "min": 10,
+     "max": 25
+    },
+    "wind_dir_deg": {
+     "min": 60,
+     "max": 120
+    },
+    "drop_below_roof_m": {
+     "min": 40,
+     "max": 80
+    }
+   }
+  },
+  {
+   "name": "Strong gusts on high facade",
+   "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction.",
+   "worlds": 8,
+   "ranges": {
+    "gust_speed_ms": {
+     "min": 20,
+     "max": 50
+    },
+    "gust_count": {
+     "min": 3,
+     "max": 6
+    },
+    "gust_duration_s": {
+     "min": 3,
+     "max": 20
+    },
+    "gust_period_s": {
+     "min": 10,
+     "max": 60
+    },
+    "gust_start_s": {
+     "min": 5,
+     "max": 100
+    },
+    "wind_dir_deg": {
+     "min": -180,
+     "max": 180
+    }
+   }
+  },
+  {
+   "name": "Dust on glass and seal",
+   "reason": "Sandstorm: dust load on glass and leak tested; airborne sand hitting sensors and pads not tested.",
+   "worlds": 7,
+   "ranges": {
+    "dust_gm2": {
+     "min": 15,
+     "max": 60
+    },
+    "dirt_level": {
+     "min": 1,
+     "max": 2
+    },
+    "seal_leak_mm2": {
+     "min": 300,
+     "max": 1000
+    },
+    "steady_wind_ms": {
+     "min": 8,
+     "max": 18
+    }
+   }
+  },
+  {
+   "name": "Wet humid low friction glass",
+   "reason": "High moisture and humidity lower friction; rain itself not tested, only wet glass.",
+   "worlds": 6,
+   "ranges": {
+    "wetness": {
+     "min": 0.6,
+     "max": 1
+    },
+    "humidity_pct": {
+     "min": 70,
+     "max": 100
+    },
+    "pad_force_n": {
+     "min": 8,
+     "max": 25
+    },
+    "temperature_c": {
+     "min": 20,
+     "max": 35
+    }
+   }
+  },
+  {
+   "name": "Dry high friction glass",
+   "reason": "Changes humidity_pct, pad_force_n, wetness only. Dust on the glass not tested.",
+   "worlds": 4,
+   "ranges": {
+    "wetness": {
+     "min": 0,
+     "max": 0.05
+    },
+    "pad_force_n": {
+     "min": 50,
+     "max": 90
+    },
+    "humidity_pct": {
+     "min": 5,
+     "max": 25
+    }
+   }
+  },
+  {
+   "name": "Weird edges and joints",
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel.",
+   "worlds": 9,
+   "ranges": {
+    "mullion_depth_m": {
+     "min": 0.015,
+     "max": 0.04
+    },
+    "joint_gap_m": {
+     "min": 0.01,
+     "max": 0.03
+    },
+    "mullion_spacing_m": {
+     "min": 0.8,
+     "max": 3
+    },
+    "mullion_offset_m": {
+     "min": 0,
+     "max": 3
+    },
+    "edge_margin_m": {
+     "min": 0.4,
+     "max": 0.6
+    },
+    "ledge_depth_m": {
+     "min": 0.08,
+     "max": 0.25
+    },
+    "ledge_below_top_m": {
+     "min": 0.5,
+     "max": 6
+    },
+    "ledge_x_m": {
+     "min": -3,
+     "max": 3
+    },
+    "ledge_width_m": {
+     "min": 2,
+     "max": 12
+    }
+   }
+  },
+  {
+   "name": "Extreme heat with weak battery",
+   "reason": "Very hot air stresses battery and suction; low start charge tests return margin.",
+   "worlds": 6,
+   "ranges": {
+    "temperature_c": {
+     "min": 40,
+     "max": 50
+    },
+    "battery_start_frac": {
+     "min": 0.05,
+     "max": 0.4
+    },
+    "humidity_pct": {
+     "min": 5,
+     "max": 30
+    },
+    "suction_pa": {
+     "min": 1200,
+     "max": 2800
+    }
+   }
+  },
+  {
+   "name": "Weak suction with wind",
+   "reason": "Reduced suction and leaky seal combined with strong wind on a high, smooth facade.",
+   "worlds": 5,
+   "ranges": {
+    "suction_pa": {
+     "min": 500,
+     "max": 1500
+    },
+    "seal_leak_mm2": {
+     "min": 500,
+     "max": 2000
+    },
+    "steady_wind_ms": {
+     "min": 8,
+     "max": 16
+    },
+    "wind_dir_deg": {
+     "min": 60,
+     "max": 120
+    }
+   }
+  }
+ ],
+ "not_tested": [
+  {
+   "factor": "Airborne sand",
+   "reason": "No physics for sand hitting sensors, pads or impeller; only dust on glass is tested."
+  },
+  {
+   "factor": "Building height and wind by height",
+   "reason": "Wind does not scale with height; tall-tower wind is mimicked only with high wind and tether drop."
+  },
+  {
+   "factor": "Sun and glare",
+   "reason": "Heat is tested as air and battery temperature only; solar heating of glass and sensor glare are not modelled."
+  },
+  {
+   "factor": "Real hardware",
+   "reason": "Only the simulated robot is tested, not real motors, sensors or tether wear."
+  },
+  {
+   "factor": "Rain, ice and snow, salt corrosion",
+   "reason": "No physics for these; wet glass only approximates moisture."
+  }
+ ]
+}

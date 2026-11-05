@@ -23,6 +23,26 @@
   --chat-line: 20px;
   --chat-small: 13px;
 
+  /* Mono agent log */
+  --log-size: 13px;
+  --log-line: 19px;
+  --log-text: #e6e6e6;
+  --log-tool-bg: #171717;
+  --log-tool-line: #8a8a8a;
+  --log-tool-text: #bdbdbd;
+  --log-user-bg: #ededed;
+  --log-user-text: #000000;
+  --log-card-line: #6a6a6a;
+  --chapter-height: 54px;
+
+  /* Failure types on the map. They stay warm because red means failure. */
+  --f1: #ff5247;
+  --f2: #ff8a3d;
+  --f3: #ffc14d;
+  --f4: #ff5fa2;
+  --f5: #b0452f;
+  --map-pass: #2e2e2e;
+
   /* Diff text grows with the window, so it stays readable on a projector. */
   --diff-size: clamp(12px, 0.85vw, 22px);
   --diff-bg: #0d0d0d;

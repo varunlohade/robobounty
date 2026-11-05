@@ -18,7 +18,7 @@ export interface Trial {
 export interface WorldRun {
   name: string; group: string; reason: string; seed: number; passed: boolean; failure: string | null;
   fired: Record<string, { t: number; value: number }>; time_s: number; coverage: number; min_pressure_pa: number;
-  thumb: string[]; end: [number, number]; trial: string | null;
+  thumb: string[]; end: [number, number]; trial: string | null; outcome?: string; index?: number;
 }
 export interface WorldsData {
   total: number; count_reason: string; groups: { name: string; reason: string }[];
@@ -36,8 +36,9 @@ export async function trialIndex(): Promise<TrialEntry[]> {
   return (await get('/trials/index.json')).json();
 }
 
-export async function loadTrial(id: string): Promise<Trial> {
-  const base = `/trials/${encodeURIComponent(id)}`;
+export const loadTrial = (id: string) => loadTrialFrom(`/trials/${encodeURIComponent(id)}`);
+
+export async function loadTrialFrom(base: string): Promise<Trial> {
   const [manifest, xml, q, result, worldText, controller, trace, wind, dirt] = await Promise.all([
     get(`${base}/manifest.json`).then(r => r.json()),
     get(`${base}/model.xml`).then(r => r.text()),

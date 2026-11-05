@@ -20,6 +20,8 @@ export class SimView {
   private dustColor: THREE.Color;
   private anchorSite: number; private robotSite: number;
   private dirty = true;
+  private stopped = false;
+  private observer: ResizeObserver;
 
   constructor(private host: HTMLElement, private replay: Replay, private trial: Trial) {
     const area = trial.manifest.area;
@@ -81,14 +83,39 @@ export class SimView {
       this.scene.add(this.path);
     }
 
-    new ResizeObserver(() => this.resize()).observe(host);
+    this.observer = new ResizeObserver(() => this.resize());
+    this.observer.observe(host);
     this.resize();
     const loop = () => {
+      if (this.stopped) return;
       this.controls.update();
       if (this.dirty && host.clientWidth > 0) { this.dirty = false; this.renderer.render(this.scene, this.camera); }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+  }
+
+  dispose() {
+    this.stopped = true;
+    this.observer.disconnect();
+    this.controls.dispose();
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
+    this.renderer.domElement.remove();
+  }
+
+  /** One picture from a given camera position, then the old camera comes back. */
+  snapshot(position: [number, number, number], target: [number, number, number]): string {
+    const oldPos = this.camera.position.clone(), oldTarget = this.controls.target.clone();
+    this.camera.position.set(...position);
+    this.camera.lookAt(...target);
+    this.renderer.render(this.scene, this.camera);
+    const url = this.renderer.domElement.toDataURL('image/png');
+    this.camera.position.copy(oldPos);
+    this.controls.target.copy(oldTarget);
+    this.camera.lookAt(oldTarget);
+    this.dirty = true;
+    return url;
   }
 
   private materialColor(mat: number): THREE.Color {
