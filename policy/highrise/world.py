@@ -4,11 +4,18 @@ A world file holds numbers only. Every field is required, finite and in range. N
 world file reaches the MJCF. The MJCF uses primitives only, so it also loads in browser MuJoCo.
 """
 import hashlib
+import importlib.util
 import json
 import math
 from pathlib import Path
 
+_spec = importlib.util.spec_from_file_location("highrise_elements", Path(__file__).resolve().parent / "elements.py")
+E = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(E)
+
 SCHEMA = "highrise.world.v3"
+SCHEMA_V4 = "highrise.world.v4"  # the same fields, plus an optional elements list
+MAX_WORLD_FILE_BYTES = 1 << 20
 
 # name: (min, max). SI units unless the name says otherwise.
 FIELDS = {
@@ -68,6 +75,7 @@ AIR_PRESSURE_PA = 101325.0
 GLASS_BELOW_AIR_C = 3.0
 CONDENSATION_RAMP_C = 3.0
 LEDGE_THICKNESS = 0.12
+START_CLEARANCE_M = 0.05
 TRANSOM_SPACING = 3.6  # floor height, fixed for the tower
 
 
@@ -83,11 +91,13 @@ def validate(raw):
     if not isinstance(raw, dict):
         raise WorldError("world must be an object")
     expected = set(FIELDS) | {"schema"}
+    if raw.get("schema") == SCHEMA_V4 and "elements" in raw:
+        expected = expected | {"elements"}
     if set(raw) != expected:
         raise WorldError(f"bad fields: missing {sorted(expected - set(raw))}, extra {sorted(set(raw) - expected)}")
-    if raw["schema"] != SCHEMA:
+    if raw["schema"] not in (SCHEMA, SCHEMA_V4):
         raise WorldError("bad schema")
-    world = {"schema": SCHEMA}
+    world = {"schema": raw["schema"]}
     for name, (lo, hi) in FIELDS.items():
         v = raw[name]
         if isinstance(v, bool) or not isinstance(v, (int, float)):
@@ -97,11 +107,35 @@ def validate(raw):
         if not math.isfinite(v) or not lo <= v <= hi:
             raise WorldError(f"{name}={v} outside [{lo}, {hi}]")
         world[name] = int(v) if name in INTEGER_FIELDS else float(v)
+    if "elements" in raw:
+        world["elements"] = E.validate(raw["elements"], WorldError)
+        _check_start_clear(world)
     return world
 
 
+def _check_start_clear(world):
+    """The robot must start on glass and clear of every solid element, or the first contact is not physics."""
+    sx, sz = start_pose(world)
+    g = glass_rect(world)
+    h = BODY_SIDE / 2 + START_CLEARANCE_M
+    if sx - h < g["x0"] or sx + h > g["x1"] or sz + h > g["z1"] or sz - h < g["z0"]:
+        raise WorldError("start pose is not on glass")
+    for x0, x1, z0, z1, _ in E.rects(world, area(world)):
+        if x0 < sx + h and x1 > sx - h and z0 < sz + h and z1 > sz - h:
+            raise WorldError("an element blocks the start pose")
+    for e in E.of_type(world, "cradle"):
+        a = area(world)
+        x = a["x0"] + e["x_m"]
+        z = E.cradle_z(e, a["z1"], 0.0)
+        if x - e["width_m"] / 2 < sx + h and x + e["width_m"] / 2 > sx - h and z - e["height_m"] / 2 < sz + h and z + e["height_m"] / 2 > sz - h:
+            raise WorldError("the cradle blocks the start pose")
+
+
 def load(path):
-    return validate(json.loads(Path(path).read_text(), parse_constant=_reject_constant))
+    text = Path(path).read_text()
+    if len(text) > MAX_WORLD_FILE_BYTES:
+        raise WorldError("world file too large")
+    return validate(json.loads(text, parse_constant=_reject_constant))
 
 
 def world_hash(world):
@@ -142,16 +176,35 @@ def area(world):
 def glass_rect(world):
     a = area(world)
     m = world["edge_margin_m"]
-    return {"x0": a["x0"] - m, "x1": a["x1"] + m, "z0": a["z0"] - 16.0, "z1": a["z1"] + m}
+    rect = {"x0": a["x0"] - m, "x1": a["x1"] + m, "z0": a["z0"] - 16.0, "z1": a["z1"] + m}
+    for e in E.of_type(world, "corner"):
+        x = a["x0"] + e["x_m"]
+        if e["side"] > 0:
+            rect["x1"] = min(rect["x1"], x)
+        else:
+            rect["x0"] = max(rect["x0"], x)
+    for e in E.of_type(world, "setback"):
+        rect["z1"] = a["z1"] + e["above_top_m"]
+    return rect
+
+
+def joint_depth(world):
+    for e in E.of_type(world, "pane_grid"):
+        return e["mullion_depth_m"]
+    return world["mullion_depth_m"]
 
 
 def mullion_xs(world):
     g = glass_rect(world)
     s, off = world["mullion_spacing_m"], world["mullion_offset_m"]
+    skip = 0
+    for e in E.of_type(world, "pane_grid"):
+        s, off, skip = e["pane_width_m"], e["offset_x_m"], e["skip_every"]
     k = math.ceil((g["x0"] - off) / s)
     out = []
     while off + k * s < g["x1"]:
-        out.append(off + k * s)
+        if not skip or k % skip:
+            out.append(off + k * s)
         k += 1
     return out
 
@@ -159,10 +212,13 @@ def mullion_xs(world):
 def transom_zs(world):
     g = glass_rect(world)
     s = TRANSOM_SPACING
-    k = math.ceil((g["z0"] + 0.01) / s)
+    off = 0.0
+    for e in E.of_type(world, "pane_grid"):
+        s, off = e["pane_height_m"], e["offset_z_m"]
+    k = math.ceil((g["z0"] + 0.01 - off) / s)
     out = []
-    while k * s < g["z1"]:
-        out.append(k * s)
+    while off + k * s < g["z1"]:
+        out.append(off + k * s)
         k += 1
     return out
 
@@ -188,7 +244,7 @@ def _scenery():
 
 def build_xml(world):
     g = glass_rect(world)
-    d = world["mullion_depth_m"]
+    d = joint_depth(world)
     h = max(d, MULLION_MIN_H)
     R = MULLION_ROUND_R
     hw, hh = (g["x1"] - g["x0"]) / 2, (g["z1"] - g["z0"]) / 2
@@ -219,7 +275,7 @@ def build_xml(world):
         for n in ("lf", "lb", "rf", "rb"))
     zc = RIDE_CLEARANCE + BODY_HEIGHT / 2
     half = BODY_SIDE / 2
-    return f"""<mujoco model="highrise">
+    xml = f"""<mujoco model="highrise">
   <option timestep="0.002" integrator="implicitfast" cone="elliptic" impratio="1" noslip_iterations="3" solver="Newton" iterations="20" ls_iterations="6"/>
   <statistic extent="4" center="{cx} -1 {a['z1']}"/>
   <visual>
@@ -291,3 +347,6 @@ def build_xml(world):
   </actuator>
 </mujoco>
 """
+    if world.get("elements"):
+        return E.extend_xml(xml, world, a, g, ROOF_Z)
+    return xml

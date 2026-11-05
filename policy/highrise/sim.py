@@ -31,6 +31,7 @@ SKIRT_COMPLIANCE_M = 0.010  # the skirt lip follows the glass up to this lift
 LIP_CONFORM_M = 0.006  # the lip bridges a joint this high with no leak
 CROSS_LEAK_SHAPE = 3.0  # leak at one skirt-joint crossing = shape * (height - conform)^2
 JOINT_GROOVE_DEPTH_M = 0.005
+SKIRT_HALF_M = 0.15
 OFF_GLASS_GAP_M = 0.05  # open gap along skirt perimeter that has run past the glass edge
 SKIRT_STIFFEN_BELOW_C = 0.0  # the skirt follows the glass less below this
 SKIRT_STIFFEN_PER_C = 0.02
@@ -177,7 +178,8 @@ class Sim:
         self.glass = W.glass_rect(world)
         self.mullions = W.mullion_xs(world)
         self.transoms = W.transom_zs(world)
-        self.height = max(world["mullion_depth_m"], W.MULLION_MIN_H)
+        self.joint_depth = W.joint_depth(world)
+        self.height = max(self.joint_depth, W.MULLION_MIN_H)
         a = W.area(world)
         self.ledge = (world["ledge_x_m"] + a["x1"] / 2, a["z1"] - world["ledge_below_top_m"],
                       world["ledge_width_m"] / 2, W.LEDGE_THICKNESS / 2, world["ledge_depth_m"])
@@ -215,6 +217,9 @@ class Sim:
         self.base_force = np.zeros(3)
         self.sensor_rng = np.random.default_rng([seed, 23])
         self._init_dirt(world, seed)
+        self.has_elements = bool(world.get("elements"))
+        if self.has_elements:
+            self._init_elements(world)
 
         self.tension = 0.0
         self.tension_tick = 0.0
@@ -263,6 +268,68 @@ class Sim:
         mask[np.ix_(np.abs(cz - lz) < lh + DIRT_CELL_M / 2, np.abs(cx - lx) < lw + DIRT_CELL_M / 2)] = False
         self.dirt_mask = mask
 
+    def _init_elements(self, world):
+        a = self.area
+        E = W.E
+        self.el_rects = [r for r in E.rects(world, a)]
+        self.el_vents = E.regions(world, a, "vent", "open_frac")
+        base = W.friction(world)
+        self.el_patches = []
+        for x0, x1, z0, z1, wet in E.regions(world, a, "wet_patch", "wetness"):
+            mu = W.friction({**world, "wetness": max(wet, W.effective_wetness(world))})
+            self.el_patches.append((x0, x1, z0, z1, mu))
+        for x0, x1, z0, z1, level in E.regions(world, a, "dirt_patch", "level"):
+            self.el_patches.append((x0, x1, z0, z1, base + (W.MU_DUST - base) * min(1.0, level)))
+        self.el_base_mu = base
+        self.el_roller_ids = sorted(self.roller_geoms)
+        self.el_cradle = None
+        for e in E.of_type(world, "cradle"):
+            body = mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_BODY, "cradle")
+            self.el_cradle = (e, self.m.body_mocapid[body])
+        cx = a["x0"] + (np.arange(self.nx) + 0.5) * DIRT_CELL_M
+        cz = a["z0"] + (np.arange(self.nz) + 0.5) * DIRT_CELL_M
+        g = self.glass
+        self.dirt_mask[:, (cx < g["x0"]) | (cx > g["x1"])] = False
+        self.dirt_mask[(cz < g["z0"]) | (cz > g["z1"]), :] = False
+        for x0, x1, z0, z1, _ in self.el_rects:
+            self.dirt_mask[np.ix_((cz > z0) & (cz < z1), (cx > x0) & (cx < x1))] = False
+        for x0, x1, z0, z1, level in E.regions(world, a, "dirt_patch", "level"):
+            self.dirt[np.ix_((cz > z0) & (cz < z1), (cx > x0) & (cx < x1))] += level
+        if not self.dirt_mask.any():
+            raise W.WorldError("elements leave no glass to clean")
+        self._update_elements()
+
+    def _update_elements(self):
+        """Moves the cradle and sets each roller's friction from the patch under it. The last matching patch wins."""
+        d, m = self.d, self.m
+        if self.el_cradle is not None:
+            e, mocap = self.el_cradle
+            d.mocap_pos[mocap, 2] = W.E.cradle_z(e, self.area["z1"], self.t)
+        if self.el_patches:
+            for g in self.el_roller_ids:
+                x, _, z = d.geom_xpos[g]
+                mu = self.el_base_mu
+                for x0, x1, z0, z1, value in self.el_patches:
+                    if x0 <= x <= x1 and z0 <= z <= z1:
+                        mu = value
+                m.geom_friction[g, 0] = mu
+
+    def _element_leak(self, x, z, reach):
+        """Raised elements under the skirt lip leak like a joint. An open vent under the skirt leaks through its open share."""
+        leak = 0.0
+        # The skirt sits inside the chassis, so a solid that stops the chassis does not foul the lip.
+        reach = reach * SKIRT_HALF_M / (W.BODY_SIDE / 2)
+        for x0, x1, z0, z1, h in self.el_rects:
+            if x0 < x + reach and x1 > x - reach and z0 < z + reach and z1 > z - reach:
+                step = max(0.0, min(h, W.RIDE_CLEARANCE) - self.lip_conform)
+                leak += 2 * CROSS_LEAK_SHAPE * step * step
+        for x0, x1, z0, z1, share in self.el_vents:
+            over_x = min(x1, x + reach) - max(x0, x - reach)
+            over_z = min(z1, z + reach) - max(z0, z - reach)
+            if over_x > 0 and over_z > 0:
+                leak += over_x * over_z * share
+        return leak
+
     def _cap_half_width(self):
         R, h = W.MULLION_ROUND_R, self.height
         return math.sqrt(max(0.0, R * R - (R - h) ** 2))
@@ -283,6 +350,8 @@ class Sim:
         h = hashlib.sha256()
         for arr in (d.qpos, d.qvel, d.act, self.dirt):
             h.update(arr.tobytes())
+        if self.m.nmocap:
+            h.update(d.mocap_pos.tobytes())
         h.update(np.array([self.t, self.tether_len, self.dp, self.impeller, self.soc]).tobytes())
         return h.hexdigest()
 
@@ -321,8 +390,10 @@ class Sim:
         h = self.heading()
         reach = W.BODY_SIDE / 2 * (abs(math.cos(h)) + abs(math.sin(h)))
         n = sum(1 for m in self.mullions if abs(m - x) < reach) + sum(1 for t in self.transoms if abs(t - z) < reach)
-        step = max(0.0, self.world["mullion_depth_m"] - self.lip_conform)
+        step = max(0.0, self.joint_depth - self.lip_conform)
         per_crossing = CROSS_LEAK_SHAPE * step * step + self.world["joint_gap_m"] * JOINT_GROOVE_DEPTH_M
+        if self.has_elements:
+            return 2 * n * per_crossing + self._element_leak(x, z, reach)
         return 2 * n * per_crossing
 
     def _update_adhesion(self, settle=False):
@@ -528,6 +599,8 @@ class Sim:
         self._apply_tether(a[3])
         self._apply_wind_and_line()
         self.cross_leak_m2 = self._crossing_leak()
+        if self.has_elements:
+            self._update_elements()
         self.tension_tick = 0.0
         self.impact_tick = 0.0
         f = d.xfrc_applied[self.robot]
@@ -571,6 +644,10 @@ class Sim:
         lx, lz, lw, lh, ld = self.ledge
         if abs(sx - lx) < lw and abs(sz - lz) < lh:
             best = max(best, ld)
+        if self.has_elements:
+            for x0, x1, z0, z1, h in self.el_rects:
+                if x0 <= sx <= x1 and z0 <= sz <= z1:
+                    best = max(best, h)
         return best, False
 
     def obs(self):

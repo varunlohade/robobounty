@@ -17,7 +17,7 @@ import sim as S
 import world as W
 
 GENESIS = "0" * 64
-CODE_FILES = ("controller.py", "sim.py", "world.py", "judge.py", "run_trial.py")
+CODE_FILES = ("controller.py", "sim.py", "world.py", "elements.py", "judge.py", "run_trial.py")
 
 
 def code_hashes():
@@ -38,6 +38,7 @@ def run(world, seed, out=None):
     rows = [{"i": -1, "a": [], "s": sim.start_sha, "h": S.digest(GENESIS, -1, [], sim.start_sha)}]
     prev = rows[0]["h"]
     frames = [sim.d.qpos.copy()]
+    mocap_frames = [sim.d.mocap_pos.copy()] if sim.m.nmocap else None
     trace = []
     action = [0.0] * len(S.ACTION_FIELDS)
     status = "ok"
@@ -54,6 +55,8 @@ def run(world, seed, out=None):
         rows.append({"i": i, "a": action, "s": sha, "h": h})
         prev = h
         frames.append(sim.d.qpos.copy())
+        if mocap_frames is not None:
+            mocap_frames.append(sim.d.mocap_pos.copy())
         trace.append([ctl.phase, round(ctl.estimate, 3), round(sim.dp, 1), round(sim.body_xz()[0], 3), round(sim.body_xz()[1], 3),
                       round(sim.tension_tick, 1), round(sim.slip_rate, 3), round(sim.volts, 2), round(sim.coverage(), 3) if i % 20 == 0 else None])
         i += 1
@@ -80,8 +83,10 @@ def run(world, seed, out=None):
         with gzip.GzipFile(out / "actions.jsonl.gz", "wb", mtime=0) as f:
             f.write("".join(json.dumps(r, separators=(",", ":")) + "\n" for r in rows).encode())
         with gzip.GzipFile(out / "qpos.json.gz", "wb", mtime=0) as f:
-            f.write(json.dumps({"hz": S.CONTROL_HZ, "nq": sim.m.nq, "frames": np.round(np.array(frames), 5).tolist()},
-                               separators=(",", ":")).encode())
+            recording = {"hz": S.CONTROL_HZ, "nq": sim.m.nq, "frames": np.round(np.array(frames), 5).tolist()}
+            if mocap_frames is not None:
+                recording["mocap_frames"] = np.round(np.array(mocap_frames), 5).tolist()
+            f.write(json.dumps(recording, separators=(",", ":")).encode())
         with gzip.GzipFile(out / "trace.json.gz", "wb", mtime=0) as f:
             f.write(json.dumps({"columns": ["phase", "est_fraction", "dp", "x", "z", "tension", "slip_rate", "volts", "coverage"],
                                 "rows": trace}, separators=(",", ":")).encode())

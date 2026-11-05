@@ -80,6 +80,23 @@ Field names: `temperature_c`, `humidity_pct`, `dust_gm2`. Each changes the physi
 | Dust reaching impeller | 10% of swept load over the body width | | ASSUMPTION |
 | Dust sensor noise | noise x (1 + 0.02 dust), nose dropout + 0.002 per g/m2 | | ASSUMPTION |
 
+## Scene elements (schema v4)
+
+A v4 world may hold an `elements` list. Types are allowlisted, fields are exact, finite and clamped, and caps apply per type and at 24 in total. Only a type name and numbers exist: no XML, code or file paths. A start pose on glass and clear of solids is enforced. Worlds without `elements` keep their MJCF bytes and state hashes. The catalog is in `elements.py`. Every value below is ASSUMPTION.
+
+| Element | Collision | Seal or friction effect |
+|---|---|---|
+| `pane_grid` | Replaces joints with rounded caps at the given pane size, depth and skip pattern | Same joint crossing leak as a plain world |
+| `ledge`, `sill`, `fin`, `sign`, `balcony`, `frame_step` | Fixed box, friction 0.3 | Inside the skirt (0.15 m half side) the lip leaks 2 x 3 x (h - lip)^2, h capped at ride clearance. Cells beneath do not count |
+| `vent` | 3 mm box | Leak = skirt overlap area x `open_frac`. Cells beneath do not count |
+| `corner` | Glass box ends, so rollers run off the edge | Skirt past the edge leaks at the 0.05 m gap. Detach fires when the centre leaves the glass. Cells past it do not count |
+| `setback` | Glass top ends at the height given | Same as `corner`. Terrace and upper tower are visual only |
+| `wet_patch` | None | Friction per roller, updated at 20 Hz: mix towards wet at the given `wetness` |
+| `dirt_patch` | None | Adds `level` to dirt. Roller friction moves towards 0.40 with level, capped at level 1 |
+| `cradle` | Moving box, sine motion from world time, 1 cm off the glass | Pushes the robot. Replay: `mocap_frames` in `qpos.json.gz`, only for this element |
+
+Simplifications: a tether passes through solids. The nose sensor does not see the cradle. Balcony railings are visual only. No element has wind effects, and a solid under the lip leaks as if crossing, even when fully inside the skirt. Patch friction applies at roller centres. `controller.py` knows nothing about elements, so results measure a controller not designed for them.
+
 ## Tether
 
 | Value | Number | Unit | Source or label |
