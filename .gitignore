@@ -25,3 +25,6 @@ design/film/ref
 design/film/frames
 design/cinematic/*.mp4
 design/cinematic/_cache
+design/render/
+*.blend
+*.blend1
