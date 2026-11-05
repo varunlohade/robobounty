@@ -16,3 +16,5 @@ Chat on the left, simulation on the right. The 40 worlds as rows by risk type, h
 Correction, same day. Owner's full words: "black is fine as a background". The app uses a pure black background with white text, not a white page. Set B's layout stays. Red stays for failures only. All colours live in one token file so they can change.
 
 Left panel. Owner's words: "left window can look like cursor side window exacctly". The chat follows the familiar AI code editor side panel: compact sans, tool-step rows, inline diffs with Accept and Reject, input pinned at the bottom. No Cursor name, logo or assets. Palatino stays for headings outside the chat.
+
+Familiar first. Owner's words: "it should look familer". For the app, familiarity beats being distinctive. It should read at once as a modern code editor with a simulator pane. Do not invent new interface patterns.
