@@ -180,8 +180,61 @@ def model_sha(sim):
     return h.hexdigest()
 
 
+def _settle(wrapper):
+    """No-op steps until quiet. Measures what settling did to each object."""
+    inner = _inner(wrapper)
+    inner.sim.forward()
+    placed = _poses(inner)
+    dummy = np.array(get_libero_dummy_action(), dtype=np.float64)
+    steps = 0
+    while steps < MAX_SETTLE_STEPS:
+        raw_obs, _, _, _ = wrapper._env.step(dummy)
+        steps += 1
+        now = _poses(inner)
+        if steps >= MIN_SETTLE_STEPS and max(p["speed"] for p in now.values()) < QUIET_SPEED:
+            break
+    objects = {}
+    for name, p in now.items():
+        objects[name] = {
+            "pos": [float(x) for x in p["pos"]],
+            "xy_drift_m": float(np.linalg.norm(p["pos"][:2] - placed[name]["pos"][:2])),
+            "z_change_m": float(p["pos"][2] - placed[name]["pos"][2]),
+            "tilt_change_deg": abs(p["tilt_deg"] - placed[name]["tilt_deg"]),
+            "speed": p["speed"],
+        }
+    return raw_obs, {"settle_steps": steps, "objects": objects,
+                     "deepest_penetration_m": _deepest_penetration(inner.sim)}
+
+
+def _problems(report, stock):
+    """Compares with the same init state and seed without edits, because some stock states already slide."""
+    base = stock["objects"]
+    zero = {"xy_drift_m": 0.0, "z_change_m": 0.0, "tilt_change_deg": 0.0, "speed": 0.0}
+    problems = []
+    if report["deepest_penetration_m"] > max(MAX_PENETRATION_M, stock["deepest_penetration_m"]):
+        problems.append(f"penetration {report['deepest_penetration_m']:.4f} m")
+    for name, o in report["objects"].items():
+        b = base.get(name, zero)
+        if o["xy_drift_m"] - b["xy_drift_m"] > MAX_XY_DRIFT_M:
+            problems.append(f"{name} slid {o['xy_drift_m']:.4f} m (stock {b['xy_drift_m']:.4f}) while settling")
+        if o["z_change_m"] - b["z_change_m"] > MAX_RISE_M:
+            problems.append(f"{name} rests {o['z_change_m'] - b['z_change_m']:.4f} m higher than stock")
+        if o["tilt_change_deg"] - b["tilt_change_deg"] > MAX_TILT_CHANGE_DEG:
+            problems.append(f"{name} tilted {o['tilt_change_deg']:.1f} deg (stock {b['tilt_change_deg']:.1f}) while settling")
+        if o["speed"] >= QUIET_SPEED and b["speed"] < QUIET_SPEED:
+            problems.append(f"{name} still moving at {o['speed']:.3f} m/s")
+    return problems
+
+
 def prepare(scene):
     """Reset, apply the variation, settle, check the scene is physically sane. Returns (wrapper, raw_obs, report)."""
+    varied = scene["objects"] or scene["clutter"]  # light and colour cannot change the physics
+    stock = None
+    if varied:
+        reference = build(scene)
+        _, stock = _settle(reference)
+        reference.close()
+
     wrapper = build(scene)
     inner = _inner(wrapper)
     if scene["clutter"]:
@@ -192,38 +245,11 @@ def prepare(scene):
         _set_colour(inner, OBJECTS[c["object"]], c["rgb"])
     for e in scene["objects"]:
         _move(inner, e)
-    inner.sim.forward()
 
-    placed = _poses(inner)
-    dummy = np.array(get_libero_dummy_action(), dtype=np.float64)
-    steps = 0
-    while steps < MAX_SETTLE_STEPS:
-        raw_obs, _, _, _ = wrapper._env.step(dummy)
-        steps += 1
-        now = _poses(inner)
-        if steps >= MIN_SETTLE_STEPS and max(p["speed"] for p in now.values()) < QUIET_SPEED:
-            break
-
-    report = {"settle_steps": steps, "objects": {}, "problems": []}
-    report["deepest_penetration_m"] = _deepest_penetration(inner.sim)
-    if report["deepest_penetration_m"] > MAX_PENETRATION_M:
-        report["problems"].append(f"penetration {report['deepest_penetration_m']:.4f} m")
-    for name, p in now.items():
-        drift = float(np.linalg.norm(p["pos"][:2] - placed[name]["pos"][:2]))
-        rise = float(p["pos"][2] - placed[name]["pos"][2])
-        tilt_change = abs(p["tilt_deg"] - placed[name]["tilt_deg"])
-        report["objects"][name] = {
-            "pos": [float(x) for x in p["pos"]],
-            "xy_drift_m": drift, "z_change_m": rise, "tilt_change_deg": tilt_change, "speed": p["speed"],
-        }
-        if drift > MAX_XY_DRIFT_M:
-            report["problems"].append(f"{name} slid {drift:.4f} m while settling")
-        if rise > MAX_RISE_M:
-            report["problems"].append(f"{name} rose {rise:.4f} m while settling")
-        if tilt_change > MAX_TILT_CHANGE_DEG:
-            report["problems"].append(f"{name} tilted {tilt_change:.1f} deg while settling")
-        if p["speed"] >= QUIET_SPEED:
-            report["problems"].append(f"{name} still moving at {p['speed']:.3f} m/s")
+    raw_obs, report = _settle(wrapper)
+    report["problems"] = _problems(report, stock) if stock else []
+    if stock:
+        report["stock_xy_drift_m"] = {k: v["xy_drift_m"] for k, v in stock["objects"].items()}
     report["valid"] = not report["problems"]
     return wrapper, raw_obs, report
 
@@ -264,10 +290,8 @@ class Outcome:
             reason = "target_lifted_not_placed"
         elif self.touched:
             reason = "target_touched_not_lifted"
-        elif not self.touched:
-            reason = "target_never_touched"
         else:
-            reason = "unknown"
+            reason = "target_never_touched"
         return reason, metrics
 
 
