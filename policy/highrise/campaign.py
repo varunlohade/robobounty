@@ -48,6 +48,9 @@ OTHER_RANGES = {
     "ledge_depth_m": (0.02, 0.10),
     "ledge_x_m": (-2.0, 2.0),
     "ledge_width_m": (0.5, 3.0),
+    "temperature_c": (-10.0, 45.0),
+    "humidity_pct": (10.0, 95.0),
+    "dust_gm2": (0.0, 30.0),
     "sun_level": (0.3, 1.0),
 }
 LEDGE_INSIDE_SHARE = 0.3
@@ -92,8 +95,10 @@ def wilson(k, n, z=1.96):
 
 def table(rows):
     lines = []
+    broken = [r["trial"] for r in rows if r["failure"] == "sim_diverged"]
+    lines.append(f"numerical divergence, left out of the rates: {len(broken)} {broken[:8]}")
     for kind in ("control", "varied"):
-        sub = [r for r in rows if r["kind"] == kind]
+        sub = [r for r in rows if r["kind"] == kind and r["failure"] != "sim_diverged"]
         passed = sum(r["passed"] for r in sub)
         lo, hi = wilson(passed, len(sub))
         lines.append(f"{kind}: {passed}/{len(sub)} passed, 95% interval {lo:.2f}-{hi:.2f}")

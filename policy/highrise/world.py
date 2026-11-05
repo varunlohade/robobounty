@@ -8,7 +8,7 @@ import json
 import math
 from pathlib import Path
 
-SCHEMA = "highrise.world.v2"
+SCHEMA = "highrise.world.v3"
 
 # name: (min, max). SI units unless the name says otherwise.
 FIELDS = {
@@ -37,6 +37,9 @@ FIELDS = {
     "ledge_below_top_m": (0.5, 14.0),
     "ledge_x_m": (-6.0, 6.0),
     "ledge_width_m": (0.2, 12.0),
+    "temperature_c": (-20.0, 50.0),  # air and battery temperature
+    "humidity_pct": (0.0, 100.0),
+    "dust_gm2": (0.0, 60.0),  # dust load on the glass
     "sun_level": (0.2, 1.0),  # render only, no effect on physics
 }
 INTEGER_FIELDS = {"gust_count"}
@@ -59,6 +62,11 @@ ROOF_Z = 160.0
 START_ABOVE_TOP = 0.13  # body centre start above the area top, so the pads reach the top edge
 MU_DRY = 0.75
 MU_WET = 0.30
+MU_DUST = 0.40
+DUST_FRICTION_SCALE_GM2 = 5.0
+AIR_PRESSURE_PA = 101325.0
+GLASS_BELOW_AIR_C = 3.0
+CONDENSATION_RAMP_C = 3.0
 LEDGE_THICKNESS = 0.12
 TRANSOM_SPACING = 3.6  # floor height, fixed for the tower
 
@@ -100,8 +108,29 @@ def world_hash(world):
     return hashlib.sha256(json.dumps(world, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
+def air(world):
+    """Moist air density from the ideal gas mix, and the dew point. Saturation pressure from the Magnus form."""
+    t = world["temperature_c"]
+    kelvin = t + 273.15
+    e_s = 610.94 * math.exp(17.625 * t / (t + 243.04))
+    e = world["humidity_pct"] / 100.0 * e_s
+    rho = (AIR_PRESSURE_PA - e) / (287.05 * kelvin) + e / (461.5 * kelvin)
+    if e <= 0:
+        return rho, -273.15
+    x = math.log(e / 610.94)
+    return rho, 243.04 * x / (17.625 - x)
+
+
+def effective_wetness(world):
+    """The larger of the stated wetness and condensation, when the glass is colder than the dew point."""
+    _, dew = air(world)
+    glass = world["temperature_c"] - GLASS_BELOW_AIR_C
+    return max(world["wetness"], min(1.0, max(0.0, (dew - glass) / CONDENSATION_RAMP_C)))
+
+
 def friction(world):
-    return MU_DRY + (MU_WET - MU_DRY) * world["wetness"]
+    clean = MU_DRY + (MU_WET - MU_DRY) * effective_wetness(world)
+    return clean + (MU_DUST - clean) * (1 - math.exp(-world["dust_gm2"] / DUST_FRICTION_SCALE_GM2))
 
 
 def area(world):

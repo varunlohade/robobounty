@@ -79,9 +79,9 @@ def main():
                 cam.distance = 1.35 * max(a_["z1"] - a_["z0"], a_["x1"] - a_["x0"]) + 2.0
                 cam.azimuth, cam.elevation = 104, -12
             else:
-                cam.lookat[:] = (x + 2.0, -4.0, z - 6.0)
-                cam.distance = 12.0
-                cam.azimuth, cam.elevation = 142, -22
+                cam.lookat[:] = (x, -0.5, z - 1.0)
+                cam.distance = 7.0
+                cam.azimuth, cam.elevation = -16, -30
             r = frames["r"]
             r.update_scene(sim.d, cam, frames["opt"])
             add_dirt(r.scene, sim)

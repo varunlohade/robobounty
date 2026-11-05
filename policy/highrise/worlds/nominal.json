@@ -1,5 +1,5 @@
 {
- "schema": "highrise.world.v2",
+ "schema": "highrise.world.v3",
  "steady_wind_ms": 2.0,
  "gust_speed_ms": 5.0,
  "gust_start_s": 30.0,
@@ -25,5 +25,8 @@
  "ledge_below_top_m": 8.0,
  "ledge_x_m": 0.0,
  "ledge_width_m": 2.0,
+ "temperature_c": 15.0,
+ "humidity_pct": 50.0,
+ "dust_gm2": 1.0,
  "sun_level": 0.7
 }

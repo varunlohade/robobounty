@@ -48,6 +48,9 @@ def run(world, seed, out=None):
         if not sim.step(action):
             status = "invalid_action"
             break
+        if sim.diverged:
+            status = "sim_diverged"
+            break
         judge.update(sim, action)
         sha = sim.state_sha()
         h = S.digest(prev, i, action, sha)
@@ -60,9 +63,9 @@ def run(world, seed, out=None):
         if judge.should_stop(sim, action):
             break
     result = judge.finish(sim, action)
-    if status == "invalid_action":
+    if status != "ok":
         result["passed"] = False
-        result["failure"] = "invalid_action"
+        result["failure"] = status
     result.update({
         "status": status, "seed": seed, "world_sha256": W.world_hash(world), "model_sha256": sim.model_sha,
         "start_state_sha256": sim.start_sha, "final_state_sha256": sim.state_sha(), "action_chain_head": prev,

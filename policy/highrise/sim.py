@@ -22,7 +22,7 @@ DT_SAMPLE = DT_CONTROL / SAMPLES_PER_CONTROL
 ACTION_FIELDS = ("left_speed", "right_speed", "suction", "tether_rate", "done", "reported_coverage")
 ACTION_LIMITS = np.array([[-0.4, 0.4], [-0.4, 0.4], [0, 1], [-1, 1], [0, 1], [0, 1]], dtype=float)
 
-AIR_DENSITY = 1.225
+REFERENCE_AIR_DENSITY = 1.225  # the fan curve is rated at this density
 GRAVITY = 9.81
 
 # Vacuum skirt and impeller.
@@ -31,6 +31,12 @@ SKIRT_COMPLIANCE_M = 0.010  # the skirt lip follows the glass up to this lift
 LIP_CONFORM_M = 0.006  # the lip bridges a joint this high with no leak
 CROSS_LEAK_SHAPE = 3.0  # leak at one skirt-joint crossing = shape * (height - conform)^2
 JOINT_GROOVE_DEPTH_M = 0.005
+SKIRT_STIFFEN_BELOW_C = 0.0  # the skirt follows the glass less below this
+SKIRT_STIFFEN_PER_C = 0.02
+SKIRT_STIFFEN_FLOOR = 0.5
+DUST_LEAK_M2_PER_GM2 = 2e-6
+DUST_CAPTURE_FRACTION = 0.1  # share of swept dust that reaches the impeller
+IMPELLER_CLOG_G = 200.0
 ORIFICE_CD = 0.6
 IMPELLER_FLOW_MAX_M3S = 0.03
 IMPELLER_LAG_S = 0.4
@@ -42,7 +48,10 @@ IMPELLER_LOSS_W = 25.0  # shaft loss at full speed, scales with speed cubed
 BATTERY_AH = 6.0
 BATTERY_V_FULL = 16.4
 BATTERY_V_EMPTY = 12.4
-BATTERY_R_OHM = 0.2
+BATTERY_R_OHM = 0.2  # at 25 C
+BATTERY_R_B_K = 2000.0
+BATTERY_CAPACITY_PER_K = 0.008
+BATTERY_CAPACITY_FLOOR = 0.5
 IMPELLER_V_FULL_SPEED = 14.0  # below this voltage the impeller cannot reach full speed
 ELECTRONICS_W = 5.0
 DRIVE_EFFICIENCY = 0.6
@@ -85,6 +94,8 @@ NOSE_NOISE_M = 0.001
 NOSE_DROPOUT = 0.03  # share of nose-sensor readings lost on clear glass
 NOSE_X = 0.24
 NOSE_Y = 0.12
+DUST_NOISE_PER_GM2 = 0.02
+DUST_DROPOUT_PER_GM2 = 0.002
 SLIP_FLOOR_MS = 0.02
 PIVOT_TRACK_DIFF_MS = 0.04
 
@@ -103,13 +114,13 @@ def versions():
     return {"mujoco": mujoco.__version__, "numpy": np.__version__}
 
 
-def impeller_pressure(p_max, flow_max, area_m2):
+def impeller_pressure(p_max, flow_max, area_m2, rho):
     """Steady pressure where the fan curve meets the leak: dP = Pm(1-(Q/Qm)^2), Q = Cd A sqrt(2 dP / rho)."""
     if p_max <= 0:
         return 0.0, 0.0
-    k = 2 * ORIFICE_CD ** 2 * area_m2 ** 2 / AIR_DENSITY
+    k = 2 * ORIFICE_CD ** 2 * area_m2 ** 2 / rho
     dp = p_max / (1 + k * p_max / flow_max ** 2)
-    return dp, ORIFICE_CD * area_m2 * math.sqrt(2 * dp / AIR_DENSITY)
+    return dp, ORIFICE_CD * area_m2 * math.sqrt(2 * dp / rho)
 
 
 class Wind:
@@ -163,6 +174,20 @@ class Sim:
         a = W.area(world)
         self.ledge = (world["ledge_x_m"] + a["x1"] / 2, a["z1"] - world["ledge_below_top_m"],
                       world["ledge_width_m"] / 2, W.LEDGE_THICKNESS / 2, world["ledge_depth_m"])
+
+        self.rho, _ = W.air(world)
+        kelvin = world["temperature_c"] + 273.15
+        self.battery_r = BATTERY_R_OHM * math.exp(BATTERY_R_B_K * (1 / kelvin - 1 / 298.15))
+        self.battery_ah = BATTERY_AH * min(1.0, max(BATTERY_CAPACITY_FLOOR, 1 + BATTERY_CAPACITY_PER_K * (kelvin - 298.15)))
+        cold = world["temperature_c"] - SKIRT_STIFFEN_BELOW_C
+        stiff = min(1.0, max(SKIRT_STIFFEN_FLOOR, 1 + SKIRT_STIFFEN_PER_C * cold))
+        self.skirt_compliance = SKIRT_COMPLIANCE_M * stiff
+        self.lip_conform = LIP_CONFORM_M * stiff
+        self.dust_leak_m2 = DUST_LEAK_M2_PER_GM2 * world["dust_gm2"]
+        self.dust_ingested_g = 0.0
+        self.noise_scale = 1 + DUST_NOISE_PER_GM2 * world["dust_gm2"]
+        self.nose_dropout = min(1.0, NOSE_DROPOUT + DUST_DROPOUT_PER_GM2 * world["dust_gm2"])
+        self.diverged = False
 
         self.t = 0.0
         self.wind = Wind(world, seed)
@@ -288,23 +313,24 @@ class Sim:
         h = self.heading()
         reach = W.BODY_SIDE / 2 * (abs(math.cos(h)) + abs(math.sin(h)))
         n = sum(1 for m in self.mullions if abs(m - x) < reach) + sum(1 for t in self.transoms if abs(t - z) < reach)
-        step = max(0.0, self.world["mullion_depth_m"] - LIP_CONFORM_M)
+        step = max(0.0, self.world["mullion_depth_m"] - self.lip_conform)
         per_crossing = CROSS_LEAK_SHAPE * step * step + self.world["joint_gap_m"] * JOINT_GROOVE_DEPTH_M
         return 2 * n * per_crossing
 
     def _update_adhesion(self, settle=False):
         gaps = self._corner_gaps() if not settle else (0, 0, 0, 0)
         side = W.BODY_SIDE
-        leak = self.world["seal_leak_mm2"] * 1e-6 + self.cross_leak_m2
+        leak = self.world["seal_leak_mm2"] * 1e-6 + self.cross_leak_m2 + self.dust_leak_m2
         for i in range(4):
-            a = max(0.0, gaps[i] - SKIRT_COMPLIANCE_M)
-            b = max(0.0, gaps[(i + 1) % 4] - SKIRT_COMPLIANCE_M)
+            a = max(0.0, gaps[i] - self.skirt_compliance)
+            b = max(0.0, gaps[(i + 1) % 4] - self.skirt_compliance)
             leak += side * (a + b) / 2
         leak += self._off_glass_length() * 0.05
         self.leak_m2 = leak
         s = self.impeller
-        p_max = self.world["suction_pa"] * s * s
-        target, flow = impeller_pressure(p_max, IMPELLER_FLOW_MAX_M3S * max(s, 1e-3), leak)
+        p_max = self.world["suction_pa"] * s * s * self.rho / REFERENCE_AIR_DENSITY
+        clog = max(0.05, 1 - self.dust_ingested_g / IMPELLER_CLOG_G)
+        target, flow = impeller_pressure(p_max, IMPELLER_FLOW_MAX_M3S * clog * max(s, 1e-3), leak, self.rho)
         self.flow = flow
         if settle:
             self.dp = target
@@ -358,10 +384,10 @@ class Sim:
         wx = speed * math.cos(direction)
         wy = speed * math.sin(direction)
         rx, ry = wx - d.qvel[0], wy - d.qvel[1]
-        drag = 0.5 * AIR_DENSITY * BODY_DRAG_CD
+        drag = 0.5 * self.rho * BODY_DRAG_CD
         fx = drag * AREA_BODY_SIDE * abs(rx) * rx
-        fy = drag * AREA_BODY_FRONT * abs(ry) * ry - 0.5 * AIR_DENSITY * LIFT_COEF * AREA_BODY_FRONT * (wx * wx + wy * wy)
-        line = 0.5 * AIR_DENSITY * TETHER_CD * TETHER_DIAMETER_M * self.tether_len * TETHER_SHARE_ON_ROBOT
+        fy = drag * AREA_BODY_FRONT * abs(ry) * ry - 0.5 * self.rho * LIFT_COEF * AREA_BODY_FRONT * (wx * wx + wy * wy)
+        line = 0.5 * self.rho * TETHER_CD * TETHER_DIAMETER_M * self.tether_len * TETHER_SHARE_ON_ROBOT
         fx += line * abs(wx) * wx
         fy += line * abs(wy) * wy
         fz = -TETHER_KG_PER_M * self.tether_len * TETHER_SHARE_ON_ROBOT * GRAVITY
@@ -381,11 +407,11 @@ class Sim:
         total = fan_w + drive_w + ELECTRONICS_W
         ocv = self._ocv()
         # V = OCV - I R with I = P / V, the higher root. Past the power limit the voltage collapses to OCV/2.
-        disc = ocv * ocv - 4 * BATTERY_R_OHM * total
+        disc = ocv * ocv - 4 * self.battery_r * total
         self.volts = (ocv + math.sqrt(disc)) / 2 if disc > 0 else ocv / 2
         self.amps = total / self.volts
         self.fan_amps = fan_w / self.volts
-        self.soc = max(0.0, self.soc - self.amps * DT_CONTROL / (BATTERY_AH * 3600))
+        self.soc = max(0.0, self.soc - self.amps * DT_CONTROL / (self.battery_ah * 3600))
 
     def _apply_tether(self, rate_cmd):
         step = TETHER_ACCEL * DT_CONTROL
@@ -480,8 +506,12 @@ class Sim:
             f[3:6] = pad[3:6]
             mujoco.mj_step(self.m, d, nstep=SUBSTEPS_PER_SAMPLE)
             self._sample_forces()
+        if d.warning[mujoco.mjtWarning.mjWARN_BADQACC].number > 0:
+            self.diverged = True
         self._read_contacts()
         self._clean()
+        swept = math.hypot(d.qvel[0], d.qvel[2]) * W.BODY_SIDE * DT_CONTROL * self.world["dust_gm2"]
+        self.dust_ingested_g += DUST_CAPTURE_FRACTION * swept
         self.encoder_left = r * sum(d.qvel[q] for q in self.dof_left) / 2
         self.encoder_right = r * sum(d.qvel[q] for q in self.dof_right) / 2
         self._update_slip()
@@ -522,16 +552,16 @@ class Sim:
             sx = x + NOSE_X * c - side * NOSE_Y * s
             sz = z + NOSE_X * s + side * NOSE_Y * c
             height, off = self._nose_reading(sx, sz)
-            lost = r.uniform() < NOSE_DROPOUT
+            lost = r.uniform() < self.nose_dropout
             noses.append({"valid": not lost, "off_glass": off and not lost,
-                          "height": 0.0 if lost else height + float(r.normal(0, NOSE_NOISE_M))})
+                          "height": 0.0 if lost else height + float(r.normal(0, NOSE_NOISE_M * self.noise_scale))})
         speed, direction = self.wind_now
         return {
             "t": self.t,
             "encoder_left": self.encoder_left,
             "encoder_right": self.encoder_right,
             "imu_heading": h + float(r.normal(0, IMU_HEADING_NOISE_RAD)),  # from gravity, on a vertical wall
-            "fan_current": max(0.0, self.fan_amps + float(r.normal(0, CURRENT_NOISE_A))),
+            "fan_current": max(0.0, self.fan_amps + float(r.normal(0, CURRENT_NOISE_A * self.noise_scale))),
             "battery_volts": self.volts,
             "tether_length": self.tether_len,
             "tether_tension": max(0.0, self.tension + float(r.normal(0, TENSION_NOISE_N))),
