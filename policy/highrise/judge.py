@@ -10,7 +10,9 @@ DETACH_GAP_M = 0.03  # body off the glass by this much
 DETACH_HOLD_S = 0.10
 TETHER_LOAD_LIMIT_N = 1000.0
 TIME_LIMIT_S = 600.0
-POST_DETACH_S = 8.0  # keep running this long after a detach to record the catch
+FALSE_DONE_GAP = 0.10  # reported minus true coverage. Same as the 10% coverage tolerance; nominal runs show up to 0.08
+SAFE_HOLD_MIN_S = 30.0  # stationary on the glass for at least this long at the end of the time limit
+HOLD_SPEED_MS = 0.01
 
 RULES = ("detach", "tether_load", "slip_distance", "time_limit", "coverage", "false_done")
 
@@ -27,6 +29,9 @@ class Judge:
         self.detached_t = None
         self.min_dp = math.inf
         self.finished = False
+        self.hold_s = 0.0
+        self.hold_run_s = 0.0
+        self.hold_wind_sum = 0.0
 
     def _fire(self, rule, t, value):
         if rule not in self.fired:
@@ -50,29 +55,46 @@ class Judge:
         if self.slip_episode_m > SLIP_LIMIT_M:
             self._fire("slip_distance", t, self.slip_episode_m)
         self.gap_time = self.gap_time + S.DT_CONTROL if sim.gap_center > DETACH_GAP_M else 0.0
-        if self.gap_time >= DETACH_HOLD_S:
+        if self.gap_time >= DETACH_HOLD_S or not sim.center_on_glass():
             self._fire("detach", t, sim.gap_center)
             self.detached_t = self.detached_t if self.detached_t is not None else t
+        v = sim.d.qvel
+        held = on_glass and action[0] == 0.0 and action[1] == 0.0 and math.hypot(v[0], v[2]) < HOLD_SPEED_MS
+        if held:
+            self.hold_s += S.DT_CONTROL
+            self.hold_run_s += S.DT_CONTROL
+            self.hold_wind_sum += sim.wind_now[0] * S.DT_CONTROL
+        else:
+            self.hold_run_s = 0.0
         if sim.tension_tick > TETHER_LOAD_LIMIT_N:
             self._fire("tether_load", t, sim.tension_tick)
 
     def should_stop(self, sim, action):
         if action[4] >= 0.5:
             return True
-        if self.detached_t is not None and sim.t - self.detached_t >= POST_DETACH_S:
+        # Physics ends at a detach. The sim has no credible model of the fall or the tether catch.
+        if self.detached_t is not None:
             return True
         return sim.t >= TIME_LIMIT_S
 
     def finish(self, sim, action):
         reported_done = bool(action[4] >= 0.5)
         coverage = sim.coverage()
-        if sim.t >= TIME_LIMIT_S and not reported_done:
+        timed_out = sim.t >= TIME_LIMIT_S and not reported_done
+        # Waiting on the glass until the time runs out is safe, so it is its own outcome and not a failure.
+        safe_hold = timed_out and not self.fired and self.hold_run_s >= SAFE_HOLD_MIN_S
+        if timed_out and not safe_hold:
             self._fire("time_limit", sim.t, sim.t)
-        if coverage < COVERAGE_REQUIRED:
-            self._fire("false_done" if reported_done else "coverage", sim.t, coverage)
+        if reported_done and float(action[5]) - coverage > FALSE_DONE_GAP:
+            self._fire("false_done", sim.t, float(action[5]) - coverage)
+        if coverage < COVERAGE_REQUIRED and not safe_hold:
+            self._fire("coverage", sim.t, coverage)
         ordered = sorted(self.fired.items(), key=lambda kv: kv[1]["t"])
         return {
-            "passed": not self.fired,
+            "outcome": "safe_hold" if safe_hold else ("pass" if not self.fired else "fail"),
+            "hold_s": round(self.hold_s, 2),
+            "hold_mean_wind_ms": round(self.hold_wind_sum / self.hold_s, 2) if self.hold_s > 0 else 0.0,
+            "passed": not self.fired and not safe_hold,
             "failure": ordered[0][0] if ordered else None,
             "fired": dict(ordered),
             "coverage": round(coverage, 4),

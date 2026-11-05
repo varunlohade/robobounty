@@ -49,6 +49,8 @@ def replay(run_dir, keep=None):
         if keep is not None:
             keep(sim, row["i"])
     result = judge.finish(sim, action)
+    if sim.diverged:
+        result["failure"], result["passed"] = "sim_diverged", False
     keys = ("failure", "passed", "coverage", "reported_done", "slip_m", "peak_tether_n", "time_s")
     report.update({
         "steps_replayed": len(rows) - 1, "first_divergent_step": first_divergence,

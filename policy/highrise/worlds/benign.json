@@ -1,0 +1,12 @@
+[
+ {"name": "calm_dry", "steady_wind_ms": 0.5, "gust_count": 0, "wetness": 0.0},
+ {"name": "light_breeze", "steady_wind_ms": 3.0, "gust_speed_ms": 6.0},
+ {"name": "small_area", "area_width_m": 1.8, "area_height_m": 2.0},
+ {"name": "light_dirt", "dirt_level": 0.3},
+ {"name": "strong_suction", "suction_pa": 3200.0},
+ {"name": "good_seal", "seal_leak_mm2": 120.0},
+ {"name": "mild_warm", "temperature_c": 25.0, "humidity_pct": 40.0},
+ {"name": "high_up", "drop_below_roof_m": 35.0},
+ {"name": "flush_joints", "mullion_depth_m": 0.002, "joint_gap_m": 0.001},
+ {"name": "low_gust_along_wall", "gust_speed_ms": 8.0, "wind_dir_deg": 0.0}
+]

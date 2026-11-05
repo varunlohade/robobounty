@@ -28,6 +28,7 @@ A simulated robot built for a hackathon, in the family of Ecovacs WINBOT and HOB
 | Discharge coefficient Cd | 0.6 | | About 0.6 for a sharp edge, [orifice plate reference](https://www.wikipedia.org/wiki/Orifice_plate). A skirt gap is not a sharp plate, so this is an approximation |
 | Baseline skirt leak `seal_leak_mm2` | 200 nominal | mm2 | ASSUMPTION |
 | Skirt lift before leak | 0.010 | m | ASSUMPTION |
+| Open gap past the glass edge | 0.05 | m | ASSUMPTION: along skirt perimeter that has left the glass |
 | Lip bridges a joint up to | 0.006 | m | ASSUMPTION |
 | Joint crossing leak | 2 crossings x (3 (h - lip)^2 + gap x 5 mm) | m2 | ASSUMPTION: geometric guess |
 | Impeller lag, chamber lag | 0.4, 0.05 | s | ASSUMPTION |
@@ -51,7 +52,8 @@ A simulated robot built for a hackathon, in the family of Ecovacs WINBOT and HOB
 | Force law | 0.5 rho Cd A v^2 | | Physics |
 | Air density | per world, 1.221 at nominal | kg/m3 | Moist ideal gas mix at 101325 Pa, textbook. Height and pressure change not modelled |
 | Body drag Cd | 1.2 | | ASSUMPTION: bluff body, wall effects not modelled |
-| Outward load coefficient | 0.9 on 0.13 m2 | | ASSUMPTION. See note below |
+| Outward load coefficient | 0.9 on 0.13 m2, on total wind speed | | ASSUMPTION: no source found. The one outward wind load. See note below |
+| Wall-normal wind | clamped at 0 | | Physics: air cannot blow out of a solid wall. A `wind_dir_deg` pointing away from the wall keeps only its along-wall part |
 | Tether drag | 1.2 on 6 mm line, half the load reaches the robot | | ASSUMPTION |
 | Turbulence, gust shape | 18% sum of sines, 1-cos | | ASSUMPTION |
 | Wind pause in the controller | 10, resume 7 | m/s | Unvalidated vendor blog figure in research notes, about 10 m/s. Not a validated limit |
@@ -85,7 +87,7 @@ Field names: `temperature_c`, `humidity_pct`, `dust_gm2`. Each changes the physi
 | Line weight | 0.03 | kg/m | ASSUMPTION |
 | Line stiffness EA | 2e5 | N | ASSUMPTION: k = EA/L |
 | Damping ratio | 0.2 | | ASSUMPTION |
-| Load limit in judge | 1000 | N | ASSUMPTION |
+| Load limit in judge | 1000 | N | ASSUMPTION. Applies only while on the glass, because physics ends at a detach |
 | Sag and wave motion | none | | Simplification: straight massless constraint plus a lumped weight |
 
 ## Battery
@@ -106,6 +108,9 @@ Field names: `temperature_c`, `humidity_pct`, `dust_gm2`. Each changes the physi
 | Coverage required | 0.90 | | ASSUMPTION: chosen before the campaign |
 | Slide limit, gap for detach | 0.30, 0.03 | m | ASSUMPTION |
 | Time limit | 600 | s | ASSUMPTION |
+| Safe hold | stationary on glass at least 30 s at the time limit, with no safety rule fired | s | ASSUMPTION: own outcome, not a failure |
+| False done gap | reported minus true coverage above 0.10 | | ASSUMPTION: same as the 10% coverage tolerance, and chosen knowing nominal gaps reach 0.08. Sensitivity in each table |
+| Sanity limits | 2 cm inside glass, 30 m/s, 10 kN, 0.5 m tether stretch, MuJoCo bad-acceleration warning | | Numerical limits: the trial is thrown out and counted separately |
 
 ## Sensors
 
@@ -119,11 +124,13 @@ Nose height noise 1 mm, 3% lost readings, heading from gravity 0.005 rad, tensio
 - Joints are rounded caps. Real capped mullions stand far prouder, and this robot could not cross them. Flush glazing is the implied building.
 - Glass stays one flat rectangle. Wind has no change with height. Wind on the wall is uniform.
 - `sun_level` changes the picture only.
+- Physics ends at a detach, or when the body centre leaves the glass. There is no model of the fall or the tether catch, so no number comes from them. The tether limit is checked only while the robot is on the glass.
+- Adhesion, wind and line loads act at the centre of mass. Adhesion acts along a line through it, so it adds no moment.
 - The world is deterministic given world, seed and actions. Replay across machines is unknown.
 
-## Changes made after seeing results, before the formal campaign
+## Changes made after seeing results
 
-All made while debugging the nominal world.
+The first group came from debugging the nominal world, before the first formal campaign.
 
 - Body mass 5 to 4 kg, nominal pad force 40 to 25 N, nominal wetness 0.3 to 0.2: at the first values gravity used about 65% of track grip, and a 90 degree pivot slid about 0.25 m.
 - Drive torque limit 0.9 to 1.5 N m: pivots stalled on one track.
@@ -133,3 +140,13 @@ All made while debugging the nominal world.
 - Airborne sand, rain, wind by height, salt, ice and snow have no physics here.
 - Campaign `all` ranges narrowed (wetness to 0.6, joint depth to 12 mm, joint gap to 8 mm, suction from 2200 Pa, leak to 350 mm2, battery from 0.25, dirt to 1.0), because the wider ranges gave 0 passes of 40.
 - A slide counts per event and only on the glass, not as a running total.
+
+Made after seeing the first formal campaigns (seeds 11, 12, 21, 22), which are withdrawn:
+
+- First results led to dropping the old `all` range table in favour of `worlds/moderate_ranges.json`. Those ranges were fixed before the runs that use them, but after seeing the earlier `all` runs, so they are not blind to that experience.
+- Fresh audit fixes: outward wind clamped; one outward load coefficient; safe hold split from `time_limit`; `false_done` based on reported minus true coverage; physics ends at detach; pad torque taken about the centre of mass; sanity limits added. The audit is in `docs/security/SIM-AUDIT-2026-11-06.md`.
+- The wind pause stays in the controller at 10 m/s. Changing it per world would need a controller edit, and `controller.py` is frozen at af0424f.
+- `controller.py` constants `PIVOT_SAG_M_PER_RAD` and `LANE_OVERRUN_M` were set from the nominal world, before af0424f, and were not reset for later physics changes.
+- The nominal control therefore proves little by itself. `worlds/benign.json` is a second control, written by hand and not used for tuning.
+
+Frozen before the audit-fix campaigns: see the commit that records this line. No physics or judge change after it.

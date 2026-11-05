@@ -31,6 +31,7 @@ SKIRT_COMPLIANCE_M = 0.010  # the skirt lip follows the glass up to this lift
 LIP_CONFORM_M = 0.006  # the lip bridges a joint this high with no leak
 CROSS_LEAK_SHAPE = 3.0  # leak at one skirt-joint crossing = shape * (height - conform)^2
 JOINT_GROOVE_DEPTH_M = 0.005
+OFF_GLASS_GAP_M = 0.05  # open gap along skirt perimeter that has run past the glass edge
 SKIRT_STIFFEN_BELOW_C = 0.0  # the skirt follows the glass less below this
 SKIRT_STIFFEN_PER_C = 0.02
 SKIRT_STIFFEN_FLOOR = 0.5
@@ -60,7 +61,7 @@ DRIVE_EFFICIENCY = 0.6
 BODY_DRAG_CD = 1.2
 AREA_BODY_FRONT = W.BODY_SIDE * W.BODY_SIDE
 AREA_BODY_SIDE = W.BODY_SIDE * W.BODY_HEIGHT
-LIFT_COEF = 0.9  # outward load on the body from flow along the wall
+OUTWARD_LOAD_COEF = 0.9  # outward load on the body from flow past it, on the total wind speed
 TETHER_DIAMETER_M = 0.006
 TETHER_CD = 1.2
 TETHER_KG_PER_M = 0.03
@@ -97,6 +98,12 @@ NOSE_Y = 0.12
 DUST_NOISE_PER_GM2 = 0.02
 DUST_DROPOUT_PER_GM2 = 0.002
 SLIP_FLOOR_MS = 0.02
+
+# Numerical sanity. Past any of these the state is not physics, so the trial is thrown out.
+SANE_INSIDE_GLASS_M = 0.02
+SANE_SPEED_MS = 30.0
+SANE_TENSION_N = 10000.0
+SANE_TETHER_STRETCH_M = 0.5
 PIVOT_TRACK_DIFF_MS = 0.04
 
 
@@ -188,6 +195,7 @@ class Sim:
         self.noise_scale = 1 + DUST_NOISE_PER_GM2 * world["dust_gm2"]
         self.nose_dropout = min(1.0, NOSE_DROPOUT + DUST_DROPOUT_PER_GM2 * world["dust_gm2"])
         self.diverged = False
+        self.diverged_reason = None
 
         self.t = 0.0
         self.wind = Wind(world, seed)
@@ -325,7 +333,7 @@ class Sim:
             a = max(0.0, gaps[i] - self.skirt_compliance)
             b = max(0.0, gaps[(i + 1) % 4] - self.skirt_compliance)
             leak += side * (a + b) / 2
-        leak += self._off_glass_length() * 0.05
+        leak += self._off_glass_length() * OFF_GLASS_GAP_M
         self.leak_m2 = leak
         s = self.impeller
         p_max = self.world["suction_pa"] * s * s * self.rho / REFERENCE_AIR_DENSITY
@@ -341,10 +349,12 @@ class Sim:
         """Three spring pads behind the tracks. Force falls to zero as the body lifts by the pad reach.
 
         Each pad pushes the body away from the glass and drags against its motion, with a smooth
-        Coulomb law. Returns the world force and the torque about the body origin.
+        Coulomb law. Returns the world force and the torque about the centre of mass, where MuJoCo
+        applies xfrc_applied.
         """
         d = self.d
         p = d.xpos[self.robot]
+        com = d.xipos[self.robot]
         r = d.xmat[self.robot]
         per_pad = self.world["pad_force_n"] / 3
         fx = fy = fz = tx = ty = tz = 0.0
@@ -372,9 +382,10 @@ class Sim:
             fx += f[0]
             fy += f[1]
             fz += f[2]
-            tx += oy * f[2] - oz * f[1]
-            ty += oz * f[0] - ox * f[2]
-            tz += ox * f[1] - oy * f[0]
+            cx, cy, cz = p[0] + ox - com[0], p[1] + oy - com[1], p[2] + oz - com[2]
+            tx += cy * f[2] - cz * f[1]
+            ty += cz * f[0] - cx * f[2]
+            tz += cx * f[1] - cy * f[0]
         return fx, fy, fz, tx, ty, tz
 
     def _apply_wind_and_line(self):
@@ -382,11 +393,12 @@ class Sim:
         self.wind_now = (speed, direction)
         d = self.d
         wx = speed * math.cos(direction)
-        wy = speed * math.sin(direction)
+        # Air cannot blow out of a solid wall: only the component into the wall stays.
+        wy = max(0.0, speed * math.sin(direction))
         rx, ry = wx - d.qvel[0], wy - d.qvel[1]
         drag = 0.5 * self.rho * BODY_DRAG_CD
         fx = drag * AREA_BODY_SIDE * abs(rx) * rx
-        fy = drag * AREA_BODY_FRONT * abs(ry) * ry - 0.5 * self.rho * LIFT_COEF * AREA_BODY_FRONT * (wx * wx + wy * wy)
+        fy = drag * AREA_BODY_FRONT * abs(ry) * ry - 0.5 * self.rho * OUTWARD_LOAD_COEF * AREA_BODY_FRONT * speed * speed
         line = 0.5 * self.rho * TETHER_CD * TETHER_DIAMETER_M * self.tether_len * TETHER_SHARE_ON_ROBOT
         fx += line * abs(wx) * wx
         fy += line * abs(wy) * wy
@@ -470,6 +482,28 @@ class Sim:
             cells -= CLEAN_RATE * (f - PAD_MIN_N) * DT_CONTROL
             cells[cells < 0] = 0.0
 
+    def _check_sane(self):
+        d = self.d
+        reason = None
+        if d.warning[mujoco.mjtWarning.mjWARN_BADQACC].number > 0:
+            reason = "bad_qacc"
+        elif self.center_on_glass() and d.xpos[self.robot][1] > SANE_INSIDE_GLASS_M:
+            reason = "inside_glass"
+        elif math.sqrt(d.qvel[0] ** 2 + d.qvel[1] ** 2 + d.qvel[2] ** 2) > SANE_SPEED_MS:
+            reason = "speed"
+        elif self.tension_tick > SANE_TENSION_N:
+            reason = "tension_spike"
+        elif d.ten_length[self.tether_id] - self.tether_len > SANE_TETHER_STRETCH_M:
+            reason = "tether_stretch"
+        if reason is not None and not self.diverged:
+            self.diverged = True
+            self.diverged_reason = reason
+
+    def center_on_glass(self):
+        x, z = self.body_xz()
+        g = self.glass
+        return g["x0"] <= x <= g["x1"] and g["z0"] <= z <= g["z1"]
+
     def _update_slip(self):
         """Body speed over the glass that the track encoders do not account for."""
         d = self.d
@@ -506,8 +540,7 @@ class Sim:
             f[3:6] = pad[3:6]
             mujoco.mj_step(self.m, d, nstep=SUBSTEPS_PER_SAMPLE)
             self._sample_forces()
-        if d.warning[mujoco.mjtWarning.mjWARN_BADQACC].number > 0:
-            self.diverged = True
+        self._check_sane()
         self._read_contacts()
         self._clean()
         swept = math.hypot(d.qvel[0], d.qvel[2]) * W.BODY_SIDE * DT_CONTROL * self.world["dust_gm2"]

@@ -48,9 +48,6 @@ def run(world, seed, out=None):
         if not sim.step(action):
             status = "invalid_action"
             break
-        if sim.diverged:
-            status = "sim_diverged"
-            break
         judge.update(sim, action)
         sha = sim.state_sha()
         h = S.digest(prev, i, action, sha)
@@ -60,12 +57,17 @@ def run(world, seed, out=None):
         trace.append([ctl.phase, round(ctl.estimate, 3), round(sim.dp, 1), round(sim.body_xz()[0], 3), round(sim.body_xz()[1], 3),
                       round(sim.tension_tick, 1), round(sim.slip_rate, 3), round(sim.volts, 2), round(sim.coverage(), 3) if i % 20 == 0 else None])
         i += 1
+        if sim.diverged:
+            status = "sim_diverged"
+            break
         if judge.should_stop(sim, action):
             break
     result = judge.finish(sim, action)
     if status != "ok":
         result["passed"] = False
         result["failure"] = status
+        result["outcome"] = "sim_diverged" if status == "sim_diverged" else "fail"
+        result["diverged_reason"] = sim.diverged_reason
     result.update({
         "status": status, "seed": seed, "world_sha256": W.world_hash(world), "model_sha256": sim.model_sha,
         "start_state_sha256": sim.start_sha, "final_state_sha256": sim.state_sha(), "action_chain_head": prev,

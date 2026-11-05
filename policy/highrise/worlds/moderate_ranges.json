@@ -1,0 +1,33 @@
+{
+ "ledge_inside_share": 0.1,
+ "gust_count": [0, 4],
+ "ranges": {
+  "steady_wind_ms": [0.0, 5.0],
+  "gust_speed_ms": [3.0, 20.0],
+  "gust_start_s": [10.0, 200.0],
+  "gust_duration_s": [3.0, 15.0],
+  "gust_period_s": [20.0, 90.0],
+  "wind_dir_deg": [-180.0, 180.0],
+  "wetness": [0.0, 0.4],
+  "mullion_depth_m": [0.002, 0.008],
+  "mullion_spacing_m": [1.2, 2.2],
+  "mullion_offset_m": [0.0, 2.2],
+  "joint_gap_m": [0.0, 0.005],
+  "edge_margin_m": [0.8, 1.5],
+  "area_width_m": [2.0, 3.0],
+  "area_height_m": [2.5, 3.5],
+  "drop_below_roof_m": [10.0, 40.0],
+  "suction_pa": [2400.0, 3200.0],
+  "seal_leak_mm2": [120.0, 280.0],
+  "battery_start_frac": [0.4, 1.0],
+  "pad_force_n": [20.0, 30.0],
+  "dirt_level": [0.4, 0.8],
+  "ledge_depth_m": [0.02, 0.08],
+  "ledge_x_m": [-1.0, 1.0],
+  "ledge_width_m": [0.5, 2.0],
+  "temperature_c": [0.0, 35.0],
+  "humidity_pct": [20.0, 80.0],
+  "dust_gm2": [0.0, 5.0],
+  "sun_level": [0.3, 1.0]
+ }
+}
