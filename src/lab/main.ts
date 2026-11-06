@@ -6,6 +6,7 @@ import { SimView, restoreOnLoss } from '../app/view.ts';
 import { worldPage } from '../app/world_page.ts';
 import { lookOf } from '../view/real/look.ts';
 import { LabChat, replayNote } from './chat.ts';
+import { loadPoses, posesPage } from './poses.ts';
 
 const NS = 'http://www.w3.org/2000/svg';
 const HEALTH_RETRY_MS = 2_000;
@@ -88,6 +89,21 @@ async function replayOnly(root: HTMLElement, id: string) {
     statusRight.append(el('span', '', `Recorded in MuJoCo ${trial.manifest.python_mujoco}, shown with ${replay.version}`));
   } catch (err) {
     world.viewport.append(el('div', 'sim-error', `MuJoCo could not load this model in the browser, so there is no 3D view.\n${String(err)}`));
+  }
+}
+
+// A pack's replay file opened by address.
+async function posesOnly(root: HTMLElement, url: string) {
+  const { main, statusRight, setName } = shell(root, replayNote());
+  setName('recorded_run');
+  try {
+    const replay = await loadPoses(url);
+    const world = posesPage(replay, statusRight);
+    main.append(world.page);
+    world.start();
+    (window as unknown as { __lab: unknown }).__lab = { view: () => world.view, jump: world.jump };
+  } catch (err) {
+    main.append(el('div', 'sim-error', `Could not load the recorded run.\n${String(err)}`));
   }
 }
 
@@ -241,8 +257,10 @@ async function live(root: HTMLElement) {
 
 async function main() {
   const root = document.getElementById('lab')!;
-  const id = new URLSearchParams(location.search).get('trial');
-  if (id) await replayOnly(root, id);
+  const params = new URLSearchParams(location.search);
+  const id = params.get('trial'), poses = params.get('poses');
+  if (poses) await posesOnly(root, poses);
+  else if (id) await replayOnly(root, id);
   else await live(root);
 }
 

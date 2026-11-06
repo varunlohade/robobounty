@@ -96,6 +96,7 @@ button { cursor: pointer; }
 .sim-key { left: 12px; bottom: 12px; color: var(--lab-text-2); }
 .sim-elements { left: 12px; bottom: 44px; color: var(--lab-text-2); }
 .sim-off { left: 12px; top: 48px; color: var(--lab-red-text); }
+.sim-bad { color: var(--lab-red-text); }
 .sim-off[hidden] { display: none; }
 .sim-error { position: absolute; inset: 0; padding: 24px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--lab-red-text); }
 
