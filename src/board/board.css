@@ -186,6 +186,7 @@ tr.click{cursor:pointer}tr.click:hover{background:var(--raised)}tr.click[aria-se
 .walletaddr code{color:var(--t1)}
 .walletmoney{color:var(--t1);font-weight:500}
 .walleterr{flex-basis:100%;color:var(--red-t);font-size:12px;line-height:16px}
+.chainstep,.chainbalance{font-feature-settings:"tnum","cv11","calt" 0}
 .chainstep{min-height:32px}
 .chainstep>span:first-child{min-width:0;white-space:nowrap;overflow:hidden}
 .chainstep b{font-weight:500;color:var(--t1);flex:none}

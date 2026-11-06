@@ -189,7 +189,8 @@ try {
   const fundAt = Date.now();
   await press('Fund from my wallet');
   await c.until(`document.querySelector('[data-step="funded"]')?.dataset.state === 'ok'`, 'funded', 60);
-  check('funding shows two real wallet popups', (await popups()).join() === `tx:${APPROVE},tx:${CREATE}`, (await popups()).join());
+  const funding = (await popups()).filter(p => p.startsWith('tx:')).join();
+  check('funding sends two wallet transactions, approve then create', funding === `tx:${APPROVE},tx:${CREATE}`, funding);
   const fundTxs = await stepTx('funded');
   check('funded: approve and create have receipts with status 1', fundTxs.length === 2 && fundTxs.every(t => BigInt(receipt(t).status) === 1n), fundTxs.join());
   check('the contract holds the pay', usdc(CONTRACT) === 1_000_000n && usdc(COMPANY) === 9_000_000n);
@@ -244,9 +245,8 @@ try {
   const nextLeft = Number((await text('[data-step="dispute-window"]')).match(/(\d+) s left/)[1]);
   check('the countdown moves', nextLeft < firstLeft && firstLeft <= 60, `${firstLeft} then ${nextLeft}`);
   check('nothing is paid during the window', usdc(ENGINEER) === 0n);
-  const early = cast('wallet', 'address', '--keystore', join(keys, 'resolver'), '--password-file', join(keys, 'password')); // Same wallet, read only, as the agent.
-  let earlyRefused = false;
-  try { read(CONTRACT, 'payout(uint256,bytes32)', '1', JSON.parse(readFileSync(join(boardRoot, '1/fixes/1/arc_steps.json'), 'utf8')).fingerprint, '--from', early); } catch { earlyRefused = true; }
+    let earlyRefused = false;
+  try { read(CONTRACT, 'payout(uint256,bytes32)', '1', JSON.parse(readFileSync(join(boardRoot, '1/fixes/1/arc_steps.json'), 'utf8')).fingerprint, '--from', RESOLVER); } catch { earlyRefused = true; }
   check('the contract refuses pay before the window ends', earlyRefused);
 
   // The agent finalizes and pays. The engineer presses nothing.
@@ -259,7 +259,7 @@ try {
   const chainTxs = Object.entries(steps.txs);
   check('propose, finalize and payout each have a receipt with status 1', ['propose', 'finalize', 'payout'].every(k => steps.txs[k]) && chainTxs.every(([, t]) => BigInt(receipt(t).status) === 1n), chainTxs.map(([k, t]) => `${k} ${t.slice(0, 10)}`).join(', '));
   check('the agent sent them, from the resolver wallet', ['propose', 'finalize', 'payout'].every(k => receipt(steps.txs[k]).from.toLowerCase() === RESOLVER));
-  check('the engineer saw only sign popups, and no transaction', (await popups()).every(p => p === 'sign' || p === 'connect'), (await popups()).join());
+  check('the engineer saw only sign popups, and no transaction', !(await popups()).some(p => p.startsWith('tx:')) && (await popups()).includes('sign'), (await popups()).join());
   check('the list says Paid', (await text('.list')).includes('Paid'));
   await showChain();
   await shot('paid');

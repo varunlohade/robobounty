@@ -432,7 +432,7 @@ function fixDetail(b: Bounty, inner: HTMLElement) {
     const subs = h('table', 'subs');
     const rows = h('tbody');
     for (const x of S.fixes) {
-      const row = h('tr', 'click', h('td', '', x.tester), h('td', '', code(x.source_sha256.slice(0, 10))), h('td', '', fixTag(x)), h('td', 'num t2', x.payout?.amount ? `${x.payout.status}, ${x.payout.amount}` : 'Nothing held'));
+      const row = h('tr', 'click', h('td', '', x.tester), h('td', '', code(x.source_sha256.slice(0, 10))), h('td', '', fixTag(x)), h('td', 'num t2', arc ? (b.arc?.fixes?.[String(x.n)]?.state ?? (x.payout?.amount ? 'Accepted' : 'Nothing held')) : x.payout?.amount ? `${x.payout.status}, ${x.payout.amount}` : 'Nothing held'));
       row.setAttribute('aria-selected', String(x.n === f?.n));
       row.addEventListener('click', () => { S.focus = x.n; render(); });
       rows.append(row);
@@ -476,13 +476,14 @@ function latestProof(): FixResult | null {
 function flow(b: Bounty, f: Fix | undefined) {
   const r = f?.result;
   const s = r?.sets;
-  const reached = !f ? -1 : !r ? 0 : !s ? 0 : r.target.every(t => t.passed || t.safe_hold) ? (Object.values(s).every(v => v.worse === 0) && r.code !== 'overfit' ? (f.payout?.status === 'Claimed' ? 4 : f.payout ? 3 : 2) : 1) : 0;
+  const paidNow = arc ? b.arc?.fixes?.[String(f?.n)]?.state === 'Claimed' : f?.payout?.status === 'Claimed';
+  const reached = !f ? -1 : !r ? 0 : !s ? 0 : r.target.every(t => t.passed || t.safe_hold) ? (Object.values(s).every(v => v.worse === 0) && r.code !== 'overfit' ? (paidNow ? 4 : f.payout ? 3 : 2) : 1) : 0;
   const fixed = r ? r.target.filter(t => t.passed || t.safe_hold).length : 0;
   const steps: [string, string][] = [
     ['Patch received', f ? f.source_sha256.slice(0, 12) : 'No patch yet'],
     ['Public worlds', s ? `${fixed} of ${r!.target.length} pass` : f && !r ? 'Running' : 'Waiting'],
     ['Hidden worlds', s ? `${Object.entries(s).filter(([k]) => k !== 'target').reduce((a, [, v]) => a + v.worse, 0)} worse of ${hiddenTotal(b)}` : 'Waiting'],
-    arc ? [`${arc.agent_name} pays`, 'Read from the chain below'] : ['Ledger pays', f?.payout?.status === 'Claimed' ? `${f.payout.amount} test units paid` : f?.payout?.amount ? `${f.payout.status}, ${f.payout.amount} held` : 'Only on a full pass'],
+    arc ? [`${arc.agent_name} pays`, paidNow ? 'Paid on chain' : 'Only on a full pass'] : ['Ledger pays', f?.payout?.status === 'Claimed' ? `${f.payout.amount} test units paid` : f?.payout?.amount ? `${f.payout.status}, ${f.payout.amount} held` : 'Only on a full pass'],
   ];
   return h('div', 'flowline', ...steps.map(([k, v], i) => h('div', i < reached || reached === 4 ? 'd' : i === reached ? 'n' : '', h('b', '', k), h('small', '', v))));
 }

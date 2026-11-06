@@ -1,0 +1,114 @@
+{
+ "note": "One real gate run of fixtures/fix5/good_match_fan.py on the recorded window batch. Simulated.",
+ "key": {
+  "source": "03ab780bdf966f08056ce0252522237acf5b5233141f256f34ba2d6f389c5f91",
+  "plan": "e8709f5f892ba980f7f4e7eb579b6f7c663a548da33d0761448621f649d1b10d",
+  "controller": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705",
+  "group": "stalled",
+  "pack": "window",
+  "frozen": {
+   "highrise5/judge5.py": "59c318c9e1878e05696b19efe73709d09e5180beccba47cb3ffa9b9942a125bf",
+   "highrise5/sim5.py": "40fdef177eddfb9cc2ed32e5d95fdfbdd55dc3b5fa6e07753c2e30a83e75d224",
+   "highrise5/compile5.py": "52a192db14a562e8d7797335aa17eae39fb1aa96e52ce89cab8e1b5c0c679d73",
+   "highrise5/engine5.py": "0fadeaf0048c97d184341ad328b205c15ea5df452916a73ac781584a6dc5a5e0",
+   "highrise5/parts5.py": "2db0165732d8ee47f976e4686c2227d5f35a5c1ca33bc7dfd0722110ce543d65",
+   "highrise5/geoms5.py": "eaafae097953636b36c6c121a8d716c14b5912a50b0c656ab58eb50800aedf0d",
+   "highrise5/scene5.py": "0d06de286a768774c982d4901b78c7dac13c3d2b9720a3eea46dd5bebc3b878d",
+   "highrise5/world5.py": "df486980cbbd838114aac82168c76827bbdc4e377ccdfcd3672f761e7147f323",
+   "highrise5/run_trial5.py": "9a1a0ade70997cae9c5cbce296e9606e0ae9066d65027b00eabb103cf01db69f"
+  }
+ },
+ "wall_s": 99.3,
+ "result": {
+  "accepted": true,
+  "code": "accepted",
+  "words": "Every failing world now passes or holds safely, and no world got worse.",
+  "stage": "done",
+  "sets": {
+   "target": {
+    "n": 3,
+    "better": 3,
+    "worse": 0,
+    "same": 0,
+    "passed_before": 0,
+    "passed_after": 3,
+    "limits_hit": 0,
+    "replay_mismatch": 0,
+    "not_rejudged": 0
+   },
+   "passed_before": {
+    "n": 15,
+    "better": 0,
+    "worse": 0,
+    "same": 15,
+    "passed_before": 13,
+    "passed_after": 13,
+    "limits_hit": 0,
+    "replay_mismatch": 0,
+    "not_rejudged": 0
+   },
+   "held_back": {
+    "n": 14,
+    "better": 1,
+    "worse": 0,
+    "same": 13,
+    "passed_before": 1,
+    "passed_after": 2,
+    "limits_hit": 0,
+    "replay_mismatch": 0,
+    "not_rejudged": 0
+   },
+   "other_failed": {
+    "n": 16,
+    "better": 0,
+    "worse": 0,
+    "same": 16,
+    "passed_before": 0,
+    "passed_after": 0,
+    "limits_hit": 0,
+    "replay_mismatch": 0,
+    "not_rejudged": 0
+   }
+  },
+  "target": [
+   {
+    "index": 44,
+    "name": "top_margin_slightly_smaller",
+    "old": "stalled",
+    "new": "passed",
+    "passed": true,
+    "safe_hold": false,
+    "reason": "The robot cleaned 95.0% of the glass in 362 s."
+   },
+   {
+    "index": 45,
+    "name": "high_setback_above_area",
+    "old": "stalled",
+    "new": "passed",
+    "passed": true,
+    "safe_hold": false,
+    "reason": "The robot cleaned 95.7% of the glass in 362 s."
+   },
+   {
+    "index": 46,
+    "name": "top_margin_half_size",
+    "old": "stalled",
+    "new": "passed",
+    "passed": true,
+    "safe_hold": false,
+    "reason": "The robot cleaned 95.7% of the glass in 362 s."
+   }
+  ],
+  "held_back_with_this_failure": 1,
+  "held_back_fixed": 1,
+  "flags": [],
+  "proof_wall_s": 73.1,
+  "patched_sha256": "03ab780bdf966f08056ce0252522237acf5b5233141f256f34ba2d6f389c5f91",
+  "diff_sha256": "aafc28c51cb1b6270a4a734b4758758a9da121207d39ad5958cab5e4b3c812bd",
+  "limits": [
+   "In this simulation only. The physics is uncalibrated.",
+   "sandbox-exec is not a VM. It shares the kernel with the host.",
+   "Only the controller copy changed. The judge and the worlds did not."
+  ]
+ }
+}
