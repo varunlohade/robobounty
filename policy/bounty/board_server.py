@@ -11,7 +11,7 @@ GET  /api/bounties/<id>/submissions/<n>
 POST /api/bounties                     {title, company, scenarios, cap, per_failure, limits, window?}
 POST /api/bounties/<id>/submit         {tester, world, seed}
 POST /api/bounties/<id>/failures/<fingerprint>/reject|finalize   {}
-POST /api/bounties/<id>/failures/<fingerprint>/claim             {tester}
+POST /api/bounties/<id>/failures/<fingerprint>/claim             {tester, secret}. submit returned the secret, once.
 POST /api/bounties/<id>/submissions/<n>/replay                   {}, writes the replay of the recorded run once
 GET  /api/bounties/<id>/submissions/<n>/replay/<file>
 """
@@ -170,8 +170,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.submit(int(m[1]))
             m = STEP_ROUTE.fullmatch(self.path)
             if m:
-                v = self.body(MAX_STEP_BODY, {"tester"} if m[3] == "claim" else set())
-                row = B.ledger_step(int(m[1]), m[2], m[3], v.get("tester"), ROOT)
+                v = self.body(MAX_STEP_BODY, {"tester", "secret"} if m[3] == "claim" else set())
+                row = B.ledger_step(int(m[1]), m[2], m[3], v.get("tester"), ROOT, secret=v.get("secret"))
                 return self.reply(200, {"failure": row, "bounty": B.get(int(m[1]), ROOT), **LABELS})
             m = REPLAY_ROUTE.fullmatch(self.path)
             if m and not m[3]:
@@ -222,10 +222,11 @@ class Handler(BaseHTTPRequestHandler):
                 raise Refused(409, "cap_reached", "The cap of this bounty is used up.")
             if WAITING.full():
                 raise Refused(503, "queue_full", f"{QUEUE_CAP} submissions are already waiting. Try again soon. This did not use one of your submissions.")
-            row = B.reserve(bounty_id, v["tester"], v["seed"], ROOT)
+            secret = B.new_claim_secret()
+            row = B.reserve(bounty_id, v["tester"], v["seed"], ROOT, secret=secret)
             WAITING.put_nowait((row, world))
             ahead = WAITING.qsize() - 1
-        return self.reply(202, {"n": row["n"], "state": row["state"], "ahead": ahead, "used": row["used_before"] + 1, "of": B.MAX_PER_TESTER, **LABELS})
+        return self.reply(202, {"claim_secret": secret, "n": row["n"], "state": row["state"], "ahead": ahead, "used": row["used_before"] + 1, "of": B.MAX_PER_TESTER, **LABELS})
 
 
 def main():

@@ -11,7 +11,7 @@ fix.py run <session campaign dir> --base controller5.py --group VERDICT [--pack 
 Layers: tools limited to Read and Edit, a diff limited to one file, an AST allowlist, then sandbox-exec with no network and writes to
 the run dir only, with CPU, memory and time limits. sandbox-exec is not a VM and Apple marks it deprecated. It shares the kernel, so treat it as one layer.
 A/B: both controllers run in the same sandbox on the same worlds and seeds, on the seen worlds and on fresh worlds the LLM never saw.
-Every patched run is re-judged by replaying its stored actions with no controller loaded, so a controller cannot forge its result.
+Every patched window run, and every inspection run for the board, is judged again outside the sandbox by policy/bounty/rejudge.py, which never imports the submitted file. That verdict replaces what the sandbox wrote, so a controller cannot forge its result.
 """
 import argparse
 import ast
@@ -19,6 +19,7 @@ import concurrent.futures as cf
 import difflib
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -52,12 +53,15 @@ ALPHA = 0.05
 ALLOWED_IMPORTS = {"math", "numpy"}
 BANNED_NAMES = {"open", "exec", "eval", "compile", "__import__", "getattr", "setattr", "delattr", "globals", "locals", "vars", "dir", "input",
                 "breakpoint", "memoryview", "type", "object", "super", "print", "help", "exit", "quit", "classmethod", "staticmethod", "property"}
-# Every numpy route to a file, a process or native code that we know of. The sandbox is the layer behind this list.
+# The exact names a controller may reach through an imported module, from what controller.py, controller5.py and the inspection controller use. Nothing else on a module name passes, however it is spelled.
+ALLOWED_ATTRS = {"numpy.array", "numpy.zeros", "numpy.cross", "numpy.concatenate", "numpy.float32",
+                 "math.pi", "math.sqrt", "math.sin", "math.cos", "math.ceil", "math.atan2", "math.radians", "math.hypot", "math.dist"}
+# Routes from a plain value to a file, a process or native code. The sandbox is the layer behind this list.
 BANNED_ATTRS = {"load", "save", "savez", "savez_compressed", "loadtxt", "savetxt", "genfromtxt", "fromfile", "tofile", "dump", "dumps", "memmap", "fromregex",
                 "DataSource", "ctypeslib", "ctypes", "f2py", "distutils", "testing", "lib", "open_memmap", "system", "popen", "frombuffer", "get_include", "show_config",
                 "show_runtime", "info", "lookfor", "source", "who", "format", "format_map", "mgrid", "setbufsize", "seterrcall",
                 "core", "compat", "add_newdoc", "add_docstring", "os", "sys", "subprocess", "builtins", "modules", "importlib", "pickle",
-                "mro", "gi_frame", "gi_code", "cr_frame", "ag_frame", "f_globals", "f_locals", "f_builtins", "f_back", "f_code", "tb_frame", "tb_next", "co_code"}
+                "cffi", "mro", "gi_frame", "gi_code", "cr_frame", "ag_frame", "f_globals", "f_locals", "f_builtins", "f_back", "f_code", "tb_frame", "tb_next", "co_code"}
 
 
 def base_private_names(base=None):
@@ -90,8 +94,43 @@ def validate_source(text, base=None):
     return bad
 
 
-def rule_problems(roots, helpers):
-    """The AST allowlist over these nodes. Returns (reasons, whether a Controller with a step method was seen)."""
+def imported_names(root):
+    """Name -> dotted path, for every name an import binds in this tree. A name bound to two things gets a path nothing allows."""
+    bound = {}
+    for node in ast.walk(root):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for a in node.names:
+                name = a.asname or a.name.split(".")[0]
+                path = a.name if isinstance(node, ast.Import) else f"{node.module}.{a.name}"
+                bound[name] = path if bound.get(name, path) == path else "two imports"
+    return bound
+
+
+def module_problems(roots, bound=None):
+    """Every use of an imported name must spell one exact path of ALLOWED_ATTRS. So `x = np`, `f(np)`, `y = np.linalg` and `np.pi.real` all fail, and an alias is no way around it."""
+    bound = dict(bound or {})
+    for root in roots:
+        bound.update(imported_names(root))
+    bad = []
+    inner = set()
+    for node in (n for root in roots for n in ast.walk(root)):  # Outer nodes come first, so a chain's parts are marked before the walk reaches them.
+        if id(node) in inner or not isinstance(node, (ast.Attribute, ast.Name)):
+            continue
+        parts = []
+        part = node
+        while isinstance(part, ast.Attribute):
+            parts.insert(0, part.attr)
+            inner.add(id(part.value))
+            part = part.value
+        if isinstance(part, ast.Name) and part.id in bound:
+            path = ".".join([bound[part.id], *parts])
+            if path not in ALLOWED_ATTRS or not isinstance(part.ctx, ast.Load):
+                bad.append(f"line {node.lineno}: {part.id}{''.join('.' + p for p in parts)} is not on the list of allowed module names")
+    return bad
+
+
+def rule_problems(roots, helpers, bound=None):
+    """The AST allowlist over these nodes. bound names what the file's imports and frozen parts bind outside these nodes. Returns (reasons, whether a Controller with a step method was seen)."""
     bad = []
     has_step = False
     for node in (n for root in roots for n in ast.walk(root)):
@@ -104,7 +143,7 @@ def rule_problems(roots, helpers):
             if node.level or node.module not in ALLOWED_IMPORTS:
                 bad.append(f"{where}: from {node.module} import is not allowed")
             for a in node.names:
-                if a.name == "*" or a.name.startswith("_") or a.name in BANNED_ATTRS:
+                if f"{node.module}.{a.name}" not in ALLOWED_ATTRS:
                     bad.append(f"{where}: from {node.module} import {a.name} is not allowed")
         elif isinstance(node, ast.Name) and (node.id in BANNED_NAMES or node.id.startswith("__")):
             bad.append(f"{where}: name {node.id} is not allowed")
@@ -120,7 +159,7 @@ def rule_problems(roots, helpers):
                 bad.append(f"{where}: Controller must stay a plain class")
         elif isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.decorator_list:
             bad.append(f"{where}: decorators are not allowed")
-    return bad, has_step
+    return bad + module_problems(roots, bound), has_step
 
 
 ROUTE_CONSTANTS = {"SPEED_MPS", "TURN_RADPS", "HEADING_GAIN", "TURN_IN_PLACE_DEG", "LOOKAHEAD_M", "ARRIVE_M"}
@@ -128,20 +167,40 @@ ROUTE_EDITABLE = {"RouteFollower", "_closest_on_leg"}
 
 
 def _top_level(text):
-    """Top-level statements by name. Only what the inspection file really holds gets a name, so a new statement has none and is refused."""
-    named = {}
+    """Top-level statements by name, and the statements that repeat a name. Only what the inspection file really holds gets a name, so a new statement has none and is refused.
+    A repeat would hide the earlier statement from every check while it still runs at import, so each repeat is refused by the caller."""
+    named, repeats = {}, []
     for node in ast.parse(text).body:
         if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
-            named[node.name] = node
+            name = node.name
         elif isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            named[node.targets[0].id] = node
+            name = node.targets[0].id
         elif isinstance(node, (ast.Import, ast.ImportFrom)):
-            named[f"import {ast.unparse(node)}"] = node
+            name = f"import {ast.unparse(node)}"
         elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
-            named["docstring"] = node
+            name = "docstring"
         else:
-            named[f"other line {node.lineno}"] = node
-    return named
+            name = f"other line {node.lineno}"
+        if name in named:
+            repeats.append((name, node))
+        named[name] = node
+    return named, repeats
+
+
+def _plain_number(node):
+    return isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and type(node.value.value) in (int, float) and math.isfinite(node.value.value)
+
+
+def route_constants(text):
+    """The six numbers of a source whose follower logic is the frozen one, or None. The judge outside the sandbox uses these numbers and nothing else from the file."""
+    try:
+        named, repeats = _top_level(text)
+    except (SyntaxError, ValueError):
+        return None
+    frozen = _top_level(PACK5["inspection"]["file"].read_text())[0]
+    if repeats or any(name not in named or ast.dump(named[name]) != ast.dump(frozen[name]) for name in ROUTE_EDITABLE) or not all(_plain_number(named.get(name)) for name in ROUTE_CONSTANTS):
+        return None
+    return {name: named[name].value.value for name in ROUTE_CONSTANTS}
 
 
 def validate_route_follower(text, base_text, constants_only=False):
@@ -149,8 +208,9 @@ def validate_route_follower(text, base_text, constants_only=False):
     problem = parse_problem(text)
     if problem:
         return [problem]
-    new, old = _top_level(text), _top_level(base_text)
+    (new, repeats), (old, _) = _top_level(text), _top_level(base_text)
     bad = [f"{name} must stay in the file" for name in old if name not in new and name != "docstring"]
+    bad += [f"line {node.lineno}: {name} appears twice at the top level, which is not allowed" for name, node in repeats]
     changed = []
     for name, node in new.items():
         if name == "docstring":
@@ -159,7 +219,7 @@ def validate_route_follower(text, base_text, constants_only=False):
             bad.append(f"line {node.lineno}: only RouteFollower can change, so a new {name} is not allowed")
         elif ast.dump(node) != ast.dump(old[name]):
             if name in ROUTE_CONSTANTS:
-                if not (isinstance(node.value, ast.Constant) and type(node.value.value) in (int, float)):
+                if not _plain_number(node):
                     bad.append(f"line {node.lineno}: {name} must stay a plain number")
             elif name in ROUTE_EDITABLE and not constants_only:
                 changed.append((name, node))
@@ -170,11 +230,16 @@ def validate_route_follower(text, base_text, constants_only=False):
     checked = []
     for name, node in changed:
         if isinstance(node, ast.ClassDef):
-            before = {m.name: ast.dump(m) for m in old[name].body if isinstance(m, ast.FunctionDef)}
+            if type(old[name]) is not ast.ClassDef or [ast.dump(n) for n in node.bases + node.keywords + node.decorator_list] != [ast.dump(n) for n in old[name].bases + old[name].keywords + old[name].decorator_list]:
+                bad.append(f"line {node.lineno}: {name} must keep its own class line and decorators")
+                continue
+            before = {m.name: ast.dump(m) for m in old[name].body if isinstance(m, ast.FunctionDef)}  # A method with the same name twice shows up as changed or fails the dump, so each copy is checked.
             checked += [m for m in node.body if not isinstance(m, ast.FunctionDef) or ast.dump(m) != before.get(m.name)]
         else:
             checked.append(node)
-    bad += rule_problems(checked, set())[0]
+    frozen_parts = {name: "frozen part of this file" for name in old if name.isidentifier() and name not in ROUTE_EDITABLE and name not in ROUTE_CONSTANTS}
+    bound = {**frozen_parts, **imported_names(ast.parse(base_text))}
+    bad += rule_problems(checked, set(), bound)[0]
     return bad
 
 
@@ -378,7 +443,7 @@ def prompt_for(summary, feedback):
     return f"""policy/highrise/controller.py is in this folder as controller.py. It drives a simulated suction window robot. Read it, then edit it to lower the failures in this \
 diagnosis. Make the smallest general change you can justify from the table. Your change will be tested on new worlds you have not seen, and on nominal controls that must keep passing.
 
-Rules: edit controller.py only. Imports: math and numpy only. No files, no network, no dunder names, no getattr or eval, no match statements. No attribute may start with an underscore, except the self._x helpers already in the file, so name any new helper without one. Keep the Controller class, __init__(mission) and step(o). \
+Rules: edit controller.py only. Imports: math and numpy only, and only these names from them: {", ".join(sorted(ALLOWED_ATTRS))}. No files, no network, no dunder names, no getattr or eval, no match statements. No attribute may start with an underscore, except the self._x helpers already in the file, so name any new helper without one. Keep the Controller class, __init__(mission) and step(o). \
 Keep obs and action formats. Do not lower the safety behaviour to gain coverage: a detach is the worst outcome. If you think no controller change can help a failure, leave that failure alone.
 
 Diagnosis table (simulation only, physics uncalibrated):
@@ -471,6 +536,9 @@ PACK5 = {
     "inspection": {"python": POLICY / ".venv-newton" / "bin" / "python", "file": POLICY / "packs" / "inspection" / "controller.py", "shown": "policy/packs/inspection/controller.py", "max_procs": 6},
 }
 WORKER5 = POLICY / "server" / "sandbox_worker5.py"
+REJUDGE = POLICY / "bounty" / "rejudge.py"
+REJUDGE_WALL_S = 900
+INSPECTION_REJUDGE = False  # The board sets this. A lab run keeps one sim run per world, and pays nothing.
 SAFETY_LINE = re.compile(r"LOW_PRESSURE_PA|RESUME|TETHER|HOLD")
 INSPECTION_CANNOT = {"fell": "falls come from the walking policy, which is a fixed ONNX file. An AI fix can change only the RouteFollower constants"}
 NOT_A_CONTROLLER_FAILURE = {"sim_diverged", "sim_failed", "process_crashed", "froze", "controller_crashed", "replay_mismatch"}
@@ -488,13 +556,17 @@ def validate5(pack, text, base=None, constants_only=False):
     return validate_route_follower(text, PACK5["inspection"]["file"].read_text(), constants_only)
 
 
+def sandbox_asset():
+    return next((Path.home() / "Library" / "Caches" / "newton").glob("newton-assets_anybotics_anymal_c_*")) / "anybotics_anymal_c"
+
+
 def sandbox_setup5(pack, run_dir):
     """Extra reads and env for one run. Warp writes to its kernel cache, so each inspection run gets a clone of it inside its run dir and the real cache stays out of reach."""
     reads = [POLICY / "packs", HIGHRISE5, POLICY / "server" / "pack_job.py", WORKER5]
     env = {"CRASHLAB_NO_FRAMES": "1"}  # A sandbox has no graphics connection, and drawing there crashes the run with a CGLError. This is the one place that turns frames off. film5 draws the square's picture afterwards.
     if pack == "inspection":
         caches = Path.home() / "Library" / "Caches"
-        asset = next((caches / "newton").glob("newton-assets_anybotics_anymal_c_*")) / "anybotics_anymal_c"
+        asset = sandbox_asset()
         versions = sorted((caches / "warp").iterdir())
         clone = Path(run_dir) / "warp_cache"
         if not clone.exists():
@@ -502,6 +574,26 @@ def sandbox_setup5(pack, run_dir):
         reads.append(asset)
         env.update(CRASHLAB_WARP_CACHE=str(clone), CRASHLAB_NEWTON_ASSET=str(asset), CRASHLAB_CPU_S=str(INSPECTION_CPU_S))  # A kernel missing from the cache compiles in the run, and the result stays in the clone.
     return reads, env
+
+
+def write_trusted(path, value):
+    """After the sandbox has ended. The sandbox could write here, so whatever it left goes first, and a link it left is never followed."""
+    path = Path(path)
+    path.unlink(missing_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+    with os.fdopen(fd, "w") as f:
+        f.write(json.dumps(value, indent=1) + "\n")
+
+
+def read_sandbox_json(path):
+    """A JSON object the sandbox wrote, as hostile data. None if it is a link, or is no object."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd) as f:
+            value = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) and isinstance(value.get("verdict"), str) and "reason" in value else None
 
 
 def limit_result(req, controller, why, code):
@@ -519,9 +611,11 @@ def sandbox_run5(pack, controller, request, own_group=False):
     code, why = run_sandboxed([str(WORKER5), "run", pack, str(controller), str(request)], out, controller, wall_s=INSPECTION_WALL_S if pack == "inspection" else TRIAL_WALL_S, python=PACK5[pack]["python"], extra_reads=reads, extra_env=env, own_group=own_group, log_name="job.log")
     shutil.rmtree(out / "warp_cache", ignore_errors=True)
     result_path = out / "job_result.json"
-    if code != 0 or not result_path.exists():
-        result_path.write_text(json.dumps(limit_result(req, controller, why, code), indent=1) + "\n")
-    return json.loads(result_path.read_text())
+    result = read_sandbox_json(result_path) if code == 0 else None
+    if result is None:
+        result = limit_result(req, controller, why, code)
+        write_trusted(result_path, result)
+    return result
 
 
 def film5(pack, world, out):
@@ -531,7 +625,9 @@ def film5(pack, world, out):
     import pack_job
     out = Path(out)
     result_path = out / "job_result.json"
-    result = json.loads(result_path.read_text())
+    result = read_sandbox_json(result_path)
+    if result is None:
+        return
     (out / "film.jpg").unlink(missing_ok=True)  # The sandbox could write here, so whatever it left goes before this process writes the name.
     film = None
     if result["verdict"] != "controller_crashed" and (pack != "window" or replay_ok5(out / "run")):
@@ -539,7 +635,7 @@ def film5(pack, world, out):
             film = pack_job.ask(pack, "film", {"world": world, "out": str(out)}, timeout=FILM_WALL_S)
         except (RuntimeError, subprocess.TimeoutExpired, ValueError) as e:
             print(f"no picture for this run: {type(e).__name__}", file=sys.stderr)
-    result_path.write_text(json.dumps({**result, "film": film}, indent=1) + "\n")
+    write_trusted(result_path, {**result, "film": film})
 
 
 def trace5(controller, run_folder, target):
@@ -559,6 +655,44 @@ def replay_ok5(run_folder):
     return done.returncode == 0
 
 
+def rejudge5(pack, controller, world, seed, out):
+    """The verdict from a process outside the sandbox that never imports the controller. None if this process could not give one, or the source has no numbers it can use."""
+    request = {"pack": pack, "world": world, "seed": seed, "run": str(Path(out) / "run" if pack == "window" else out)}
+    if pack == "inspection":
+        request["constants"] = route_constants(Path(controller).read_text())
+        if request["constants"] is None:
+            return None
+        request["asset"] = str(sandbox_asset())
+    env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "USER", "TMPDIR") if k in os.environ}
+    try:
+        done = subprocess.run([str(PACK5[pack]["python"]), "-I", str(REJUDGE)], input=json.dumps(request).encode(), capture_output=True, cwd=POLICY, env={**env, "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "VECLIB_MAXIMUM_THREADS": "1", "MUJOCO_LOG": "0"}, timeout=REJUDGE_WALL_S)
+    except subprocess.TimeoutExpired:
+        print(f"re-judge: the time limit stopped it, {out}", file=sys.stderr)
+        return None
+    if done.returncode != 0:
+        print(f"re-judge: exit {done.returncode}: {done.stderr[-400:].decode(errors='replace')}", file=sys.stderr)
+        return None
+    return json.loads(done.stdout)
+
+
+def rejudged_row5(pack, controller, world, out, row, claimed):
+    """The row and job_result.json from the outside verdict. What the sandbox wrote counts only as a claim to compare with."""
+    judged = rejudge5(pack, controller, world["world"], world["seed"], out)
+    sha = hashlib.sha256(Path(controller).read_bytes()).hexdigest()
+    base = {"code": None, "note": "Simulated.", "seed": world["seed"], "numbers": {}, "events": [], "controller_sha256": sha, "label": f"session copy, controller copy {sha[:8]}"}
+    if judged is None:
+        result = {**base, "verdict": "not_rejudged", "passed": False, "safe_hold": False, "rejudged": False, "reason": "The judge outside the sandbox gave no verdict, so this run does not count."}
+    elif judged["no_record"]:
+        result = {**base, "verdict": "controller_crashed", "passed": False, "safe_hold": False, "rejudged": True, "reason": "The run left no record, so it counts as a crash of this code."}
+    elif not judged["matches"] or judged["verdict"] != claimed.get("verdict") or judged["passed"] != claimed.get("passed"):
+        why = judged["why"] or "what the sandbox reported differs from the judge's verdict"
+        result = {**base, "verdict": "replay_mismatch", "passed": False, "safe_hold": False, "rejudged": True, "reason": f"The stored run does not match the judge outside the sandbox, so it does not count: {why}."}
+    else:
+        result = {**base, **{k: v for k, v in judged.items() if k not in ("no_record", "matches", "why", "label")}, "rejudged": True, "code": judged.get("code") or claimed.get("code")}
+    write_trusted(Path(out) / "job_result.json", result)
+    return {**row, **{k: result[k] for k in ("verdict", "passed", "safe_hold", "reason", "rejudged")}, "safe_hold": bool(result["safe_hold"])}
+
+
 def rank5(row):
     """Passed over a safe hold, over a failure, over a failure that drops the robot."""
     if row["passed"]:
@@ -573,9 +707,9 @@ def trial5(pack, controller, world, out, replay_it):
     request = out / "request.json"
     request.write_text(json.dumps({"world": world["world"], "seed": world["seed"], "out": str(out), "progress": str(out / "progress.json")}))
     r = sandbox_run5(pack, controller, request, own_group=True)
-    row = {"index": world["index"], "name": world["name"], "verdict": r["verdict"], "passed": bool(r["passed"]), "safe_hold": bool(r.get("safe_hold")), "reason": r["reason"], "limit": r.get("limit")}
-    if replay_it and pack == "window" and r["verdict"] != "controller_crashed" and not replay_ok5(out / "run"):
-        row.update(verdict="replay_mismatch", passed=False, safe_hold=False, reason="The stored actions do not replay to this result, so the run does not count.")
+    row = {"index": world["index"], "name": world["name"], "verdict": r["verdict"], "passed": bool(r.get("passed")), "safe_hold": bool(r.get("safe_hold")), "reason": r["reason"], "limit": r.get("limit"), "rejudged": False}
+    if replay_it and (pack == "window" or INSPECTION_REJUDGE) and not row["limit"]:
+        return rejudged_row5(pack, controller, world, out, row, r)
     return row
 
 
@@ -583,7 +717,7 @@ def tally5(a_rows, b_rows):
     worse = [b["index"] for a, b in zip(a_rows, b_rows) if rank5(b) < rank5(a)]
     better = [b["index"] for a, b in zip(a_rows, b_rows) if rank5(b) > rank5(a)]
     return {"n": len(a_rows), "better": len(better), "worse": len(worse), "same": len(a_rows) - len(better) - len(worse), "passed_before": sum(r["passed"] for r in a_rows), "passed_after": sum(r["passed"] for r in b_rows),
-            "worse_worlds": worse, "better_worlds": better, "limits_hit": sum(bool(r.get("limit")) for r in b_rows), "replay_mismatch": sum(r["verdict"] == "replay_mismatch" for r in b_rows)}
+            "worse_worlds": worse, "better_worlds": better, "limits_hit": sum(bool(r.get("limit")) for r in b_rows), "replay_mismatch": sum(r["verdict"] == "replay_mismatch" for r in b_rows), "not_rejudged": sum(not r.get("rejudged") and not r.get("limit") for r in b_rows)}
 
 
 def flags5(diff_text):
@@ -610,7 +744,7 @@ def flags5(diff_text):
 
 def prompt5(pack, name, group, shown):
     rules = "Change only the values of these number constants: " + ", ".join(sorted(ROUTE_CONSTANTS)) + ". Change no other line." if pack == "inspection" else (
-        "Imports: math and numpy only. No files, no network, no dunder names, no getattr or eval, no match statements. No attribute may start with an underscore, except the self._x helpers already in the file, so name any new helper without one. "
+        "Imports: math and numpy only, and only these names from them: " + ", ".join(sorted(ALLOWED_ATTRS)) + ". No files, no network, no dunder names, no getattr or eval, no match statements. No attribute may start with an underscore, except the self._x helpers already in the file, so name any new helper without one. "
         "Keep the Controller class, __init__(mission) and step(o). Keep obs and action formats. Do not lower the safety behaviour to gain coverage: a detach is the worst outcome. Keep the phase names and the attributes phase, estimate, wind_hold, retreats and lane, since other code reads them.")
     return f"""{name} is in this folder. It drives a simulated robot in a test campaign. Read it, then edit it to lower the failures in this one group: {group}. Make the smallest general change you can justify from the table. \
 Your change will be tested on worlds you have not seen, and on worlds that pass today, which must keep passing.

@@ -130,7 +130,8 @@ def main():
     ap.add_argument("--root", default=str(B.ROOT))
     a = ap.parse_args()
     world = Path(a.world).read_bytes()[:G.MAX_SUBMISSION_BYTES + 1].decode("utf-8", "replace")
-    print(json.dumps(run(B.reserve(a.bounty, a.tester, a.seed, a.root), world, a.root), indent=1))
+    secret = B.new_claim_secret()
+    print(json.dumps({**B.public_row(run(B.reserve(a.bounty, a.tester, a.seed, a.root, secret=secret), world, a.root)), "claim_secret": secret}, indent=1))
 
 
 if __name__ == "__main__":

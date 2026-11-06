@@ -34,11 +34,11 @@ SIM_LABEL = "Simulated with hand-built physics. Not checked against real hardwar
 SANDBOX_LABEL = "sandbox-exec shares the kernel with this machine. It is one layer, not a VM."
 FROZEN_FILES = {
     "window": ["highrise5/judge5.py", "highrise5/sim5.py", "highrise5/compile5.py", "highrise5/engine5.py", "highrise5/parts5.py", "highrise5/geoms5.py", "highrise5/scene5.py", "highrise5/world5.py", "highrise5/run_trial5.py"],
-    "inspection": ["packs/inspection/judge.py", "packs/inspection/sim.py", "packs/inspection/world.py", "packs/inspection/model.py", "packs/inspection/plant.py"],
+    "inspection": ["packs/inspection/judge.py", "packs/inspection/sim.py", "packs/inspection/world.py", "packs/inspection/model.py", "packs/inspection/plant.py", "packs/inspection/controller.py"],
 }
 ROBOT_NAME = {"window": "Window cleaning robot", "inspection": "Inspection robot"}
-SCOPE = {"window": "You can edit the whole of controller5.py under the code rules. The judge and the worlds stay frozen.",
-         "inspection": "You can change only the six RouteFollower number constants. This robot has no replay re-judge, so a controller's reported result is not re-checked."}
+SCOPE = {"window": "You can edit the whole of controller5.py under the code rules. The judge and the worlds stay frozen. The board replays your recorded actions outside the sandbox and judges that replay.",
+         "inspection": "You can change only the six RouteFollower number constants. The board runs the frozen robot again outside the sandbox with those numbers, and judges that run."}
 
 
 def frozen_shas(pack, code_root=POLICY):
@@ -179,7 +179,7 @@ def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DI
                 json.dump(hidden, f)
             info = {"schema": SCHEMA, "kind": "fix_failure", "id": bounty_id, "title": title, "company": company, "pack": pack, "robot": ROBOT_NAME[pack], "group": group, "posted_by": posted_by, "posted_at": time.time(),
                     "controller": {"file": base.name, "sha256": hashlib.sha256(base_text.encode()).hexdigest()}, "frozen": frozen_shas(pack), "public_worlds": public,
-                    "hidden_counts": {"held_back": len(held_back), "passed_before": len(passed), "other_failed": len(other)}, "pay": pay, "cap": pay, "window_s": window, "scope": SCOPE[pack], "replay_rejudge": pack == "window"}
+                    "hidden_counts": {"held_back": len(held_back), "passed_before": len(passed), "other_failed": len(other)}, "pay": pay, "cap": pay, "window_s": window, "scope": SCOPE[pack], "replay_rejudge": True}
             B.write_json(tmp / "pack.json", info)
             spec_hash = "0x" + G.sha256_hex(G.canonical(info))
             book = B.ledger_module.Ledger(tmp / "ledger.json")
@@ -263,8 +263,9 @@ def save_fix(row, root=B.ROOT):
     B.write_json(folder_of(row["bounty_id"], root) / "fixes" / str(row["n"]) / "fix.json", row)
 
 
-def reserve(bounty_id, tester, source, root=B.ROOT):
-    """Counts one submission in the bounty's lock, so two requests cannot both take the last place. The source stays on disk at 0600 and is never served."""
+def reserve(bounty_id, tester, source, root=B.ROOT, secret=None):
+    """Counts one submission in the bounty's lock, so two requests cannot both take the last place. The source stays on disk at 0600 and is never served.
+    Only the hash of secret goes on disk. With no secret, nobody can ever claim this fix."""
     folder = folder_of(bounty_id, root)
     key = B.tester_key(tester)
     if not isinstance(source, str) or not source.strip():
@@ -284,7 +285,7 @@ def reserve(bounty_id, tester, source, root=B.ROOT):
         if any(r["source_sha256"] == sha and r["state"] != "interrupted" for r in rows):
             raise B.BoardError("same_source", "This exact source was already submitted to this bounty, so it gets no new run.")
         n = 1 + max((r["n"] for r in rows), default=0)
-        row = {"n": n, "bounty_id": bounty_id, "tester": key, "source_sha256": sha, "state": "queued", "submitted_at": time.time(), "result": None, "payout": None, "used_before": used}
+        row = {"n": n, "bounty_id": bounty_id, "tester": key, "source_sha256": sha, "state": "queued", "submitted_at": time.time(), "result": None, "payout": None, "used_before": used, "claim_sha256": B.claim_hash(secret) if secret else None}
         (folder / "fixes" / str(n)).mkdir()
         fd = os.open(folder / "fixes" / str(n) / "source.py", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "wb") as f:
@@ -300,8 +301,9 @@ def _settle_budget(info, amount, root, what):
         budget.spend(info["id"], amount, what, root)
 
 
-def ledger_step(bounty_id, n, step, tester=None, root=B.ROOT):
-    """One step on the local ledger, with the contract's rules. No account exists, so anyone who can reach the board can press these. Claim checks only the name."""
+def ledger_step(bounty_id, n, step, tester=None, root=B.ROOT, secret=None):
+    """One step on the local ledger, with the contract's rules. No account exists, so anyone who can reach the board can press reject and finalize.
+    Claim needs the name and the secret that submit returned once. The claim and the budget settle in one lock: if the budget refuses, the ledger goes back and the claim fails."""
     folder = folder_of(bounty_id, root)
     caller = B.tester_address(B.tester_key(tester)) if step == "claim" else None
     with B.locked(folder / ".lock"):
@@ -312,16 +314,23 @@ def ledger_step(bounty_id, n, step, tester=None, root=B.ROOT):
         fingerprint = (row.get("payout") or {}).get("fingerprint")
         if not fingerprint:
             raise B.BoardError("ledger_refused", "This fix holds nothing on the ledger.")
+        if step == "claim":
+            B.check_claim_secret(row, secret)
         book = B._ledger(folder)
+        before = book.path.read_bytes()
         try:
             {"reject": book.reject, "finalize": book.finalize}[step](fingerprint) if step != "claim" else book.claim(fingerprint, caller)
         except B.ledger_module.LedgerError as e:
             raise B.BoardError("ledger_refused", f"The ledger refused this: {e}.") from None
         entry = book.failures[fingerprint]
+        if step == "claim":
+            try:
+                _settle_budget(_read(folder / "pack.json"), entry["amount"], root, f"claim of fix {n}")
+            except BaseException:
+                book.path.write_bytes(before)
+                raise
         row["payout"] = {**row["payout"], **entry}
         save_fix(row, root)
-    if step == "claim":
-        _settle_budget(_read(folder / "pack.json"), entry["amount"], root, f"claim of fix {n}")
     return row
 
 

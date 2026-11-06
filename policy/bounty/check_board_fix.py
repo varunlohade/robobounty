@@ -27,7 +27,8 @@ import board_store as B
 import budget
 
 F = X.F
-BASE = "http://127.0.0.1:5298"
+PORT = os.environ.get("CHECK_BOARD_PORT", "5298")
+BASE = f"http://127.0.0.1:{PORT}"
 ORIGIN = "http://localhost:5199"
 DEFAULT_CAMPAIGN = "5a8d63e3648b469a8142af56c0824119/c1"
 GOOD = (HERE / "fixtures" / "fix5" / "good_match_fan.py").read_text()
@@ -66,7 +67,7 @@ def call(method, path, body=None, origin=ORIGIN, raw=False):
 
 def start_server(root):
     log = open(root / "server.log", "ab")
-    server = subprocess.Popen([str(X.PYTHON), str(HERE / "board_server.py"), "--root", str(root)], stdout=log, stderr=subprocess.STDOUT)
+    server = subprocess.Popen([str(X.PYTHON), str(HERE / "board_server.py"), "--root", str(root), "--port", PORT], stdout=log, stderr=subprocess.STDOUT)
     for _ in range(100):
         try:
             if call("GET", "/api/health")[0] == 200:
@@ -251,7 +252,7 @@ def t3(session, cid):
         for label, extra in (("no Origin", []), ("wrong Origin", ["-H", "Origin: https://evil.example"]), ("the app server Origin", ["-H", "Origin: http://localhost:5198"])):
             codes = [curl(*extra, BASE + p) for p in paths]
             check(f"curl GET gets 403 with {label}", set(codes) == {"403"}, str(codes))
-            posted = [curl(*extra, "-X", "POST", "-H", "Content-Type: application/json", "-d", body, BASE + p) for p, body in (("/api/bounties/fix", "{}"), (f"/api/bounties/{bid}/fix", '{"tester":"a","source":"x"}'), ("/api/budget/stop", "{}"), (f"/api/bounties/{bid}/fixes/1/claim", '{"tester":"a"}'))]
+            posted = [curl(*extra, "-X", "POST", "-H", "Content-Type: application/json", "-d", body, BASE + p) for p, body in (("/api/bounties/fix", "{}"), (f"/api/bounties/{bid}/fix", '{"tester":"a","source":"x"}'), ("/api/budget/stop", "{}"), (f"/api/bounties/{bid}/fixes/1/claim", '{"tester":"a","secret":"b"}'))]
             check(f"curl POST gets 403 with {label}", set(posted) == {"403"}, str(posted))
         ok = [curl("-H", f"Origin: {ORIGIN}", BASE + p) for p in paths]
         check("curl gets 200 with the board's Origin", ok.count("200") == len(paths), str(ok))
@@ -401,7 +402,8 @@ def t6(session, cid):
         status, source = call("GET", f"/api/bounties/{bid}/source")
         check("the engineer reads the controller copy", status == 200 and source["sha256"] == info["controller"]["sha256"])
         status, reply = call("POST", f"/api/bounties/{bid}/fix", {"tester": "ana", "source": GOOD})
-        check("submit the fix", status == 202 and reply["n"] == 1, json.dumps(reply)[:100])
+        check("submit the fix", status == 202 and reply["n"] == 1, str(reply["n"]))
+        secret = reply["claim_secret"]
         t0 = time.time()
         while True:
             fix = call("GET", f"/api/bounties/{bid}/fixes/1")[1]
@@ -414,7 +416,7 @@ def t6(session, cid):
         check("Pending: the ledger holds the pay", fix["payout"]["status"] == "Pending" and balance()["pending"] == 40 and balance()["available"] == 0, json.dumps(balance()))
         status, reply = call("POST", f"/api/bounties/{bid}/fixes/1/finalize", {})
         check("finalize is refused while the dispute window is open", status == 409 and "DisputeWindowOpen" in reply["reason"], reply["reason"])
-        status, reply = call("POST", f"/api/bounties/{bid}/fixes/1/claim", {"tester": "ana"})
+        status, reply = call("POST", f"/api/bounties/{bid}/fixes/1/claim", {"tester": "ana", "secret": secret})
         check("claim is refused before finalize", status == 409 and "WrongStatus" in reply["reason"], reply["reason"])
         status, reply = call("POST", f"/api/bounties/{bid}/fix", {"tester": "ben", "source": GOOD + "\n"})
         check("a second fix hits the cap while the first is pending", status == 409 and reply["error"] == "cap_reached", reply["error"])
@@ -425,13 +427,13 @@ def t6(session, cid):
         check("reject is refused after the window closes", status == 409 and "DisputeWindowClosed" in reply["reason"], reply.get("reason"))
         status, reply = call("POST", f"/api/bounties/{bid}/fixes/1/finalize", {})
         check("Finalized after the window", status == 200 and reply["fix"]["payout"]["status"] == "Finalized" and balance()["finalized"] == 40, json.dumps(balance()))
-        status, reply = call("POST", f"/api/bounties/{bid}/fixes/1/claim", {"tester": "mallory"})
+        status, reply = call("POST", f"/api/bounties/{bid}/fixes/1/claim", {"tester": "mallory", "secret": secret})
         check("another name cannot claim", status == 409 and "NotSubmitter" in reply["reason"], reply["reason"])
-        status, reply = call("POST", f"/api/bounties/{bid}/fixes/1/claim", {"tester": "ana"})
+        status, reply = call("POST", f"/api/bounties/{bid}/fixes/1/claim", {"tester": "ana", "secret": secret})
         final = balance()
         check("Claimed by the submitter, with balances", status == 200 and reply["fix"]["payout"]["status"] == "Claimed" and final["claimed"] == 40 and final["claimed_by_tester"] == {"ana": 40} and final["available"] == 0, json.dumps(final))
         check("the parts add up to the cap", final["available"] + final["pending"] + final["finalized"] + final["claimed"] == 40)
-        status, reply = call("POST", f"/api/bounties/{bid}/fixes/1/claim", {"tester": "ana"})
+        status, reply = call("POST", f"/api/bounties/{bid}/fixes/1/claim", {"tester": "ana", "secret": secret})
         check("a second claim is refused", status == 409, reply.get("reason"))
         print(f"EVIDENCE root {root} fingerprint {fp}", flush=True)
     finally:

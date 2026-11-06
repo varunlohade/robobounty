@@ -5,6 +5,7 @@ All data goes in a new folder under policy/runs/board/, named check_<time>.
 """
 import argparse
 import json
+import os
 import stat
 import subprocess
 import sys
@@ -21,7 +22,8 @@ import gate as G
 W = G.W
 SALT = "ab" * 32
 FIXTURES = HERE / "fixtures"
-BASE = "http://127.0.0.1:5298"
+PORT = os.environ.get("CHECK_BOARD_PORT", "5298")
+BASE = f"http://127.0.0.1:{PORT}"
 PAGE = "http://localhost:5299"
 results = []
 
@@ -136,7 +138,7 @@ def wait_done(bounty, n, most_s=180):
 
 
 def start_server(root):
-    p = subprocess.Popen([sys.executable, str(HERE / "board_server.py"), "--root", str(root)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    p = subprocess.Popen([sys.executable, str(HERE / "board_server.py"), "--root", str(root), "--port", PORT], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(100):
         time.sleep(0.2)
         if curl("GET", "/api/health")[0] == 200:
@@ -184,6 +186,7 @@ def server_flow(root):
 
         status, out = curl("POST", f"/api/bounties/{wide['id']}/submit", {"tester": "Ana", "seed": seed, "world": world})
         check("submit is queued", status == 202 and out["world_id_label"] == "World ID is not connected", f"{status} {out.get('used')} of {out.get('of')}")
+        secret = out["claim_secret"]
         row = wait_done(wide["id"], out["n"])
         check("failing fixture accepted over HTTP, ledger Pending", row["result"]["code"] == "accepted" and row["result"]["runs"] == 10 and row["payout"]["status"] == "Pending", f"{row['result']['reason']} {row['wall_s']}s")
         status, money = curl("GET", f"/api/bounties/{wide['id']}")
@@ -193,7 +196,7 @@ def server_flow(root):
         step = lambda name, **body: curl("POST", f"/api/bounties/{wide['id']}/failures/{fp}/{name}", body)
         status, out = step("finalize")
         check("finalize before the window ends is refused", status == 409 and "DisputeWindowOpen" in out["reason"] and curl("GET", f"/api/bounties/{wide['id']}")[1]["balance"]["pending"] == 10, f"{status} {out['reason']}")
-        status, out = step("claim", tester="Ana")
+        status, out = step("claim", tester="Ana", secret=secret)
         check("claim before finalize is refused", status == 409 and "WrongStatus" in out["reason"], f"{status} {out['reason']}")
 
         status, third = curl("POST", "/api/bounties", {"title": "Reject test", "company": "Sample company", "scenarios": [], "cap": 10, "per_failure": 10, "limits": {}})
@@ -220,17 +223,19 @@ def server_flow(root):
         time.sleep(max(0.0, row["payout"]["dispute_ends_at"] - time.time()) + 0.5)
         status, out = step("reject")
         check("reject after the window is refused", status == 409 and "DisputeWindowClosed" in out["reason"], f"{status} {out['reason']}")
-        status, out = step("claim", tester="Ana")
+        status, out = step("claim", tester="Ana", secret=secret)
         check("claim before finalize is still refused after the window", status == 409, f"{status}")
         status, out = step("finalize")
         check("finalize after the window", status == 200 and out["failure"]["status"] == "Finalized" and out["bounty"]["balance"]["finalized"] == 10, f"{status} {out['failure']['status']}")
-        status, out = step("claim", tester="Ben")
+        status, out = step("claim", tester="Ana", secret="wrong")
+        check("claim with the wrong secret is refused", status == 403 and out["error"] == "bad_secret", f"{status} {out['error']}")
+        status, out = step("claim", tester="Ben", secret=secret)
         check("claim by another name is refused", status == 409 and "NotSubmitter" in out["reason"], f"{status} {out['reason']}")
-        status, out = step("claim", tester=" ANA ")
+        status, out = step("claim", tester=" ANA ", secret=secret)
         balance = out["bounty"]["balance"]
         check("full path ends in Claimed with the right balance", status == 200 and out["failure"]["status"] == "Claimed" and balance["claimed"] == 10 and balance["pending"] == 0 and balance["finalized"] == 0 and balance["available"] == 10 and balance["claimed_by_tester"] == {"ana": 10} and balance["available"] + balance["claimed"] == wide["cap"], json.dumps(balance))
         check("the submission shows Claimed", curl("GET", f"/api/bounties/{wide['id']}/submissions/{row['n']}")[1]["payout"]["status"] == "Claimed")
-        status, out = step("claim", tester="Ana")
+        status, out = step("claim", tester="Ana", secret=secret)
         check("second claim is refused", status == 409, f"{status}")
         status, out = curl("POST", f"/api/bounties/{wide['id']}/failures/0x{'0' * 64}/finalize", {})
         check("unknown failure is refused", status == 409, f"{status} {out['reason']}")

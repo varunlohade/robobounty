@@ -8,9 +8,9 @@ GET  /api/bounties/<id>/public/<world>/<file>   a recorded run of one public fai
 GET  /api/fixable
 GET  /api/budget
 POST /api/bounties/fix                     {session, campaign, group, title, company, pay, window?}
-POST /api/bounties/<id>/fix                {tester, source}. The server sets every other field. Any other field is refused.
+POST /api/bounties/<id>/fix                {tester, source}. The server sets every other field. Any other field is refused. The reply holds claim_secret, once.
 POST /api/bounties/<id>/fixes/<n>/approve|decline|reject|finalize   {}
-POST /api/bounties/<id>/fixes/<n>/claim    {tester}
+POST /api/bounties/<id>/fixes/<n>/claim    {tester, secret}
 POST /api/budget/stop                      {}
 """
 import queue
@@ -30,7 +30,7 @@ MAX_STEP_BODY = 256
 POST_FIELDS = {"session", "campaign", "group", "title", "company", "pay"}
 FIX_FIELDS = {"tester", "source"}
 ERROR_STATUS = {"unknown_campaign": 404, "already_posted": 409, "not_fixable": 409, "campaign_stale": 409, "no_hidden_worlds": 409, "cap_reached": 409, "same_source": 409, "source_too_large": 413, "wrong_state": 409, "queue_full": 503,
-                "budget_stopped": 409, "over_budget": 409, "over_per_bounty": 409, "no_budget": 404, "not_found": 404}
+                "bad_secret": 403, "budget_stopped": 409, "over_budget": 409, "over_per_bounty": 409, "no_budget": 404, "not_found": 404, "budget_mismatch": 409}
 PUBLIC_FILES = {"manifest.json": "application/json", "model.xml": "application/xml", "qpos.json": "application/json", "result.json": "application/json", "world.json": "application/json",
                 "controller.py.txt": "text/plain", "trace.json": "application/json", "wind.json": "application/json", "dirt.bin": "application/octet-stream"}
 ONE = re.compile(r"/api/bounties/([0-9]{1,9})")
@@ -121,21 +121,21 @@ def _post(h, root):
         with SUBMIT_LOCK:
             if WAITING.full():
                 raise B.BoardError("queue_full", f"{QUEUE_CAP} fixes are already waiting. Try again soon. This did not use one of your submissions.")
-            row = X.reserve(bounty_id, v["tester"], v["source"], root)
+            secret = B.new_claim_secret()
+            row = X.reserve(bounty_id, v["tester"], v["source"], root, secret=secret)
             WAITING.put_nowait(row)
-        h.reply(202, {"n": row["n"], "state": row["state"], "used": row["used_before"] + 1, "of": B.MAX_PER_TESTER, "ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL})
+        h.reply(202, {"claim_secret": secret, "n": row["n"], "state": row["state"], "used": row["used_before"] + 1, "of": B.MAX_PER_TESTER, "ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL})
     elif m := STEP.fullmatch(path):
         bounty_id, n, step = int(m[1]), int(m[2]), m[3]
-        v = h.body(MAX_STEP_BODY, {"tester"} if step == "claim" else set())
+        v = h.body(MAX_STEP_BODY, {"tester", "secret"} if step == "claim" else set())
         if step in ("approve", "decline"):
             row = board_fix_gate.company_decide(bounty_id, n, step == "approve", root)
         else:
-            row = X.ledger_step(bounty_id, n, step, v.get("tester"), root)
+            row = X.ledger_step(bounty_id, n, step, v.get("tester"), root, secret=v.get("secret"))
         h.reply(200, {"fix": X.fix_view(row), "bounty": X.view(bounty_id, root), "ledger_label": B.LEDGER_LABEL})
     elif (m := FIND_CLAIM.fullmatch(path)) and str(int(m[1])) in budget.view(root).get("by_bounty", {}):
-        v = h.body(MAX_STEP_BODY, {"tester"})
-        row = B.ledger_step(int(m[1]), m[2], "claim", v["tester"], root)
-        budget.spend(int(m[1]), row["amount"], f"claim of failure {m[2][:10]}", root)
+        v = h.body(MAX_STEP_BODY, {"tester", "secret"})
+        row = B.ledger_step(int(m[1]), m[2], "claim", v["tester"], root, secret=v["secret"], on_claim=lambda amount: budget.spend(int(m[1]), amount, f"claim of failure {m[2][:10]}", root))
         h.reply(200, {"failure": row, "bounty": B.get(int(m[1]), root), "ledger_label": B.LEDGER_LABEL})
     else:
         return False

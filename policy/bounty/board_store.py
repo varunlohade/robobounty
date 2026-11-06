@@ -6,6 +6,7 @@ World ID is not connected: a tester is only a name, so one person can use many n
 import contextlib
 import fcntl
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -161,6 +162,26 @@ def tester_address(key):
     return "0x" + hashlib.sha256(f"crashlab.board.tester|{key}".encode()).hexdigest()[:40]
 
 
+def new_claim_secret():
+    """Returned once at submit. The disk holds only claim_hash of it."""
+    return secrets.token_urlsafe(32)
+
+
+def claim_hash(secret):
+    return hashlib.sha256(secret.encode()).hexdigest()
+
+
+def check_claim_secret(row, secret):
+    """The caller holds the bounty lock. A row with no hash can never be claimed."""
+    stored = row.get("claim_sha256")
+    if not stored or not isinstance(secret, str) or not hmac.compare_digest(stored, claim_hash(secret)):
+        raise BoardError("bad_secret", "This is not the claim secret that this submission got at submit.")
+
+
+def public_row(row):
+    return {k: v for k, v in row.items() if k != "claim_sha256"}
+
+
 def human_id(bounty_id, key):
     return "0x" + hashlib.sha256(f"crashlab.board.human|{bounty_id}|{key}".encode()).hexdigest()
 
@@ -187,8 +208,8 @@ def require_room(bounty_id, tester, root=ROOT):
         raise _cap_error(key, used)
 
 
-def reserve(bounty_id, tester, seed, root=ROOT):
-    """Counts a new submission against the tester's cap, in the same lock, so two requests cannot both take the last place."""
+def reserve(bounty_id, tester, seed, root=ROOT, secret=None):
+    """Counts a new submission against the tester's cap, in the same lock, so two requests cannot both take the last place. Only the hash of secret goes on disk. With no secret, nobody can ever claim it."""
     folder = _folder(bounty_id, root)
     key = tester_key(tester)
     if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**31:
@@ -199,7 +220,7 @@ def reserve(bounty_id, tester, seed, root=ROOT):
         if used >= MAX_PER_TESTER:
             raise _cap_error(key, used)
         n = 1 + max((r["n"] for r in rows), default=0)
-        row = {"n": n, "bounty_id": bounty_id, "tester": key, "seed": seed, "used_before": used, "state": "queued", "submitted_at": time.time(), "result": None, "payout": None}
+        row = {"n": n, "bounty_id": bounty_id, "tester": key, "seed": seed, "used_before": used, "state": "queued", "submitted_at": time.time(), "result": None, "payout": None, "claim_sha256": claim_hash(secret) if secret else None}
         (folder / "submissions" / str(n)).mkdir()
         write_json(folder / "submissions" / str(n) / "submission.json", row)
     return row
@@ -217,22 +238,27 @@ def get_submission(bounty_id, n, root=ROOT):
     row = json.loads(path.read_text())
     if row["state"] == "running":
         row["progress"] = progress_of(bounty_id, n, root)
-    return {**row, "now": time.time()}
+    return {**public_row(row), "now": time.time()}
 
 
 def list_submissions(bounty_id, root=ROOT):
-    return _rows(_folder(bounty_id, root))
+    return [public_row(r) for r in _rows(_folder(bounty_id, root))]
 
 
-def ledger_step(bounty_id, fingerprint, step, tester=None, root=ROOT):
+def ledger_step(bounty_id, fingerprint, step, tester=None, root=ROOT, secret=None, on_claim=None):
     """Moves one failure on the ledger with the contract's rules, and updates the submission that earned it. Returns the failure row.
 
-    No account exists, so anyone who can reach the board can press these. Claim checks only the name. World ID is not connected.
+    No account exists, so anyone who can reach the board can press reject and finalize. Claim needs the name and the secret that submit returned once. World ID is not connected.
+    on_claim(amount) runs in this lock. If it raises, the ledger goes back and the claim fails.
     """
     folder = _folder(bounty_id, root)
     caller = tester_address(tester_key(tester)) if step == "claim" else None
     with locked(folder / ".lock"):
         book = _ledger(folder)
+        before = book.path.read_bytes()
+        earned = book.failures.get(fingerprint)
+        if step == "claim" and earned:
+            check_claim_secret(next((s for s in _rows(folder) if s["payout"] and s["payout"].get("result_hash") == earned["result_hash"]), {}), secret)
         try:
             if step == "reject":
                 book.reject(fingerprint)
@@ -243,6 +269,12 @@ def ledger_step(bounty_id, fingerprint, step, tester=None, root=ROOT):
         except ledger_module.LedgerError as e:
             raise BoardError("ledger_refused", f"The ledger refused this: {e}.") from None
         row = book.failures[fingerprint]
+        if step == "claim" and on_claim:
+            try:
+                on_claim(row["amount"])
+            except BaseException:
+                book.path.write_bytes(before)
+                raise
         for sub in _rows(folder):
             if sub["payout"] and sub["payout"].get("result_hash") == row["result_hash"]:
                 save_submission({**sub, "payout": {**sub["payout"], "status": row["status"]}}, root)

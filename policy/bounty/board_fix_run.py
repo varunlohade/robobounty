@@ -1,6 +1,6 @@
 """Runs fix.py for the board, as its own process: board_fix_run.py check|preflight|run ... No file of fix.py changes.
 
-One thing differs from fix.py run: no LLM can start here: the board always passes --patch.
+Two things differ from fix.py run: no LLM can start here, since the board always passes --patch. And every inspection run gets judged again outside the sandbox.
 """
 import json
 import sys
@@ -16,6 +16,7 @@ def _no_llm(*_, **__):
 
 
 F.llm_edit = _no_llm
+F.INSPECTION_REJUDGE = True
 
 
 def main():

@@ -17,7 +17,7 @@ import board_gate
 import board_store as B
 import gate as G
 
-GATE_TIMEOUT_S = 1800
+GATE_TIMEOUT_S = {"window": 1800, "inspection": 3600}  # An inspection world takes two full sim runs: the sandbox's and the one outside it.
 PROCS = 6
 NOTE = "Engineer's source, tested by the board. No AI call ran."
 
@@ -41,7 +41,7 @@ def decide(report, out, patched_sha):
     if status == "cannot_fix":
         return _fail("cannot_fix", report["words"], "check")
     sets = report["sets"]
-    counts = {name: {k: sets[name][k] for k in ("n", "better", "worse", "same", "passed_before", "passed_after", "limits_hit", "replay_mismatch")} for name in sets}
+    counts = {name: {k: sets[name][k] for k in ("n", "better", "worse", "same", "passed_before", "passed_after", "limits_hit", "replay_mismatch", "not_rejudged")} for name in sets}
     rows = [p for p in report["pairs"] if p["set"] == "target"]
     target = []
     for p in rows:
@@ -55,8 +55,11 @@ def decide(report, out, patched_sha):
     forged = sum(s["replay_mismatch"] for s in counts.values())
     limits = sum(s["limits_hit"] for s in counts.values())
     worse = sum(s["worse"] for s in counts.values())
+    unjudged = sum(s["not_rejudged"] for s in counts.values())
     if forged:
         return {**_fail("replay_mismatch", f"{forged} runs did not replay to their stored result, so the runs do not count.", "sim"), **base, "flags": []}
+    if unjudged:
+        return {**_fail("not_rejudged", f"{unjudged} runs have no verdict from the judge outside the sandbox, so the board pays nothing.", "sim"), **base, "flags": []}
     if limits:
         return {**_fail("limit_hit", f"{limits} runs hit a time, CPU or memory limit. A kill counts as a fail.", "sim"), **base, "flags": []}
     missed = [t["index"] for t in target if not (t["passed"] or t["safe_hold"])]
@@ -135,7 +138,7 @@ def _run(row, root, code_root, folder, sub, t0):
         return _fail("limit_hit", f"The first run hit a limit ({row_one['limit']}), so the sandbox stopped it. A kill counts as a fail.", "sim")
 
     out = work / "proof"
-    code = board_gate._process([py, str(X.RUNNER), "run", str(folder / "campaign"), "--base", str(base), "--group", info["group"], "--pack", info["pack"], "--out", str(out), "--patch", str(source), "--patch-note", NOTE, "--procs", str(PROCS)], sub / "gate.log", GATE_TIMEOUT_S)
+    code = board_gate._process([py, str(X.RUNNER), "run", str(folder / "campaign"), "--base", str(base), "--group", info["group"], "--pack", info["pack"], "--out", str(out), "--patch", str(source), "--patch-note", NOTE, "--procs", str(PROCS)], sub / "gate.log", GATE_TIMEOUT_S[info["pack"]])
     report_path = out / "report.json"
     if code != 0 or not report_path.is_file():
         return _fail("gate_crashed", "The proof stopped with an error or hit the time limit, so there is no verdict.", "gate")
