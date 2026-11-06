@@ -444,6 +444,9 @@ def thumb_and_end(run):
     return app_export.thumb_and_end(run)
 
 
+FAILURE_WORDS = {"coverage": "too little of the glass got clean"}
+
+
 def agent5():
     """The v5 engine loop. It loads on first use, so the old app path never imports it."""
     if str(POLICY / "highrise5") not in sys.path:
@@ -493,19 +496,6 @@ def history5(session):
                 pointer.write_text(json.dumps({"n": n}) + "\n")
 
     return ServerHistory(session.dir / "v5")
-
-
-# The numeric blocks of a v5 world, for the chat's "old → new" words.
-V5_WORDS = ("tower", "area", "panes", "weather", "wind", "robot", "robot_start")
-
-
-def moved_words5(old, new):
-    out = []
-    for block in V5_WORDS:
-        for key, value in new[block].items():
-            if isinstance(value, (int, float)) and old[block][key] != value:
-                out.append(f"{block} {key.replace('_', ' ')} {plain_number(old[block][key])} → {plain_number(value)}")
-    return out
 
 
 class Worker:
@@ -832,20 +822,34 @@ class Session:
         return complete
 
     def show5(self, event):
-        """One agent5 event in the chat. Every line was written by code from checked values."""
+        """One agent5 event for the log, as it happens. The chat gets its plain lines when the turn ends."""
         kind = event["kind"]
         if kind == "call":
             self.tool("engine_call", event["status"], [event["line"]])
-            for line in event.get("words", []):
-                self.say(line)
         elif kind == "result":
             self.tool("run_result", event["table"]["outcome"], [event["line"]])
+        elif kind == "cannot":
+            self.tool("cannot_build", event["reason"], [event["line"]])
         elif kind == "say_hidden":
-            self.tool("say_hidden", "hidden", [event["line"]])  # In the log. The chat already has the lines from code, and this one repeats on most turns.
-        elif kind in ("cannot", "say"):
-            self.say(event["line"])
+            self.tool("say_hidden", "hidden", [event["line"], *event["reasons"]])  # The code-written lines stand in for the model's words.
+            recovery_log(self, f"the AI's words failed the truth check: {event['reasons']}", "showed the lines from code")
         elif kind == "refused":
             self.say(event["line"], fail=True)
+
+    def speak5(self, events, before, new):
+        """The turn in short plain lines, with the raw engine lines behind one collapsed row."""
+        A = agent5()
+        lines = A.plain_lines(events, before, new)
+        for line in lines:
+            self.say(line)
+        said = [e["line"] for e in events if e["kind"] == "say"]
+        for line in said:
+            self.say(line)
+        if not lines and not said and not any(e["kind"] == "refused" or e.get("applied") for e in events):
+            self.say("Nothing changed. The world stays as it was.")
+        raw = [e["line"] for e in events if e["kind"] in ("call", "result", "cannot", "saved", "timing")]
+        if raw:
+            self.tool("details", "", raw)
 
     def turn5(self, text):
         A = agent5()
@@ -871,11 +875,10 @@ class Session:
             self.phase = phase_before
             raise
         self.working()
-        if not any(e["kind"] in ("call", "cannot", "say", "say_hidden", "refused") for e in events):
-            self.say("Nothing changed. The world stays as it was.")
-        self.finish5(before, new, first)
+        self.speak5(events, before, new)
+        self.finish5(before, new, first, A.result_change(events))
 
-    def finish5(self, before, new, first):
+    def finish5(self, before, new, first, change):
         """A physics change shows a new run. A picture change updates the view in place, with no run."""
         A = agent5()
         hist = self.history5()
@@ -889,10 +892,12 @@ class Session:
             if self.world["xml"] != old_xml or new != before:  # Time, fog and the city live in the world and not in the view model.
                 self.emit_view5(focus)
             return
-        moved = moved_words5(before, new)
+        moved = A.moved_lines(before, new)
         if moved:
             self.tool("change_world", "ok", moved)
-            self.say(f"{'. '.join(moved)}.")
+            self.say(" ".join(moved))
+        if change:
+            self.say(change)
         key = self.world["hash"]
         try:
             result = hist.run({"world": new, "physics_hash": key})
@@ -921,7 +926,7 @@ class Session:
         elif result["passed"]:
             word = f"It passed. {cleaned}"
         elif result["failure"]:
-            word = f"It failed: {result['failure']}. {cleaned}"
+            word = f"It failed: {FAILURE_WORDS.get(result['failure'], result['failure'].replace('_', ' '))}. {cleaned}"
         else:
             word = f"{held_words(result, json.loads((out / 'wind.json').read_text()), POLICY / 'highrise5' / 'controller5.py')} {cleaned}"
         self.emit(type="card", title="Does the scene look right?", body=word, result=word, actions=[{"label": "Looks right", "action": "scene_ok", "primary": True}])

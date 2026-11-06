@@ -226,7 +226,7 @@ try {
   n = await idle();
   await type('make the robot dance');
   await quiet(n);
-  check('an unknown request is refused by code', (await chatText()).includes('cannot_build:no_function'));
+  check('an unknown request is refused by code', (await chatText()).includes('No engine function can do that.'));
   // 5. An AI failure falls back and says so. This message has no stored reply.
   if (!LIVE) {
     n = await idle();

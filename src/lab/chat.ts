@@ -158,10 +158,15 @@ export class LabChat {
       this.note(`Not built: ${event.lines[0].replace(/[.,;:!?]+$/, '')}. ${event.lines[1]}`);
       return;
     }
-    // One plain line for each engine call and each run, written by code from checked values.
-    const shown = event.title === 'engine_call' || event.title === 'run_result';
-    const words = shown ? event.lines[0] : STEP_WORDS[event.title];
-    if (!words || (!shown && NOT_DONE.test(event.meta ?? ''))) return;
+    // The raw engine lines stay one click away, closed by default.
+    if (event.title === 'details') {
+      const box = el('details', 'chat-details');
+      box.append(el('summary', '', 'Details'), ...event.lines.map(line => el('div', 'chat-detail', line)));
+      this.append(box);
+      return;
+    }
+    const words = STEP_WORDS[event.title];
+    if (!words || NOT_DONE.test(event.meta ?? '')) return;
     let steps = this.list.lastElementChild as HTMLElement | null;
     if (!steps?.classList.contains('chat-steps')) {
       steps = el('div', 'chat-steps');

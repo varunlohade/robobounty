@@ -117,3 +117,7 @@ button { cursor: pointer; }
 
 .view-back { position: absolute; right: 12px; top: 12px; z-index: 5; padding: 4px 10px; font: inherit; font-size: 12px; color: var(--text, #e6e6e6); background: rgba(20, 20, 22, 0.78); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 4px; cursor: pointer; }
 .view-back:hover { background: rgba(40, 40, 44, 0.9); }
+
+.chat-details { font-size: 12px; opacity: 0.7; }
+.chat-details summary { cursor: pointer; }
+.chat-detail { margin-top: 4px; font-family: "JetBrains Mono", monospace; font-size: 11px; line-height: 16px; overflow-wrap: anywhere; }

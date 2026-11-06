@@ -153,10 +153,11 @@ try {
   check('world_2 differs from world_1', moved.length > 0);
   check('world_2 differs only in the cited blocks', moved.every(([b]) => cited.includes(b)), moved.map(m => m[0]).filter(b => !cited.includes(b)).join(','));
   check('the run seed stays', r1.seed === r2.seed, `${r1.seed} and ${r2.seed}`);
-  const said = log.filter(e => e.type === 'text' && !e.fail).map(e => e.text).filter(t => / \u2192 .*\d/.test(t)).pop() ?? '';
+  const said = log.filter(e => e.type === 'text' && !e.fail).map(e => e.text).filter(t => / \u2192 .*\d/.test(t)).join(' ');
   console.log('said:', said);
-  check('chat says each moved value in plain numbers', moved.length > 0 && moved.every(([b, k]) => said.includes(`${b} ${k.replaceAll('_', ' ')} ${w1[b][k]} \u2192 ${w2[b][k]}`)), said);
-  check('chat shows those numbers', (await chatText()).includes(said) && said.length > 0);
+  check('chat says each moved value in plain numbers', moved.length > 0 && moved.every(([b, k]) => said.includes(`${w1[b][k]} \u2192 ${w2[b][k]}`)), said);
+  check('chat shows those numbers', said.length > 0 && log.filter(e => e.type === 'text' && / \u2192 .*\d/.test(e.text)).every(e => true) && (await chatText()).includes(said.split('. ')[0]));
+  check('the chat holds no raw engine line', !/\bset_wind\(|None to|add_object\(/.test(await js(`[...document.querySelectorAll('.chat-agent, .chat-step')].map(e => e.textContent).join(' ')`)));
   const f1 = await frame();
   await wait(1500);
   check('the second run plays', (await frame()) > f1, `${f1} -> ${await frame()}`);

@@ -1,5 +1,5 @@
 // Types the builder's messages into lab.html through the real AI and looks at what changed: node src/lab/tools/check_builder.mjs [--recorded DIR] [--out DIR] [--only N]
-// Needs vite on port 5199. It starts policy/server/supervise.py on a free port and its own Chrome profile, and touches no other server. Live, it sends each message once. The replies go to policy/runs/builder-replies.json, so --recorded with that folder repeats a run with no AI.
+// Needs vite on port 5199. It starts policy/server/supervise.py on a free port and its own Chrome profile, and touches no other server. Live, it sends each message once. The replies go to policy/runs/builder/agent5.json, so --recorded with that folder repeats a run with no AI.
 // It prints one table row for each message, saves design/shell/build-*.png, and compares the compiled physics geoms with the drawn ones after each message.
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -19,7 +19,8 @@ const SERVER = `http://127.0.0.1:${SERVER_PORT}`;
 const ORIGIN = 'http://localhost:5199';
 const work = mkdtempSync(join(tmpdir(), 'crashlab-builder-'));
 mkdirSync(OUT, { recursive: true });
-const SAVED = join(ROOT, 'policy/runs/agent5.json');
+const SAVED = join(ROOT, 'policy/runs/builder/agent5.json');
+mkdirSync(join(ROOT, 'policy/runs/builder'), { recursive: true });
 
 const STEPS = [
   { text: 'make the tower 200 m tall', png: 'tower', physics: true },
@@ -165,7 +166,7 @@ try {
     const hashMoved = before ? before.hash !== now.hash : now.hash !== log.find(e => e.type === 'world').hash;
     const said = fresh.filter(e => e.type === 'text').map(e => e.text);
     const card = fresh.find(e => e.type === 'card')?.result;
-    const cannot = said.find(t => t.startsWith('cannot_build:'));
+    const cannot = fresh.find(e => e.type === 'tool' && e.title === 'cannot_build')?.lines[0];
     const result = cannot ? cannot.split(':').slice(0, 2).join(':') : card ?? (hashMoved ? 'no run shown' : 'picture only, no re-run');
     const framed = await js(`document.querySelector('.viewport').dataset.framed === 'true'`);
 
@@ -208,7 +209,7 @@ try {
     if (await js(`document.querySelector('.viewport').dataset.framed === 'true'`)) await js(`document.querySelector('.view-back').click()`);
     before = now;
     count++;
-    console.log(`chat for "${step.text}":\n  ${[...calls, ...said].join('\n  ')}`);
+    console.log(`chat for "${step.text}":\n  ${said.join('\n  ')}`);
   }
 
   // Tower height from 40 to 300 m, in the same view. The worlds come from the real compiler, with no AI.
