@@ -315,7 +315,7 @@ def advance(chain, root, bounty_id, n, contract):
     chain_bounty, wallet = funding["chain_bounty"], row["wallet"]
     fingerprint = A.fingerprint_on_chain(chain, chain_bounty, numbers["patched"])
     status, ends, submitter = chain.failure(chain_bounty, fingerprint, contract)
-    steps.update(fix=n, chain_bounty=chain_bounty, fingerprint=fingerprint, submitter=wallet, amount_base_units=numbers["pay"], state=status if status != "None" else None, dispute_ends_at=ends or None, recorded=bool(row["result"].get("recorded")), message=None, chain_now=chain.now())
+    steps.update(fix=n, chain_bounty=chain_bounty, fingerprint=fingerprint, submitter=wallet, amount_base_units=numbers["pay"], state=status if status != "None" else None, dispute_ends_at=ends or None, recorded=bool(row["result"].get("recorded")), message=None, chain_now=chain.now(), chain_read_at=time.time())
     moved = False
     request = folder / "fixes" / str(n) / "arc_reject.json"
     if status == "None":

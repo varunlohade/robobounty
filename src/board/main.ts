@@ -15,6 +15,9 @@ const seenBalance: Record<string, ArcBalance> = {};
 const TEST_USDC = (base: string | number | bigint) => `${W.shownUsdc(BigInt(base))} test USDC`;
 let who: Who | null = null; // Only for what to show. The board server checks the session on every action.
 const POLL_MS = 1500;
+// A chain read takes seconds on a public RPC. A timer that starts a new one before the last ends fills the browser's few connections, and then a button's request waits behind them.
+const noOverlap = (run: () => Promise<unknown>) => { let busy = false; return () => { if (busy) return; busy = true; void run().finally(() => { busy = false; }); }; };
+const inTime = <T>(asked: Promise<T>) => Promise.race([asked, new Promise<never>((_, no) => setTimeout(() => no(new W.WalletError('The server has not answered for 60 s. Nothing was sent. Press Fund from my wallet again.')), 60_000))]);
 const BALANCE_MS = 3000;
 
 type Kid = Node | string;
@@ -238,8 +241,8 @@ const fundBounty = (b: Bounty) => walletAct('fund', async () => {
   if (earlier) {
     try { await reportFunded(b.id, earlier, null); store.drop(key); return; } catch (e) { store.drop(key); if (!(e instanceof ApiError)) throw e; }
   }
-  const plan = await api.arcPlan(b.id);
-  const money = await api.arcBalance(address);
+  const plan = await inTime(api.arcPlan(b.id));
+  const money = await inTime(api.arcBalance(address));
   if (BigInt(money.usdc_base_units) < BigInt(plan.cap)) throw new W.WalletError(`This wallet holds ${TEST_USDC(money.usdc_base_units)}, and the bounty needs ${TEST_USDC(plan.cap)}. Get some at faucet.circle.com.`);
   let approve: string | null = null;
   if (BigInt(money.allowance_base_units) < BigInt(plan.cap)) {
@@ -301,7 +304,7 @@ function chainPanel(b: Bounty, f: Fix | undefined) {
   const txs = steps?.txs ?? {}, urls = steps?.tx_links ?? {};
   out.push(chainStep('Proposed', txs.propose ? 'ok' : 'skip', txs.propose ? `By ${c.agent_name}, to ${short(steps!.submitter!)}` : `${c.agent_name} proposes when the gate accepts a fix`, ...links(txs, urls, ['propose'])));
   if (state === 'Pending') {
-    const skew = (steps!.chain_now ?? b.now) - b.now;
+    const skew = steps!.chain_read_at ? steps!.chain_now! - steps!.chain_read_at : 0; // The chain's clock against the server's, both at one moment. The agent's file can be many seconds old.
     const left = Math.max(0, Math.ceil((steps!.dispute_ends_at ?? 0) - (Date.now() / 1000 + skew)));
     const stop = button('sec', wal.busy === 'reject' ? 'Sign in your wallet' : 'Reject', 'x', () => { void rejectFix(b, f!.n); });
     stop.disabled = !!wal.busy || left <= 0;
@@ -379,7 +382,7 @@ async function startArc() {
     wal.chain = now.chain;
     await readWallet();
     W.onWalletChange(() => { wal.address = null; wal.words = null; void readWallet().then(render); });
-    setInterval(readBalances, BALANCE_MS);
+    setInterval(noOverlap(readBalances), BALANCE_MS);
   } catch { /* An old board server has no such route, so the local path stands. */ }
   render();
 }
@@ -715,7 +718,7 @@ const site = shell();
 render();
 void startArc();
 refresh();
-setInterval(refresh, POLL_MS);
+setInterval(noOverlap(refresh), POLL_MS);
 const postRef = new URLSearchParams(location.search).get('post');
 if (postRef) {
   void site.who.then(who => {
