@@ -150,7 +150,7 @@ try {
   await c.until(`!!${hasButton('Connect wallet')}`, 'Connect', 30);
   await press('Connect wallet');
   await walletError('rejected the network switch', 'wrong network, switch refused: a plain message');
-  await c.until(`document.querySelector('.walletbar').innerText.includes('another network')`, 'the wrong network line', 10);
+  await c.until(`(document.querySelector('.walletbar')?.innerText ?? '').includes('another network')`, 'the wrong network line', 10);
   check('wrong network: no balance shows as if ready', !(await text('.walletbar')).includes('test USDC'));
   await shot('wrong-network');
 
@@ -158,7 +158,7 @@ try {
   await setWallet({ account: COMPANY, chain: '0x1', connected: true });
   await go('bounties.html');
   await press('Switch network');
-  await c.until(`document.querySelector('.walletbar').innerText.includes('10.00 test USDC')`, 'the balance from the chain', 30);
+  await c.until(`(document.querySelector('.walletbar')?.innerText ?? '').includes('10.00 test USDC')`, 'the balance from the chain', 30);
   check('the wallet is asked to add the chain, USDC with 18 decimals', (await popups()).some(p => p === 'add:Local stand-in chain:USDC:18'), (await popups()).join());
   const bar = await text('.walletbar');
   check('connected: address, balance, label', bar.includes('0xf39fd6') && bar.includes('10.00 test USDC') && bar.includes('Not real money'), bar);
@@ -197,7 +197,7 @@ try {
   const fundTxs = await stepTx('funded');
   check('funded: approve and create have receipts with status 1', fundTxs.length === 2 && fundTxs.every(t => BigInt(receipt(t).status) === 1n), fundTxs.join());
   check('the contract holds the pay', usdc(CONTRACT) === 1_000_000n && usdc(COMPANY) === 9_000_000n);
-  await c.until(`document.querySelector('.walletbar').innerText.includes('9.00 test USDC')`, 'the company balance after funding', 15);
+  await c.until(`(document.querySelector('.walletbar')?.innerText ?? '').includes('9.00 test USDC')`, 'the company balance after funding', 15);
   await showChain();
   await shot('funded');
 
@@ -221,7 +221,7 @@ try {
   await go('bounties.html');
   await clearPopups();
   await press('Save this wallet');
-  await c.until(`document.querySelector('.walletbar').innerText.includes('Payout wallet saved')`, 'the saved wallet', 30);
+  await c.until(`(document.querySelector('.walletbar')?.innerText ?? '').includes('Payout wallet saved')`, 'the saved wallet', 30);
   const side = await text('.sh-who');
   check('the side bar shows the proved wallet', side.includes('0x7099') && side.includes('signature checked'), side);
   await shot('saved');
@@ -257,7 +257,7 @@ try {
   console.log(`  fund to paid ${((Date.now() - fundAt) / 1000).toFixed(1)} s`);
   check('the money reached the engineer, read from the chain', usdc(ENGINEER) === 1_000_000n && usdc(CONTRACT) === 0n, String(usdc(ENGINEER)));
   await c.until(`document.querySelector('.chainbalance')?.dataset.balance === '1000000'`, 'the balance on the page', 15);
-  await c.until(`document.querySelector('.walletbar').innerText.includes('1.00 test USDC')`, 'the engineer balance in the wallet line', 15);
+  await c.until(`(document.querySelector('.walletbar')?.innerText ?? '').includes('1.00 test USDC')`, 'the engineer balance in the wallet line', 15);
   const steps = JSON.parse(readFileSync(join(boardRoot, '1/fixes/1/arc_steps.json'), 'utf8'));
   const chainTxs = Object.entries(steps.txs);
   check('propose, finalize and payout each have a receipt with status 1', ['propose', 'finalize', 'payout'].every(k => steps.txs[k]) && chainTxs.every(([, t]) => BigInt(receipt(t).status) === 1n), chainTxs.map(([k, t]) => `${k} ${t.slice(0, 10)}`).join(', '));
