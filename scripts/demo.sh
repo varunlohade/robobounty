@@ -47,7 +47,7 @@ stop() {
 trap 'stop 0' INT TERM
 trap 'stop 1' EXIT
 
-export CRASHLAB_WEB_PORT="$WEB" CRASHLAB_SITE_PORT="$SITE" VITE_RUN_PORT="$RUN" VITE_BOARD_PORT="$BOARD"
+export CRASHLAB_DEMO=1 CRASHLAB_WEB_PORT="$WEB" CRASHLAB_SITE_PORT="$SITE" VITE_RUN_PORT="$RUN" VITE_BOARD_PORT="$BOARD"
 case "$MODE" in
   recorded) RECORDED=(--recorded policy/runs/demo) ;;
   stored) RECORDED=(--recorded policy/server/fixtures) ;;

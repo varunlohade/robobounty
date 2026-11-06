@@ -4,6 +4,7 @@ const pages = ['index', 'toy', 'app', 'lab', 'bounties', 'home', 'crashlab', 'da
 const site = `http://127.0.0.1:${process.env.CRASHLAB_SITE_PORT ?? 5297}`;
 export default defineConfig({
   optimizeDeps: { exclude: ['@mujoco/mujoco'] },
-  server: { port: 5199, proxy: { '/site-api': site, '^/trials/demo-window-': site } },
+  // In a demo a saved file must not reload the judge's page, so scripts/demo.sh turns live reload off.
+  server: { port: 5199, ...(process.env.CRASHLAB_DEMO ? { hmr: false, watch: null } : {}), proxy: { '/site-api': site, '^/trials/demo-window-': site } },
   build: { target: 'es2022', rollupOptions: { input: Object.fromEntries(pages.map(p => [p === 'index' ? 'main' : p, `${p}.html`])) } },
 });
