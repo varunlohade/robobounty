@@ -136,7 +136,7 @@ CONFIRM: enter the Classic / From Scratch track, and confirm that no code or des
 
 ## Links to fill in
 
-CONFIRM: team members and their ETHGlobal accounts.
+Team: one person, Varun Lohade. CONFIRM: his ETHGlobal account.
 
 CONFIRM: the demo video link. Partner judges read the video, the repo and this write-up.
 
