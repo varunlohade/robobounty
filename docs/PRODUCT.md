@@ -39,3 +39,7 @@ Owner's words: "Go on their website and watch that video. It's so helpful." Idea
 8. Each fix is validated on held-back worlds, with no regressions, and the whole set is re-run. Before and after side by side.
 9. What the code cannot fix is handed on. Ours: it goes to a bounty or to the right owner.
 10. A short final report with a few big numbers.
+
+## Main product flow, restated by the owner (2026-11-06)
+Owner's words: "a platform where a user can come import their robot file and say, hey ... This robot is used for cleaning Dubai skylines. Now what the simulation does is it generates realistic looking simulations for Dubai skylines ... it will run one realistic use case based on the prompt ... it can take 10 minutes, I'm okay if it takes 5 minutes ... it shouldn't be like real time, but just make sure that all the physics are there, all the realistic animations are there ... we can use Unreal Engine, we can use Unity, we can use Blender ... It's fine if it's a desktop app".
+So: import robot file, write prompt, wait 5-10 minutes, get one realistic rendered run with real physics. Then test across many worlds and go to bounty as before. Desktop app is fine. Not real time.

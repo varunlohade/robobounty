@@ -25,7 +25,7 @@ class LLMError(Exception):
 def _claude(prompt, schema):
     cmd = ["claude", "-p", "--safe-mode", "--tools", "", "--strict-mcp-config", "--no-session-persistence",
            "--output-format", "json", "--max-budget-usd", MAX_BUDGET_USD,
-           "--model", os.environ.get("CRASHLAB_LLM_MODEL", "sonnet"),
+           "--model", os.environ.get("CRASHLAB_LLM_MODEL", "opus"),
            "--system-prompt", SYSTEM, "--json-schema", json.dumps(schema)]
     env = {k: os.environ[k] for k in KEPT_ENV if k in os.environ}
     with tempfile.TemporaryDirectory() as empty:
