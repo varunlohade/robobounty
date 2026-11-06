@@ -6,6 +6,7 @@
 # It checks each port first, refuses a port in use and kills nothing it did not start. Ctrl+C stops all four.
 # --ports WEB,RUN,SITE,BOARD picks other ports. --board-root DIR keeps the board's ledger elsewhere.
 set -u
+trap "" PIPE # A closed log pipe must not stop the shutdown below.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 MODE=live
