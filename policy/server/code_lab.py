@@ -14,6 +14,7 @@ from types import SimpleNamespace
 
 import pack_campaign
 import pack_job
+import recorded_batch
 
 FIX = pack_job.POLICY / "crashlab" / "fix.py"
 PYTHON = pack_job.POLICY / ".venv" / "bin" / "python"
@@ -45,7 +46,7 @@ def reply(session):
     f = FILES[session.pack]
     source, original = source_now(session), f["file"].read_text()
     return {"pack": session.pack, "name": f["file"].name, "file": f["shown"], "source": source, "original": original, "sha": sha(source), "original_sha": sha(original), "edited": source != original,
-            "scope": f["scope"], "fix_scope": f["fix_scope"], "note": SANDBOX_NOTE, "trace": session.pack == "window"}
+            "scope": f["scope"], "fix_scope": f["fix_scope"], "note": recorded_batch.NO_RERUN if T.batch() else SANDBOX_NOTE, "trace": session.pack == "window" and not T.batch(), "recorded": bool(T.batch())}
 
 
 def check(pack, source, folder):
@@ -164,7 +165,8 @@ def run_worlds(session, cid, indexes, scope):
     started = time.monotonic()
 
     def on_grid(sub):
-        grid = merged(base, sub["rows"], sub["running"], round(time.monotonic() - started, 1))
+        rows = [{**r, "film": {**r["film"], "run": run}} if r.get("film") else r for r in sub["rows"]]  # Tells the square which film to fetch.
+        grid = merged(base, rows, sub["running"], round(time.monotonic() - started, 1))
         write_grid(folder, grid)
         session.set_grid(grid)
 
@@ -275,6 +277,46 @@ def decide_fix(session, cid, fid, accept):
     return 200, {"ok": True}
 
 
+RERUN_PYTHON = pack_job.POLICY / "rerun_lab" / ".venv" / "bin" / "python"
+RERUN_EXPORT = pack_job.POLICY / "rerun_lab" / "export_rrd.py"
+RERUN_WALL_S = 300
+
+
+def rerun_source(session, folder, index, detail):
+    """The export_rrd.py arguments for one finished run. None hides the button: no tool, no record, or an inspection run that did not fall, since that export reports a fall."""
+    if not RERUN_PYTHON.exists() or detail.get("held_back") or not detail.get("replay"):
+        return None
+    run = run_folder(folder, index)
+    if session.pack == "window":
+        if T.batch():
+            return ["--window-run", str(run / "run")] if (T.batch() / "window" / f"w{index:03d}" / "export").exists() else None
+        return ["--window-run", str(run / "run")] if (run / "run" / "qpos.json.gz").exists() else None
+    if detail.get("verdict") == "fell" and (run / "record.npz").exists() and (run / "replay.json.gz").exists():
+        return ["--inspection-run", str(run / "record.npz"), str(run / "replay.json.gz")]
+    return None
+
+
+def rerun_file(session, cid, index, detail):
+    """A .rrd of one run, made once. It reads recorded files and runs no physics. Returns the path, or None."""
+    folder = session.dir / "campaigns" / cid
+    source = rerun_source(session, folder, index, detail)
+    if not source:
+        return None
+    target = run_folder(folder, index) / "rerun.rrd"
+    if not target.exists():
+        if T.batch():
+            recorded_batch.fill_run(folder, T.batch(), session.pack, index)
+        partial = target.with_suffix(".partial")
+        try:
+            done = subprocess.run([str(RERUN_PYTHON), str(RERUN_EXPORT), *source, "--to", str(partial)], capture_output=True, timeout=RERUN_WALL_S, cwd=RERUN_EXPORT.parent)
+        except subprocess.TimeoutExpired:
+            return None
+        if done.returncode != 0 or not partial.exists():
+            return None
+        partial.replace(target)
+    return target
+
+
 def overlay(session, folder, index, detail):
     """A world's detail with its latest code run on top, and what each run said."""
     grid = pack_campaign.read_json(folder / "grid.json")
@@ -286,6 +328,7 @@ def overlay(session, folder, index, detail):
         detail.update(numbers=result.get("numbers", {}), events=result.get("events", []), log=pack_campaign.tail(run / "job.log"), code=result.get("code"), wall_s=result.get("wall_s"), label=result.get("label"), note=result.get("note") or detail["note"], replay=bool(result) and (result["verdict"] != "controller_crashed"))
     detail["first"] = row.get("first")
     detail["controller_sha"] = result.get("controller_sha256") or frozen_sha
+    detail["rerun"] = rerun_source(session, folder, index, detail) is not None
     traced = pack_campaign.read_json(run / "line_trace.json")
     if traced and traced.get("traced") and detail.get("code"):
         detail["code"] = traced_code(detail["code"], traced)
@@ -300,7 +343,7 @@ def world_trace(session, cid, index):
     """The window robot's executed line for one finished run. A traced re-run in the sandbox, cached in the run's folder. Anything less stays labelled as active code."""
     folder = session.dir / "campaigns" / cid
     run = run_folder(folder, index)
-    if session.pack != "window" or not (run / "run" / "result.json").exists():
+    if session.pack != "window" or T.batch() or not (run / "run" / "result.json").exists():
         return {"traced": False}
     target = run / "line_trace.json"
     if not target.exists():

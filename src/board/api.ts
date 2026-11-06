@@ -1,5 +1,5 @@
 // The board server. Every bounty, fix and number on the page comes from here. Nothing is sample data.
-const BASE = 'http://127.0.0.1:5298';
+const BASE = `http://127.0.0.1:${import.meta.env.VITE_BOARD_PORT ?? 5298}`;
 
 export class ApiError extends Error {
   constructor(readonly code: string, reason: string) { super(reason); }

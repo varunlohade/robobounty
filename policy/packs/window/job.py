@@ -148,6 +148,10 @@ def run(world, seed, out, progress):
     return done
 
 
+def film(world, out):
+    return pack_job.write_film(out, FR.Camera(world).film(out / "run"))
+
+
 def judge_again(out):
     folder = out / "run"
     result = json.loads((folder / "result.json").read_text())

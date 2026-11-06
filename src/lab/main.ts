@@ -291,7 +291,9 @@ async function live(root: HTMLElement) {
       statusRight,
       openFile: d => void code.openFile(String(e.campaign), d),
       openWorld: d => code.openWorld(String(e.campaign), d),
-      play: async (how: ServerEvent) => {
+      bountyLink: verdict => code.bountyLink(String(e.campaign), verdict),
+      play: async (how: ServerEvent, say: (words: string) => void) => {
+        say('Downloading the recorded run');
         if (how.kind === 'poses') {
           const replay = await fetchWith(() => loadPoses(`${SERVER}${how.url}`), String(how.url));
           if (!replay) return null;

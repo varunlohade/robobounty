@@ -22,7 +22,7 @@ sys.path.insert(0, str(HERE))
 import agent_post
 import board_fix as X
 import board_fix_gate as FG
-import board_fix_run  # noqa: F401 turns frames off and the LLM off for the direct fix.py calls here
+import board_fix_run  # noqa: F401 turns the LLM off for the direct fix.py calls here
 import board_store as B
 import budget
 

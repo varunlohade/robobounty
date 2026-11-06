@@ -73,8 +73,16 @@ function shell() {
     h('div', 'tablewrap', table),
     ledgerBox);
   const site = mountShell({ page: 'bounties', title: 'Bounties', status: SIM_NOTE, statusRight: [`${WORLD_ID}, so the cap of 5 counts names, not people.`, LEDGER] });
-  site.actions.append(h('span', 'warnline', icon('warn', 'i12'), WORLD_ID), postBtn);
+  // The side bar and this line read the same login state, so they cannot disagree.
+  const idLine = h('span', 'warnline', icon('warn', 'i12'), WORLD_ID);
+  void site.who.then(who => {
+    if (who.kind !== 'verified') return;
+    idLine.replaceChildren(icon('warn', 'i12'), 'World ID signs you in. The board does not check it yet');
+    site.setStatus(SIM_NOTE, ['The board does not check World ID yet, so the cap of 5 counts names, not people.', LEDGER]);
+  });
+  site.actions.append(idLine, postBtn);
   site.main.append(h('div', 'bty', list, detail));
+  return site;
 }
 
 function drawList() {
@@ -436,12 +444,15 @@ function openPost(ref: string | null) {
   select.addEventListener('change', () => { titleIn.value = ''; const now = rows.find(r => r.ref === select.value); if (now) fill(now); });
 }
 
-shell();
+const site = shell();
 render();
 refresh();
 setInterval(refresh, POLL_MS);
 const postRef = new URLSearchParams(location.search).get('post');
 if (postRef) {
-  history.replaceState(null, '', location.pathname);  // A reload must not open the dialog again.
-  openPost(postRef);
+  void site.who.then(who => {
+    if (who.kind === 'none') return; // The shell is on its way to login, and login brings the visitor back with this address.
+    history.replaceState(null, '', location.pathname);  // A reload must not open the dialog again.
+    openPost(postRef);
+  });
 }

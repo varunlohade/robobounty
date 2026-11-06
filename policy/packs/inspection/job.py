@@ -149,6 +149,14 @@ def run(world, seed, out, progress):
     return done
 
 
+def film(world, out):
+    from . import frames as FR
+    from . import pack as P
+
+    rec, _ = P.load(out / "record.npz")
+    return pack_job.write_film(out, FR.Camera(world).film(rec))
+
+
 def judge_again(out):
     from . import pack as P
 

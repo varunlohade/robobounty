@@ -20,9 +20,15 @@ const side = h('div', 'side', h('div', 'mark', 'CrashLab'),
 const picture = h('div', 'picture frame', Object.assign(h('img'), { src: '/site/frames/login-snow.jpg', alt: 'The window robot on a tower in snow' }), h('div', 'frame-note', 'Simulated. Still from a recorded run.'));
 root.append(h('div', 'login', side, picture));
 
+// Where a visitor was going before login. Only a page of this site, so a link cannot send them elsewhere.
+function nextPage(): string {
+  const asked = new URLSearchParams(location.search).get('next') ?? '';
+  return /^[a-z]+\.html(\?[\w\-./=&%]*)?$/.test(asked) ? asked : 'home.html';
+}
+
 function guest() {
   enterAsGuest();
-  location.href = 'home.html';
+  location.href = nextPage();
 }
 
 function fail(words: string) {
@@ -100,7 +106,7 @@ async function start() {
     steps.replaceChildren(step('done', 'check', 'Request created'), step('done', 'check', 'World App answered'), step('now', 'loader', 'Checking the proof on the server'));
     const reply = await post('/site-api/auth/world/verify', done.result);
     if (!reply.ok || reply.body.verified !== true) throw new Error(reply.body.words ?? 'The server refused this proof. You are not signed in.');
-    location.href = 'home.html';
+    location.href = nextPage();
   } catch (err) {
     onState();
     const words = err instanceof Error ? err.message : '';
@@ -108,5 +114,5 @@ async function start() {
   }
 }
 
-whoIs().then(who => { if (who.kind !== 'none') location.replace('home.html'); });
+whoIs().then(who => { if (who.kind !== 'none') location.replace(nextPage()); });
 getJson<Status>('/site-api/auth/world').then(s => (s.on ? onState() : offState(s))).catch(() => offState(null));

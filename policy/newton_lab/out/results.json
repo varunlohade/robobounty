@@ -22,7 +22,7 @@
    "nearest_object_m": null,
    "shapes": 61,
    "peak_base_z_m": 0.406,
-   "rtf": 2.09,
+   "rtf": 1.89,
    "peak_nacon": 3,
    "peak_nefc": 14
   },
@@ -46,7 +46,7 @@
    "nearest_object_m": 0.289,
    "shapes": 62,
    "peak_base_z_m": 0.406,
-   "rtf": 1.46,
+   "rtf": 1.38,
    "peak_nacon": 4,
    "peak_nefc": 17
   },
@@ -70,7 +70,7 @@
    "nearest_object_m": null,
    "shapes": 61,
    "peak_base_z_m": 0.407,
-   "rtf": 2.04,
+   "rtf": 1.82,
    "peak_nacon": 4,
    "peak_nefc": 17
   },
@@ -94,7 +94,7 @@
    "nearest_object_m": 2.023,
    "shapes": 62,
    "peak_base_z_m": 0.406,
-   "rtf": 1.51,
+   "rtf": 1.4,
    "peak_nacon": 3,
    "peak_nefc": 14
   },
@@ -118,7 +118,7 @@
    "nearest_object_m": 0.0,
    "shapes": 62,
    "peak_base_z_m": 0.637,
-   "rtf": 1.5,
+   "rtf": 1.43,
    "peak_nacon": 5,
    "peak_nefc": 20
   },
@@ -142,7 +142,7 @@
    "nearest_object_m": 0.0,
    "shapes": 62,
    "peak_base_z_m": 0.828,
-   "rtf": 1.5,
+   "rtf": 1.47,
    "peak_nacon": 3,
    "peak_nefc": 13
   },
@@ -166,7 +166,7 @@
    "nearest_object_m": 0.0,
    "shapes": 65,
    "peak_base_z_m": 0.623,
-   "rtf": 1.5,
+   "rtf": 1.49,
    "peak_nacon": 5,
    "peak_nefc": 22
   }

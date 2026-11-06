@@ -1,6 +1,6 @@
 """Runs fix.py for the board, as its own process: board_fix_run.py check|preflight|run ... No file of fix.py changes.
 
-Two things differ from fix.py run: every sandbox run has live frames off, since a sandbox has no graphics connection and a picture never changes a result. And no LLM can start here: the board always passes --patch.
+One thing differs from fix.py run: no LLM can start here: the board always passes --patch.
 """
 import json
 import sys
@@ -10,21 +10,11 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "crashlab"))
 sys.path.insert(0, str(HERE.parent / "server"))
 import fix as F
-import pack_job
-
-_setup = F.sandbox_setup5
-
-
-def _no_frames(pack, run_dir):
-    reads, env = _setup(pack, run_dir)
-    return reads, {**env, pack_job.NO_FRAMES_ENV: "1"}
-
 
 def _no_llm(*_, **__):
     raise SystemExit("The board never calls an LLM.")
 
 
-F.sandbox_setup5 = _no_frames
 F.llm_edit = _no_llm
 
 
