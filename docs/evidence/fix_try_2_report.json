@@ -1,0 +1,773 @@
+{
+ "try": 2,
+ "base_controller_sha256": "85e7220d4a09c7dd8c89ed5335542ede770d697c239e2d8ab9f5fd8a20f60ad6",
+ "llm": {
+  "error": null,
+  "seconds": 15.7,
+  "cost_usd": 0.0692553,
+  "turns": 3,
+  "permission_denials": 0
+ },
+ "validation": [],
+ "ab": {
+  "seen": {
+   "n": 52,
+   "A": {
+    "pass": 3,
+    "holds": {
+     "wind_hold": 9,
+     "battery_stop": 4
+    },
+    "fail": 36,
+    "failures": {
+     "slip_distance": 20,
+     "detach": 11,
+     "false_done": 3,
+     "time_limit": 1,
+     "stalled": 1
+    }
+   },
+   "B": {
+    "pass": 5,
+    "holds": {
+     "wind_hold": 9,
+     "battery_stop": 4
+    },
+    "fail": 34,
+    "failures": {
+     "slip_distance": 20,
+     "detach": 10,
+     "false_done": 2,
+     "time_limit": 1,
+     "stalled": 1
+    }
+   },
+   "better": 2,
+   "worse": 0,
+   "same": 50,
+   "sign_test_p_one_sided": 0.25,
+   "limits_hit_B": 0,
+   "replay_mismatch_B": 0
+  },
+  "fresh": {
+   "n": 30,
+   "A": {
+    "pass": 5,
+    "holds": {
+     "wind_hold": 8
+    },
+    "fail": 17,
+    "failures": {
+     "detach": 1,
+     "false_done": 3,
+     "slip_distance": 12,
+     "time_limit": 1
+    }
+   },
+   "B": {
+    "pass": 8,
+    "holds": {
+     "wind_hold": 8
+    },
+    "fail": 14,
+    "failures": {
+     "detach": 1,
+     "slip_distance": 12,
+     "time_limit": 1
+    }
+   },
+   "better": 3,
+   "worse": 0,
+   "same": 27,
+   "sign_test_p_one_sided": 0.125,
+   "limits_hit_B": 0,
+   "replay_mismatch_B": 0
+  },
+  "controls": {
+   "n": 10,
+   "A": {
+    "pass": 10,
+    "holds": {},
+    "fail": 0,
+    "failures": {}
+   },
+   "B": {
+    "pass": 10,
+    "holds": {},
+    "fail": 0,
+    "failures": {}
+   },
+   "better": 0,
+   "worse": 0,
+   "same": 10,
+   "sign_test_p_one_sided": 1.0,
+   "limits_hit_B": 0,
+   "replay_mismatch_B": 0
+  }
+ },
+ "verdict": {
+  "helped": false,
+  "reasons": [
+   "fresh worlds: 3 better, 0 worse, p 0.125"
+  ]
+ },
+ "status": "did_not_help",
+ "diff_sha256": "ea534a88ad5ee3bfa4ff984bf3d2158e62f2adb709f878075d8e0cd31e2d5a37",
+ "pairs": {
+  "seen": [
+   {
+    "trial": "t0000",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "t0001",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "t0002",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "t0003",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "t0004",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "t0005",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "t0006",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "t0007",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0008",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0009",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0010",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0011",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "t0012",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "t0013",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0014",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "t0015",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "t0016",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0017",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0018",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0019",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0020",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0021",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0022",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0023",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0024",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0025",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0026",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0027",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0028",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "t0029",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "t0030",
+    "A": "fail",
+    "A_failure": "false_done",
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "t0031",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0032",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "t0033",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "t0034",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "t0035",
+    "A": "fail",
+    "A_failure": "false_done",
+    "B": "fail",
+    "B_failure": "false_done"
+   },
+   {
+    "trial": "t0036",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "t0037",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "t0038",
+    "A": "fail",
+    "A_failure": "false_done",
+    "B": "fail",
+    "B_failure": "false_done"
+   },
+   {
+    "trial": "t0039",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "t0040",
+    "A": "fail",
+    "A_failure": "time_limit",
+    "B": "fail",
+    "B_failure": "time_limit"
+   },
+   {
+    "trial": "t0041",
+    "A": "stalled",
+    "A_failure": "stalled",
+    "B": "stalled",
+    "B_failure": "stalled"
+   },
+   {
+    "trial": "t0042",
+    "A": "battery_stop",
+    "A_failure": null,
+    "B": "battery_stop",
+    "B_failure": null
+   },
+   {
+    "trial": "t0043",
+    "A": "battery_stop",
+    "A_failure": null,
+    "B": "battery_stop",
+    "B_failure": null
+   },
+   {
+    "trial": "t0044",
+    "A": "battery_stop",
+    "A_failure": null,
+    "B": "battery_stop",
+    "B_failure": null
+   },
+   {
+    "trial": "t0045",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0046",
+    "A": "battery_stop",
+    "A_failure": null,
+    "B": "battery_stop",
+    "B_failure": null
+   },
+   {
+    "trial": "t0047",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "t0048",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "t0049",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "t0050",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "t0051",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   }
+  ],
+  "fresh": [
+   {
+    "trial": "f0000",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "f0001",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "f0002",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "f0003",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "f0004",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "f0005",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "f0006",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "f0007",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "f0008",
+    "A": "fail",
+    "A_failure": "detach",
+    "B": "fail",
+    "B_failure": "detach"
+   },
+   {
+    "trial": "f0009",
+    "A": "fail",
+    "A_failure": "false_done",
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "f0010",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "f0011",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0012",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "f0013",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "f0014",
+    "A": "fail",
+    "A_failure": "false_done",
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "f0015",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0016",
+    "A": "wind_hold",
+    "A_failure": null,
+    "B": "wind_hold",
+    "B_failure": null
+   },
+   {
+    "trial": "f0017",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0018",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0019",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0020",
+    "A": "fail",
+    "A_failure": "time_limit",
+    "B": "fail",
+    "B_failure": "time_limit"
+   },
+   {
+    "trial": "f0021",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0022",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0023",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0024",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0025",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0026",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0027",
+    "A": "fail",
+    "A_failure": "slip_distance",
+    "B": "fail",
+    "B_failure": "slip_distance"
+   },
+   {
+    "trial": "f0028",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "f0029",
+    "A": "fail",
+    "A_failure": "false_done",
+    "B": "pass",
+    "B_failure": null
+   }
+  ],
+  "controls": [
+   {
+    "trial": "control000",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "control001",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "control002",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "control003",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "control004",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "control005",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "control006",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "control007",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "control008",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   },
+   {
+    "trial": "control009",
+    "A": "pass",
+    "A_failure": null,
+    "B": "pass",
+    "B_failure": null
+   }
+  ]
+ },
+ "regressions": {
+  "seen": [],
+  "fresh": [],
+  "controls": []
+ }
+}

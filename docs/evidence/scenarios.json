@@ -1,0 +1,919 @@
+{
+ "scenarios_schema": 1,
+ "world_schema": "highrise.world.v3",
+ "chat_sha256": "58819402a59d3f4ba9a468c9033f617f1507f4090c23179c49125a2876e2a6f2",
+ "seed": 1,
+ "cap": 60,
+ "verdict": "build",
+ "rejection": null,
+ "total_worlds": 52,
+ "worlds_with_elements": 0,
+ "worlds_plain": 52,
+ "elements_note": null,
+ "worlds_requested": 52,
+ "capped": false,
+ "count_reason": "Eight groups cover the user's named hazards. Wind, gusts and edges are the harshest and widest, so they get most worlds. Friction, heat and dust get fewer. Total is 52, below the cap of 60.",
+ "groups": [
+  {
+   "name": "High steady wind",
+   "reason": "Tall towers see strong sustained wind; tests tether and suction hold. Height-based wind profile itself not tested.",
+   "ranges": {
+    "steady_wind_ms": {
+     "min": 10,
+     "max": 25
+    },
+    "wind_dir_deg": {
+     "min": 60,
+     "max": 120
+    },
+    "drop_below_roof_m": {
+     "min": 40,
+     "max": 80
+    }
+   },
+   "worlds_requested": 7,
+   "worlds_built": 7,
+   "elements": null,
+   "has_elements": false
+  },
+  {
+   "name": "Strong gusts on high facade",
+   "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction.",
+   "ranges": {
+    "gust_speed_ms": {
+     "min": 20,
+     "max": 50
+    },
+    "gust_count": {
+     "min": 3,
+     "max": 6
+    },
+    "gust_duration_s": {
+     "min": 3,
+     "max": 20
+    },
+    "gust_period_s": {
+     "min": 10,
+     "max": 60
+    },
+    "gust_start_s": {
+     "min": 5,
+     "max": 100
+    },
+    "wind_dir_deg": {
+     "min": -180,
+     "max": 180
+    }
+   },
+   "worlds_requested": 8,
+   "worlds_built": 8,
+   "elements": null,
+   "has_elements": false
+  },
+  {
+   "name": "Dust on glass and seal",
+   "reason": "Sandstorm: dust load on glass and leak tested; airborne sand hitting sensors and pads not tested.",
+   "ranges": {
+    "dust_gm2": {
+     "min": 15,
+     "max": 60
+    },
+    "dirt_level": {
+     "min": 1,
+     "max": 2
+    },
+    "seal_leak_mm2": {
+     "min": 300,
+     "max": 1000
+    },
+    "steady_wind_ms": {
+     "min": 8,
+     "max": 18
+    }
+   },
+   "worlds_requested": 7,
+   "worlds_built": 7,
+   "elements": null,
+   "has_elements": false
+  },
+  {
+   "name": "Wet humid low friction glass",
+   "reason": "High moisture and humidity lower friction; rain itself not tested, only wet glass.",
+   "ranges": {
+    "wetness": {
+     "min": 0.6,
+     "max": 1
+    },
+    "humidity_pct": {
+     "min": 70,
+     "max": 100
+    },
+    "pad_force_n": {
+     "min": 8,
+     "max": 25
+    },
+    "temperature_c": {
+     "min": 20,
+     "max": 35
+    }
+   },
+   "worlds_requested": 6,
+   "worlds_built": 6,
+   "elements": null,
+   "has_elements": false
+  },
+  {
+   "name": "Dry high friction glass",
+   "reason": "Changes humidity_pct, pad_force_n, wetness only. Dust on the glass not tested.",
+   "ranges": {
+    "wetness": {
+     "min": 0,
+     "max": 0.05
+    },
+    "pad_force_n": {
+     "min": 50,
+     "max": 90
+    },
+    "humidity_pct": {
+     "min": 5,
+     "max": 25
+    }
+   },
+   "worlds_requested": 4,
+   "worlds_built": 4,
+   "elements": null,
+   "has_elements": false
+  },
+  {
+   "name": "Weird edges and joints",
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel.",
+   "ranges": {
+    "mullion_depth_m": {
+     "min": 0.015,
+     "max": 0.04
+    },
+    "joint_gap_m": {
+     "min": 0.01,
+     "max": 0.03
+    },
+    "mullion_spacing_m": {
+     "min": 0.8,
+     "max": 3
+    },
+    "mullion_offset_m": {
+     "min": 0,
+     "max": 3
+    },
+    "edge_margin_m": {
+     "min": 0.4,
+     "max": 0.6
+    },
+    "ledge_depth_m": {
+     "min": 0.08,
+     "max": 0.25
+    },
+    "ledge_below_top_m": {
+     "min": 0.5,
+     "max": 6
+    },
+    "ledge_x_m": {
+     "min": -3,
+     "max": 3
+    },
+    "ledge_width_m": {
+     "min": 2,
+     "max": 12
+    }
+   },
+   "worlds_requested": 9,
+   "worlds_built": 9,
+   "elements": null,
+   "has_elements": false
+  },
+  {
+   "name": "Extreme heat with weak battery",
+   "reason": "Very hot air stresses battery and suction; low start charge tests return margin.",
+   "ranges": {
+    "temperature_c": {
+     "min": 40,
+     "max": 50
+    },
+    "battery_start_frac": {
+     "min": 0.05,
+     "max": 0.4
+    },
+    "humidity_pct": {
+     "min": 5,
+     "max": 30
+    },
+    "suction_pa": {
+     "min": 1200,
+     "max": 2800
+    }
+   },
+   "worlds_requested": 6,
+   "worlds_built": 6,
+   "elements": null,
+   "has_elements": false
+  },
+  {
+   "name": "Weak suction with wind",
+   "reason": "Reduced suction and leaky seal combined with strong wind on a high, smooth facade.",
+   "ranges": {
+    "suction_pa": {
+     "min": 500,
+     "max": 1500
+    },
+    "seal_leak_mm2": {
+     "min": 500,
+     "max": 2000
+    },
+    "steady_wind_ms": {
+     "min": 8,
+     "max": 16
+    },
+    "wind_dir_deg": {
+     "min": 60,
+     "max": 120
+    }
+   },
+   "worlds_requested": 5,
+   "worlds_built": 5,
+   "elements": null,
+   "has_elements": false
+  }
+ ],
+ "worlds": [
+  {
+   "file": "worlds/world_000.json",
+   "world_hash": "2bbee43d9bb83b5caa73f9c025f992a8ba881c837891c31f7cfe316f5139d804",
+   "group": "High steady wind",
+   "has_elements": false,
+   "reason": "Tall towers see strong sustained wind; tests tether and suction hold. Height-based wind profile itself not tested. This world: drop_below_roof_m 49.4809 (nominal 21.8), steady_wind_ms 19.6659 (nominal 2.0), wind_dir_deg 94.4364 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_001.json",
+   "world_hash": "35359eb5f3915ff7c25b8c430a24593351915c309d47ed941a558cfb31478af9",
+   "group": "High steady wind",
+   "has_elements": false,
+   "reason": "Tall towers see strong sustained wind; tests tether and suction hold. Height-based wind profile itself not tested. This world: drop_below_roof_m 64.6416 (nominal 21.8), steady_wind_ms 14.5296 (nominal 2.0), wind_dir_deg 77.0565 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_002.json",
+   "world_hash": "fc02adf958df1deda33f1a0b560ced7d5422647f97ad0cfb47bb06fc9c4018c2",
+   "group": "High steady wind",
+   "has_elements": false,
+   "reason": "Tall towers see strong sustained wind; tests tether and suction hold. Height-based wind profile itself not tested. This world: drop_below_roof_m 75.4367 (nominal 21.8), steady_wind_ms 12.8133 (nominal 2.0), wind_dir_deg 80.4216 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_003.json",
+   "world_hash": "95f04c8ad2dde8bb574070340e64eb9c0b690d589eb1265155047d13eedbf81d",
+   "group": "High steady wind",
+   "has_elements": false,
+   "reason": "Tall towers see strong sustained wind; tests tether and suction hold. Height-based wind profile itself not tested. This world: drop_below_roof_m 69.0588 (nominal 21.8), steady_wind_ms 11.1038 (nominal 2.0), wind_dir_deg 64.1972 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_004.json",
+   "world_hash": "8d96030958859eb26d60c0cbca4122796808c0e0818612c59d1528a2058a8d0a",
+   "group": "High steady wind",
+   "has_elements": false,
+   "reason": "Tall towers see strong sustained wind; tests tether and suction hold. Height-based wind profile itself not tested. This world: drop_below_roof_m 56.41 (nominal 21.8), steady_wind_ms 23.7314 (nominal 2.0), wind_dir_deg 103.6818 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_005.json",
+   "world_hash": "707d98eff3f42ac00f14e8dc1221b9130f9bb73651b876fb8fde38977f039e4a",
+   "group": "High steady wind",
+   "has_elements": false,
+   "reason": "Tall towers see strong sustained wind; tests tether and suction hold. Height-based wind profile itself not tested. This world: drop_below_roof_m 61.7756 (nominal 21.8), steady_wind_ms 16.8899 (nominal 2.0), wind_dir_deg 88.6773 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_006.json",
+   "world_hash": "dc57c3332d06ffa4cd58229d07aa574080660e0a087ac927262ecc93fe3e9e29",
+   "group": "High steady wind",
+   "has_elements": false,
+   "reason": "Tall towers see strong sustained wind; tests tether and suction hold. Height-based wind profile itself not tested. This world: drop_below_roof_m 45.484 (nominal 21.8), steady_wind_ms 22.3355 (nominal 2.0), wind_dir_deg 116.1658 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_007.json",
+   "world_hash": "fb8a5c8249e470d60fbc5ee08057b278b1ae5e02bf9b7da250ab292daa7ee93a",
+   "group": "Strong gusts on high facade",
+   "has_elements": false,
+   "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction. This world: gust_count 4 (nominal 2), gust_duration_s 15.9555 (nominal 6.0), gust_period_s 43.0613 (nominal 60.0), gust_speed_ms 25.9688 (nominal 5.0), gust_start_s 93.075 (nominal 30.0), wind_dir_deg 177.9573 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_008.json",
+   "world_hash": "1c2f84d7f7d1e581731d3f822aa8710b0831996504e4a81f780f4c55e874231b",
+   "group": "Strong gusts on high facade",
+   "has_elements": false,
+   "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction. This world: gust_count 3 (nominal 2), gust_duration_s 5.3668 (nominal 6.0), gust_period_s 29.6334 (nominal 60.0), gust_speed_ms 41.0748 (nominal 5.0), gust_start_s 23.6828 (nominal 30.0), wind_dir_deg -106.1566 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_009.json",
+   "world_hash": "9a360051f39fa67b9a7779165469ec4e242466c8fe5f81607953dc7fa155b6a2",
+   "group": "Strong gusts on high facade",
+   "has_elements": false,
+   "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction. This world: gust_count 3 (nominal 2), gust_duration_s 10.7965 (nominal 6.0), gust_period_s 53.9399 (nominal 60.0), gust_speed_ms 29.9373 (nominal 5.0), gust_start_s 82.8486 (nominal 30.0), wind_dir_deg -155.3563 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_010.json",
+   "world_hash": "c6bea79b035aaad103a8fa3f008ca21e35c3f27052357691cae28583297c2ce7",
+   "group": "Strong gusts on high facade",
+   "has_elements": false,
+   "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction. This world: gust_count 5 (nominal 2), gust_duration_s 13.4444 (nominal 6.0), gust_period_s 23.2935 (nominal 60.0), gust_speed_ms 34.9185 (nominal 5.0), gust_start_s 32.2508 (nominal 30.0), wind_dir_deg -29.6249 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_011.json",
+   "world_hash": "203e0037fdfdccaa2d4f3889610c969ae19e1e100cae16cd35f2940041192686",
+   "group": "Strong gusts on high facade",
+   "has_elements": false,
+   "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction. This world: gust_count 6 (nominal 2), gust_duration_s 4.352 (nominal 6.0), gust_period_s 49.0305 (nominal 60.0), gust_speed_ms 46.2164 (nominal 5.0), gust_start_s 8.8894 (nominal 30.0), wind_dir_deg -53.6524 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_012.json",
+   "world_hash": "a51ee2eb6189cae50595f51b1f605263507a40b44fcead1f82124ad5bd2904ff",
+   "group": "Strong gusts on high facade",
+   "has_elements": false,
+   "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction. This world: gust_count 5 (nominal 2), gust_duration_s 8.8044 (nominal 6.0), gust_period_s 16.059 (nominal 60.0), gust_speed_ms 22.8412 (nominal 5.0), gust_start_s 66.7003 (nominal 30.0), wind_dir_deg 92.5575 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_013.json",
+   "world_hash": "58f5515acaccf41767c166e917de24c8af39ae03a8d352aaa91296f53b61b23e",
+   "group": "Strong gusts on high facade",
+   "has_elements": false,
+   "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction. This world: gust_count 4 (nominal 2), gust_duration_s 14.8763 (nominal 6.0), gust_period_s 41.244 (nominal 60.0), gust_speed_ms 48.2394 (nominal 5.0), gust_start_s 41.468 (nominal 30.0), wind_dir_deg 5.554 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_014.json",
+   "world_hash": "283aa211c194ad4b42e10db7dad2f1071a2beb17830aaca1d2cde4bdc918aa91",
+   "group": "Strong gusts on high facade",
+   "has_elements": false,
+   "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction. This world: gust_count 5 (nominal 2), gust_duration_s 6.332 (nominal 6.0), gust_period_s 41.2912 (nominal 60.0), gust_speed_ms 26.5593 (nominal 5.0), gust_start_s 53.5981 (nominal 30.0), wind_dir_deg 91.5377 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_015.json",
+   "world_hash": "f1db2e651b0c461ddd819cfa9ebe2f7262c99a3901fb218cd3993d3588edb090",
+   "group": "Dust on glass and seal",
+   "has_elements": false,
+   "reason": "Sandstorm: dust load on glass and leak tested; airborne sand hitting sensors and pads not tested. This world: dirt_level 1.8952 (nominal 0.6), dust_gm2 56.3252 (nominal 1.0), seal_leak_mm2 390.0474 (nominal 200.0), steady_wind_ms 10.3138 (nominal 2.0)."
+  },
+  {
+   "file": "worlds/world_016.json",
+   "world_hash": "69eb473066d4d38c99642a0dccb4bc22c03a89ac18f2ff6edfd5a610d86b8ca9",
+   "group": "Dust on glass and seal",
+   "has_elements": false,
+   "reason": "Sandstorm: dust load on glass and leak tested; airborne sand hitting sensors and pads not tested. This world: dirt_level 1.568 (nominal 0.6), dust_gm2 48.0739 (nominal 1.0), seal_leak_mm2 805.9324 (nominal 200.0), steady_wind_ms 8.429 (nominal 2.0)."
+  },
+  {
+   "file": "worlds/world_017.json",
+   "world_hash": "845c1537ee4863168db125a4a99db94a61a5158e0af8c207a40b243e0c288254",
+   "group": "Dust on glass and seal",
+   "has_elements": false,
+   "reason": "Sandstorm: dust load on glass and leak tested; airborne sand hitting sensors and pads not tested. This world: dirt_level 1.6108 (nominal 0.6), dust_gm2 21.7398 (nominal 1.0), seal_leak_mm2 708.8012 (nominal 200.0), steady_wind_ms 13.6965 (nominal 2.0)."
+  },
+  {
+   "file": "worlds/world_018.json",
+   "world_hash": "4b895d1214f03b9d1393102681c7a00fbddd4e902c9bb04fad1af6877bbc3123",
+   "group": "Dust on glass and seal",
+   "has_elements": false,
+   "reason": "Sandstorm: dust load on glass and leak tested; airborne sand hitting sensors and pads not tested. This world: dirt_level 1.1598 (nominal 0.6), dust_gm2 28.7083 (nominal 1.0), seal_leak_mm2 450.3003 (nominal 200.0), steady_wind_ms 14.642 (nominal 2.0)."
+  },
+  {
+   "file": "worlds/world_019.json",
+   "world_hash": "48f8c4f5aa0b66ba9229d16aad8a3342c8c9693363037a20c881d2b133c89f78",
+   "group": "Dust on glass and seal",
+   "has_elements": false,
+   "reason": "Sandstorm: dust load on glass and leak tested; airborne sand hitting sensors and pads not tested. This world: dirt_level 1.0128 (nominal 0.6), dust_gm2 43.2777 (nominal 1.0), seal_leak_mm2 615.9806 (nominal 200.0), steady_wind_ms 15.564 (nominal 2.0)."
+  },
+  {
+   "file": "worlds/world_020.json",
+   "world_hash": "2fbbc25d44b1d0e4f5a8548e74b3980cdba58f3666b6ba57e139e7105bf47c8a",
+   "group": "Dust on glass and seal",
+   "has_elements": false,
+   "reason": "Sandstorm: dust load on glass and leak tested; airborne sand hitting sensors and pads not tested. This world: dirt_level 1.3455 (nominal 0.6), dust_gm2 40.5592 (nominal 1.0), seal_leak_mm2 580.8071 (nominal 200.0), steady_wind_ms 17.822 (nominal 2.0)."
+  },
+  {
+   "file": "worlds/world_021.json",
+   "world_hash": "9782cb1326df5de0303930ba99744dd9b24ff58c03e39a3f1605199d9336e27a",
+   "group": "Dust on glass and seal",
+   "has_elements": false,
+   "reason": "Sandstorm: dust load on glass and leak tested; airborne sand hitting sensors and pads not tested. This world: dirt_level 1.8194 (nominal 0.6), dust_gm2 16.533 (nominal 1.0), seal_leak_mm2 938.2246 (nominal 200.0), steady_wind_ms 11.5551 (nominal 2.0)."
+  },
+  {
+   "file": "worlds/world_022.json",
+   "world_hash": "e8482c3f6974d00b24bd679b51f6cdc00bc62eb9d6abc9c57b97a9f37fe95a20",
+   "group": "Wet humid low friction glass",
+   "has_elements": false,
+   "reason": "High moisture and humidity lower friction; rain itself not tested, only wet glass. This world: humidity_pct 75.5641 (nominal 50.0), pad_force_n 16.8416 (nominal 25.0), temperature_c 24.9701 (nominal 15.0), wetness 0.9412 (nominal 0.2)."
+  },
+  {
+   "file": "worlds/world_023.json",
+   "world_hash": "5e58706964965cffe0f57a0564c534a1e7e8836f8572f7014efbd32c6463d9c8",
+   "group": "Wet humid low friction glass",
+   "has_elements": false,
+   "reason": "High moisture and humidity lower friction; rain itself not tested, only wet glass. This world: humidity_pct 92.5958 (nominal 50.0), pad_force_n 8.4356 (nominal 25.0), temperature_c 28.8013 (nominal 15.0), wetness 0.876 (nominal 0.2)."
+  },
+  {
+   "file": "worlds/world_024.json",
+   "world_hash": "a2f5309282dbd994dcfa75c41029dc4fb5eec3ae7f7606f845e7118c797ef2b2",
+   "group": "Wet humid low friction glass",
+   "has_elements": false,
+   "reason": "High moisture and humidity lower friction; rain itself not tested, only wet glass. This world: humidity_pct 84.3144 (nominal 50.0), pad_force_n 20.9511 (nominal 25.0), temperature_c 34.822 (nominal 15.0), wetness 0.8118 (nominal 0.2)."
+  },
+  {
+   "file": "worlds/world_025.json",
+   "world_hash": "2c928a5e8871a17e51512a73764ab60fce663f204e34b9080bd2c24539858033",
+   "group": "Wet humid low friction glass",
+   "has_elements": false,
+   "reason": "High moisture and humidity lower friction; rain itself not tested, only wet glass. This world: humidity_pct 70.6014 (nominal 50.0), pad_force_n 11.7479 (nominal 25.0), temperature_c 30.0775 (nominal 15.0), wetness 0.72 (nominal 0.2)."
+  },
+  {
+   "file": "worlds/world_026.json",
+   "world_hash": "975bc02144de81f45baf01a66a951de81c971cff2307d130a79e7225a83fbbcb",
+   "group": "Wet humid low friction glass",
+   "has_elements": false,
+   "reason": "High moisture and humidity lower friction; rain itself not tested, only wet glass. This world: humidity_pct 97.2569 (nominal 50.0), pad_force_n 14.144 (nominal 25.0), temperature_c 26.0126 (nominal 15.0), wetness 0.6288 (nominal 0.2)."
+  },
+  {
+   "file": "worlds/world_027.json",
+   "world_hash": "1dfb9213f644b278b90d6c578aa86f13aea73457343459c39c12548293faa24e",
+   "group": "Wet humid low friction glass",
+   "has_elements": false,
+   "reason": "High moisture and humidity lower friction; rain itself not tested, only wet glass. This world: humidity_pct 86.6936 (nominal 50.0), pad_force_n 23.17 (nominal 25.0), temperature_c 22.108 (nominal 15.0), wetness 0.7337 (nominal 0.2)."
+  },
+  {
+   "file": "worlds/world_028.json",
+   "world_hash": "778736fc731820d8b7a32dc3903691ecd5d9a5264e8ecba70c8beac3a1ccbb3d",
+   "group": "Dry high friction glass",
+   "has_elements": false,
+   "reason": "Changes humidity_pct, pad_force_n, wetness only. Dust on the glass not tested. This world: humidity_pct 23.3416 (nominal 50.0), pad_force_n 71.8439 (nominal 25.0), wetness 0.0135 (nominal 0.2)."
+  },
+  {
+   "file": "worlds/world_029.json",
+   "world_hash": "4d58517bd80c98101ba7b84ddd07b1748668c1a4c6cb2ccecc436044c4daf724",
+   "group": "Dry high friction glass",
+   "has_elements": false,
+   "reason": "Changes humidity_pct, pad_force_n, wetness only. Dust on the glass not tested. This world: humidity_pct 16.3715 (nominal 50.0), pad_force_n 62.1676 (nominal 25.0), wetness 0.0364 (nominal 0.2)."
+  },
+  {
+   "file": "worlds/world_030.json",
+   "world_hash": "2a982982697de249c149c748af2dfdd48161d9220af0c584edd788979985d039",
+   "group": "Dry high friction glass",
+   "has_elements": false,
+   "reason": "Changes humidity_pct, pad_force_n, wetness only. Dust on the glass not tested. This world: humidity_pct 6.7789 (nominal 50.0), pad_force_n 56.2609 (nominal 25.0), wetness 0.0015 (nominal 0.2)."
+  },
+  {
+   "file": "worlds/world_031.json",
+   "world_hash": "2e76032de32fed3cc8d84d3b037b4fadd5e007166930506e6691069dc91b28b5",
+   "group": "Dry high friction glass",
+   "has_elements": false,
+   "reason": "Changes humidity_pct, pad_force_n, wetness only. Dust on the glass not tested. This world: humidity_pct 14.2087 (nominal 50.0), pad_force_n 83.8565 (nominal 25.0), wetness 0.0476 (nominal 0.2)."
+  },
+  {
+   "file": "worlds/world_032.json",
+   "world_hash": "cb221b62d3b37affa8d9cbfecbda3d86de1e71cd391234999437164538ffc724",
+   "group": "Weird edges and joints",
+   "has_elements": false,
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel. This world: edge_margin_m 0.4339 (nominal 1.0), joint_gap_m 0.0208 (nominal 0.004), ledge_below_top_m 3.1778 (nominal 8.0), ledge_depth_m 0.1497 (nominal 0.05), ledge_width_m 3.5551 (nominal 2.0), ledge_x_m -2.6478 (nominal 0.0), mullion_depth_m 0.0303 (nominal 0.005), mullion_offset_m 0.0425 (nominal 0.75), mullion_spacing_m 2.779 (nominal 1.5)."
+  },
+  {
+   "file": "worlds/world_033.json",
+   "world_hash": "779400356d6d0e52ff8d3e40a5e233a444f569fb8349597060e29d4dcf5a4270",
+   "group": "Weird edges and joints",
+   "has_elements": false,
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel. This world: edge_margin_m 0.4679 (nominal 1.0), joint_gap_m 0.0117 (nominal 0.004), ledge_below_top_m 2.8749 (nominal 8.0), ledge_depth_m 0.1694 (nominal 0.05), ledge_width_m 7.6567 (nominal 2.0), ledge_x_m -0.9187 (nominal 0.0), mullion_depth_m 0.0284 (nominal 0.005), mullion_offset_m 0.45 (nominal 0.75), mullion_spacing_m 1.6067 (nominal 1.5)."
+  },
+  {
+   "file": "worlds/world_034.json",
+   "world_hash": "37bd73a947f4569fc174802f557fe9066a9538024fecbe9859b42ec98b7224b3",
+   "group": "Weird edges and joints",
+   "has_elements": false,
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel. This world: edge_margin_m 0.5833 (nominal 1.0), joint_gap_m 0.0278 (nominal 0.004), ledge_below_top_m 4.391 (nominal 8.0), ledge_depth_m 0.0985 (nominal 0.05), ledge_width_m 7.4049 (nominal 2.0), ledge_x_m 1.7044 (nominal 0.0), mullion_depth_m 0.0215 (nominal 0.005), mullion_offset_m 0.9203 (nominal 0.75), mullion_spacing_m 2.3826 (nominal 1.5)."
+  },
+  {
+   "file": "worlds/world_035.json",
+   "world_hash": "4328cb5aeb48e0c3c0dd0de7afb49390b701198bfcab5f180e7db5c0b1599e38",
+   "group": "Weird edges and joints",
+   "has_elements": false,
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel. This world: edge_margin_m 0.4468 (nominal 1.0), joint_gap_m 0.015 (nominal 0.004), ledge_below_top_m 1.6653 (nominal 8.0), ledge_depth_m 0.1304 (nominal 0.05), ledge_width_m 4.7096 (nominal 2.0), ledge_x_m -2.0164 (nominal 0.0), mullion_depth_m 0.0397 (nominal 0.005), mullion_offset_m 1.6522 (nominal 0.75), mullion_spacing_m 1.8669 (nominal 1.5)."
+  },
+  {
+   "file": "worlds/world_036.json",
+   "world_hash": "9c967df8c2cdfe436d3f9f41f2fab5a77657c1639a07d1ac84ea200aa67e71c8",
+   "group": "Weird edges and joints",
+   "has_elements": false,
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel. This world: edge_margin_m 0.5048 (nominal 1.0), joint_gap_m 0.0296 (nominal 0.004), ledge_below_top_m 5.6634 (nominal 8.0), ledge_depth_m 0.2185 (nominal 0.05), ledge_width_m 2.8074 (nominal 2.0), ledge_x_m 2.7952 (nominal 0.0), mullion_depth_m 0.0347 (nominal 0.005), mullion_offset_m 2.2401 (nominal 0.75), mullion_spacing_m 1.0181 (nominal 1.5)."
+  },
+  {
+   "file": "worlds/world_037.json",
+   "world_hash": "22fd3d1a3e0e74aea52657ba7db40fd9444aebe15440af3866bd927d14a14e7f",
+   "group": "Weird edges and joints",
+   "has_elements": false,
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel. This world: edge_margin_m 0.5604 (nominal 1.0), joint_gap_m 0.0171 (nominal 0.004), ledge_below_top_m 3.6759 (nominal 8.0), ledge_depth_m 0.1083 (nominal 0.05), ledge_width_m 10.2753 (nominal 2.0), ledge_x_m 1.4968 (nominal 0.0), mullion_depth_m 0.0184 (nominal 0.005), mullion_offset_m 1.0595 (nominal 0.75), mullion_spacing_m 1.4551 (nominal 1.5)."
+  },
+  {
+   "file": "worlds/world_038.json",
+   "world_hash": "ebbd51b48f2cb0befeb37aff7a10e84ec2a3ad05dfd2c6af017cf43933f8b892",
+   "group": "Weird edges and joints",
+   "has_elements": false,
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel. This world: edge_margin_m 0.5372 (nominal 1.0), joint_gap_m 0.0235 (nominal 0.004), ledge_below_top_m 4.887 (nominal 8.0), ledge_depth_m 0.2336 (nominal 0.05), ledge_width_m 6.3341 (nominal 2.0), ledge_x_m -0.2374 (nominal 0.0), mullion_depth_m 0.0339 (nominal 0.005), mullion_offset_m 1.9139 (nominal 0.75), mullion_spacing_m 1.078 (nominal 1.5)."
+  },
+  {
+   "file": "worlds/world_039.json",
+   "world_hash": "39a4c4d0e5808be7d2252743c520c44aa8eee67b51c0ae0a12897f435808519b",
+   "group": "Weird edges and joints",
+   "has_elements": false,
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel. This world: edge_margin_m 0.4073 (nominal 1.0), joint_gap_m 0.0231 (nominal 0.004), ledge_below_top_m 2.2828 (nominal 8.0), ledge_depth_m 0.1962 (nominal 0.05), ledge_width_m 9.0114 (nominal 2.0), ledge_x_m 0.7412 (nominal 0.0), mullion_depth_m 0.0259 (nominal 0.005), mullion_offset_m 2.4879 (nominal 0.75), mullion_spacing_m 2.0409 (nominal 1.5)."
+  },
+  {
+   "file": "worlds/world_040.json",
+   "world_hash": "d9b58332b7caa7043cdb61a54bf4b40cd1bb1d9a7e55e3539696d6341ed67fe3",
+   "group": "Weird edges and joints",
+   "has_elements": false,
+   "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel. This world: edge_margin_m 0.5212 (nominal 1.0), joint_gap_m 0.0132 (nominal 0.004), ledge_below_top_m 0.6037 (nominal 8.0), ledge_depth_m 0.1883 (nominal 0.05), ledge_width_m 11.146 (nominal 2.0), ledge_x_m -1.2662 (nominal 0.0), mullion_depth_m 0.0157 (nominal 0.005), mullion_offset_m 2.7144 (nominal 0.75), mullion_spacing_m 2.7234 (nominal 1.5)."
+  },
+  {
+   "file": "worlds/world_041.json",
+   "world_hash": "a2d0ba59e9af8f2f3ce912b7dd71c4bc262668848f428309b6c25660c4fc5a43",
+   "group": "Extreme heat with weak battery",
+   "has_elements": false,
+   "reason": "Very hot air stresses battery and suction; low start charge tests return margin. This world: battery_start_frac 0.3704 (nominal 1.0), humidity_pct 18.9476 (nominal 50.0), suction_pa 2486.961 (nominal 2800.0), temperature_c 40.6655 (nominal 15.0)."
+  },
+  {
+   "file": "worlds/world_042.json",
+   "world_hash": "4f02a3b94d970de6d3225d8cf76513b1c3d5bbf5671f78059af969b529469996",
+   "group": "Extreme heat with weak battery",
+   "has_elements": false,
+   "reason": "Very hot air stresses battery and suction; low start charge tests return margin. This world: battery_start_frac 0.171 (nominal 1.0), humidity_pct 23.2638 (nominal 50.0), suction_pa 1463.2003 (nominal 2800.0), temperature_c 44.2183 (nominal 15.0)."
+  },
+  {
+   "file": "worlds/world_043.json",
+   "world_hash": "e640bafa59310adc952514f4d3c295a66bc04ba6fb29526516fbe4c464a99bf0",
+   "group": "Extreme heat with weak battery",
+   "has_elements": false,
+   "reason": "Very hot air stresses battery and suction; low start charge tests return margin. This world: battery_start_frac 0.2519 (nominal 1.0), humidity_pct 17.0701 (nominal 50.0), suction_pa 2688.7595 (nominal 2800.0), temperature_c 48.1686 (nominal 15.0)."
+  },
+  {
+   "file": "worlds/world_044.json",
+   "world_hash": "54990ee7dc5ecb47a0235f432b07ad4e69b6b9da7676b1d120af9f9cab1a8b49",
+   "group": "Extreme heat with weak battery",
+   "has_elements": false,
+   "reason": "Very hot air stresses battery and suction; low start charge tests return margin. This world: battery_start_frac 0.1482 (nominal 1.0), humidity_pct 10.7188 (nominal 50.0), suction_pa 1818.6545 (nominal 2800.0), temperature_c 45.2546 (nominal 15.0)."
+  },
+  {
+   "file": "worlds/world_045.json",
+   "world_hash": "15f515860e90970b67f4a0c55048eb1919167c49858a01970c906a404ca424c5",
+   "group": "Extreme heat with weak battery",
+   "has_elements": false,
+   "reason": "Very hot air stresses battery and suction; low start charge tests return margin. This world: battery_start_frac 0.33 (nominal 1.0), humidity_pct 8.7308 (nominal 50.0), suction_pa 1561.8416 (nominal 2800.0), temperature_c 43.1961 (nominal 15.0)."
+  },
+  {
+   "file": "worlds/world_046.json",
+   "world_hash": "37c89322ac26557a3fe90b44d7846aef06152b675b3ffb85197c68bfb0065fa7",
+   "group": "Extreme heat with weak battery",
+   "has_elements": false,
+   "reason": "Very hot air stresses battery and suction; low start charge tests return margin. This world: battery_start_frac 0.064 (nominal 1.0), humidity_pct 26.9694 (nominal 50.0), suction_pa 2118.0748 (nominal 2800.0), temperature_c 48.9794 (nominal 15.0)."
+  },
+  {
+   "file": "worlds/world_047.json",
+   "world_hash": "9141f601614fb516c5857afefa812ca22540e517f4aa6c18b291b4c76b29b8e2",
+   "group": "Weak suction with wind",
+   "has_elements": false,
+   "reason": "Reduced suction and leaky seal combined with strong wind on a high, smooth facade. This world: seal_leak_mm2 1012.0772 (nominal 200.0), steady_wind_ms 9.2504 (nominal 2.0), suction_pa 707.792 (nominal 2800.0), wind_dir_deg 100.7457 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_048.json",
+   "world_hash": "d1114a47818ad1b24a7995570266d2e39e0037596d15ac15236e8b7ee3bb63cb",
+   "group": "Weak suction with wind",
+   "has_elements": false,
+   "reason": "Reduced suction and leaky seal combined with strong wind on a high, smooth facade. This world: seal_leak_mm2 1955.5924 (nominal 200.0), steady_wind_ms 13.2997 (nominal 2.0), suction_pa 1116.6851 (nominal 2800.0), wind_dir_deg 75.4313 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_049.json",
+   "world_hash": "af1aac869d33a1dd3e4db0c78024380776655f53be9ca77920879eebffb71174",
+   "group": "Weak suction with wind",
+   "has_elements": false,
+   "reason": "Reduced suction and leaky seal combined with strong wind on a high, smooth facade. This world: seal_leak_mm2 1424.9863 (nominal 200.0), steady_wind_ms 15.8089 (nominal 2.0), suction_pa 509.4947 (nominal 2800.0), wind_dir_deg 67.8965 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_050.json",
+   "world_hash": "954a4d961f3653ec60232bb65945b87425ede10c1c2e5a36c27ca4dc7a5c2ef1",
+   "group": "Weak suction with wind",
+   "has_elements": false,
+   "reason": "Reduced suction and leaky seal combined with strong wind on a high, smooth facade. This world: seal_leak_mm2 1267.0058 (nominal 200.0), steady_wind_ms 12.4721 (nominal 2.0), suction_pa 1040.5774 (nominal 2800.0), wind_dir_deg 108.1319 (nominal 20.0)."
+  },
+  {
+   "file": "worlds/world_051.json",
+   "world_hash": "b8d96734dee4fbc64666357204f197a5f593af55dd0ae512a72cf0bbe49ebe09",
+   "group": "Weak suction with wind",
+   "has_elements": false,
+   "reason": "Reduced suction and leaky seal combined with strong wind on a high, smooth facade. This world: seal_leak_mm2 678.4747 (nominal 200.0), steady_wind_ms 10.7238 (nominal 2.0), suction_pa 1470.409 (nominal 2800.0), wind_dir_deg 84.8685 (nominal 20.0)."
+  }
+ ],
+ "not_tested": [
+  {
+   "factor": "Airborne sand",
+   "reason": "No physics for sand hitting sensors, pads or impeller; only dust on glass is tested.",
+   "source": "agent"
+  },
+  {
+   "factor": "Building height and wind by height",
+   "reason": "Wind does not scale with height; tall-tower wind is mimicked only with high wind and tether drop.",
+   "source": "agent"
+  },
+  {
+   "factor": "Sun and glare",
+   "reason": "Heat is tested as air and battery temperature only; solar heating of glass and sensor glare are not modelled.",
+   "source": "agent"
+  },
+  {
+   "factor": "Real hardware",
+   "reason": "Only the simulated robot is tested, not real motors, sensors or tether wear.",
+   "source": "agent"
+  },
+  {
+   "factor": "Rain, ice and snow, salt corrosion",
+   "reason": "No physics for these; wet glass only approximates moisture.",
+   "source": "agent"
+  }
+ ],
+ "dropped": {
+  "inert_gust": 1,
+  "groups_that_move_nothing": 0,
+  "not_tested_items": 0
+ },
+ "llm_reply": {
+  "verdict": "build",
+  "reject_reason": "none",
+  "count_reason": "Eight groups cover the user's named hazards. Wind, gusts and edges are the harshest and widest, so they get most worlds. Friction, heat and dust get fewer. Total is 52, below the cap of 60.",
+  "groups": [
+   {
+    "name": "High steady wind",
+    "reason": "Tall towers see strong sustained wind; tests tether and suction hold. Height-based wind profile itself not tested.",
+    "worlds": 7,
+    "ranges": {
+     "steady_wind_ms": {
+      "min": 10,
+      "max": 25
+     },
+     "wind_dir_deg": {
+      "min": 60,
+      "max": 120
+     },
+     "drop_below_roof_m": {
+      "min": 40,
+      "max": 80
+     }
+    }
+   },
+   {
+    "name": "Strong gusts on high facade",
+    "reason": "Gusts at height can peel or swing the robot; varies speed, timing and direction.",
+    "worlds": 8,
+    "ranges": {
+     "gust_speed_ms": {
+      "min": 20,
+      "max": 50
+     },
+     "gust_count": {
+      "min": 3,
+      "max": 6
+     },
+     "gust_duration_s": {
+      "min": 3,
+      "max": 20
+     },
+     "gust_period_s": {
+      "min": 10,
+      "max": 60
+     },
+     "gust_start_s": {
+      "min": 5,
+      "max": 100
+     },
+     "wind_dir_deg": {
+      "min": -180,
+      "max": 180
+     }
+    }
+   },
+   {
+    "name": "Dust on glass and seal",
+    "reason": "Sandstorm: dust load on glass and leak tested; airborne sand hitting sensors and pads not tested.",
+    "worlds": 7,
+    "ranges": {
+     "dust_gm2": {
+      "min": 15,
+      "max": 60
+     },
+     "dirt_level": {
+      "min": 1,
+      "max": 2
+     },
+     "seal_leak_mm2": {
+      "min": 300,
+      "max": 1000
+     },
+     "steady_wind_ms": {
+      "min": 8,
+      "max": 18
+     }
+    }
+   },
+   {
+    "name": "Wet humid low friction glass",
+    "reason": "High moisture and humidity lower friction; rain itself not tested, only wet glass.",
+    "worlds": 6,
+    "ranges": {
+     "wetness": {
+      "min": 0.6,
+      "max": 1
+     },
+     "humidity_pct": {
+      "min": 70,
+      "max": 100
+     },
+     "pad_force_n": {
+      "min": 8,
+      "max": 25
+     },
+     "temperature_c": {
+      "min": 20,
+      "max": 35
+     }
+    }
+   },
+   {
+    "name": "Dry high friction glass",
+    "reason": "Changes humidity_pct, pad_force_n, wetness only. Dust on the glass not tested.",
+    "worlds": 4,
+    "ranges": {
+     "wetness": {
+      "min": 0,
+      "max": 0.05
+     },
+     "pad_force_n": {
+      "min": 50,
+      "max": 90
+     },
+     "humidity_pct": {
+      "min": 5,
+      "max": 25
+     }
+    }
+   },
+   {
+    "name": "Weird edges and joints",
+    "reason": "Odd edges, proud mullions, wide joint gaps and ledges can break seal or block travel.",
+    "worlds": 9,
+    "ranges": {
+     "mullion_depth_m": {
+      "min": 0.015,
+      "max": 0.04
+     },
+     "joint_gap_m": {
+      "min": 0.01,
+      "max": 0.03
+     },
+     "mullion_spacing_m": {
+      "min": 0.8,
+      "max": 3
+     },
+     "mullion_offset_m": {
+      "min": 0,
+      "max": 3
+     },
+     "edge_margin_m": {
+      "min": 0.4,
+      "max": 0.6
+     },
+     "ledge_depth_m": {
+      "min": 0.08,
+      "max": 0.25
+     },
+     "ledge_below_top_m": {
+      "min": 0.5,
+      "max": 6
+     },
+     "ledge_x_m": {
+      "min": -3,
+      "max": 3
+     },
+     "ledge_width_m": {
+      "min": 2,
+      "max": 12
+     }
+    }
+   },
+   {
+    "name": "Extreme heat with weak battery",
+    "reason": "Very hot air stresses battery and suction; low start charge tests return margin.",
+    "worlds": 6,
+    "ranges": {
+     "temperature_c": {
+      "min": 40,
+      "max": 50
+     },
+     "battery_start_frac": {
+      "min": 0.05,
+      "max": 0.4
+     },
+     "humidity_pct": {
+      "min": 5,
+      "max": 30
+     },
+     "suction_pa": {
+      "min": 1200,
+      "max": 2800
+     }
+    }
+   },
+   {
+    "name": "Weak suction with wind",
+    "reason": "Reduced suction and leaky seal combined with strong wind on a high, smooth facade.",
+    "worlds": 5,
+    "ranges": {
+     "suction_pa": {
+      "min": 500,
+      "max": 1500
+     },
+     "seal_leak_mm2": {
+      "min": 500,
+      "max": 2000
+     },
+     "steady_wind_ms": {
+      "min": 8,
+      "max": 16
+     },
+     "wind_dir_deg": {
+      "min": 60,
+      "max": 120
+     }
+    }
+   }
+  ],
+  "not_tested": [
+   {
+    "factor": "Airborne sand",
+    "reason": "No physics for sand hitting sensors, pads or impeller; only dust on glass is tested."
+   },
+   {
+    "factor": "Building height and wind by height",
+    "reason": "Wind does not scale with height; tall-tower wind is mimicked only with high wind and tether drop."
+   },
+   {
+    "factor": "Sun and glare",
+    "reason": "Heat is tested as air and battery temperature only; solar heating of glass and sensor glare are not modelled."
+   },
+   {
+    "factor": "Real hardware",
+    "reason": "Only the simulated robot is tested, not real motors, sensors or tether wear."
+   },
+   {
+    "factor": "Rain, ice and snow, salt corrosion",
+    "reason": "No physics for these; wet glass only approximates moisture."
+   }
+  ]
+ },
+ "llm": {
+  "backend": "reply_file",
+  "seconds": 0.0
+ },
+ "physics_fields": [
+  "area_height_m",
+  "area_width_m",
+  "battery_start_frac",
+  "dirt_level",
+  "drop_below_roof_m",
+  "dust_gm2",
+  "edge_margin_m",
+  "gust_count",
+  "gust_duration_s",
+  "gust_period_s",
+  "gust_speed_ms",
+  "gust_start_s",
+  "humidity_pct",
+  "joint_gap_m",
+  "ledge_below_top_m",
+  "ledge_depth_m",
+  "ledge_width_m",
+  "ledge_x_m",
+  "mullion_depth_m",
+  "mullion_offset_m",
+  "mullion_spacing_m",
+  "pad_force_n",
+  "seal_leak_mm2",
+  "steady_wind_ms",
+  "suction_pa",
+  "temperature_c",
+  "wetness",
+  "wind_dir_deg"
+ ],
+ "fields_without_physics": [
+  "sun_level"
+ ],
+ "limits": [
+  "No robot ran. Each world only passed the validator, so whether the robot survives it is unknown.",
+  "Physics is hand-built and not validated against real hardware. Any result from these worlds is simulated.",
+  "The controller knows nothing about scene elements, so it drives into them and most of these worlds are expected to fail. That is known in advance and is not a finding. Worlds with elements are labelled and stay out of headline numbers."
+ ]
+}

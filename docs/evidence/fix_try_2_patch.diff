@@ -1,0 +1,13 @@
+diff --git a/policy/highrise/controller.py b/policy/highrise/controller.py
+index 557471e..384888b 100644
+--- a/policy/highrise/controller.py
++++ b/policy/highrise/controller.py
+@@ -22,7 +22,7 @@ PIVOT_SAG_M_PER_RAD = 0.125  # a pivot skids the tracks, so the body slides down
+ LANE_OVERRUN_M = 0.10  # drive this far past the area edge, for position error
+ 
+ # Suction.
+-SUCTION_CLEAN = 0.85
++SUCTION_CLEAN = 0.9
+ SUCTION_MAX = 1.0
+ 
+ # Pressure estimate from impeller current. Design numbers of the fan.

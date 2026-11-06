@@ -1,0 +1,2445 @@
+{
+ "schema": "crashlab.diagnosis.v1",
+ "campaign": "campaign_dubai_final",
+ "limits": [
+  "In this simulation only. The physics is hand-built and not calibrated to a real robot.",
+  "A factor table shows association. Only a retest row changes one value and holds the rest.",
+  "Tether peaks after a detach are not quoted, because that part of the model is crude."
+ ],
+ "code_matches_campaign": true,
+ "code_changed_since_campaign": [],
+ "counts": {
+  "varied": 47,
+  "varied_passed": 3,
+  "controls": 10,
+  "controls_passed": 10,
+  "diverged": 0,
+  "first_failure": {
+   "slip_distance": 17,
+   "detach": 9,
+   "false_done": 3,
+   "time_limit": 1,
+   "stalled": 1
+  },
+  "holds": {
+   "wind_hold": 9,
+   "battery_stop": 4
+  }
+ },
+ "groups": {
+  "Dry high friction glass": {
+   "passed": 1,
+   "worlds": 4,
+   "first_failure": {
+    "slip_distance": 2,
+    "false_done": 1
+   }
+  },
+  "Dust on glass and seal": {
+   "passed": 0,
+   "worlds": 7,
+   "first_failure": {
+    "wind_hold": 1,
+    "slip_distance": 6
+   }
+  },
+  "Extreme heat with weak battery": {
+   "passed": 0,
+   "worlds": 6,
+   "first_failure": {
+    "stalled": 1,
+    "battery_stop": 4,
+    "slip_distance": 1
+   }
+  },
+  "High steady wind": {
+   "passed": 0,
+   "worlds": 7,
+   "first_failure": {
+    "wind_hold": 7
+   }
+  },
+  "Strong gusts on high facade": {
+   "passed": 2,
+   "worlds": 5,
+   "first_failure": {
+    "slip_distance": 2,
+    "detach": 1
+   }
+  },
+  "Weak suction with wind": {
+   "passed": 0,
+   "worlds": 3,
+   "first_failure": {
+    "detach": 2,
+    "wind_hold": 1
+   }
+  },
+  "Weird edges and joints": {
+   "passed": 0,
+   "worlds": 9,
+   "first_failure": {
+    "detach": 6,
+    "false_done": 2,
+    "time_limit": 1
+   }
+  },
+  "Wet humid low friction glass": {
+   "passed": 0,
+   "worlds": 6,
+   "first_failure": {
+    "slip_distance": 6
+   }
+  }
+ },
+ "factor_table": {
+  "slip_distance": {
+   "cases": 17,
+   "of": 47,
+   "controls": [
+    0,
+    10
+   ],
+   "tests_adjusted_for": 196,
+   "factors": [
+    {
+     "factor": "pad_force_n",
+     "cut_low": 25.0,
+     "cut_high": 25.0,
+     "low": [
+      6,
+      6
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      11,
+      41
+     ],
+     "fisher_p_low_vs_high": 0.00115,
+     "adjusted_p": 0.22591,
+     "direction": "lower"
+    },
+    {
+     "factor": "edge_margin_m",
+     "cut_low": 1.0,
+     "cut_high": 1.0,
+     "low": [
+      0,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      17,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.01726,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    },
+    {
+     "factor": "ledge_below_top_m",
+     "cut_low": 8.0,
+     "cut_high": 8.0,
+     "low": [
+      0,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      17,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.01726,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    },
+    {
+     "factor": "suction_pa",
+     "cut_low": 2800.0,
+     "cut_high": 2800.0,
+     "low": [
+      1,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      16,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.12715,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    },
+    {
+     "factor": "ledge_x_m",
+     "cut_low": 0.0,
+     "cut_high": 0.0,
+     "low": [
+      0,
+      5
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      17,
+      42
+     ],
+     "fisher_p_low_vs_high": 0.14348,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    }
+   ]
+  },
+  "wind_hold": {
+   "cases": 9,
+   "of": 47,
+   "controls": [
+    0,
+    10
+   ],
+   "tests_adjusted_for": 196,
+   "factors": [
+    {
+     "factor": "humidity_pct",
+     "cut_low": 50.0,
+     "cut_high": 50.0,
+     "low": [
+      0,
+      10
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      9,
+      37
+     ],
+     "fisher_p_low_vs_high": 0.17194,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    },
+    {
+     "factor": "edge_margin_m",
+     "cut_low": 1.0,
+     "cut_high": 1.0,
+     "low": [
+      0,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      9,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.17341,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    },
+    {
+     "factor": "ledge_below_top_m",
+     "cut_low": 8.0,
+     "cut_high": 8.0,
+     "low": [
+      0,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      9,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.17341,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    },
+    {
+     "factor": "gust_period_s",
+     "cut_low": 60.0,
+     "cut_high": 60.0,
+     "low": [
+      0,
+      5
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      9,
+      42
+     ],
+     "fisher_p_low_vs_high": 0.56691,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    },
+    {
+     "factor": "ledge_x_m",
+     "cut_low": 0.0,
+     "cut_high": 0.0,
+     "low": [
+      0,
+      5
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      9,
+      42
+     ],
+     "fisher_p_low_vs_high": 0.56691,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    }
+   ]
+  },
+  "detach": {
+   "cases": 9,
+   "of": 47,
+   "controls": [
+    0,
+    10
+   ],
+   "tests_adjusted_for": 196,
+   "factors": [
+    {
+     "factor": "edge_margin_m",
+     "cut_low": 1.0,
+     "cut_high": 1.0,
+     "low": [
+      6,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      3,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.00054,
+     "adjusted_p": 0.10562,
+     "direction": "lower"
+    },
+    {
+     "factor": "ledge_below_top_m",
+     "cut_low": 8.0,
+     "cut_high": 8.0,
+     "low": [
+      6,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      3,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.00054,
+     "adjusted_p": 0.10562,
+     "direction": "lower"
+    },
+    {
+     "factor": "mullion_offset_m",
+     "cut_low": 0.75,
+     "cut_high": 0.75,
+     "low": [
+      2,
+      2
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      7,
+      45
+     ],
+     "fisher_p_low_vs_high": 0.0333,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "mullion_spacing_m",
+     "cut_low": 1.5,
+     "cut_high": 1.5,
+     "low": [
+      2,
+      3
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      7,
+      44
+     ],
+     "fisher_p_low_vs_high": 0.08955,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "humidity_pct",
+     "cut_low": 50.0,
+     "cut_high": 50.0,
+     "low": [
+      0,
+      10
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      9,
+      37
+     ],
+     "fisher_p_low_vs_high": 0.17194,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    }
+   ]
+  },
+  "battery_stop": {
+   "cases": 4,
+   "of": 47,
+   "controls": [
+    0,
+    10
+   ],
+   "tests_adjusted_for": 196,
+   "factors": [
+    {
+     "factor": "battery_start_frac",
+     "cut_low": 1.0,
+     "cut_high": 1.0,
+     "low": [
+      4,
+      6
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      0,
+      41
+     ],
+     "fisher_p_low_vs_high": 8e-05,
+     "adjusted_p": 0.01648,
+     "direction": "lower"
+    },
+    {
+     "factor": "suction_pa",
+     "cut_low": 2800.0,
+     "cut_high": 2800.0,
+     "low": [
+      4,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      0,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.00071,
+     "adjusted_p": 0.13846,
+     "direction": "lower"
+    },
+    {
+     "factor": "humidity_pct",
+     "cut_low": 50.0,
+     "cut_high": 50.0,
+     "low": [
+      4,
+      10
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      0,
+      37
+     ],
+     "fisher_p_low_vs_high": 0.00118,
+     "adjusted_p": 0.23076,
+     "direction": "lower"
+    },
+    {
+     "factor": "edge_margin_m",
+     "cut_low": 1.0,
+     "cut_high": 1.0,
+     "low": [
+      0,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      4,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.57433,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    },
+    {
+     "factor": "ledge_below_top_m",
+     "cut_low": 8.0,
+     "cut_high": 8.0,
+     "low": [
+      0,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      4,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.57433,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    }
+   ]
+  },
+  "false_done": {
+   "cases": 3,
+   "of": 47,
+   "controls": [
+    0,
+    10
+   ],
+   "tests_adjusted_for": 196,
+   "factors": [
+    {
+     "factor": "ledge_x_m",
+     "cut_low": 0.0,
+     "cut_high": 0.0,
+     "low": [
+      2,
+      5
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      1,
+      42
+     ],
+     "fisher_p_low_vs_high": 0.02652,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "edge_margin_m",
+     "cut_low": 1.0,
+     "cut_high": 1.0,
+     "low": [
+      2,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      1,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.08955,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "ledge_below_top_m",
+     "cut_low": 8.0,
+     "cut_high": 8.0,
+     "low": [
+      2,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      1,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.08955,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "mullion_spacing_m",
+     "cut_low": 1.5,
+     "cut_high": 1.5,
+     "low": [
+      1,
+      3
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      2,
+      44
+     ],
+     "fisher_p_low_vs_high": 0.18323,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "wetness",
+     "cut_low": 0.2,
+     "cut_high": 0.2,
+     "low": [
+      1,
+      4
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      2,
+      43
+     ],
+     "fisher_p_low_vs_high": 0.23891,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    }
+   ]
+  },
+  "time_limit": {
+   "cases": 1,
+   "of": 47,
+   "controls": [
+    0,
+    10
+   ],
+   "tests_adjusted_for": 196,
+   "factors": [
+    {
+     "factor": "ledge_x_m",
+     "cut_low": 0.0,
+     "cut_high": 0.0,
+     "low": [
+      1,
+      5
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      0,
+      42
+     ],
+     "fisher_p_low_vs_high": 0.10638,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "edge_margin_m",
+     "cut_low": 1.0,
+     "cut_high": 1.0,
+     "low": [
+      1,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      0,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.19149,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "ledge_below_top_m",
+     "cut_low": 8.0,
+     "cut_high": 8.0,
+     "low": [
+      1,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      0,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.19149,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "steady_wind_ms",
+     "cut_low": 2.0,
+     "cut_high": 10.3138,
+     "low": [
+      0,
+      0
+     ],
+     "mid": [
+      1,
+      31
+     ],
+     "high": [
+      0,
+      16
+     ],
+     "fisher_p_low_vs_high": 1.0,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "gust_speed_ms",
+     "cut_low": 5.0,
+     "cut_high": 5.0,
+     "low": [
+      0,
+      0
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      1,
+      47
+     ],
+     "fisher_p_low_vs_high": 1.0,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    }
+   ]
+  },
+  "stalled": {
+   "cases": 1,
+   "of": 47,
+   "controls": [
+    0,
+    10
+   ],
+   "tests_adjusted_for": 196,
+   "factors": [
+    {
+     "factor": "battery_start_frac",
+     "cut_low": 1.0,
+     "cut_high": 1.0,
+     "low": [
+      1,
+      6
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      0,
+      41
+     ],
+     "fisher_p_low_vs_high": 0.12766,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "suction_pa",
+     "cut_low": 2800.0,
+     "cut_high": 2800.0,
+     "low": [
+      1,
+      9
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      0,
+      38
+     ],
+     "fisher_p_low_vs_high": 0.19149,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "humidity_pct",
+     "cut_low": 50.0,
+     "cut_high": 50.0,
+     "low": [
+      1,
+      10
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      0,
+      37
+     ],
+     "fisher_p_low_vs_high": 0.21277,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "steady_wind_ms",
+     "cut_low": 2.0,
+     "cut_high": 10.3138,
+     "low": [
+      0,
+      0
+     ],
+     "mid": [
+      1,
+      31
+     ],
+     "high": [
+      0,
+      16
+     ],
+     "fisher_p_low_vs_high": 1.0,
+     "adjusted_p": 1.0,
+     "direction": "lower"
+    },
+    {
+     "factor": "gust_speed_ms",
+     "cut_low": 5.0,
+     "cut_high": 5.0,
+     "low": [
+      0,
+      0
+     ],
+     "mid": [
+      0,
+      0
+     ],
+     "high": [
+      1,
+      47
+     ],
+     "fisher_p_low_vs_high": 1.0,
+     "adjusted_p": 1.0,
+     "direction": "higher"
+    }
+   ]
+  }
+ },
+ "guard": {
+  "low_pressure_pa": 1500.0,
+  "blind_from_speed_measured": 0.9,
+  "blind_from_speed_exact": 0.896,
+  "suction_clean": 0.85,
+  "suction_max": 1.0,
+  "samples": [
+   {
+    "speed": 0.7,
+    "lowest_estimate_pa": 914.7,
+    "estimate_at_zero_power_pa": 1372.0
+   },
+   {
+    "speed": 0.85,
+    "lowest_estimate_pa": 1348.7,
+    "estimate_at_zero_power_pa": 2023.0
+   },
+   {
+    "speed": 0.89,
+    "lowest_estimate_pa": 1478.6,
+    "estimate_at_zero_power_pa": 2217.9
+   },
+   {
+    "speed": 0.9,
+    "lowest_estimate_pa": 1512.0,
+    "estimate_at_zero_power_pa": 2268.0
+   },
+   {
+    "speed": 1.0,
+    "lowest_estimate_pa": 1866.7,
+    "estimate_at_zero_power_pa": 2800.0
+   }
+  ],
+  "file_lines": [
+   "policy/highrise/controller.py:36",
+   "policy/highrise/controller.py:108"
+  ]
+ },
+ "pressure_lead": {
+  "steps_true_pressure_below_guard": 132360,
+  "of_those_estimate_below_guard": 2,
+  "detach_trials": 9,
+  "detach_estimate_above_guard_while_true_below": 9,
+  "phase_when_true_pressure_fell_below_guard": {
+   "hold": 1,
+   "below limit from the start": 4,
+   "turn": 4
+  },
+  "per_trial": [
+   {
+    "trial": "t0013",
+    "t": 51.35,
+    "true_pa": 101.0,
+    "estimate_pa": 2207.424,
+    "phase": "hold",
+    "estimate_above_guard": true,
+    "true_below_guard": true,
+    "seconds_true_below_guard_before_detach": 0.1
+   },
+   {
+    "trial": "t0032",
+    "t": 0.55,
+    "true_pa": 0.8,
+    "estimate_pa": 2798.547,
+    "phase": "seal",
+    "estimate_above_guard": true,
+    "true_below_guard": true,
+    "seconds_true_below_guard_before_detach": null
+   },
+   {
+    "trial": "t0033",
+    "t": 30.35,
+    "true_pa": 2.3,
+    "estimate_pa": 2758.044,
+    "phase": "turn",
+    "estimate_above_guard": true,
+    "true_below_guard": true,
+    "seconds_true_below_guard_before_detach": 0.35
+   },
+   {
+    "trial": "t0034",
+    "t": 23.85,
+    "true_pa": 2.1,
+    "estimate_pa": 2761.418,
+    "phase": "turn",
+    "estimate_above_guard": true,
+    "true_below_guard": true,
+    "seconds_true_below_guard_before_detach": 0.5
+   },
+   {
+    "trial": "t0036",
+    "t": 0.55,
+    "true_pa": 0.5,
+    "estimate_pa": 2799.573,
+    "phase": "seal",
+    "estimate_above_guard": true,
+    "true_below_guard": true,
+    "seconds_true_below_guard_before_detach": null
+   },
+   {
+    "trial": "t0037",
+    "t": 12.35,
+    "true_pa": 1.6,
+    "estimate_pa": 2749.867,
+    "phase": "turn",
+    "estimate_above_guard": true,
+    "true_below_guard": true,
+    "seconds_true_below_guard_before_detach": 0.65
+   },
+   {
+    "trial": "t0039",
+    "t": 23.45,
+    "true_pa": 1.9,
+    "estimate_pa": 2754.503,
+    "phase": "turn",
+    "estimate_above_guard": true,
+    "true_below_guard": true,
+    "seconds_true_below_guard_before_detach": 0.4
+   },
+   {
+    "trial": "t0048",
+    "t": 0.6,
+    "true_pa": 8.9,
+    "estimate_pa": 2794.218,
+    "phase": "seal",
+    "estimate_above_guard": true,
+    "true_below_guard": true,
+    "seconds_true_below_guard_before_detach": null
+   },
+   {
+    "trial": "t0049",
+    "t": 0.6,
+    "true_pa": 7.0,
+    "estimate_pa": 2797.636,
+    "phase": "seal",
+    "estimate_above_guard": true,
+    "true_below_guard": true,
+    "seconds_true_below_guard_before_detach": null
+   }
+  ]
+ },
+ "reproduce": {
+  "runs_per_failure": 3,
+  "needed": 2,
+  "jitter": 0.005,
+  "ran": true,
+  "reproduced": 44,
+  "flaky_excluded": 5,
+  "flaky": [
+   {
+    "trial": "t0007",
+    "failure": "slip_distance",
+    "same_failure_runs": 0,
+    "of": 3,
+    "reruns": [
+     "pass",
+     "pass",
+     "pass"
+    ],
+    "reproduced": false
+   },
+   {
+    "trial": "t0009",
+    "failure": "slip_distance",
+    "same_failure_runs": 0,
+    "of": 3,
+    "reruns": [
+     "false_done",
+     "pass",
+     "false_done"
+    ],
+    "reproduced": false
+   },
+   {
+    "trial": "t0011",
+    "failure": "detach",
+    "same_failure_runs": 1,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "detach"
+    ],
+    "reproduced": false
+   },
+   {
+    "trial": "t0047",
+    "failure": "slip_distance",
+    "same_failure_runs": 1,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "slip_distance",
+     "detach"
+    ],
+    "reproduced": false
+   },
+   {
+    "trial": "t0050",
+    "failure": "detach",
+    "same_failure_runs": 1,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "detach",
+     "slip_distance"
+    ],
+    "reproduced": false
+   }
+  ],
+  "per_trial": [
+   {
+    "trial": "t0000",
+    "failure": "wind_hold",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "wind_hold",
+     "wind_hold",
+     "wind_hold"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0001",
+    "failure": "wind_hold",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "wind_hold",
+     "wind_hold",
+     "wind_hold"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0002",
+    "failure": "wind_hold",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "wind_hold",
+     "wind_hold",
+     "wind_hold"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0003",
+    "failure": "wind_hold",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "wind_hold",
+     "wind_hold",
+     "wind_hold"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0004",
+    "failure": "wind_hold",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "wind_hold",
+     "wind_hold",
+     "wind_hold"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0005",
+    "failure": "wind_hold",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "wind_hold",
+     "wind_hold",
+     "wind_hold"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0006",
+    "failure": "wind_hold",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "wind_hold",
+     "wind_hold",
+     "wind_hold"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0007",
+    "failure": "slip_distance",
+    "same_failure_runs": 0,
+    "of": 3,
+    "reruns": [
+     "pass",
+     "pass",
+     "pass"
+    ],
+    "reproduced": false
+   },
+   {
+    "trial": "t0008",
+    "failure": "slip_distance",
+    "same_failure_runs": 2,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "pass"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0009",
+    "failure": "slip_distance",
+    "same_failure_runs": 0,
+    "of": 3,
+    "reruns": [
+     "false_done",
+     "pass",
+     "false_done"
+    ],
+    "reproduced": false
+   },
+   {
+    "trial": "t0010",
+    "failure": "slip_distance",
+    "same_failure_runs": 2,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "detach",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0011",
+    "failure": "detach",
+    "same_failure_runs": 1,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "detach"
+    ],
+    "reproduced": false
+   },
+   {
+    "trial": "t0013",
+    "failure": "detach",
+    "same_failure_runs": 2,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "detach",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0015",
+    "failure": "wind_hold",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "wind_hold",
+     "wind_hold",
+     "wind_hold"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0016",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0017",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0018",
+    "failure": "slip_distance",
+    "same_failure_runs": 2,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "time_limit",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0019",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0020",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0021",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0022",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0023",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0024",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0025",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0026",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0027",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0028",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0030",
+    "failure": "false_done",
+    "same_failure_runs": 2,
+    "of": 3,
+    "reruns": [
+     "false_done",
+     "pass",
+     "false_done"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0031",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0032",
+    "failure": "detach",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "detach",
+     "detach"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0033",
+    "failure": "detach",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "detach",
+     "detach"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0034",
+    "failure": "detach",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "detach",
+     "detach"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0035",
+    "failure": "false_done",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "false_done",
+     "false_done",
+     "false_done"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0036",
+    "failure": "detach",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "detach",
+     "detach"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0037",
+    "failure": "detach",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "detach",
+     "detach"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0038",
+    "failure": "false_done",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "false_done",
+     "false_done",
+     "false_done"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0039",
+    "failure": "detach",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "detach",
+     "detach"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0040",
+    "failure": "time_limit",
+    "same_failure_runs": 2,
+    "of": 3,
+    "reruns": [
+     "coverage",
+     "time_limit",
+     "time_limit"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0041",
+    "failure": "stalled",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "stalled",
+     "stalled",
+     "stalled"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0042",
+    "failure": "battery_stop",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "battery_stop",
+     "battery_stop",
+     "battery_stop"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0043",
+    "failure": "battery_stop",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "battery_stop",
+     "battery_stop",
+     "battery_stop"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0044",
+    "failure": "battery_stop",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "battery_stop",
+     "battery_stop",
+     "battery_stop"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0045",
+    "failure": "slip_distance",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "slip_distance",
+     "slip_distance"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0046",
+    "failure": "battery_stop",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "battery_stop",
+     "battery_stop",
+     "battery_stop"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0047",
+    "failure": "slip_distance",
+    "same_failure_runs": 1,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "slip_distance",
+     "detach"
+    ],
+    "reproduced": false
+   },
+   {
+    "trial": "t0048",
+    "failure": "detach",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "detach",
+     "detach"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0049",
+    "failure": "detach",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "detach",
+     "detach",
+     "detach"
+    ],
+    "reproduced": true
+   },
+   {
+    "trial": "t0050",
+    "failure": "detach",
+    "same_failure_runs": 1,
+    "of": 3,
+    "reruns": [
+     "slip_distance",
+     "detach",
+     "slip_distance"
+    ],
+    "reproduced": false
+   },
+   {
+    "trial": "t0051",
+    "failure": "wind_hold",
+    "same_failure_runs": 3,
+    "of": 3,
+    "reruns": [
+     "wind_hold",
+     "wind_hold",
+     "wind_hold"
+    ],
+    "reproduced": true
+   }
+  ]
+ },
+ "retest": [],
+ "oracle": {
+  "n": 29,
+  "passed_with_estimate": 2,
+  "passed_with_true_pressure": 2,
+  "fail_to_pass": 0,
+  "pass_to_fail": 0,
+  "detach_with_estimate": 9,
+  "detach_with_true_pressure": 8,
+  "controls_passed_with_true_pressure": [
+   10,
+   10
+  ]
+ },
+ "wording": null,
+ "wording_error": null,
+ "failure_lines": {
+  "slip_distance": {
+   "cases": 17,
+   "fires_at_end_of_run": 0,
+   "moment": "when the judge fired",
+   "at_fire": [
+    {
+     "phase": "clean",
+     "file_line": "policy/highrise/controller.py:240",
+     "code": "elif self._lane_done():",
+     "trials": 9,
+     "control_step_share": 0.6958
+    },
+    {
+     "phase": "seal",
+     "file_line": "policy/highrise/controller.py:193",
+     "code": "if t - self.phase_t > 2.0:",
+     "trials": 5,
+     "control_step_share": 0.006
+    },
+    {
+     "phase": "hold",
+     "file_line": "policy/highrise/controller.py:215",
+     "code": "self.ok_since = None",
+     "trials": 3,
+     "control_step_share": 0.0
+    }
+   ],
+   "at_onset": [
+    {
+     "phase": "clean",
+     "file_line": "policy/highrise/controller.py:240",
+     "code": "elif self._lane_done():",
+     "trials": 8,
+     "control_step_share": 0.6958
+    },
+    {
+     "phase": "seal",
+     "file_line": "policy/highrise/controller.py:193",
+     "code": "if t - self.phase_t > 2.0:",
+     "trials": 5,
+     "control_step_share": 0.006
+    },
+    {
+     "phase": "hold",
+     "file_line": "policy/highrise/controller.py:215",
+     "code": "self.ok_since = None",
+     "trials": 3,
+     "control_step_share": 0.0
+    },
+    {
+     "phase": "turn",
+     "file_line": "policy/highrise/controller.py:250",
+     "code": "left, right = -turn, turn",
+     "trials": 1,
+     "control_step_share": 0.2517
+    }
+   ],
+   "phase_entered_by": [
+    {
+     "phase": "clean",
+     "file_line": "policy/highrise/controller.py:247",
+     "wind_hold": false,
+     "trials": 8
+    },
+    {
+     "phase": "hold",
+     "file_line": "policy/highrise/controller.py:203",
+     "wind_hold": true,
+     "trials": 3
+    },
+    {
+     "phase": "clean",
+     "file_line": "policy/highrise/controller.py:194",
+     "wind_hold": false,
+     "trials": 1
+    }
+   ],
+   "transition_lines_more_common_than_in_passes": [
+    {
+     "file_line": "policy/highrise/controller.py:264",
+     "code": "self._set(\"hold\", t)",
+     "this_failure": [
+      1,
+      17
+     ],
+     "passed_worlds": [
+      0,
+      3
+     ],
+     "controls": [
+      0,
+      10
+     ]
+    }
+   ]
+  },
+  "wind_hold": {
+   "cases": 9,
+   "fires_at_end_of_run": 9,
+   "moment": "end of run, so the line shows where the run stopped, not a cause",
+   "at_fire": [
+    {
+     "phase": "hold",
+     "file_line": "policy/highrise/controller.py:215",
+     "code": "self.ok_since = None",
+     "trials": 9,
+     "control_step_share": 0.0
+    }
+   ],
+   "at_onset": [],
+   "phase_entered_by": [
+    {
+     "phase": "hold",
+     "file_line": "policy/highrise/controller.py:203",
+     "wind_hold": true,
+     "trials": 9
+    }
+   ],
+   "transition_lines_more_common_than_in_passes": [
+    {
+     "file_line": "policy/highrise/controller.py:203",
+     "code": "self._set(\"hold\", t)",
+     "this_failure": [
+      9,
+      9
+     ],
+     "passed_worlds": [
+      2,
+      3
+     ],
+     "controls": [
+      0,
+      10
+     ]
+    }
+   ]
+  },
+  "detach": {
+   "cases": 9,
+   "fires_at_end_of_run": 0,
+   "moment": "when the judge fired",
+   "at_fire": [
+    {
+     "phase": "seal",
+     "file_line": "policy/highrise/controller.py:193",
+     "code": "if t - self.phase_t > 2.0:",
+     "trials": 4,
+     "control_step_share": 0.006
+    },
+    {
+     "phase": "turn",
+     "file_line": "policy/highrise/controller.py:250",
+     "code": "left, right = -turn, turn",
+     "trials": 4,
+     "control_step_share": 0.2517
+    },
+    {
+     "phase": "hold",
+     "file_line": "policy/highrise/controller.py:215",
+     "code": "self.ok_since = None",
+     "trials": 1,
+     "control_step_share": 0.0
+    }
+   ],
+   "at_onset": [
+    {
+     "phase": "turn",
+     "file_line": "policy/highrise/controller.py:250",
+     "code": "left, right = -turn, turn",
+     "trials": 4,
+     "control_step_share": 0.2517
+    },
+    {
+     "phase": "hold",
+     "file_line": "policy/highrise/controller.py:215",
+     "code": "self.ok_since = None",
+     "trials": 1,
+     "control_step_share": 0.0
+    }
+   ],
+   "phase_entered_by": [
+    {
+     "phase": "turn",
+     "file_line": "policy/highrise/controller.py:259",
+     "wind_hold": false,
+     "trials": 3
+    },
+    {
+     "phase": "hold",
+     "file_line": "policy/highrise/controller.py:203",
+     "wind_hold": true,
+     "trials": 1
+    },
+    {
+     "phase": "turn",
+     "file_line": "policy/highrise/controller.py:239",
+     "wind_hold": false,
+     "trials": 1
+    }
+   ],
+   "transition_lines_more_common_than_in_passes": [
+    {
+     "file_line": "policy/highrise/controller.py:239",
+     "code": "self._begin_side_step_from_stop(t)",
+     "this_failure": [
+      4,
+      9
+     ],
+     "passed_worlds": [
+      0,
+      3
+     ],
+     "controls": [
+      0,
+      10
+     ]
+    }
+   ]
+  },
+  "battery_stop": {
+   "cases": 4,
+   "fires_at_end_of_run": 4,
+   "moment": "end of run, so the line shows where the run stopped, not a cause",
+   "at_fire": [
+    {
+     "phase": "hold",
+     "file_line": "policy/highrise/controller.py:213",
+     "code": "self._set(self.resume_phase, t)",
+     "trials": 4,
+     "control_step_share": 0.0
+    }
+   ],
+   "at_onset": [],
+   "phase_entered_by": [
+    {
+     "phase": "hold",
+     "file_line": "policy/highrise/controller.py:264",
+     "wind_hold": false,
+     "trials": 4
+    }
+   ],
+   "transition_lines_more_common_than_in_passes": [
+    {
+     "file_line": "policy/highrise/controller.py:264",
+     "code": "self._set(\"hold\", t)",
+     "this_failure": [
+      4,
+      4
+     ],
+     "passed_worlds": [
+      0,
+      3
+     ],
+     "controls": [
+      0,
+      10
+     ]
+    },
+    {
+     "file_line": "policy/highrise/controller.py:213",
+     "code": "self._set(self.resume_phase, t)",
+     "this_failure": [
+      4,
+      4
+     ],
+     "passed_worlds": [
+      2,
+      3
+     ],
+     "controls": [
+      0,
+      10
+     ]
+    }
+   ]
+  },
+  "false_done": {
+   "cases": 3,
+   "fires_at_end_of_run": 3,
+   "moment": "end of run, so the line shows where the run stopped, not a cause",
+   "at_fire": [
+    {
+     "phase": "finished",
+     "file_line": "policy/highrise/controller.py:261",
+     "code": "done = 1.0",
+     "trials": 3,
+     "control_step_share": 0.0001
+    }
+   ],
+   "at_onset": [],
+   "phase_entered_by": [
+    {
+     "phase": "finished",
+     "file_line": "policy/highrise/controller.py:239",
+     "wind_hold": false,
+     "trials": 2
+    },
+    {
+     "phase": "finished",
+     "file_line": "policy/highrise/controller.py:242",
+     "wind_hold": false,
+     "trials": 1
+    }
+   ],
+   "transition_lines_more_common_than_in_passes": [
+    {
+     "file_line": "policy/highrise/controller.py:239",
+     "code": "self._begin_side_step_from_stop(t)",
+     "this_failure": [
+      2,
+      3
+     ],
+     "passed_worlds": [
+      0,
+      3
+     ],
+     "controls": [
+      0,
+      10
+     ]
+    }
+   ]
+  },
+  "time_limit": {
+   "cases": 1,
+   "fires_at_end_of_run": 1,
+   "moment": "end of run, so the line shows where the run stopped, not a cause",
+   "at_fire": [
+    {
+     "phase": "turn",
+     "file_line": "policy/highrise/controller.py:250",
+     "code": "left, right = -turn, turn",
+     "trials": 1,
+     "control_step_share": 0.2517
+    }
+   ],
+   "at_onset": [],
+   "phase_entered_by": [
+    {
+     "phase": "turn",
+     "file_line": "policy/highrise/controller.py:239",
+     "wind_hold": false,
+     "trials": 1
+    }
+   ],
+   "transition_lines_more_common_than_in_passes": [
+    {
+     "file_line": "policy/highrise/controller.py:239",
+     "code": "self._begin_side_step_from_stop(t)",
+     "this_failure": [
+      1,
+      1
+     ],
+     "passed_worlds": [
+      0,
+      3
+     ],
+     "controls": [
+      0,
+      10
+     ]
+    }
+   ]
+  },
+  "stalled": {
+   "cases": 1,
+   "fires_at_end_of_run": 1,
+   "moment": "end of run, so the line shows where the run stopped, not a cause",
+   "at_fire": [
+    {
+     "phase": null,
+     "file_line": "policy/highrise/controller.py:260",
+     "code": "elif self.phase == \"finished\":",
+     "trials": 1,
+     "control_step_share": 0.0
+    }
+   ],
+   "at_onset": [],
+   "phase_entered_by": [
+    {
+     "phase": null,
+     "file_line": "policy/highrise/controller.py:213",
+     "wind_hold": false,
+     "trials": 1
+    }
+   ],
+   "transition_lines_more_common_than_in_passes": [
+    {
+     "file_line": "policy/highrise/controller.py:264",
+     "code": "self._set(\"hold\", t)",
+     "this_failure": [
+      1,
+      1
+     ],
+     "passed_worlds": [
+      0,
+      3
+     ],
+     "controls": [
+      0,
+      10
+     ]
+    },
+    {
+     "file_line": "policy/highrise/controller.py:213",
+     "code": "self._set(self.resume_phase, t)",
+     "this_failure": [
+      1,
+      1
+     ],
+     "passed_worlds": [
+      2,
+      3
+     ],
+     "controls": [
+      0,
+      10
+     ]
+    }
+   ]
+  }
+ },
+ "trace_lines": [
+  "policy/highrise/controller.py:193",
+  "policy/highrise/controller.py:194",
+  "policy/highrise/controller.py:203",
+  "policy/highrise/controller.py:208",
+  "policy/highrise/controller.py:213",
+  "policy/highrise/controller.py:215",
+  "policy/highrise/controller.py:239",
+  "policy/highrise/controller.py:240",
+  "policy/highrise/controller.py:242",
+  "policy/highrise/controller.py:247",
+  "policy/highrise/controller.py:250",
+  "policy/highrise/controller.py:254",
+  "policy/highrise/controller.py:259",
+  "policy/highrise/controller.py:260",
+  "policy/highrise/controller.py:261",
+  "policy/highrise/controller.py:264"
+ ],
+ "requirements": {
+  "schema": "crashlab.requirements.v1",
+  "requirements": [
+   {
+    "id": "R1",
+    "rule": "detach",
+    "severity": "critical",
+    "text": "The body stays on the glass: gap under 0.03 m, or over it for less than 0.1 s, with its centre on the glass."
+   },
+   {
+    "id": "R2",
+    "rule": "tether_load",
+    "severity": "critical",
+    "text": "Tether load stays at or under 1000 N."
+   },
+   {
+    "id": "R3",
+    "rule": "slip_distance",
+    "severity": "high",
+    "text": "No single slide on the glass goes further than 0.3 m."
+   },
+   {
+    "id": "R4",
+    "rule": "false_done",
+    "severity": "high",
+    "text": "When the robot reports done, reported coverage is within 0.1 of true coverage."
+   },
+   {
+    "id": "R5",
+    "rule": "coverage",
+    "severity": "medium",
+    "text": "True coverage is at least 0.9, unless the run ends in a safe hold."
+   },
+   {
+    "id": "R6",
+    "rule": "time_limit",
+    "severity": "medium",
+    "text": "The robot finishes within 600 s, or holds still on the glass for the last 30 s for a stated reason: wind or low battery."
+   },
+   {
+    "id": "R7",
+    "rule": "stalled",
+    "severity": "high",
+    "text": "The robot does not stop on the glass with no reason: not 30 s of wind under 7.0 m/s without a battery reason."
+   }
+  ],
+  "judge_sha256": "135131fad8267778d0dc19b9f788d78fd5f9021e203bfaa6406da27b3fcfa702",
+  "holds": "wind_hold and battery_stop are their own outcomes: not a failure and not a pass.",
+  "limits": "Simulation only. Limits are assumptions, see PARAMETERS.md.",
+  "written_before_campaign": true
+ },
+ "dead_phase": {
+  "trials": 6,
+  "of": 52,
+  "file_lines": [
+   "policy/highrise/controller.py:213"
+  ],
+  "trial_ids": [
+   "t0041",
+   "t0042",
+   "t0043",
+   "t0044",
+   "t0045",
+   "t0046"
+  ],
+  "outcomes": {
+   "stalled": 1,
+   "battery_stop": 4,
+   "slip_distance": 1
+  }
+ },
+ "failure_types": [
+  {
+   "type": "detach",
+   "is_failure": true,
+   "requirement": "R1",
+   "severity": "critical",
+   "count": 9,
+   "worst_world": {
+    "trial": "t0032",
+    "measure": "first_t",
+    "value": 0.55
+   },
+   "code_line": "policy/highrise/controller.py:250",
+   "code": "left, right = -turn, turn",
+   "phase": "turn",
+   "code_line_trials": 4,
+   "stopped_at_full_suction": [
+    5,
+    9
+   ],
+   "trials": [
+    "t0013",
+    "t0032",
+    "t0033",
+    "t0034",
+    "t0036",
+    "t0037",
+    "t0039",
+    "t0048",
+    "t0049"
+   ]
+  },
+  {
+   "type": "slip_distance",
+   "is_failure": true,
+   "requirement": "R3",
+   "severity": "high",
+   "count": 17,
+   "worst_world": {
+    "trial": "t0016",
+    "measure": "slip_m",
+    "value": 4.483
+   },
+   "code_line": "policy/highrise/controller.py:240",
+   "code": "elif self._lane_done():",
+   "phase": "clean",
+   "code_line_trials": 8,
+   "stopped_at_full_suction": [
+    8,
+    17
+   ],
+   "trials": [
+    "t0008",
+    "t0010",
+    "t0016",
+    "t0017",
+    "t0018",
+    "t0019",
+    "t0020",
+    "t0021",
+    "t0022",
+    "t0023",
+    "t0024",
+    "t0025",
+    "t0026",
+    "t0027",
+    "t0028",
+    "t0031",
+    "t0045"
+   ]
+  },
+  {
+   "type": "false_done",
+   "is_failure": true,
+   "requirement": "R4",
+   "severity": "high",
+   "count": 3,
+   "worst_world": {
+    "trial": "t0038",
+    "measure": "coverage",
+    "value": 0.1572
+   },
+   "code_line": "policy/highrise/controller.py:261",
+   "code": "done = 1.0",
+   "phase": "finished",
+   "code_line_trials": 3,
+   "stopped_at_full_suction": [
+    0,
+    3
+   ],
+   "trials": [
+    "t0030",
+    "t0035",
+    "t0038"
+   ]
+  },
+  {
+   "type": "stalled",
+   "is_failure": true,
+   "requirement": "R7",
+   "severity": "high",
+   "count": 1,
+   "worst_world": {
+    "trial": "t0041",
+    "measure": "coverage",
+    "value": 0.3092
+   },
+   "code_line": "policy/highrise/controller.py:260",
+   "code": "elif self.phase == \"finished\":",
+   "phase": null,
+   "code_line_trials": 1,
+   "stopped_at_full_suction": [
+    0,
+    1
+   ],
+   "trials": [
+    "t0041"
+   ]
+  },
+  {
+   "type": "time_limit",
+   "is_failure": true,
+   "requirement": "R6",
+   "severity": "medium",
+   "count": 1,
+   "worst_world": {
+    "trial": "t0040",
+    "measure": "coverage",
+    "value": 0.0
+   },
+   "code_line": "policy/highrise/controller.py:250",
+   "code": "left, right = -turn, turn",
+   "phase": "turn",
+   "code_line_trials": 1,
+   "stopped_at_full_suction": [
+    0,
+    1
+   ],
+   "trials": [
+    "t0040"
+   ]
+  },
+  {
+   "type": "wind_hold",
+   "is_failure": false,
+   "requirement": null,
+   "severity": "info",
+   "count": 9,
+   "worst_world": {
+    "trial": "t0000",
+    "measure": "coverage",
+    "value": 0.0094
+   },
+   "code_line": "policy/highrise/controller.py:215",
+   "code": "self.ok_since = None",
+   "phase": "hold",
+   "code_line_trials": 9,
+   "stopped_at_full_suction": [
+    9,
+    9
+   ],
+   "trials": [
+    "t0000",
+    "t0001",
+    "t0002",
+    "t0003",
+    "t0004",
+    "t0005",
+    "t0006",
+    "t0015",
+    "t0051"
+   ]
+  },
+  {
+   "type": "battery_stop",
+   "is_failure": false,
+   "requirement": null,
+   "severity": "info",
+   "count": 4,
+   "worst_world": {
+    "trial": "t0043",
+    "measure": "coverage",
+    "value": 0.0071
+   },
+   "code_line": "policy/highrise/controller.py:213",
+   "code": "self._set(self.resume_phase, t)",
+   "phase": "hold",
+   "code_line_trials": 4,
+   "stopped_at_full_suction": [
+    4,
+    4
+   ],
+   "trials": [
+    "t0042",
+    "t0043",
+    "t0044",
+    "t0046"
+   ]
+  }
+ ],
+ "follow_ups": [
+  {
+   "id": "F1",
+   "failure_type": "detach",
+   "requirement": "R1",
+   "severity": "critical",
+   "trials": [
+    "t0013",
+    "t0032",
+    "t0033",
+    "t0034",
+    "t0036",
+    "t0037",
+    "t0039",
+    "t0048",
+    "t0049"
+   ],
+   "evidence": {
+    "stopped_at_full_suction": [
+     5,
+     9
+    ],
+    "true_pressure_oracle": {
+     "n": 29,
+     "passed_with_estimate": 2,
+     "passed_with_true_pressure": 2,
+     "fail_to_pass": 0,
+     "pass_to_fail": 0,
+     "detach_with_estimate": 9,
+     "detach_with_true_pressure": 8,
+     "controls_passed_with_true_pressure": [
+      10,
+      10
+     ]
+    }
+   },
+   "why": "When this failure began, the robot had already stopped with suction at full, so the controller had no more force to command.",
+   "needs": "A hardware or physical-limit decision: suction, tracks or tether. Or a work limit on wind.",
+   "route": "bounty_or_owner",
+   "caveat": "Simulation only. An earlier reaction by the controller is not ruled out."
+  }
+ ]
+}

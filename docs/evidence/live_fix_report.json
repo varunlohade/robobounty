@@ -1,0 +1,139 @@
+{
+ "schema": "crashlab.fix.v1",
+ "campaign": "campaign",
+ "status": "no_fix_helped",
+ "tries": [
+  {
+   "try": 1,
+   "status": "did_not_help",
+   "validation": [],
+   "verdict": {
+    "helped": false,
+    "reasons": [
+     "fresh worlds: 0 better, 0 worse, p 1.0",
+     "seen worlds: 0 better, 0 worse"
+    ]
+   },
+   "ab": {
+    "seen": {
+     "n": 11,
+     "A": {
+      "pass": 3,
+      "holds": {
+       "wind_hold": 2
+      },
+      "fail": 6,
+      "failures": {
+       "slip_distance": 5,
+       "detach": 1
+      }
+     },
+     "B": {
+      "pass": 3,
+      "holds": {
+       "wind_hold": 2
+      },
+      "fail": 6,
+      "failures": {
+       "slip_distance": 5,
+       "detach": 1
+      }
+     },
+     "better": 0,
+     "worse": 0,
+     "same": 11,
+     "sign_test_p_one_sided": 1.0,
+     "limits_hit_B": 0,
+     "replay_mismatch_B": 0
+    },
+    "fresh": {
+     "n": 12,
+     "A": {
+      "pass": 4,
+      "holds": {
+       "wind_hold": 6
+      },
+      "fail": 2,
+      "failures": {
+       "slip_distance": 2
+      }
+     },
+     "B": {
+      "pass": 4,
+      "holds": {
+       "wind_hold": 6
+      },
+      "fail": 2,
+      "failures": {
+       "slip_distance": 2
+      }
+     },
+     "better": 0,
+     "worse": 0,
+     "same": 12,
+     "sign_test_p_one_sided": 1.0,
+     "limits_hit_B": 0,
+     "replay_mismatch_B": 0
+    },
+    "controls": {
+     "n": 10,
+     "A": {
+      "pass": 10,
+      "holds": {},
+      "fail": 0,
+      "failures": {}
+     },
+     "B": {
+      "pass": 10,
+      "holds": {},
+      "fail": 0,
+      "failures": {}
+     },
+     "better": 0,
+     "worse": 0,
+     "same": 10,
+     "sign_test_p_one_sided": 1.0,
+     "limits_hit_B": 0,
+     "replay_mismatch_B": 0
+    }
+   },
+   "regressions": {
+    "seen": [],
+    "fresh": [],
+    "controls": []
+   },
+   "llm": {
+    "error": null,
+    "seconds": 15.6,
+    "cost_usd": 0.060826399999999996,
+    "turns": 3,
+    "permission_denials": 0
+   },
+   "diff_sha256": "c28eee7159ca7178b6a5a446e5baa073aec8f77f580d66fb9784146579e11854"
+  }
+ ],
+ "applied": false,
+ "fresh_seed": 778,
+ "seen_worlds": 11,
+ "fresh_worlds": 12,
+ "control_worlds": 10,
+ "full_rerun_of_campaign": true,
+ "held_back_worlds_shown_to_llm": 0,
+ "earlier_attempts": [],
+ "still_failing_after_best_try": {
+  "seen": {
+   "slip_distance": 5,
+   "detach": 1
+  },
+  "fresh": {
+   "slip_distance": 2
+  },
+  "controls": {}
+ },
+ "base_controller_sha256": "85e7220d4a09c7dd8c89ed5335542ede770d697c239e2d8ab9f5fd8a20f60ad6",
+ "limits": [
+  "In this simulation only. The physics is uncalibrated.",
+  "sandbox-exec is not a VM. It shares the kernel with the host.",
+  "applied stays false until a human runs fix.py accept at a terminal."
+ ]
+}

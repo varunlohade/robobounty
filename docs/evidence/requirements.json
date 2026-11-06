@@ -1,0 +1,51 @@
+{
+ "schema": "crashlab.requirements.v1",
+ "requirements": [
+  {
+   "id": "R1",
+   "rule": "detach",
+   "severity": "critical",
+   "text": "The body stays on the glass: gap under 0.03 m, or over it for less than 0.1 s, with its centre on the glass."
+  },
+  {
+   "id": "R2",
+   "rule": "tether_load",
+   "severity": "critical",
+   "text": "Tether load stays at or under 1000 N."
+  },
+  {
+   "id": "R3",
+   "rule": "slip_distance",
+   "severity": "high",
+   "text": "No single slide on the glass goes further than 0.3 m."
+  },
+  {
+   "id": "R4",
+   "rule": "false_done",
+   "severity": "high",
+   "text": "When the robot reports done, reported coverage is within 0.1 of true coverage."
+  },
+  {
+   "id": "R5",
+   "rule": "coverage",
+   "severity": "medium",
+   "text": "True coverage is at least 0.9, unless the run ends in a safe hold."
+  },
+  {
+   "id": "R6",
+   "rule": "time_limit",
+   "severity": "medium",
+   "text": "The robot finishes within 600 s, or holds still on the glass for the last 30 s for a stated reason: wind or low battery."
+  },
+  {
+   "id": "R7",
+   "rule": "stalled",
+   "severity": "high",
+   "text": "The robot does not stop on the glass with no reason: not 30 s of wind under 7.0 m/s without a battery reason."
+  }
+ ],
+ "judge_sha256": "135131fad8267778d0dc19b9f788d78fd5f9021e203bfaa6406da27b3fcfa702",
+ "holds": "wind_hold and battery_stop are their own outcomes: not a failure and not a pass.",
+ "limits": "Simulation only. Limits are assumptions, see PARAMETERS.md.",
+ "written_before_campaign": true
+}

@@ -1,0 +1,26 @@
+group Dry high friction glass: 1/4 passed, first failures {'slip_distance': 2, 'false_done': 1}
+group Dust on glass and seal: 0/7 passed, first failures {'wind_hold': 1, 'slip_distance': 6}
+group Extreme heat with weak battery: 0/6 passed, first failures {'stalled': 1, 'battery_stop': 4, 'slip_distance': 1}
+group High steady wind: 0/7 passed, first failures {'wind_hold': 7}
+group Strong gusts on high facade: 2/8 passed, first failures {'slip_distance': 4, 'detach': 2}
+group Weak suction with wind: 0/5 passed, first failures {'slip_distance': 1, 'detach': 3, 'wind_hold': 1}
+group Weird edges and joints: 0/9 passed, first failures {'detach': 6, 'false_done': 2, 'time_limit': 1}
+group Wet humid low friction glass: 0/6 passed, first failures {'slip_distance': 6}
+numerical divergence, left out of the rates: 0 []
+control: 10/10 passed, 95% interval 0.72-1.00
+  failure type      first    any  example
+  of 10 reporting done, false_done by gap limit: {0.02: 10, 0.05: 5, 0.1: 0, 0.15: 0, 0.2: 0}; true coverage below: {0.85: 0, 0.9: 0, 0.95: 5}
+benign: 0/0 passed, 95% interval 0.00-0.00
+  failure type      first    any  example
+varied: 3/52 passed, 95% interval 0.02-0.16
+  wind_hold (paused for wind, grip intact): 9, mean held 600 s at mean wind 15.8 m/s
+  battery_stop (low voltage, grip intact, job incomplete): 4, mean held 578 s at mean wind 2.0 m/s
+  failure type      first    any  example
+  slip_distance        20     20  t0008
+  detach               11     14  t0011
+  false_done            3     13  t0030
+  time_limit            1      8  t0040
+  stalled               1      1  t0041
+  coverage              0     36  t0008
+  of 16 reporting done, false_done by gap limit: {0.02: 16, 0.05: 16, 0.1: 13, 0.15: 11, 0.2: 10}; true coverage below: {0.85: 11, 0.9: 13, 0.95: 16}
+this run: 62 trials in 127.4s = 29 trials per minute on 4 processes

@@ -1,0 +1,310 @@
+{
+ "schema": "crashlab.fix.v1",
+ "campaign": "campaign_dubai_v4",
+ "status": "no_fix_helped",
+ "tries": [
+  {
+   "try": 1,
+   "status": "did_not_help",
+   "validation": [],
+   "verdict": {
+    "helped": false,
+    "reasons": [
+     "controls: 0 of 10 passed",
+     "fresh worlds: 0 better, 5 worse, p 1.0",
+     "seen worlds: 0 better, 3 worse"
+    ]
+   },
+   "ab": {
+    "seen": {
+     "n": 52,
+     "A": {
+      "pass": 3,
+      "holds": {
+       "wind_hold": 9,
+       "battery_stop": 4
+      },
+      "fail": 36,
+      "failures": {
+       "slip_distance": 20,
+       "detach": 11,
+       "false_done": 3,
+       "time_limit": 1,
+       "stalled": 1
+      }
+     },
+     "B": {
+      "pass": 0,
+      "holds": {
+       "wind_hold": 9,
+       "battery_stop": 4
+      },
+      "fail": 39,
+      "failures": {
+       "false_done": 7,
+       "slip_distance": 21,
+       "detach": 10,
+       "time_limit": 1
+      }
+     },
+     "better": 0,
+     "worse": 3,
+     "same": 49,
+     "sign_test_p_one_sided": 1.0,
+     "limits_hit_B": 0,
+     "replay_mismatch_B": 0
+    },
+    "fresh": {
+     "n": 30,
+     "A": {
+      "pass": 5,
+      "holds": {
+       "wind_hold": 8
+      },
+      "fail": 17,
+      "failures": {
+       "detach": 1,
+       "false_done": 3,
+       "slip_distance": 12,
+       "time_limit": 1
+      }
+     },
+     "B": {
+      "pass": 0,
+      "holds": {
+       "wind_hold": 8
+      },
+      "fail": 22,
+      "failures": {
+       "false_done": 7,
+       "slip_distance": 14,
+       "time_limit": 1
+      }
+     },
+     "better": 0,
+     "worse": 5,
+     "same": 25,
+     "sign_test_p_one_sided": 1.0,
+     "limits_hit_B": 0,
+     "replay_mismatch_B": 0
+    },
+    "controls": {
+     "n": 10,
+     "A": {
+      "pass": 10,
+      "holds": {},
+      "fail": 0,
+      "failures": {}
+     },
+     "B": {
+      "pass": 0,
+      "holds": {},
+      "fail": 10,
+      "failures": {
+       "false_done": 7,
+       "slip_distance": 3
+      }
+     },
+     "better": 0,
+     "worse": 10,
+     "same": 0,
+     "sign_test_p_one_sided": 1.0,
+     "limits_hit_B": 0,
+     "replay_mismatch_B": 0
+    }
+   },
+   "regressions": {
+    "seen": [
+     "t0012",
+     "t0014",
+     "t0029"
+    ],
+    "fresh": [
+     "f0007",
+     "f0010",
+     "f0012",
+     "f0013",
+     "f0028"
+    ],
+    "controls": [
+     "control000",
+     "control001",
+     "control002",
+     "control003",
+     "control004",
+     "control005",
+     "control006",
+     "control007",
+     "control008",
+     "control009"
+    ]
+   },
+   "llm": {
+    "error": null,
+    "from_file": true,
+    "note": "LLM edit from an earlier fix.py run whose harness crashed after the call. This tests its saved file with no new call."
+   },
+   "diff_sha256": "15790fd892506189ac0d74695a5bbdc2a8dc6340004e5f020632aecf08ade26a",
+   "saved_from_earlier_run": true
+  },
+  {
+   "try": 2,
+   "status": "did_not_help",
+   "validation": [],
+   "verdict": {
+    "helped": false,
+    "reasons": [
+     "fresh worlds: 3 better, 0 worse, p 0.125"
+    ]
+   },
+   "ab": {
+    "seen": {
+     "n": 52,
+     "A": {
+      "pass": 3,
+      "holds": {
+       "wind_hold": 9,
+       "battery_stop": 4
+      },
+      "fail": 36,
+      "failures": {
+       "slip_distance": 20,
+       "detach": 11,
+       "false_done": 3,
+       "time_limit": 1,
+       "stalled": 1
+      }
+     },
+     "B": {
+      "pass": 5,
+      "holds": {
+       "wind_hold": 9,
+       "battery_stop": 4
+      },
+      "fail": 34,
+      "failures": {
+       "slip_distance": 20,
+       "detach": 10,
+       "false_done": 2,
+       "time_limit": 1,
+       "stalled": 1
+      }
+     },
+     "better": 2,
+     "worse": 0,
+     "same": 50,
+     "sign_test_p_one_sided": 0.25,
+     "limits_hit_B": 0,
+     "replay_mismatch_B": 0
+    },
+    "fresh": {
+     "n": 30,
+     "A": {
+      "pass": 5,
+      "holds": {
+       "wind_hold": 8
+      },
+      "fail": 17,
+      "failures": {
+       "detach": 1,
+       "false_done": 3,
+       "slip_distance": 12,
+       "time_limit": 1
+      }
+     },
+     "B": {
+      "pass": 8,
+      "holds": {
+       "wind_hold": 8
+      },
+      "fail": 14,
+      "failures": {
+       "detach": 1,
+       "slip_distance": 12,
+       "time_limit": 1
+      }
+     },
+     "better": 3,
+     "worse": 0,
+     "same": 27,
+     "sign_test_p_one_sided": 0.125,
+     "limits_hit_B": 0,
+     "replay_mismatch_B": 0
+    },
+    "controls": {
+     "n": 10,
+     "A": {
+      "pass": 10,
+      "holds": {},
+      "fail": 0,
+      "failures": {}
+     },
+     "B": {
+      "pass": 10,
+      "holds": {},
+      "fail": 0,
+      "failures": {}
+     },
+     "better": 0,
+     "worse": 0,
+     "same": 10,
+     "sign_test_p_one_sided": 1.0,
+     "limits_hit_B": 0,
+     "replay_mismatch_B": 0
+    }
+   },
+   "regressions": {
+    "seen": [],
+    "fresh": [],
+    "controls": []
+   },
+   "llm": {
+    "error": null,
+    "seconds": 15.7,
+    "cost_usd": 0.0692553,
+    "turns": 3,
+    "permission_denials": 0
+   },
+   "diff_sha256": "ea534a88ad5ee3bfa4ff984bf3d2158e62f2adb709f878075d8e0cd31e2d5a37"
+  }
+ ],
+ "applied": false,
+ "fresh_seed": 777,
+ "seen_worlds": 52,
+ "fresh_worlds": 30,
+ "control_worlds": 10,
+ "full_rerun_of_campaign": true,
+ "held_back_worlds_shown_to_llm": 0,
+ "still_failing_after_best_try": {
+  "seen": {
+   "slip_distance": 20,
+   "detach": 10,
+   "false_done": 2,
+   "time_limit": 1,
+   "stalled": 1
+  },
+  "fresh": {
+   "detach": 1,
+   "slip_distance": 12,
+   "time_limit": 1
+  },
+  "controls": {}
+ },
+ "base_controller_sha256": "85e7220d4a09c7dd8c89ed5335542ede770d697c239e2d8ab9f5fd8a20f60ad6",
+ "limits": [
+  "In this simulation only. The physics is uncalibrated.",
+  "sandbox-exec is not a VM. It shares the kernel with the host.",
+  "applied stays false until a human runs fix.py accept at a terminal."
+ ],
+ "earlier_attempts": [
+  "2026-11-06_discarded"
+ ],
+ "live_llm_edits": {
+  "tested": 2,
+  "interrupted_no_result": 1,
+  "budget_left": 0
+ },
+ "notes": [
+  "Try 2 raised SUCTION_CLEAN to 0.9, past the 0.896 speed where the low-pressure guard goes blind. The A/B does not measure that loss."
+ ]
+}

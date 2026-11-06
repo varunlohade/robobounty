@@ -1,0 +1,20 @@
+{
+ "campaign_dubai_final": [
+  "0e36d3bf97fe99a5d96f3229a579d6fdd2748c4bccabb6b1c76eb2af6b5fe2ac"
+ ],
+ "campaign_dubai_v4": [
+  "aac6648b734afeb0a1d05aa522bd98cb21f9082268d99fe0b0011ad522fb9ed5"
+ ],
+ "seed1000_rerun": [
+  "0e36d3bf97fe99a5d96f3229a579d6fdd2748c4bccabb6b1c76eb2af6b5fe2ac"
+ ],
+ "retest_2026-11-06": [
+  "0e36d3bf97fe99a5d96f3229a579d6fdd2748c4bccabb6b1c76eb2af6b5fe2ac"
+ ],
+ "fix_try_2": [
+  "aac6648b734afeb0a1d05aa522bd98cb21f9082268d99fe0b0011ad522fb9ed5"
+ ],
+ "live_fix_session_campaign": [
+  "0e36d3bf97fe99a5d96f3229a579d6fdd2748c4bccabb6b1c76eb2af6b5fe2ac"
+ ]
+}
