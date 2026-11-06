@@ -155,7 +155,7 @@ def part1_good():
                 problems.append(f"{where}: undo did not restore the world")
     check(f"{calls} good calls apply, recompile, load in MuJoCo, keep the old world and undo", not problems, problems[:12])
     for fn in sorted(READS - {"undo"}):
-        out = G.call(start, fn, {})
+        out = G.call(start, fn, GOOD[fn][0])
         check(f"{fn} reads and changes nothing", out["result"] == G.OK and out["state"] is start and not out["rerun"] and out["data"] is not None)
     world_copy = G.call(start, "read_world")["data"]["world"]
     world_copy["tower"]["height_m"] = 1.0

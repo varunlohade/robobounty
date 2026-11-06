@@ -239,8 +239,9 @@ export class LabChat {
         this.working(event.text);
         break;
       case 'retire':
-        for (const b of this.list.querySelectorAll('button')) b.disabled = true;
-        for (const c of this.list.querySelectorAll('.chat-card')) c.classList.add('chat-answered');
+        // A Show it button still works later: it only moves the camera.
+        for (const b of this.list.querySelectorAll<HTMLButtonElement>('button:not([data-keep])')) b.disabled = true;
+        for (const c of this.list.querySelectorAll('.chat-card:not(:has([data-keep]))')) c.classList.add('chat-answered');
         break;
       case 'tool':
         this.tool(event);
@@ -309,6 +310,7 @@ export class LabChat {
   private option(action: ChatAction): HTMLButtonElement {
     const b = el('button', 'chat-option', action.label);
     b.type = 'button';
+    if (action.action === 'focus') b.dataset.keep = '1';
     b.addEventListener('click', () => {
       if (action.action === 'focus') { void this.backend.act(action); return; } // Only the camera moves, so no job starts and the button stays.
       for (const other of b.parentElement!.querySelectorAll('button')) other.disabled = true;

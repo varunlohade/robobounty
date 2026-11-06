@@ -152,7 +152,7 @@ def server_flow(root):
     seed = meta["failing_seed"]
     server = start_server(root)
     try:
-        for name, kw in (("no Origin", {"origin": None}), ("other origin", {"origin": "http://evil.example"}), ("main app origin", {"origin": "http://localhost:5199"}), ("other Host", {"host": "evil.example:5298"})):
+        for name, kw in (("no Origin", {"origin": None}), ("other origin", {"origin": "http://evil.example"}), ("main app origin", {"origin": "http://localhost:5198"}), ("other Host", {"host": "evil.example:5298"})):
             status, out = curl("GET", "/api/bounties", **kw)
             check(f"refuses {name}", status == 403 and out["error"] == "origin_refused", f"{status}")
         status, out = curl("POST", "/api/bounties", {"title": "x", "company": "y", "scenarios": [], "cap": 10, "per_failure": 5, "limits": {}}, origin=None)
