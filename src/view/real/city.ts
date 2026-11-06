@@ -189,7 +189,7 @@ export function cityMaterial(noise: { value: THREE.Texture | null }) {
   return new THREE.ShaderMaterial({
     toneMapped: true,
     uniforms: {
-      uHaze: { value: HAZE }, uNoise: noise, uClipY: { value: 1e9 }, uFogK: { value: 1 },
+      uHaze: { value: HAZE }, uNoise: noise, uClipY: { value: 1e9 }, uBuildAt: { value: new THREE.Vector2() }, uBuildR: { value: 1e9 }, uFogK: { value: 1 },
       uDay: { value: 1 }, uLights: { value: 0 }, uCityTint: { value: new THREE.Color(1, 1, 1) }, uGround: { value: new THREE.Color(1, 1, 1) }, uLift: { value: 1 }, uShore: { value: -1e9 },
     },
     vertexShader: /* glsl */`
@@ -199,7 +199,7 @@ export function cityMaterial(noise: { value: THREE.Texture | null }) {
       void main() { vec3 at = vec3(position.xy, position.z * uLift); vW = at; vN = normal; vUv2 = uv; vCol = aColor * aColor; vKind = aKind / 40.0; gl_Position = projectionMatrix * viewMatrix * vec4(at, 1.0); }`,
     fragmentShader: /* glsl */`
       varying vec3 vW; varying vec3 vN; varying vec2 vUv2; varying vec3 vCol; varying float vKind;
-      uniform float uClipY, uDay, uLights, uLift, uShore;
+      uniform vec2 uBuildAt; uniform float uBuildR, uClipY, uDay, uLights, uLift, uShore;
       uniform vec3 uCityTint, uGround;
       ${AIR_GLSL}
       ${HASH_GLSL}
@@ -209,6 +209,9 @@ export function cityMaterial(noise: { value: THREE.Texture | null }) {
       const vec3 SUN = vec3(-0.46, -0.58, 0.67);
       void main() {
         if (vW.y > uClipY) discard;
+        // The build effect: the city spreads out from the tower, behind a bright front.
+        float buildGap = uBuildR - length(vW.xy - uBuildAt);
+        if (buildGap < 0.0) discard;
         // The look's coast: past this wavy line the buildings do not draw and the ground plane is water.
         bool sea = vW.y < uShore + 70.0 * sin(vW.x / 260.0) + 30.0 * sin(vW.x / 83.0);
         if (sea && vKind < 3.5) discard;
@@ -269,7 +272,9 @@ export function cityMaterial(noise: { value: THREE.Texture | null }) {
         vec3 v = normalize(cameraPosition - vW);
         col += gloss * uHaze * (0.5 + 0.9 * pow(1.0 - max(dot(n, v), 0.0), 4.0));
         col = col * uDay + glow;
-        gl_FragColor = vec4(mix(col, uHaze, clamp(airAmount(vW, cameraPosition), 0.0, 1.0)), 1.0);
+        col = mix(col, uHaze, clamp(airAmount(vW, cameraPosition), 0.0, 1.0));
+        if (uBuildR < 1e8) col += vec3(0.7, 0.9, 1.0) * 2.5 * (1.0 - smoothstep(0.0, 0.004 * length(vW - cameraPosition), buildGap));
+        gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,

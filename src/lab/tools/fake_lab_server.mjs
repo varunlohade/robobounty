@@ -159,7 +159,15 @@ const server = createServer((req, res) => {
     if (rest === 'message') {
       emit(s, { type: 'user', text: body.text });
       res.writeHead(202); res.end('{}');
-      if (/scenario|test case/i.test(body.text)) act(s, 'list_scenarios');
+      if (/^add /i.test(body.text) && s.pack === 'inspection') {
+        // A new object, for the build effect's check.
+        const world = poseWorld(s.pack);
+        const part = (name, type, pos, size, material, colour) => ({ name, object: 'antenna_mast', type, pos, quat: [1, 0, 0, 0], size, friction: 0.8, material, colour });
+        world.hash = 'fakehash2';
+        world.solids = [...world.solids, part('antenna_mast_pole', 'cylinder', [1.6, 1.1, 1.1], [0.05, 1.1], 'steel', [0.6, 0.6, 0.62]), part('antenna_mast_base', 'box', [1.6, 1.1, 0.06], [0.35, 0.35, 0.06], 'dark_steel', [0.2, 0.2, 0.22]), part('antenna_mast_arm', 'box', [1.6, 1.1, 1.9], [0.45, 0.03, 0.03], 'steel', [0.6, 0.6, 0.62])];
+        emit(s, world);
+        emit(s, { type: 'idle' });
+      } else if (/scenario|test case/i.test(body.text)) act(s, 'list_scenarios');
       else if (/^(run|run it|run all|go)$/i.test(body.text.trim())) act(s, 'run_campaign');
       else if (s.pack === 'inspection') {
         emit(s, { type: 'pose_trial', label: 'Normal run', passed: true, verdict: 'passed', reason: RESULTS.plant.reason, url: `/api/sessions/${s.id}/pose_runs/plant/replay` });

@@ -88,11 +88,11 @@ export function bakeGrime(renderer: THREE.WebGLRenderer, size: number): THREE.We
 export function skyDome(texture: { value: THREE.Texture | null }): THREE.Mesh {
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthTest: false, depthWrite: false, toneMapped: true,
-    uniforms: { uSky: texture, uHaze: { value: HAZE }, uHas: { value: 0 }, uSkyMix: { value: 0 }, uSkyLow: { value: new THREE.Color(1, 1, 1) }, uSkyHigh: { value: new THREE.Color(1, 1, 1) }, uSkyFog: { value: 0 } },
+    uniforms: { uSky: texture, uHaze: { value: HAZE }, uBlue: { value: 0 }, uBlueColor: { value: new THREE.Color() }, uHas: { value: 0 }, uSkyMix: { value: 0 }, uSkyLow: { value: new THREE.Color(1, 1, 1) }, uSkyHigh: { value: new THREE.Color(1, 1, 1) }, uSkyFog: { value: 0 } },
     vertexShader: `varying vec3 vDir; void main() { vDir = position; vec4 p = projectionMatrix * vec4(mat3(viewMatrix) * position, 1.0); gl_Position = p; }`,
     fragmentShader: /* glsl */`
       varying vec3 vDir;
-      uniform sampler2D uSky; uniform vec3 uHaze, uSkyLow, uSkyHigh; uniform float uHas, uSkyMix, uSkyFog;
+      uniform sampler2D uSky; uniform vec3 uHaze, uSkyLow, uSkyHigh, uBlueColor; uniform float uHas, uSkyMix, uSkyFog, uBlue;
       const float PI = 3.14159265;
       void main() {
         vec3 d = normalize(vDir);
@@ -105,7 +105,7 @@ export function skyDome(texture: { value: THREE.Texture | null }): THREE.Mesh {
         sky = mix(sky, mix(uSkyLow, uSkyHigh, pow(clamp(d.z, 0.0, 1.0), 0.45)) * (0.55 + 0.75 * cloud), uSkyMix);
         sky = mix(sky, uHaze, uSkyFog);
         float lift = smoothstep(-0.015, 0.11, d.z);
-        gl_FragColor = vec4(mix(uHaze, sky, lift), 1.0);
+        gl_FragColor = vec4(mix(mix(uHaze, sky, lift), uBlueColor, uBlue), 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,

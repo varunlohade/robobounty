@@ -17,7 +17,7 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
       uClean: { value: new THREE.Vector2(0.1, 0.34) }, uFilm: { value: 0.8 }, uWet: { value: 0.2 },
       uGrid: { value: new THREE.Vector4(grid.offsetX, grid.spacingX, grid.offsetZ, grid.spacingZ) },
       uBlocks: { value: Array.from({ length: MAX_BLOCKS }, () => new THREE.Vector4()) }, uBlockN: { value: 0 },
-      uRobot: { value: new THREE.Vector4(0, 0, 1, 0) }, uRobotNear: { value: 1 }, uFilmTop: { value: 1 }, uFogK: { value: 1 },
+      uRobot: { value: new THREE.Vector4(0, 0, 1, 0) }, uRobotNear: { value: 1 }, uClipZ: { value: 1e9 }, uFilmTop: { value: 1 }, uFogK: { value: 1 },
       // The look. As built, these change nothing.
       uBody: { value: new THREE.Color(0, 0, 0) }, uBodyLight: { value: new THREE.Color(1, 1, 1) }, uBodyAmt: { value: 0 }, uReflKeep: { value: 1 }, uFilmKeep: { value: 1 },
       uSnow: { value: 0 }, uRain: { value: 0 }, uTime: { value: 0 }, uDropBack: { value: 0 }, uDustFilm: { value: 0 },
@@ -28,7 +28,7 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
       varying vec3 vW;
       uniform sampler2D uReflect, uDirtA, uDirtB, uDrops;
       uniform mat4 uTexMat;
-      uniform float uHasReflect, uDirtMix, uFilm, uWet, uRobotNear, uBodyAmt, uReflKeep, uFilmKeep, uRooms, uSnow, uRain, uTime, uDropBack, uDustFilm;
+      uniform float uClipZ, uHasReflect, uDirtMix, uFilm, uWet, uRobotNear, uBodyAmt, uReflKeep, uFilmKeep, uRooms, uSnow, uRain, uTime, uDropBack, uDustFilm;
       uniform vec3 uEnvFlat, uBody, uBodyLight, uTint, uTintGlow, uFrit;
       uniform vec4 uDirtRect, uGrid, uRobot;
       uniform vec4 uBlocks[${MAX_BLOCKS}];
@@ -46,6 +46,7 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
       }
       float roundBox(vec2 p, vec2 b, float r) { vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
       void main() {
+        if (vW.z > uClipZ) discard;
         vec2 p = vW.xz;
         vec2 gr = (p - uGrid.xz) / uGrid.yw;
         vec2 id = floor(gr);

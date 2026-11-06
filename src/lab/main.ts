@@ -109,9 +109,28 @@ function plainName(said: string[]): string {
   return 'window_tower';
 }
 
+// What this session has already built, so a reload, a reconnect, an undo or a tab change never builds it again. Only for the blueprint effect.
+function buildMemory(session: () => string) {
+  const own = new Map<string, string[]>(); // No storage: remembered for this page only.
+  const read = (key: string): string[] | null => {
+    try { const held = sessionStorage.getItem(key); if (held) return JSON.parse(held) as string[]; } catch { /* no storage, or a bad value */ }
+    return own.get(key) ?? null;
+  };
+  return (objects: string[]) => {
+    const key = `crashlab-built-${session()}`, seen = read(key);
+    const all = [...new Set([...(seen ?? []), ...objects])];
+    own.set(key, all);
+    try { sessionStorage.setItem(key, JSON.stringify(all)); } catch { /* the page's own copy is enough */ }
+    return { first: seen === null, fresh: seen === null ? [] : [...new Set(objects)].filter(o => !seen.includes(o)) };
+  };
+}
+const windowObjects = (world: unknown): string[] => isV5(world as Record<string, unknown>) ? ((world as { objects: { name: string }[] }).objects).map(o => o.name) : [];
+const plantObjects = (scene: Pick<PoseReplay, 'solids' | 'scenery'>): string[] => [...scene.solids, ...scene.scenery].map(p => p.object ?? p.name ?? '').filter(Boolean);
+
 async function live(root: HTMLElement) {
   const pack = chosenPack();
   root.dataset.pack = pack ?? 'window';
+  const built = buildMemory(() => backend.id);
   const onEvent = async (e: ServerEvent) => {
     switch (e.type) {
       case 'pose_world': showPoseWorld(e); break;
@@ -174,7 +193,10 @@ async function live(root: HTMLElement) {
   const applyView = (e: ServerEvent) => {
     const view = current();
     if (!view) return;
+    // The first build finishes before a picture edit lands, so an early edit does not cut it short.
+    if (view.building) { view.afterBuild = () => applyView(e); return; }
     view.applyWorld(e.xml, e.world);
+    view.buildObjects(built(windowObjects(e.world)).fresh);
     const viewport = document.querySelector<HTMLElement>('.viewport');
     if (viewport) {
       viewport.dataset.hash = String(e.hash);
@@ -196,8 +218,8 @@ async function live(root: HTMLElement) {
   let shownHash = '';
   let again: (() => void) | null = null;
 
-  function playPoses(replay: PoseReplay, key: string) {
-    const world = posesPage(replay, statusRight, fixed);
+  function playPoses(replay: PoseReplay, key: string, fresh?: ReadonlySet<string>) {
+    const world = posesPage(replay, statusRight, fixed, fresh);
     swap(world.page, () => { world.stop(); poseView = () => null; });
     world.start();
     poseView = () => world.view;
@@ -215,23 +237,25 @@ async function live(root: HTMLElement) {
     const same = shownReplay && e.hash === shownHash;
     shownHash = String(e.hash);
     const scene = { solids: e.solids, scenery: e.scenery, route: e.route, floor_friction: e.floor_friction };
+    const { first, fresh } = built(plantObjects(scene));
     if (same && shownReplay!.frames.length) {
-      playPoses({ ...shownReplay!, ...scene }, 'same_physics');
+      playPoses({ ...shownReplay!, ...scene }, 'same_physics', new Set(fresh));
       return;
     }
     const replay = previewReplay({ ...scene, note: String(e.note) });
     again = () => playPreview(replay);
-    playPreview(replay);
+    playPreview(replay, first, fresh);
   }
 
-  function playPreview(replay: PoseReplay) {
+  function playPreview(replay: PoseReplay, first = false, fresh: string[] = []) {
     const page = el('div', 'world-body');
     const viewport = el('div', 'viewport');
     viewport.append(el('div', 'sim-tag sim-label', 'Simulated. World preview. No robot has run yet.'));
     page.append(viewport);
     let view: PosesView | null = null;
     swap(page, () => { view?.dispose(); poseView = () => null; });
-    view = new PosesView(viewport, replay);
+    view = new PosesView(viewport, replay, new Set(fresh));
+    if (first) view.buildFirst(); else view.buildObjects();
     poseView = () => view;
     shownReplay = replay;
     viewport.dataset.ready = 'true';
@@ -240,6 +264,7 @@ async function live(root: HTMLElement) {
   async function showPoseTrial(url: string) {
     const replay = await fetchWith(() => loadPoses(`${SERVER}${url}`), url);
     if (!replay) return;
+    built(plantObjects(replay));
     again = () => playPoses(replay, url);
     playPoses(replay, url);
   }
@@ -288,6 +313,8 @@ async function live(root: HTMLElement) {
 
   function onGrid(e: ServerEvent) {
     if (!grid || grid.campaign !== e.campaign) {
+      current()?.finishBuilds();
+      poseView()?.finishBuilds();
       grid?.leave();
       grid = makeGrid(e);
       const list = scenarios;
@@ -348,6 +375,7 @@ async function live(root: HTMLElement) {
     restoreOnLoss(view, fresh => { view = fresh; }, fixed);
     current = () => view;
     view.sync();
+    if (built(windowObjects(e.world)).first) view.buildFirst();
     viewport.dataset.ready = 'true';
     viewport.dataset.hash = String(e.hash);
   }
@@ -381,6 +409,8 @@ async function live(root: HTMLElement) {
     current = () => world.view;
     await world.start();
     if (!isV5(trial.world)) world.view?.setLook(look);
+    // A solid new object first shows in the run that tested it. It builds itself as the replay starts.
+    world.view?.buildObjects(built(windowObjects(trial.world)).fresh);
     world.viewport.dataset.tid = tid;
   }
 

@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { el, icon } from '../app/dom.ts';
 import { fmtTime } from '../app/world_page.ts';
 import { generatedModel } from '../view/real/generated.ts';
+import { BLUE_GROUND, BlueprintBuild, OBJECT_DRAW_S, OBJECT_REVEAL_S, edgeLines, groundGrid, reducedMotion, smooth, staggered, type BuildPart } from '../view/real/blueprint.ts';
 
 export interface Primitive {
   name?: string; object?: string; type: 'box' | 'cylinder' | 'capsule' | 'hull' | 'glb';
@@ -225,10 +226,15 @@ export class PosesView {
   private userFramed = false;
   private loop = 0;
   private base = new THREE.Vector3();
+  /** The blueprint effects now running. See buildFirst and buildObjects. */
+  builds: BlueprintBuild[] = [];
+  private plant: THREE.Mesh[] = [];
+  private floor: THREE.Mesh | null = null;
+  private routeGroup: THREE.Group | null = null;
   frame = 0;
   onLost: (() => void) | null = null;
 
-  constructor(private host: HTMLElement, readonly replay: PoseReplay) {
+  constructor(private host: HTMLElement, readonly replay: PoseReplay, private fresh: ReadonlySet<string> = new Set()) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.setClearColor(BACKGROUND);
@@ -300,6 +306,7 @@ export class PosesView {
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.receiveShadow = true;
     this.scene.add(floor);
+    this.floor = floor;
     this.disposers.push(() => { floorGeometry.dispose(); floorMaterial.dispose(); });
 
     const groups = new Map<string, Primitive[]>();
@@ -307,7 +314,9 @@ export class PosesView {
     this.drawGenerated(all);
     for (const p of all) {
       if (p.glb) continue;
-      const key = `${p.material ?? 'plain'}|${p.colour.join(',')}`;
+      // A new object keeps its own mesh, so it alone can build itself.
+      const own = this.fresh.has(p.object ?? p.name ?? '') ? p.object ?? p.name : '';
+      const key = `${own}|${p.material ?? 'plain'}|${p.colour.join(',')}`;
       const list = groups.get(key);
       if (list) list.push(p); else groups.set(key, [p]);
     }
@@ -329,6 +338,8 @@ export class PosesView {
       mesh.castShadow = name !== 'line' && name !== 'lamp' && name !== 'wet';
       mesh.receiveShadow = true;
       mesh.name = name;
+      mesh.userData.object = this.fresh.has(list[0].object ?? list[0].name ?? '') ? list[0].object ?? list[0].name : '';
+      this.plant.push(mesh);
       this.scene.add(mesh);
       this.disposers.push(() => { geometry.dispose(); material.dispose(); });
     }
@@ -346,6 +357,12 @@ export class PosesView {
         model.quaternion.set(p.quat[0], p.quat[1], p.quat[2], p.quat[3]);
         model.name = `generated:${object}`;
         this.scene.add(model);
+        if (this.fresh.has(object) && !reducedMotion()) {
+          const meshes: THREE.Mesh[] = [];
+          model.traverse(o => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
+          this.scene.updateMatrixWorld(true);
+          this.startBuild('object', [{ meshes, lines: edgeLines(meshes, 40), at: 0, draw: OBJECT_DRAW_S, revealAt: OBJECT_DRAW_S, reveal: OBJECT_REVEAL_S }]);
+        }
       }).catch(err => {
         if (this.stopped) return;
         this.host.append(el('div', 'sim-tag sim-key sim-bad', `The model of ${object} did not load, so its collision shapes are drawn. ${String(err)}`));
@@ -379,6 +396,7 @@ export class PosesView {
       group.add(m);
       this.disposers.push(() => g.dispose());
     });
+    this.routeGroup = group;
     this.scene.add(group);
   }
 
@@ -488,6 +506,7 @@ export class PosesView {
     const run = ++this.loop;
     const tick = () => {
       if (this.stopped || run !== this.loop) return;
+      if (this.builds.length) { const now = performance.now(); this.builds = this.builds.filter(b => b.step(now)); this.dirty = true; }
       if (this.dirty) {
         this.dirty = false;
         this.renderer.render(this.scene, this.camera);
@@ -570,7 +589,59 @@ export class PosesView {
 
   setLook() { /* A pack's plant has no look. */ }
 
+  /** Ends any blueprint effect at once. A run or a replay that starts calls this. */
+  finishBuilds() {
+    for (const b of this.builds) b.finish();
+    this.builds = [];
+  }
+
+  private startBuild(kind: string, parts: BuildPart[], onFrame?: (t: number) => void) {
+    this.host.dataset.build = kind;
+    this.host.dataset.buildsRun = String(Number(this.host.dataset.buildsRun ?? 0) + 1);
+    const build = new BlueprintBuild(this.scene, this.renderer, this.camera, parts, {
+      pixels: this.renderer.getPixelRatio(), single: kind === 'object', onFrame,
+      onEnd: () => { if (!this.builds.some(b => b !== build)) delete this.host.dataset.build; this.dirty = true; },
+    });
+    this.builds.push(build);
+    this.dirty = true;
+  }
+
+  /** The first build of a session's plant: it draws itself as a blueprint, then turns real, largest structure first. Call it right after the constructor. */
+  buildFirst() {
+    if (reducedMotion()) return;
+    this.scene.updateMatrixWorld(true);
+    const size = (mesh: THREE.Mesh) => { const s = new THREE.Box3().setFromObject(mesh).getSize(new THREE.Vector3()); return s.x * s.y + s.y * s.z + s.x * s.z; };
+    const c = this.lastChase;
+    const floor = { meshes: [this.floor!], lines: groundGrid(c.x + 4, c.y + 4, 22, 1, 0.004), axis: 'y' as const, span: [c.y - 6, c.y + 20] as [number, number], noBand: false };
+    const groups = [...this.plant].sort((a, b) => size(b) - size(a)).map(mesh => {
+      const s = new THREE.Box3().setFromObject(mesh).getSize(new THREE.Vector3());
+      return { meshes: [mesh], lines: edgeLines([mesh]), axis: s.z < 0.05 ? (s.x > s.y ? 'x' as const : 'y' as const) : 'z' as const };
+    });
+    const route: THREE.Mesh[] = [];
+    this.routeGroup?.traverse(o => { if ((o as THREE.Mesh).isMesh) route.push(o as THREE.Mesh); });
+    const routePart = { meshes: route, lines: [], axis: 'x' as const, noBand: true };
+    const ground = BLUE_GROUND.clone().multiplyScalar(0.4), real = new THREE.Color(BACKGROUND), now = new THREE.Color();
+    this.renderer.setClearColor(ground);
+    const parts = staggered([floor, ...groups, routePart], [0, 3.2], [2.4, 7.2], 1.3, 1.5);
+    this.startBuild('first', parts, t => {
+      this.renderer.setClearColor(now.copy(ground).lerp(real, smooth((t - 3.4) / 2.6)));
+    });
+  }
+
+  /** Each new object, and only it. It got its own mesh because the constructor was told its name. The camera stays where it is. */
+  buildObjects() {
+    if (reducedMotion()) return;
+    this.scene.updateMatrixWorld(true);
+    const parts: BuildPart[] = [];
+    for (const name of this.fresh) {
+      const meshes = this.plant.filter(mesh => mesh.userData.object === name);
+      if (meshes.length) parts.push({ meshes, lines: edgeLines(meshes), at: 0, draw: OBJECT_DRAW_S, revealAt: OBJECT_DRAW_S, reveal: OBJECT_REVEAL_S });
+    }
+    if (parts.length) this.startBuild('object', parts);
+  }
+
   dispose() {
+    this.finishBuilds();
     this.stopped = true;
     this.observer.disconnect();
     this.controls.dispose();
@@ -583,7 +654,7 @@ export class PosesView {
 }
 
 /** The page for one replay: the same viewport, transport bar and status line as a window robot's run. */
-export function posesPage(replay: PoseReplay, statusRight: HTMLElement, onFix?: (code: string, words: string) => void) {
+export function posesPage(replay: PoseReplay, statusRight: HTMLElement, onFix?: (code: string, words: string) => void, fresh?: ReadonlySet<string>) {
   const page = el('div', 'page');
   const body = el('div', 'world-body');
   const viewport = el('div', 'viewport');
@@ -689,7 +760,8 @@ export function posesPage(replay: PoseReplay, statusRight: HTMLElement, onFix?: 
   addEventListener('keydown', onKey);
 
   const build = () => {
-    view = new PosesView(viewport, replay);
+    view = new PosesView(viewport, replay, fresh);
+    view.buildObjects();
     let rebuilds = 0;
     const arm = (v: PosesView) => {
       v.onLost = () => {

@@ -11,6 +11,7 @@ import { compositeMaterial } from '../view/real/post.ts';
 import { buildRobot } from '../view/real/robot.ts';
 import { Weather } from '../view/real/weather.ts';
 import { generatedModel } from '../view/real/generated.ts';
+import { BLUE_GROUND, BlueprintBuild, OBJECT_DRAW_S, OBJECT_REVEAL_S, edgeLines, groundGrid, reducedMotion, smooth, staggered, type BuildPart } from '../view/real/blueprint.ts';
 import type { Replay } from './replay.ts';
 import { isV5, worldFacts, type Trial } from './trial.ts';
 
@@ -98,6 +99,12 @@ export class SimView {
   private framed = false; private glide: { t0: number; pos0: THREE.Vector3; tgt0: THREE.Vector3; pos1: THREE.Vector3; tgt1: THREE.Vector3 } | null = null;
   private blocksDirty = false;
   private backButton: HTMLButtonElement | null = null;
+  /** The blueprint effects now running. See buildFirst and buildObjects. */
+  builds: BlueprintBuild[] = [];
+  private buildingModels = new Set<string>();
+  private lens = 1;
+  /** Waits for the first build to end: a picture edit that arrives during it. */
+  afterBuild: (() => void) | null = null;
 
   constructor(private host: HTMLElement, private replay: Replay, private trial: Trial) {
     const built = performance.now();
@@ -285,6 +292,7 @@ export class SimView {
       this.controls.update();
       this.stepCamera(now);
       this.stepWeather(now);
+      if (this.builds.length) { this.builds = this.builds.filter(b => b.step(now)); this.dirty = true; this.shadowsDirty = true; }
       if (this.dirty && this.host.clientWidth > 0) { this.dirty = false; this.renderFrame(); this.watchSpeed(now); }
       this.lastTick = now;
       requestAnimationFrame(loop);
@@ -307,6 +315,8 @@ export class SimView {
   }
 
   dispose() {
+    this.afterBuild = null;
+    this.finishBuilds();
     this.stopped = true;
     this.backButton?.remove();
     this.observer.disconnect();
@@ -476,6 +486,7 @@ export class SimView {
     this.trial.world = world;
     this.glass.uniforms.uWet.value = Number(worldFacts(world).wetness ?? 0);
     if (xml !== this.trial.xml) {
+      this.finishBuilds();
       this.replay.swapModel(xml);
       const mj = this.replay.mj, m = this.replay.model;
       this.robotBody = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY.value, 'robot');
@@ -537,6 +548,137 @@ export class SimView {
     this.controls.target.copy(this.followTo).add(LOOK_FROM_ROBOT);
     this.controls.update();
     this.dirty = true;
+  }
+
+  get building() { return this.host.dataset.build === 'first'; }
+
+  /** Ends any blueprint effect at once. A run or a replay that starts calls this. */
+  finishBuilds() {
+    for (const b of this.builds) b.finish();
+    this.builds = [];
+  }
+
+  private startBuild(kind: string, parts: BuildPart[], onFrame?: (t: number) => void) {
+    this.host.dataset.build = kind;
+    this.host.dataset.buildsRun = String(Number(this.host.dataset.buildsRun ?? 0) + 1);
+    const build = new BlueprintBuild(this.scene, this.renderer, this.camera, parts, {
+      pixels: this.renderer.getPixelRatio(), lineGain: this.hdr ? 1.15 : 1, bandGain: this.hdr ? 14 : 1, target: this.hdr, single: kind === 'object', onFrame,
+      onEnd: () => { if (!this.builds.some(b => b !== build)) delete this.host.dataset.build; this.dirty = true; this.shadowsDirty = true; const next = this.afterBuild; this.afterBuild = null; next?.(); },
+    });
+    this.builds.push(build);
+    this.dirty = true;
+    return build;
+  }
+
+  /** The first build of a session's world: the prepared scene draws itself as a blueprint, then turns real, largest first. Call it after sync, before the first frame. */
+  buildFirst() {
+    if (reducedMotion()) return;
+    const tower = this.towerBox();
+    const x0 = tower.x - tower.hx, x1 = tower.x + tower.hx, top = tower.z + tower.hz, robot = this.robotPos;
+    // Where the wall is in view. The tower is far taller than the frame, so the sweep runs where the eye is.
+    this.camera.updateMatrixWorld();
+    const seen = [-1, 0, 1].flatMap(sx => [-1, 0, 1].map(sy => {
+      const d = new THREE.Vector3(sx, sy, 0.5).unproject(this.camera).sub(this.camera.position);
+      return d.y > 1e-3 ? this.camera.position.z + (d.z * -this.camera.position.y) / d.y : null;
+    })).filter((z): z is number => z !== null);
+    const nearTop = Math.min(top, Math.max(robot.z + 2, ...seen) + 0.5), nearBottom = Math.max(0, robot.z - 12);
+
+    const shell = this.built.children.filter((o): o is THREE.Mesh => (o as THREE.Mesh).isMesh && !this.drawn.some(d => d.mesh === o));
+    const wallLines: number[] = [];
+    const y = -0.012;
+    for (const x of this.bars.x) if (Math.abs(x - robot.x) < 60) wallLines.push(x, y, Math.max(0, robot.z - 80), x, y, top);
+    for (const z of this.bars.z) if (z > robot.z - 80) wallLines.push(Math.max(x0, robot.x - 60), y, z, Math.min(x1, robot.x + 60), y, z);
+    const bx = [x0, x1], by = [0, tower.y + tower.hy];
+    for (const x of bx) for (const v of by) wallLines.push(x, v, 0, x, v, top);
+    for (const z of [0, top]) for (const v of by) wallLines.push(x0, v, z, x1, v, z);
+    for (const z of [0, top]) for (const x of bx) wallLines.push(x, by[0], z, x, by[1], z);
+
+    // A fine dim grid close to the robot, so the wall reads as a surface and not as loose lines.
+    const fine: number[] = [];
+    const FINE_M = 0.25, FINE_HALF = 7;
+    for (let k = -FINE_HALF / FINE_M; k <= FINE_HALF / FINE_M; k++) {
+      const fx = Math.round(robot.x / FINE_M + k) * FINE_M, fz = Math.round(robot.z / FINE_M + k) * FINE_M;
+      fine.push(fx, y, robot.z - FINE_HALF, fx, y, robot.z + FINE_HALF, robot.x - FINE_HALF, y, fz, robot.x + FINE_HALF, y, fz);
+    }
+
+    const u = this.city.uniforms, glassClip = this.glass.uniforms.uClipZ;
+    u.uBuildAt.value.set(robot.x, 0);
+    const ground = { meshes: [], lines: groundGrid(robot.x, -300, 600, 60, 2), gain: 0.32, fadeLines: true, clip: (h: number) => { u.uBuildR.value = h < 0 ? 0 : h; }, span: [0, 7000] as [number, number], noBand: true };
+    const wall = { meshes: shell, bandLift: new THREE.Vector3(0, -0.014, 0), lines: wallLines, clip: (h: number) => { glassClip.value = h; }, span: [nearBottom, nearTop] as [number, number] };
+    const wallFine = { meshes: [], lines: fine, gain: 0.3, noBand: true, span: wall.span };
+
+    // The objects on the tower, one object at a time. An object's many geoms are one part.
+    const objects = new Map<string, THREE.Mesh[]>();
+    const { model: m, mj } = this.replay;
+    for (const { mesh, geom } of this.drawn) {
+      if (!mesh.visible) continue;
+      const name = (mj.mj_id2name?.(m, mj.mjtObj.mjOBJ_GEOM.value, geom) ?? String(geom)).split('.')[0];
+      const list = objects.get(name);
+      if (list) list.push(mesh); else objects.set(name, [mesh]);
+    }
+    this.scene.updateMatrixWorld(true);
+    const volume = (meshes: THREE.Mesh[]) => { const b = new THREE.Box3(); for (const mesh of meshes) b.expandByObject(mesh); const s = b.getSize(new THREE.Vector3()); return s.x * s.y + s.y * s.z + s.x * s.z; };
+    const fixtures = [...objects.values()].sort((a, b) => volume(b) - volume(a)).map(meshes => ({ meshes, lines: edgeLines(meshes) }));
+    const robotMeshes: THREE.Mesh[] = [];
+    this.robot.root.traverse(o => { if ((o as THREE.Mesh).isMesh) robotMeshes.push(o as THREE.Mesh); });
+    // The robot's drawing: its curved rings and its straight square lines. A long slanted edge is only how a curved shell is cut into triangles.
+    const robotPart = { meshes: robotMeshes, linePx: 1.1, lines: edgeLines(robotMeshes, 30, (a, b) => {
+      const dx = Math.abs(a.x - b.x), dy = Math.abs(a.y - b.y), dz = Math.abs(a.z - b.z), length = Math.hypot(dx, dy, dz);
+      return length < 0.025 || Math.max(dx, dy, dz) > length * 0.985;
+    }) };
+    const tether = this.robot.tether.matrixWorld;
+    const tip = new THREE.Vector3(0, 0, 0).applyMatrix4(tether), anchor = new THREE.Vector3(0, 1, 0).applyMatrix4(tether);
+
+    const skyU = (this.dome.material as THREE.ShaderMaterial).uniforms;
+    skyU.uBlueColor.value.copy(BLUE_GROUND);
+    skyU.uBlue.value = 1;
+    this.lens = 0;
+    const parts: BuildPart[] = [
+      { ...ground, at: 0, draw: 1.2, revealAt: 2.9, reveal: 3.6 }, // The city spreads while the sky clears.
+      { ...wall, at: 0.2, draw: 1.5, revealAt: 3.3, reveal: 1.9 },
+      { ...wallFine, at: 0.5, draw: 1.3, revealAt: 3.3, reveal: 1.9 },
+      ...staggered([...fixtures, robotPart], [1, 3], [4.1, 6.7], 1, 1.1),
+      { meshes: [this.robot.tether], lines: [tip.x, tip.y, tip.z, anchor.x, anchor.y, anchor.z], at: 2.6, draw: 0.6, revealAt: 6.5, reveal: 0.7, noBand: true, span: [tip.z, Math.min(anchor.z, nearTop)] },
+    ];
+    // The glass draws the robot's contact shadow itself. It waits for the robot.
+    const robotAt = parts[parts.length - 2].revealAt, near = this.glass.uniforms.uRobotNear, nearReal = near.value;
+    near.value = 0;
+    this.startBuild('first', parts, t => {
+      near.value = nearReal * smooth((t - robotAt) / 0.6);
+      skyU.uBlue.value = 1 - smooth((t - 4) / 2.2);
+      this.lens = smooth((t - 5.4) / 1.8);
+    });
+  }
+
+  /** Each new object, and only it: a blueprint, then real from the bottom up. The camera stays where it is. */
+  buildObjects(names: string[]) {
+    if (!names.length || reducedMotion()) return;
+    const { model: m, mj } = this.replay;
+    const world = this.trial.world as Record<string, any> | undefined;
+    const generated = new Set(isV5(world) ? (world!.objects as Record<string, any>[]).filter(o => o.kind === 'generated').map(o => o.name as string) : []);
+    this.scene.updateMatrixWorld(true);
+    const parts: BuildPart[] = [];
+    for (const name of names) {
+      if (generated.has(name)) {
+        const model = this.built.children.find(o => o.name === `generated:${name}`);
+        if (model) this.buildModel(model); else this.buildingModels.add(name); // Its file is still loading.
+        continue;
+      }
+      const meshes = this.drawn.filter(({ mesh, geom }) => {
+        const id = mj.mj_id2name?.(m, mj.mjtObj.mjOBJ_GEOM.value, geom) ?? '';
+        return mesh.visible && (id === `obj_${name}` || id.startsWith(`obj_${name}.`));
+      }).map(d => d.mesh);
+      if (meshes.length) parts.push({ meshes, lines: edgeLines(meshes), at: 0, draw: OBJECT_DRAW_S, revealAt: OBJECT_DRAW_S, reveal: OBJECT_REVEAL_S });
+    }
+    if (parts.length) this.startBuild('object', parts);
+  }
+
+  private buildModel(model: THREE.Object3D) {
+    if (reducedMotion()) return;
+    this.scene.updateMatrixWorld(true);
+    const meshes: THREE.Mesh[] = [];
+    model.traverse(o => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
+    this.startBuild('object', [{ meshes, lines: edgeLines(meshes, 40), at: 0, draw: OBJECT_DRAW_S, revealAt: OBJECT_DRAW_S, reveal: OBJECT_REVEAL_S }]);
   }
 
   /** What is drawn, for a check against the physics: each named geom's drawn bounds, the wall and the bars. */
@@ -706,6 +848,7 @@ export class SimView {
         model.rotation.set(o.euler_deg[0] * Math.PI / 180, o.euler_deg[1] * Math.PI / 180, o.euler_deg[2] * Math.PI / 180, 'XYZ');
         model.name = `generated:${o.name}`;
         built.add(model);
+        if (this.buildingModels.delete(o.name)) this.buildModel(model);
       }).catch(() => {
         for (const { name, mesh } of hulls) if (name.startsWith(`obj_${o.name}.h`)) mesh.visible = true;
       });
@@ -820,6 +963,7 @@ export class SimView {
       r.render(this.scene, this.camera);
       r.setRenderTarget(null);
       const u = this.composite.uniforms;
+      u.uAperture.value = 9 * r.getPixelRatio() * this.lens;
       u.uFocus.value = Math.max(0.2, this.camera.position.distanceTo(this.framed ? this.controls.target : this.robotPos));
       u.uSeed.value = this.seed;
       r.render(this.postScene, this.postCam);
