@@ -1,127 +1,231 @@
-# CrashLab demo script
+# CrashLab demo: 3 minutes
 
-Finalist slot: 4 minutes of demo, then 3 minutes of Q&A. Judges score Technicality, Originality, Practicality, Usability and WOW, in that order.
+The talk is 180 seconds, with nothing spare. Cut the Open file line if you run late. Quoted lines are the words to say. `Code` is what to type. All results are simulated.
 
-This script has 521 spoken words. At 140 words a minute that is about 3:43. Read it aloud once with a timer before the slot, because the word count is only an estimate. If you run long, cut the lines marked (cut first).
+Partner judges watch the video. Finalists get 4 minutes plus 3 minutes of questions, so this script fits both.
 
-Open before you start:
+CONFIRM: nobody has rehearsed this aloud. App waits are measured. Spoken times are estimates at about 2.5 words a second.
 
-- `http://localhost:5199/app.html?recorded=1`. It needs only `npx vite --port 5199`.
-- `design/render/clip_slip.mp4` in a muted player.
-- If you show the bounty live, walk the live flow first with the first 12 worlds. That took 5 to 7 minutes here, with 25 to 69 s for the gate and 60 s for the dispute window. `design/video/draft.mp4` has the same scene, so you can play that part instead.
+CONFIRM: this script enters as local guest. Change step 1 only if a real World ID scan has worked on staging.
 
-## The script
+<!-- App wait times:
+design/e2e/stored/timing.json: `--stored` run, 7 Nov. 08-ai-builds 6.5 s, 10-list-scenarios 0.6 s, 12-grid-done 18.4 s, 20-ask-ai-did-not-help 147.5 s.
+design/e2e/recorded/timing.json: `--recorded` run, 7 Nov. 12-grid-done 22.1 s, 13-red-square 0.5 s, 15-open-file 0.2 s, 16-ask-ai 0.1 s, 18-bounty-shows 1.1 s, 21-hidden-world-proof 120.1 s, 23-finalize 59.0 s, 25-claim 0.1 s.
+Not in timing.json, measured 7 Nov with a headless Chrome script against `--stored`: brief 7.7 s, wind and wet change 17.1 s, list 0.8 s, grid on that changed world 46.7 s, a real Find the limit 43.9 s. Same method against `--recorded`, with both servers up: Find the limit 0.1 s, labelled recorded. -->
 
-### 0:00 Cold open (25 s)
+## Why two servers
 
-*Show: `clip_slip.mp4`. Say the first line over the slide.*
+Each mode can do only part of the flow.
 
-> Wind near 36 metres a second. A window robot on a glass tower. Watch it go.
->
-> That robot does not exist. This is a recorded simulator run, drawn again in Blender. This world slid in 2 of 3 repeats. The third came off the glass.
->
-> We want you to find this on a laptop, before anyone hangs hardware on a tower.
+- `--stored` runs real physics, so typed world changes work. It answers only exact stored messages. The grid on the changed world takes 47 seconds, and Ask AI re-tests for 148 seconds. In our run the bounty fix came back "Not fixed", 3 of 4 worlds, so this mode pays nothing.
+- `--recorded` replays stored results. Its grid takes 22 seconds, Ask AI answers at once, and the end-to-end check pays out. It refuses world changes.
 
-### 0:25 Brief (30 s)
+So the talk starts on `--stored`, then moves to `--recorded` for the rest, and says so aloud.
 
-*Show: app, chat scrolled to the top.*
+## Set up, about 8 minutes before you speak
 
-> This is CrashLab. Chat on the left, simulation on the right. You describe the robot and the place in plain English.
->
-> Here the brief says glass towers in Dubai: strong wind, humidity, low and high friction, odd edges, heat. The AI turns those words into numbers. Our code checks every number before it builds anything.
->
-> Seven pass or fail rules go down before any run.
+The owner's vite may hold port 5199, so use these ports. Run each command in its own terminal.
 
-### 0:55 Worlds (30 s)
+```
+npm run demo -- --stored --ports 6499,6498,6497,6496
+npm run demo -- --recorded --ports 6199,6198,6297,6298 --board-root /tmp/crashlab-board
+```
 
-*Show: `52 worlds` tab, the map at the top. Point at the group names and the "Not tested" list.*
+Delete `/tmp/crashlab-board` first if it exists. Then open five tabs, in this order.
 
-> A scenario agent reads the chat and picks the tests. Here it chose 52 worlds in 8 groups. We didn't set that number. It gives its reason too.
->
-> A factor counts only if it changes the physics in code. Airborne sand has no model here, so it goes on this list: not tested. It never gets a fake pass.
+**Tab 1, the opening.** Open `http://localhost:6499/`. Leave it on the login page.
 
-### 1:25 Test (25 s)
+**Tab 3, the payout. Do this one early, because it needs about 3 minutes of waiting.**
 
-*Show: the map, then the Report tab.*
+1. Open `http://localhost:6199/`, click Enter as local guest, then CrashLab, Window cleaning, Open CrashLab.
+2. Click List test scenarios, then Run 34 scenarios. Wait for the grid to finish.
+3. Click a red Slipped square, then Open file, then Ask AI to fix: Slipped (6).
+4. Click Post a bounty. Title: `The robot slides on low suction`. Company: `Tower Services (test company)`. Click Post the bounty.
+5. Click Post a bounty, top right. Choose the Stalled failure. Title: `The robot stops short near the top`. Company: `Tower Services (test company)`. Click Post the bounty.
+6. Click Submit a fix. Name: `ana`. Paste all of `policy/bounty/fixtures/fix5/good_match_fan.py`. Click Run check, then simulation.
+7. Wait for Accepted, about 2 minutes. Wait until Finalize lights up, about 1 more minute. Leave it unclicked.
+8. Do not reload this tab. It holds the claim secret.
 
-> The robot is a scripted controller we wrote. The AI sits in the test loop, and it does not drive the robot. The same code runs in every world.
->
-> Of 52: 31 failed, 13 stopped and held on, 5 were flaky, 3 passed. Normal runs passed 10 of 10. We picked these worlds to be harsh, so this count says nothing about reliability.
+**Tab 2, the grid.** Open `http://localhost:6199/crashlab.html`, choose Window cleaning, click Open CrashLab, then List test scenarios. Stop at the Run 34 scenarios button.
 
-### 1:50 Find (45 s)
+**Tab 4, the limit.** Open CrashLab the same way. List, run, and wait. Click a red Low coverage square. Stop at the Find the limit button.
 
-*Show: replay world_016, then the failure table, then `controller.py`.*
+**Tab 5, the robots.** Open `http://localhost:6199/crashlab.html`.
 
-> Each failure gets three repeats. The 5 flaky ones are out, in plain view. This replay shows states recorded in Python MuJoCo.
->
-> Failures fall into 5 types, each with a count and a code line. One finding held up in audit. The low-pressure guard goes blind once fan speed passes 0.896. All 9 times the robot came off the glass, its estimate read safe while true pressure sat under the limit.
->
-> Better sensing alone did not solve it. With true pressure in 29 re-runs, it came off 8 times, not 9. (cut first)
+**The film.** Open `design/shell/hull-film.mp4` in a video player, paused at the start. It runs 13 seconds and has no audio track.
 
-### 2:35 Fix (35 s)
+## The talk
 
-*Show: Fix tab with the diff in the chat.*
+### 0:00 Login wall (10 s)
 
-> The AI tried a fix: one constant, suction while cleaning, 0.85 to 0.9.
->
-> We wrote the test plan down first, then ran 104 fresh worlds. Passes went from 11 to 17. Failures went from 67 to 60. Zero got worse.
->
-> We did not apply it. That speed takes the guard away while cleaning, and the test can't measure that loss. A later live AI try got 0 better. So no fix is proven safe.
+Tab 1. Click **Enter as local guest**.
 
-### 3:10 Bounty (30 s)
+> "Crash tests for robots. You describe the job, AI builds the tests, and people get paid when their fix passes. Every run behind this panel is simulated."
 
-*Show: Bounty tab, or the bounty part of `draft.mp4`.*
+*Fallback: if the film wall is blank, the panel still works. Say nothing about it. If Tab 1 is dead, go to Tab 2 at 0:47 and say the world change cannot run today.*
 
-> What the AI can't fix goes to a bounty. A tester sends a world file that breaks the robot. Our gate re-runs it 8 times with hidden jitter, and 7 must fail alike.
->
-> A passing world gets rejected. A new failure gets accepted, waits out a dispute window, and pays once.
+### 0:10 Pick a robot (7 s)
 
-*Say the next line if the ledger is on screen. If you switched on a chain, say what you switched on and show the transaction.*
+Click **CrashLab**, **Window cleaning**, **Open CrashLab**.
 
-> This one runs on a local ledger with test units. The contract is written with 41 tests, and it is not deployed.
+> "We pick a robot. This window cleaner is fictional. Its controller is a script we wrote."
 
-### 3:40 Limits (20 s)
+*Fallback: Tab 2 is already past this step.*
 
-*Show: Report tab, or the "Not tested" list.*
+### 0:17 Say the job (10 s)
 
-> So, the limits. One robot. Hand-built physics, not checked against real hardware. Every number here holds in this simulator only. Use it to find questions to ask, not to prove a robot safe.
->
-> Thank you.
+Type, then press Enter. The wait is about 8 seconds.
 
-## Likely questions
+`Window robot for towers in Dubai. High floor.`
 
-**Why not just use an existing tool?**
-Mature robot simulators and commercial test products exist, and our idea and structure drew on that category. For a real robot program, use them first. They have calibrated physics and we don't. Our bet is a smaller one: plain English in, a plain list of what was and was not tested out, and an open bounty for the gaps. We have not compared ourselves head to head, so we can't tell you we're better.
+> "I say where it works. These AI replies are stored from earlier real calls. Code checks every value."
 
-**Is the physics real?**
-The equations are standard: adhesion from pressure times area, a fan curve, orifice leak, air density, dew point, battery sag. The engine is MuJoCo. Most constants are assumptions, marked as such in `policy/highrise/PARAMETERS.md`. Nothing is calibrated to hardware. Sand and dust are simplified: dust changes leak, friction and sensor noise, and airborne sand has no model. A fresh AI audit (`docs/security/SIM-AUDIT-2026-11-06.md`) found wind blowing out of a solid wall. We clamped it and voided the numbers from before. The audit also says the 10 m/s pause rule causes `time_limit`, and a threshold sets the `false_done` count. No human has reviewed it.
+*Fallback: on a "cannot" reply, check the words. `--stored` needs the exact text.*
 
-**Did you plant the bug?**
-We didn't write the guard to fail, but you can't take that on trust. `controller.py` is frozen at commit `af0424f`, before the final campaigns, and its hash is in every result. The audit found no world-keyed or seed-keyed branch. Now the caveats. We tuned physics and world ranges after seeing results, and that list is in `PARAMETERS.md`. Some of that tuning came before the freeze, and git can't fully confirm its order. The 3 replays on screen repeated 3 of 3. The opening clip repeated 2 of 3.
+### 0:27 Change the world (20 s)
 
-**Why on-chain?**
-A company should not be both the payer and the judge of a claim that its own robot broke. Escrow and a dispute window let a stranger trust the payout rules before doing the work. That is the only reason. The test loop needs no chain. Today it is `contracts/src/FailureBounty.sol` with 41 local tests, no outside audit, and no deployment unless we say otherwise on stage. The gate itself runs on one machine, so the chain does not prove the sim ran fairly. The named arbiter and the company's limits do much of that work.
+Type, then press Enter. The wait is about 17 seconds, while the world runs again.
 
-**Is 3 of 52 your pass rate?**
-No. We chose those worlds to stress the robot, and the physics is uncalibrated. It is a count for this set of worlds.
+`Make the wind stronger and wet the glass.`
 
-**What does the AI actually do?**
-It turns chat into numbers, proposes scenario groups and counts, words the diagnosis, and proposes controller edits. Our code validates all of it. Our code does the judging, the failure grouping and the bounty verdict, with no model involved. `AI-USE.md` lists it file by file. Most of the code was written with Claude Code, under our direction.
+> "Now I change the world. Wind goes up, and the glass gets wet. MuJoCo runs it again, right now, on this laptop. Look at the numbers in the chat. Cleaning falls, because the robot waits out the wind."
+
+Point at the "Cleaned" line. In our timing run it read 95.1% to 8.2%.
+
+*Fallback: if it takes over 20 seconds, keep talking, and move to Tab 2 at 0:47. If the server is down, show `design/e2e/stored/09-change-world.png` and say: "Here is a saved picture of a world change. That one changes the paint."*
+
+### 0:47 List scenarios (8 s)
+
+Click **List test scenarios**.
+
+> "The AI lists what could go wrong. Each reason is labelled a guess. What has no physics goes on a not-tested list."
+
+*Fallback: Tab 2 already shows a list.*
+
+### 0:55 Run the grid (23 s)
+
+Go to Tab 2. Click **Run 34 scenarios**. It plays for 22 seconds.
+
+> "This changed world takes 47 seconds to run, so I am switching to the recorded batch of the plain tower. It says Recorded run on screen. Each square is one world. Red means failed or stuck. A judge written in code decides, with no model involved."
+
+*Fallback: if the grid stalls, open Tab 4, which finished earlier. If the recorded server is down, show `design/shell/grid-video-window.mp4`.*
+
+### 1:18 Click a red square (11 s)
+
+Click a red **Slipped** square.
+
+> "We replay the recorded run. The robot slid more than 30 centimetres in one slide, and the limit is 30. The panel gives the judge's reason and the log."
+
+Read the number from the panel. World "Suction moderately reduced" reads 0.302 m.
+
+*Fallback: show `design/e2e/recorded/13-red-square-detail-replay.png`.*
+
+### 1:29 Open file (7 s)
+
+Click **Open file**.
+
+> "Open file goes to the line that ran when the limit fired. Any edit stays in a session copy."
+
+*Fallback: show `design/e2e/recorded/15-open-file.png`.*
+
+### 1:36 AI fix did not help (14 s)
+
+Click **Ask AI to fix: Slipped (6)**.
+
+> "An AI tried this earlier. It raised suction from 0.85 to 0.92. It made none of the 6 failed worlds better. So code did not apply it, and the card says Recorded result."
+
+*Fallback: show `design/e2e/recorded/16-ask-ai-did-not-help.png`. Never start a live AI fix on stage.*
+
+### 1:50 Post a bounty (9 s)
+
+Click **Post a bounty**. Title: `The robot slides on low suction`. Click **Post the bounty**.
+
+> "So a company posts a bounty. The pay is in test units. A person can now try to fix it."
+
+*Fallback: Tab 3 already lists this bounty.*
+
+### 1:59 Hidden proof (16 s)
+
+Go to Tab 3. Scroll to Hidden worlds.
+
+> "Nobody has fixed that slide yet, so this is a stall from the same batch. Before this talk I submitted a fix Claude wrote as a test. Code ran it on 45 hidden worlds for 2 minutes. The submitter sees only counts."
+
+*Fallback: if Tab 3 failed or was reloaded, show `design/e2e/recorded/21-hidden-world-proof.png` and say "a saved picture from tonight's check".*
+
+### 2:15 Payout (10 s)
+
+Click **Finalize**. Type `ana` in the box. Click **Claim**.
+
+> "A dispute window passed, so anyone can finalize. Then the submitter claims. 40 test units, on a local ledger. No chain, and no money moved."
+
+*Fallback: show `design/e2e/recorded/25-claim.png`.*
+
+### 2:25 Find the limit (13 s)
+
+Go to Tab 4. Click **Find the limit**.
+
+> "Find the limit changes one factor at a time. This stored search says failure starts between seal leak 240 and 280 square millimetres. Other searches found no clean boundary, and they say that too."
+
+*Fallback: the search is already recorded. If the panel fails, read that line from `policy/runs/demo/window/boundary.json` and move on.*
+
+### 2:38 Two robots (8 s)
+
+Go to Tab 5. Point at the two cards.
+
+> "Two robots run in this flow today. The other is an ANYmal C model with upstream's walking policy, on Newton."
+
+*Fallback: show `design/shell/grid-video-inspection.mp4`.*
+
+### 2:46 Hull film, as a concept (14 s)
+
+Play the film.
+
+> "This last one is a concept. A hull cleaner, rendered from one recorded run on a flat plate. The water and the curve are scenery. It is not in the app yet. Thank you."
+
+*Fallback: show `design/shell/hull-still-1.png`.*
+
+## If they ask
+
+**Is it real?**
+
+"The software is real and the runs really happen in a simulator. The physics is hand-built, the values are assumed, and nothing has been checked against hardware. Use it to find questions to ask. It does not prove a robot safe."
+
+**Which parts did you run live just now?**
+
+"The world change ran real physics, using a stored AI reply. The grid, the AI fix and the limit search replayed recorded results, and the screen labels them. The hidden proof ran real sims before the talk. The payout click wrote to a local ledger."
+
+**Does AI drive the robot?**
+
+"No. The window robot runs a script we wrote. The inspection robot runs upstream's walking policy, which we did not train. AI edits the world, lists scenarios and proposes fixes. Code checks all of it and decides every result."
+
+**Would this fix work on a real robot?**
+
+"We do not know. A pass says something about these worlds in this simulator, and nothing about a real robot."
+
+**Are these scenarios things that really happen?**
+
+"They are the AI's reasoned guesses, and the app labels them so."
+
+**Is any money or chain involved?**
+
+"No. The payout is a local file in test units. The contract has 41 passing tests on a local test chain, with no audit and no deployment. Arc is not deployed, and 0G is not connected."
+
+**Is World ID working?**
+
+"It is set up on staging, and a real scan is untested. The bounty board does not read it, so its cap counts names and not people."
+
+CONFIRM: update this answer if a real scan works.
 
 **Can a tester game the bounty?**
-Partly. A world that fails 70% of the time still clears 7 of 8 about 1 time in 4. A world at 90% clears about 4 times in 5. The gate can't prove a world is fair. World ID isn't connected, so the per-human cap trusts numbers from the caller. The test worlds for the gate came from a search, so its check proves the logic and not how well it sorts new worlds.
 
-**Could an AI patch hurt you?**
-It edits a copy, runs under `sandbox-exec`, and passes an import allowlist. `sandbox-exec` is not a VM. A runtime escape test did not run. The review found no Critical or High issue it could prove, but it mostly read code.
+"Partly. A patch can fit the worlds it sees, which is why we keep some hidden. The board does not check for collusion, and the sandbox shares the kernel with the host. The page lists these under Not checked."
 
-**Does replay work across machines?**
-Unknown. We have not tested it.
+**Did you plant the failure?**
 
-**Why was the slip clip not one of your 3-of-3 replays?**
-It looks clearer on camera. It is a real entry in the campaign, world_010, with an extreme gust, and it met the rule of 2 of 3 repeats. We say so when we show it.
+"You cannot take that on trust. We tuned physics and world ranges after seeing results, and `policy/highrise/PARAMETERS.md` lists that for the older campaign. The judge and sim hashes show on every bounty."
 
-## Fallbacks
+**Who wrote this?**
 
-- Run server down: `app.html?recorded=1` needs only vite. It shows no bounty, because a recorded run takes none.
-- Bounty too slow on stage: play that part of `design/video/draft.mp4`. It shows a real gate run with the waits cut, and says so.
-- Do not start a live AI fix on stage. It takes minutes, and the recorded try found 0 better.
+"AI wrote most of the code, under one builder's direction. `AI-USE.md` lists it file by file."
+
+<!-- 41 tests: forge test, 7 Nov. 45 hidden, 40 test units, 2 minutes (122.3 s): design/e2e/recorded/21-hidden-world-proof.png, 25-claim.png. 0.85 to 0.92, 0 of 6: policy/runs/demo/window/stored_fix.json. 240 and 280: policy/runs/demo/window/boundary.json. 95.1% to 8.2%: the chat in our timing run on `--stored`, 7 Nov. Film 13 s, no audio: ffprobe design/shell/hull-film.mp4. -->

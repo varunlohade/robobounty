@@ -2,7 +2,7 @@
 
 CrashLab tests a robot in simulated worlds that it builds from plain English. You describe the robot and where it works. An AI agent proposes the worlds, our code runs and judges them in MuJoCo, and failures are traced to a line of the controller. An AI tries a fix, and what stays unsolved can go to a bounty for outside testers.
 
-The demo robot is a window cleaner for glass towers. It is a fictional robot we built for this hackathon, and it runs a scripted Python controller we wrote. AI works in the test loop and does not control the robot. All results are simulated. The physics is hand-built and has not been checked against real hardware.
+The demo robot is a window cleaner for glass towers. It is a fictional robot we built for this hackathon, and it runs a scripted Python controller we wrote. AI works in the test loop and does not control the robot. A second robot, an ANYmal C inspection robot on Newton, runs upstream's trained walking policy with our route code on top. All results are simulated. The physics is hand-built and has not been checked against real hardware.
 
 Built at ETHGlobal Mumbai, 5 to 7 November 2026. The first commit is dated 5 Nov, 23:03 IST.
 
@@ -32,7 +32,7 @@ npm run demo
 
 - `--recorded` plays stored results. The lab runs no AI and no sim, and the app labels this "Recorded run". Ask AI on a Slipped world shows one stored result of a real AI fix, labelled "Recorded result". It did not help.
 - `--stored` uses stored AI replies and real physics. It makes no AI call.
-- With no option, the AI calls are real. They go through the `claude` command-line tool, which must be installed and logged in. The limit is 10 calls a session and 40 an hour.
+- With no option, the AI calls are real. They go through the `claude` command-line tool, which must be installed and logged in. The limit is 60 calls a session and 200 an hour.
 
 A fix sent to the bounty board always runs real sims in the sandbox, in all three modes, since that proof must be real.
 
@@ -74,18 +74,22 @@ forge test
 5. **Test.** The same controller runs in every world. Failures are re-run three times, and any that come back fewer than 2 times are marked flaky and left out, in plain view.
 6. **Find.** Failures are grouped into types, each with a count, a worst world and a code line. Any failed world with a replay can be opened in the browser.
 7. **Fix.** An AI edits a copy of the controller. Our code tests the copy against the original on the same worlds and on held-back worlds. Accepting a fix writes a session copy only. `policy/highrise/controller.py` never changes.
-8. **Bounty.** Open failures and gaps can go to a bounty. A tester submits a numeric world file. The gate runs it once, then 8 times with hidden jitter. At least 7 must end in the same failure, and a nearby reference world must pass.
+8. **Bounty.** Open failures and gaps can go to a bounty. A tester submits a numeric world file. The gate runs it once, then 8 times with hidden jitter. At least 7 must end in the same failure, and a nearby reference world must pass. A fix bounty works the other way: a person submits a controller change, and code tests it on the failing worlds and on hidden worlds.
 
 ## Architecture
 
 | Part | Path | What it does |
 |---|---|---|
-| App | `app.html`, `src/app/` | Chat, world view, worlds map, fix and bounty pages. TypeScript, Three.js |
+| Site | `login.html`, `home.html`, `crashlab.html`, `data.html`, `providers.html`, `src/site/`, `policy/server/site_data.py` | Login, home, robot picker, stored run data |
+| Lab | `lab.html`, `src/lab/` | The main tool: chat, world view, test grid, code tab, Find the limit |
+| Earlier app | `app.html`, `src/app/` | Single-robot chat, world view, worlds map. The lab reuses parts of it. TypeScript, Three.js |
 | Browser MuJoCo | `src/app/replay.ts` | MuJoCo 3.16 in WASM. It sets recorded states and never steps physics |
 | Run server | `policy/server/` | Local chat flow on 127.0.0.1:5198. Refuses other origins. Runs at most 4 sim or AI processes at once |
 | Simulator | `policy/highrise/` | MuJoCo 3.8.1 in Python: world builder, suction, wind and battery models, controller, judge, campaign runner |
 | AI layer | `policy/crashlab/llm.py`, `brief_highrise.py`, `scenarios.py`, `diagnose.py`, `fix.py` | Headless Claude Code calls. Replies are schema-checked numbers, or wording checked against our tables |
+| Robot packs | `policy/packs/`, `policy/highrise5/` | Window and inspection robots behind one interface. The lab runs these. The hull pack is not in the app |
 | Bounty gate | `policy/bounty/gate.py` | Validates a world, re-runs it and writes a verdict. No model takes part |
+| Bounty board | `bounties.html`, `src/board/`, `policy/bounty/board_*.py` | Post a bounty, submit a fix, hidden world proof, dispute window, claim |
 | Ledger | `policy/server/ledger.py` | Local copy of the contract's states |
 | Contract | `contracts/src/FailureBounty.sol` | Escrow, propose, dispute window, finalize, claim, refund, in a 6-decimal token |
 | Renders | `policy/render/` | Blender re-renders of recorded runs |
@@ -111,23 +115,23 @@ forge test
 - **Local ledger.** By default the bounty writes to a local file, labelled "Local ledger. Not on chain." Amounts are test units and no money moves.
 - **Contract.** It is not deployed. No human or outside firm has audited it.
 - **Blender clips.** The robot's pose and the dirt come from recorded runs. Sky, city, haze, camera and grade are art. They are labelled "Re-render of recorded physics".
-- **Concept stills.** `design/film/` holds AI concept images, not simulation output.
+- **Concept stills.** `design/film/` holds a film treatment. Its AI concept images are not in git and are not simulation output.
 
 ## Limits
 
-- One robot. Most constants are assumptions, marked in `policy/highrise/PARAMETERS.md`. Nothing is calibrated.
+- Two robots in the app, one job each. Most constants are assumptions, marked in `policy/highrise/PARAMETERS.md`. Nothing is calibrated.
 - Not tested, because no physics covers it: airborne sand, wind by height, sun and glare, rain, ice, snow, salt, and real motors, sensors and tether wear. Dust is modelled only as added leak, friction change and sensor noise, with assumed values.
 - We tuned parameters and world ranges after seeing results, before the freeze. The list is in `PARAMETERS.md`. Git cannot fully confirm the order.
 - A fresh AI audit (`docs/security/SIM-AUDIT-2026-11-06.md`) found wind blowing out of a solid wall. We clamped it and voided earlier numbers. The audit also found that the 10 m/s pause rule causes `time_limit`, that a threshold sets the `false_done` count, and that physics after a detach is unreliable. No human reviewed it.
 - The gate's own test worlds came from a search, so its check proves the logic and not how well it sorts new worlds. A world that fails 70% of the time still clears about 1 time in 4.
-- World ID is not connected. The per-human cap trusts numbers from the caller.
+- World ID sign-in is set up on staging, and a real scan is untested. The bounty board does not read it, so its per-human cap trusts numbers from the caller.
 - `sandbox-exec` is one layer and is not a VM. A runtime escape test did not run. The security review (`docs/security/REVIEW-2026-11-06.md`) found no Critical or High issue that it could prove, but it mostly read code.
 - Replay across machines is untested.
 - The repo has no licence file yet.
 
 ## Results
 
-All from one campaign, `campaign_dubai_final`, on sim `0e36d3bf`. These count what happened in worlds chosen to stress the robot. They are not a measure of reliability.
+All from one campaign, `campaign_dubai_final`, on sim `0e36d3bf`. The lab now runs `highrise5` and the inspection pack, with recorded batches in `policy/runs/demo/` and a summary in `docs/SUBMISSION.md`. These count what happened in worlds chosen to stress the robot. They are not a measure of reliability.
 
 | Result | Count | Evidence |
 |---|---|---|
@@ -166,6 +170,8 @@ Six worlds went from failed to passed. One went from stalled to a battery stop, 
 | Foundry | MIT or Apache-2.0 | Contract test tool, not bundled |
 | Blender | GPL | Renderer, not bundled |
 | "Overcast Soil (Pure Sky)" by Sergej Majboroda, with sky edits by Jarod Guest (Poly Haven) | CC0 | Sky in renders. Downloaded at render time, not in git |
+
+The full list, including Newton, the ANYmal C model and the generated-object models, is in [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md).
 
 The earlier prototype used LIBERO and the model HuggingFaceVLA/smolvla_libero. Neither is ours or in the CrashLab flow.
 
