@@ -1,15 +1,17 @@
 import { el } from '../app/dom.ts';
 import { LiveBackend, health, type ServerEvent } from '../app/chat/live.ts';
 import { Replay, loadMujoco } from '../app/replay.ts';
-import { loadTrial, loadTrialFrom, type Trial } from '../app/trial.ts';
+import { isV5, loadTrial, loadTrialFrom, type Trial } from '../app/trial.ts';
 import { SimView, restoreOnLoss } from '../app/view.ts';
 import { worldPage } from '../app/world_page.ts';
+import { lookOf } from '../view/real/look.ts';
 import { LabChat, replayNote } from './chat.ts';
 
 const NS = 'http://www.w3.org/2000/svg';
 const HEALTH_RETRY_MS = 2_000;
 const TRIAL_TRIES = 3;
 const TRIAL_RETRY_MS = 3_000;
+const FRAMED_HOLD_MS = 8_000; // A new run shows the changed tower for this long, then goes back to the robot.
 // Lucide 0.400 outlines: panel-left, layout-grid, settings.
 const ACTIVITY = [
   ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M9 3v18'],
@@ -105,16 +107,17 @@ async function live(root: HTMLElement) {
       case 'world': await showWorld(e); break;
       case 'no_world': clear(); clear = () => {}; current = () => null; host.replaceChildren(empty); setName('new'); chat.worldGone(); break;
       case 'look': applyLook(e); break;
-      case 'trial': await showTrial(e.tid); break;
+      case 'view': applyView(e); break;
+      case 'trial': await showTrial(e.tid, e.focus); break;
       case 'llm_count': aiLine.textContent = `AI calls ${e.used} of ${e.cap}`; break;
-      case 'sim': simLine.textContent = `Sim ${e.sha ? String(e.sha).slice(0, 8) : 'unknown'}${e.sha && e.sha !== e.now ? `, now ${String(e.now).slice(0, 8)}: this run is from older code` : ''}`; break;
+      case 'sim': simLine.textContent = e.label ? String(e.label) : `Sim ${e.sha ? String(e.sha).slice(0, 8) : 'unknown'}${e.sha && e.sha !== e.now ? `, now ${String(e.now).slice(0, 8)}: this run is from older code` : ''}`; break;
       case 'idle':
         root.dataset.idle = String(Number(root.dataset.idle ?? 0) + 1);
         chat.jobDone();
         break;
     }
   };
-  const backend = new LiveBackend(onEvent);
+  const backend = new LiveBackend(onEvent, { engine: 'v5' });
   const chat = new LabChat(backend);
   const { main, statusRight, setName } = shell(root, chat.root);
   const simLine = el('span');
@@ -139,6 +142,18 @@ async function live(root: HTMLElement) {
     const viewport = document.querySelector<HTMLElement>('.viewport');
     // The time from the AI's answer reaching the server to the next frame drawn.
     if (viewport) requestAnimationFrame(() => requestAnimationFrame(() => { viewport.dataset.lookLandMs = String(Math.round(Date.now() - e.sent)); }));
+  };
+  // The world changed with no new run: the same replay, a new view model.
+  const applyView = (e: ServerEvent) => {
+    const view = current();
+    if (!view) return;
+    view.applyWorld(e.xml, e.world);
+    if (e.focus) view.frameOn(e.focus.box);
+    const viewport = document.querySelector<HTMLElement>('.viewport');
+    if (viewport) {
+      viewport.dataset.hash = String(e.hash);
+      requestAnimationFrame(() => requestAnimationFrame(() => { viewport.dataset.lookLandMs = String(Math.round(Date.now() - e.sent)); }));
+    }
   };
   const swap = (next: HTMLElement, stop: () => void) => {
     clear();
@@ -170,7 +185,7 @@ async function live(root: HTMLElement) {
     replay = new Replay(mj, trial);
     replay.seek(0);
     view = new SimView(viewport, replay, trial);
-    view.setLook(look);
+    view.setLook(isV5(e.world) ? lookOf(e.world) : look);
     restoreOnLoss(view, fresh => { view = fresh; }, fixed);
     current = () => view;
     view.sync();
@@ -196,14 +211,15 @@ async function live(root: HTMLElement) {
     }
   }
 
-  async function showTrial(tid: string) {
+  async function showTrial(tid: string, focus?: { box: number[] } | null) {
     const trial = await fetchTrial(tid);
     if (!trial) return;
     const world = worldPage(trial, statusRight, fixed);
     swap(world.page, () => world.stop());
     current = () => world.view;
     await world.start();
-    world.view?.setLook(look);
+    if (!isV5(trial.world)) world.view?.setLook(look);
+    if (focus) world.view?.frameOn(focus.box, FRAMED_HOLD_MS);
     world.viewport.dataset.tid = tid;
   }
 
@@ -211,7 +227,6 @@ async function live(root: HTMLElement) {
   for (let told = false; ;) {
     try {
       const info = await health();
-      simLine.textContent = `Sim ${info.sim_sha.slice(0, 8)}`;
       llmLine.textContent = `LLM: ${info.llm}`;
       root.dataset.server = 'up';
       break;
@@ -222,6 +237,7 @@ async function live(root: HTMLElement) {
       await new Promise(r => setTimeout(r, HEALTH_RETRY_MS));
     }
   }
+  (window as unknown as { __lab: unknown }).__lab = { view: () => current() };
   await chat.start();
 }
 

@@ -108,8 +108,8 @@ function cars(m: Soup, rng: Rng, cx: number, cy: number) {
   }
 }
 
-function layout(tcx: number, tcy: number, radius: number): Soup {
-  const rng = new Rng(1307), m = new Soup();
+function layout(tcx: number, tcy: number, radius: number, seed: number, density: number): Soup {
+  const rng = new Rng(1307 + seed), m = new Soup(), keep = new Rng(7001 + seed);
   const pitch = BLOCK + STREET, n = Math.floor(radius / pitch) + 1;
   for (let ix = -n; ix <= n; ix++) {
     for (let iy = -n; iy <= n; iy++) {
@@ -127,6 +127,7 @@ function layout(tcx: number, tcy: number, radius: number): Soup {
       const near = r < 1100;
       const gc = rng.uni(0.15, 0.2);
       m.box(cx, cy, BLOCK, BLOCK, 0, 0.35, ang, [gc, gc, gc * 0.98], 1, 3);
+      if (keep.next() >= density) continue;
       if (rng.next() < 0.05 && r > 200) {
         m.box(cx, cy, BLOCK - 6, BLOCK - 6, 0.35, 0.5, ang, [0.07, 0.1, 0.07], 1);
         const count = near ? 22 : 0;
@@ -166,12 +167,12 @@ function layout(tcx: number, tcy: number, radius: number): Soup {
   return m;
 }
 
-const cache = new Map<number, THREE.BufferGeometry>();
-export function cityGeometry(tcx: number, tcy: number, radius: number): THREE.BufferGeometry {
-  const key = Math.round(radius * 100) + tcx * 1e6 + tcy * 1e9;
+const cache = new Map<string, THREE.BufferGeometry>();
+export function cityGeometry(tcx: number, tcy: number, radius: number, seed = 0, density = 1): THREE.BufferGeometry {
+  const key = `${radius}|${tcx}|${tcy}|${seed}|${density}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const m = layout(tcx, tcy, radius);
+  const m = layout(tcx, tcy, radius, seed, density);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(m.p), 3));
   g.setAttribute('normal', new THREE.BufferAttribute(new Int8Array(m.n.map(v => Math.round(v * 127))), 3, true));

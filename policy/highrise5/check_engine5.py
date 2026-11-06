@@ -85,11 +85,12 @@ GOOD = {
     "set_robot": [{"suction_pa": 1500.0}, {"seal_leak_mm2": 800.0}, {"battery_start_frac": 0.5}, {"pad_force_n": 50.0}, {"clean_speed_ms": 0.2}],
     "set_dirt": [{"level": 1.5}],
     "set_robot_start": [{"x_m": 0.5}, {"above_top_m": 0.2}],
-    "set_light": [{"sun_level": 0.3}, {"azimuth": 40.0}, {"haze": 0.9}, {"sky_top": [0.1, 0.1, 0.1]}, {"sky_bottom": [0.9, 0.9, 0.9]}],
-    "set_surroundings": [{"city_seed": 7}, {"density": 0.5}, {"radius": 300.0}],
+    "set_light": [{"sun_level": 0.3}, {"azimuth": 40.0}, {"haze": 0.9}, {"sky_top": [0.1, 0.1, 0.1]}, {"sky_bottom": [0.9, 0.9, 0.9]}, {"time": "night"}, {"fog": 1}],
+    "set_surroundings": [{"city_seed": 7}, {"density": 0.5}, {"radius": 300.0}, {"city": "dubai"}],
+    "set_look": [{"building": "#0a0a0a"}, {"glass_tint": "#1f5fbf"}, {"frames": "#f7f7f5"}, {"time": "dusk"}, {"fog": 2}, {"city": "dubai"}],
     "read_world": [{}], "read_result": [{}], "undo": [{}], "list_parts": [{}], "explain_limits": [{}],
 }
-PICTURE_ONLY = {"set_tower": [{"width": 60.0}], "add_object": [GOOD["add_object"][0], GOOD["add_object"][3]], "group": GOOD["group"]}
+PICTURE_ONLY = {"set_tower": [{"width": 60.0}], "add_object": [GOOD["add_object"][0], GOOD["add_object"][3]], "group": GOOD["group"], "set_look": GOOD["set_look"]}
 READS = {"read_world", "read_result", "list_parts", "explain_limits", "undo"}
 
 

@@ -158,8 +158,10 @@ export class LabChat {
       this.note(`Not built: ${event.lines[0].replace(/[.,;:!?]+$/, '')}. ${event.lines[1]}`);
       return;
     }
-    const words = STEP_WORDS[event.title];
-    if (!words || NOT_DONE.test(event.meta ?? '')) return;
+    // One plain line for each engine call and each run, written by code from checked values.
+    const shown = event.title === 'engine_call' || event.title === 'run_result';
+    const words = shown ? event.lines[0] : STEP_WORDS[event.title];
+    if (!words || (!shown && NOT_DONE.test(event.meta ?? ''))) return;
     let steps = this.list.lastElementChild as HTMLElement | null;
     if (!steps?.classList.contains('chat-steps')) {
       steps = el('div', 'chat-steps');

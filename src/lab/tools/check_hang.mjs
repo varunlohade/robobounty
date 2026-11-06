@@ -151,7 +151,8 @@ try {
   await t.slow();
 
   // A frozen server, then a killed one. The page only reconnects by itself.
-  for (const [signal, words] of [['-STOP', 'The run server froze, so I restarted it.'], ['-KILL', 'The run server crashed, so I restarted it.']]) {
+  // Each message sets a new wind. A stored v5 reply sets one value, so sending the same one again rightly changes nothing.
+  for (const [signal, words, change] of [['-STOP', 'The run server froze, so I restarted it.', 'make the wind 6 m/s'], ['-KILL', 'The run server crashed, so I restarted it.', 'make the wind 7 m/s']]) {
     const { pid } = await health();
     const lostLines = await t.lines('I lost the connection');
     const start = Date.now();
@@ -162,7 +163,7 @@ try {
     check(`kill ${signal}: the replay kept playing`, (await t.moving()).ok);
     const tidBefore = await t.tid();
     const k = await t.idle();
-    await t.type(CHANGE);
+    await t.type(change);
     await t.idleAfter(k, 60);
     await t.until(`document.querySelector('.viewport')?.dataset.tid !== ${JSON.stringify(tidBefore)} && Number(document.querySelector('.viewport')?.dataset.frame ?? 0) > 0`, 'new run plays', 30);
     check(`kill ${signal}: the next message runs the same chat`, (await t.chat()).includes('Changed the world') && (await t.moving()).ok, await t.tid());

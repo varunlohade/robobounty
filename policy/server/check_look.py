@@ -264,6 +264,13 @@ def both_sides():
         check("no rain clears the picture", "rain" not in chat.trial("normal-3", "look.json"))
 
 
+def same_weather_values():
+    """engine5 and look.py each hold the numbers one weather word sets. They must not drift."""
+    sys.path.append(str(HERE.parent / "highrise5"))
+    import engine5
+    check("engine5 and look.py set the same weather values", engine5.WEATHER_PHYSICS == look.WEATHER_PHYSICS)
+
+
 def one(phrase, model):
     env = {**os.environ, "CRASHLAB_ROUTE_MODEL": model}
     req = json.dumps({"text": phrase[0], "look": {}, "has_world": True})
@@ -294,6 +301,7 @@ if __name__ == "__main__":
     if a.live:
         sys.exit(0 if live(a.live) else 1)
     offline()
+    same_weather_values()
     both_sides()
     print(f"{failed} failed" if failed else "all passed")
     sys.exit(1 if failed else 0)

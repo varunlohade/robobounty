@@ -113,6 +113,7 @@ class Deadline:
 # Times measured on this Mac on 2026-11-06. AI limits sit above llm.py's own timeouts, so its plain "timeout" answer comes first.
 DEADLINES = {
     "route": Deadline("The AI call", None, 120, ai=True),  # llm.py gives a route call 90 s.
+    "agent": Deadline("The AI call", None, 240, ai=True),  # plan_job.py gives one v5 engine call 200 s: its prompt lists every function.
     "plan": Deadline("The planner", None, 300, ai=True),  # llm.py gives a plan call 240 s.
     "scenarios": Deadline("The scenario agent", None, 600, ai=True),  # 240 s for the AI, then one build for each world.
     "build": Deadline("The build", 60, 180),  # Measured about 1 s.
@@ -385,7 +386,7 @@ def run_one(name, argv, stdout_file, paths=()):
 def llm_label():
     if not RECORDED:
         return "claude headless"
-    stored = [n for n in ("brief", "followup", "scenarios") if (Path(RECORDED) / f"{n}.json").exists()]
+    stored = [n for n in ("brief", "followup", "scenarios", "agent5") if (Path(RECORDED) / f"{n}.json").exists()]
     return f"stored {' and '.join(stored)} reply, check only"
 
 
@@ -414,21 +415,21 @@ def changed_words(old, new, fields):
     return words
 
 
-def controller_number(name):
+def controller_number(name, source=None):
     """A limit the run's controller used, read from its source, so the chat cannot drift from the code."""
-    for node in ast.parse(CONTROLLER.read_text()).body:
+    for node in ast.parse((source or CONTROLLER).read_text()).body:
         if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == name:
             return ast.literal_eval(node.value)
     raise KeyError(name)
 
 
-def held_words(result, wind):
+def held_words(result, wind, source=None):
     """Why a run ended held on, in plain words. The numbers come from result.json and the run's recorded wind, and the limits from the controller."""
     time_s, hold_s = result["time_s"], result["hold_s"]
     share = "all" if hold_s >= 0.995 * time_s else "most" if hold_s >= 0.5 * time_s else "part"
     pause = f"The robot paused for {share} of the run"
     if result["outcome"] == "wind_hold":
-        limit, resume, peak = controller_number("WIND_PAUSE_MS"), controller_number("WIND_RESUME_MS"), max(wind, default=0.0)
+        limit, resume, peak = controller_number("WIND_PAUSE_MS", source), controller_number("WIND_RESUME_MS", source), max(wind, default=0.0)
         if peak > limit:
             return f"{pause}, because wind of {peak:.1f} m/s is above its {limit:.0f} m/s limit. It waits for wind under {resume:.0f} m/s, and wind during the pause averaged {result['hold_mean_wind_ms']:.1f} m/s."
         return f"{pause}. Wind stayed at or under {peak:.1f} m/s, below its {limit:.0f} m/s limit, and averaged {result['hold_mean_wind_ms']:.1f} m/s during the pause."
@@ -441,6 +442,70 @@ def thumb_and_end(run):
     sys.path.insert(0, str(POLICY))
     import app_export
     return app_export.thumb_and_end(run)
+
+
+def agent5():
+    """The v5 engine loop. It loads on first use, so the old app path never imports it."""
+    if str(POLICY / "highrise5") not in sys.path:
+        sys.path.insert(0, str(POLICY / "highrise5"))
+    import agent5 as module
+    return module
+
+
+def history5(session):
+    """agent5's saved world history. A run goes through a child under the "run" deadline, and its folder survives a restart."""
+    A = agent5()
+
+    class ServerHistory(A.History):
+        STOPS = (StageHung,)  # gave_up ends the job and says so.
+
+        def run(self, state):
+            key = state["physics_hash"]
+            if key in self.runs:
+                return self.runs[key]
+            folder = self.dir / f"run_{key[:16]}"
+            result = json.loads((folder / "result.json").read_text()) if (folder / "result.json").exists() else None
+            if result is None or result["code_sha256"] != A.R.code_hashes():
+                world_file = self.dir / f"run_{key[:16]}.world.json"
+                world_file.write_text(json.dumps(state["world"]))
+                heartbeat = self.dir / f"run_{key[:16]}.beat"
+                previous = session.working_now
+                session.working("one normal run")
+                code = run_one("run", [PYTHON, str(HERE / "run_beat5.py"), str(heartbeat), str(world_file), "--seed", str(A.SEED), "--out", str(folder)], session.dir / "normal.log", paths=(heartbeat,))
+                session.working(previous)
+                if code != 0:
+                    raise RuntimeError(f"run exit {code}")
+                result = json.loads((folder / "result.json").read_text())
+                session.tool("run_trial", f"{result['wall_s']} s", [json.dumps({k: result[k] for k in ("passed", "outcome", "failure", "coverage", "time_s")})])
+            self.runs[key] = result
+            return result
+
+        def folder(self, key):
+            return self.dir / f"run_{key[:16]}"
+
+        def point(self, n):
+            """Back to a saved world after a freeze or a restart. None means no world yet."""
+            self.n = n
+            pointer = self.dir / "current.json"
+            if n is None:
+                pointer.unlink(missing_ok=True)
+            else:
+                pointer.write_text(json.dumps({"n": n}) + "\n")
+
+    return ServerHistory(session.dir / "v5")
+
+
+# The numeric blocks of a v5 world, for the chat's "old → new" words.
+V5_WORDS = ("tower", "area", "panes", "weather", "wind", "robot", "robot_start")
+
+
+def moved_words5(old, new):
+    out = []
+    for block in V5_WORDS:
+        for key, value in new[block].items():
+            if isinstance(value, (int, float)) and old[block][key] != value:
+                out.append(f"{block} {key.replace('_', ' ')} {plain_number(old[block][key])} → {plain_number(value)}")
+    return out
 
 
 class Worker:
@@ -481,6 +546,7 @@ class Session:
         self.ledger, self.bounty_salt, self.spec_path, self.gate_info, self.verdicts = None, None, None, None, []
         self.last_seconds, self.last_recorded = None, None
         self.tester = "0x" + hashlib.sha256(self.id.encode()).hexdigest()[:40]
+        self.v5, self.h5 = False, None  # A lab session keeps one v5 world and sends every message to agent5. The app's session stays on the old path.
         self.good, self.good_events = self.snapshot(), 0
 
     def snapshot(self):
@@ -495,7 +561,8 @@ class Session:
         self.save()
 
     def save(self):
-        kept = {"good": self.good, "good_events": self.good_events, "look": self.look, "exports": {k: str(v) for k, v in self.exports.items()}, "llm_used": self.llm_used, "round": self.round}
+        kept = {"good": self.good, "good_events": self.good_events, "look": self.look, "exports": {k: str(v) for k, v in self.exports.items()}, "llm_used": self.llm_used, "round": self.round,
+                "v5": self.v5, "chat5": self.h5.chat if self.h5 else []}
         tmp = self.dir / "session.json.tmp"
         tmp.write_text(json.dumps(kept))
         tmp.replace(self.dir / "session.json")
@@ -507,10 +574,14 @@ class Session:
         self.results, self.excluded, self.diverged, self.types, self.held, self.proposal = {}, {}, [], [], set(), None
         if self.phase not in ("brief", "asking", "review_scene"):  # Campaign state does not come back.
             self.phase = "review_scene" if self.world else "brief"
+        if self.v5:
+            self.history5().point(self.world["n"] if self.world else None)
         if show and self.world:
             self.emit(type="world", world=self.world["world"], hash=self.world["hash"], xml=self.world["xml"], area=self.world["area"], moved=self.world["moved"], facts=self.world["facts"])
             if self.shown and self.shown in self.exports:
                 self.emit(type="trial", tid=self.shown, label="Normal run", passed=self.normal["passed"], open=True)
+                if self.v5:
+                    self.emit_view5(None)
         elif show:
             self.emit(type="no_world")
         return self.world is not None
@@ -527,6 +598,9 @@ class Session:
                 except ValueError:  # A kill can cut only the last line. That event never reached a page.
                     recovery_log(s, "events.jsonl has a cut line", "skipped it")
         s.good, s.good_events = kept["good"], kept["good_events"]
+        s.v5 = kept.get("v5", False)
+        if s.v5:
+            s.history5().chat = kept.get("chat5", [])
         s.look, s.llm_used, s.round = kept["look"], kept["llm_used"], kept["round"]
         s.exports = {k: Path(v) for k, v in kept["exports"].items()}
         after = s.events[s.good_events:]
@@ -654,6 +728,14 @@ class Session:
 
     def message(self, text):
         said = " ".join(text.lower().strip(" .!").split())
+        if self.v5:
+            with self.lock:
+                busy = self.busy
+            self.emit(type="user", text=text)
+            if busy:
+                self.say("I am still working on the last step. Send it again when it finishes.")
+                return 202, {"ok": True}
+            return self.start(self.turn5, text)
         with self.lock:
             if self.routing:
                 return 409, {"error": "busy"}
@@ -699,6 +781,150 @@ class Session:
         if name in ("ledger_reject", "ledger_finalize", "ledger_claim") and self.ledger and isinstance(value, str) and _FINGERPRINT.match(value):
             return self.ledger_step(name, value)
         return 409, {"error": "not_now"}
+
+    # The v5 lab path: one world, and every message goes through agent5. It reaches this code only through typed engine functions.
+    def history5(self):
+        if self.h5 is None:
+            self.h5 = history5(self)
+        return self.h5
+
+    def record5(self, world):
+        A = agent5()
+        _, view_xml, _ = A.C.compile(world)
+        return {"world": world, "hash": A.C.physics_hash(world), "xml": view_xml, "area": A.W.area_rect(world), "moved": [], "n": self.history5().n,
+                "facts": {"friction": round(A.W.friction(world), 3), "m_below_roof": world["area"]["drop_below_roof_m"]}}
+
+    def emit_view5(self, focus):
+        w = self.world
+        self.emit(type="view", xml=w["xml"], world=w["world"], hash=w["hash"], focus=focus, sent=time.time() * 1000)
+
+    def complete5(self, text):
+        """The model for one turn. A failed first call falls back to the simple parser, whose words pass the same engine checks."""
+        A = agent5()
+        round_no, parser_used = [0], [False]
+
+        def complete(prompt, schema):
+            round_no[0] += 1
+            if parser_used[0]:
+                return {"calls": [], "say": ""}
+            allowed = self.llm_allowed()
+            code = "limit"
+            if allowed:
+                self.working("reading your message" if round_no[0] == 1 else "reading the result")
+                try:
+                    reply = job(HERE / "plan_job.py", {"text": text, "round": round_no[0], "prompt": prompt, "schema": schema, "model": A.MODEL}, "agent")
+                except StageHung:
+                    reply = {"ok": False, "rejection": "froze_twice"}
+                self.working()
+                if reply and reply["ok"]:
+                    self.tool("read_message" if round_no[0] == 1 else "read_result", f"ok, {reply['seconds']} s", [json.dumps({"calls": len(reply["reply"].get("calls", [])) if isinstance(reply["reply"], dict) else 0})])
+                    return reply["reply"]
+                code = str((reply or {}).get("rejection", "process_died"))
+                self.tool("read_message", "failed", [code])
+            if round_no[0] == 1:
+                patch, _ = look_module.parse(text)
+                if allowed:
+                    self.say("AI did not answer, so I used the simple parser.")
+                if patch:
+                    parser_used[0] = True
+                    return {"calls": [{"fn": "set_look", "args": {k: "default" if v is None else v for k, v in patch.items()}}], "say": ""}
+            raise A.llm.LLMError(code.removeprefix("llm_"))
+        return complete
+
+    def show5(self, event):
+        """One agent5 event in the chat. Every line was written by code from checked values."""
+        kind = event["kind"]
+        if kind == "call":
+            self.tool("engine_call", event["status"], [event["line"]])
+            for line in event.get("words", []):
+                self.say(line)
+        elif kind == "result":
+            self.tool("run_result", event["table"]["outcome"], [event["line"]])
+        elif kind == "say_hidden":
+            self.tool("say_hidden", "hidden", [event["line"]])  # In the log. The chat already has the lines from code, and this one repeats on most turns.
+        elif kind in ("cannot", "say"):
+            self.say(event["line"])
+        elif kind == "refused":
+            self.say(event["line"], fail=True)
+
+    def turn5(self, text):
+        A = agent5()
+        hist = self.history5()
+        self.emit(type="retire")
+        first = self.world is None
+        phase_before = self.phase
+        if first:
+            start = A.W.parse((HIGHRISE / "worlds" / "nominal.json").read_bytes())
+            state = hist.begin(start)
+            self.world = self.record5(state["world"])
+            self.tool("build_world", "ok", [f"world {self.world['hash'][:12]}"])
+            w = self.world
+            self.emit(type="world", world=w["world"], hash=w["hash"], xml=w["xml"], area=w["area"], moved=[], facts=w["facts"])
+        before = self.world["world"]
+        n_before = self.world["n"]
+        self.phase = "building"
+        try:
+            events, new = A.turn(before, text, hist, complete=self.complete5(text), notify=self.show5)
+        except BaseException:
+            hist.point(n_before)
+            self.world = None if first else self.world
+            self.phase = phase_before
+            raise
+        self.working()
+        if not any(e["kind"] in ("call", "cannot", "say", "say_hidden", "refused") for e in events):
+            self.say("Nothing changed. The world stays as it was.")
+        self.finish5(before, new, first)
+
+    def finish5(self, before, new, first):
+        """A physics change shows a new run. A picture change updates the view in place, with no run."""
+        A = agent5()
+        hist = self.history5()
+        old_xml = None if first else self.world["xml"]
+        self.world = self.record5(new)
+        focus = A.focus_of(before, new)
+        self.phase = "review_scene"
+        if focus:
+            self.say(focus["line"])
+        if not first and self.normal and self.normal["physics_sha256"] == self.world["hash"]:
+            if self.world["xml"] != old_xml or new != before:  # Time, fog and the city live in the world and not in the view model.
+                self.emit_view5(focus)
+            return
+        moved = moved_words5(before, new)
+        if moved:
+            self.tool("change_world", "ok", moved)
+            self.say(f"{'. '.join(moved)}.")
+        key = self.world["hash"]
+        try:
+            result = hist.run({"world": new, "physics_hash": key})
+        except RuntimeError as e:
+            self.tool("run_trial", "failed", [str(e)])
+            self.say("The test run crashed. This is a failed run, and I did not retry it. Log: normal.log in the session folder.", fail=True)
+            return
+        self.normal = result
+        self.round += 1
+        tid = f"normal-{self.round}"
+        out = self.dir / "exports" / tid
+        self.working("exporting the replay")
+        code = run_one("export", [PYTHON, str(POLICY / "highrise5" / "export5.py"), str(hist.folder(key)), tid, "Normal run", "--out", str(out), "--world", str(hist.dir / f"world_{hist.n}.json")], self.dir / "export.log")
+        self.working()
+        if code != 0:
+            self.say("The replay export refused this run. The sim may have changed since it was recorded. Run it again.", fail=True)
+            return
+        self.exports[tid] = out
+        self.shown = tid
+        self.emit(type="sim", sha=result["code_sha256"]["sim5.py"], now=A.R.code_hashes()["sim5.py"], label=result["label"])
+        self.emit(type="trial", tid=tid, label="Normal run", passed=result["passed"], open=True, focus=focus)
+        cleaned = f"It cleaned {result['coverage'] * 100:.1f}%."
+        if result["failure"] == "sim_diverged":
+            self.say(f"The physics could not finish this run ({str(result['diverged_reason']).replace('_', ' ')}), so it counts as a failed run. I did not retry it.", fail=True)
+            word = cleaned
+        elif result["passed"]:
+            word = f"It passed. {cleaned}"
+        elif result["failure"]:
+            word = f"It failed: {result['failure']}. {cleaned}"
+        else:
+            word = f"{held_words(result, json.loads((out / 'wind.json').read_text()), POLICY / 'highrise5' / 'controller5.py')} {cleaned}"
+        self.emit(type="card", title="Does the scene look right?", body=word, result=word, actions=[{"label": "Looks right", "action": "scene_ok", "primary": True}])
 
     # Every message goes to the AI first. It chooses engine functions and code checks them. The simple parser stands in only when the AI call fails.
     def route(self, text):
@@ -1469,6 +1695,8 @@ class Handler(BaseHTTPRequestHandler):
             if parts[3] == "events" and len(parts) == 4:
                 return self.stream(s)
             if parts[3] == "trials" and len(parts) == 6 and _ID.match(parts[4]) and parts[5] in TRIAL_FILES and parts[4] in s.exports:
+                if not (s.exports[parts[4]] / parts[5]).exists():
+                    return self.reply(404, {"error": "not_found"})
                 data = (s.exports[parts[4]] / parts[5]).read_bytes()
                 self.head(200, "application/octet-stream", len(data))
                 return self.wfile.write(data)
@@ -1535,6 +1763,7 @@ class Handler(BaseHTTPRequestHandler):
                 if len(SESSIONS) >= MAX_SESSIONS:
                     return self.reply(429, {"error": "too_many_sessions"})
                 s = Session()
+                s.v5 = body.get("engine") == "v5"
                 s.save()
                 SESSIONS[s.id] = s
             return self.reply(201, {"id": s.id})

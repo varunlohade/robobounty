@@ -38,6 +38,18 @@ export class Replay {
     return new Replay(await loadMujoco(), trial);
   }
 
+  /** A new view model with the same joints. The recording still fits it, so the frame stays. */
+  swapModel(xml: string) {
+    const model = this.mj.MjModel.from_xml_string(xml);
+    if (model.nq !== this.trial.manifest.nq) { model.delete(); throw new Error(`model nq ${model.nq}, recorded nq ${this.trial.manifest.nq}`); }
+    this.data.delete();
+    this.model.delete();
+    this.model = model;
+    this.data = new this.mj.MjData(model);
+    this.trial.xml = xml;
+    this.seek(Math.max(0, this.frame));
+  }
+
   dispose() {
     this.data.delete();
     this.model.delete();
@@ -47,6 +59,8 @@ export class Replay {
     const nq = this.trial.manifest.nq;
     this.frame = Math.max(0, Math.min(this.frames - 1, frame));
     this.data.qpos.set(this.trial.qpos.subarray(this.frame * nq, (this.frame + 1) * nq));
+    const mocap = this.trial.mocap?.[this.frame];
+    if (mocap) this.data.mocap_pos.set(mocap.flat());
     this.mj.mj_forward(this.model, this.data);
   }
 

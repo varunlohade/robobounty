@@ -136,11 +136,11 @@ try {
     return text.split('\n').filter(l => l.startsWith('data: ')).map(l => JSON.parse(l.slice(6)));
   };
 
-  // 1. A look before any world is kept, and the world loads with it.
+  // 1. A lab chat always has a world: the first message starts from the nominal one, so a look lands on it at once.
   let n = await idle();
   await type('make the building black');
   await quiet(n);
-  check('a look before a world waits for it', (await chatText()).includes('Building will be black when the world loads.'));
+  check('a first message that is a look sets it on the first world', (await chatText()).includes('Building is now black.'));
   n = await idle();
   await type('make the building white');
   await quiet(n);
@@ -226,7 +226,7 @@ try {
   n = await idle();
   await type('make the robot dance');
   await quiet(n);
-  check('an unknown request is refused by code', (await chatText()).includes('I cannot do that yet: robot dance.'));
+  check('an unknown request is refused by code', (await chatText()).includes('cannot_build:no_function'));
   // 5. An AI failure falls back and says so. This message has no stored reply.
   if (!LIVE) {
     n = await idle();
@@ -237,15 +237,18 @@ try {
   }
 
   // 6. It persists: the export holds it, and a replay opened fresh shows it.
-  const saved = await (await get('trials/normal-1/look.json')).json();
-  check('look.json is in the export', saved.building === '#0a0a0a', JSON.stringify(saved));
-  const worldText = await (await get('trials/normal-1/world.json')).text();
-  check('look stays out of world.json', !/building|glass_tint|frames|#0a0a0a/.test(worldText));
+  // In a v5 session the world is the one source of the look.
+  check('a v5 export has no look.json', (await get('trials/normal-1/look.json')).status === 404);
+  const lastView = (await events()).filter(e => e.type === 'view').pop();
+  const rgba = lastView.world.materials.tower.rgba;
+  check('the world holds the building colour', rgba.slice(0, 3).every(v => Math.round(v * 255) === 10), rgba.join(' '));
+  const physicsOnly = lastView.xml.match(/<material name="tower"[^>]*>/)[0];
+  check('the view model holds it too', physicsOnly.includes(`${rgba[0]}`), physicsOnly);
   // 6b. A look changes no physics: the same brief with no look gives the same final state.
   {
     const h = { Origin: ORIGIN, 'Content-Type': 'application/json' };
     const base = `${SERVER}/api/sessions`;
-    const { id } = await (await fetch(base, { method: 'POST', headers: h, body: '{}' })).json();
+    const { id } = await (await fetch(base, { method: 'POST', headers: h, body: '{"engine":"v5"}' })).json();
     const state = async () => (await fetch(`${base}/${id}/state`, { headers: h })).json();
     const settle = async () => { for (let i = 0; i < 240; i++) { await wait(500); const st = await state(); if (!st.busy) return st; } throw new Error('second session stuck'); };
     await fetch(`${base}/${id}/message`, { method: 'POST', headers: h, body: JSON.stringify({ text: 'Window robot for towers in Dubai. High floor.' }) });
@@ -258,8 +261,11 @@ try {
     const looked = await (await get('trials/normal-1/result.json')).json();
     check('a look keeps final_state_sha256', !!looked.final_state_sha256 && looked.final_state_sha256 === plain.final_state_sha256, `${String(looked.final_state_sha256).slice(0, 16)} and ${String(plain.final_state_sha256).slice(0, 16)}`);
   }
+  const idles = (await events()).filter(e => e.type === 'idle').length;
   await send('Page.navigate', { url: `${ORIGIN}/lab.html?server=${SERVER_PORT}` });
   await until(`document.querySelector('.viewport')?.dataset.tid === 'normal-1'`, 'replay after reload', 60);
+  // A reload replays every view event in order, and the first of them is already black.
+  await until(`Number(document.getElementById('lab').dataset.idle ?? 0) >= ${idles}`, 'events replayed', 60);
   await until(`document.querySelector('.viewport').dataset.look?.includes('#0a0a0a')`, 'look after reload', 20);
   await js(STATS);
   await js(`document.querySelector('[aria-label="Go to start"]').click()`);

@@ -47,7 +47,7 @@ export class LiveBackend implements ChatBackend {
   private quietNote = 0;
   private ended = false;
 
-  constructor(private onEvent: (e: ServerEvent) => void | Promise<void>) {}
+  constructor(private onEvent: (e: ServerEvent) => void | Promise<void>, private newSession: object = {}) {}
 
   trialBase(tid: string) {
     return `${SERVER}/api/sessions/${this.id}/trials/${tid}`;
@@ -56,7 +56,7 @@ export class LiveBackend implements ChatBackend {
   private async session(): Promise<void> {
     const old = remembered();
     if (old && (await fetch(`${SERVER}/api/sessions/${old}/state`, { signal: AbortSignal.timeout(REPLY_DEADLINE_MS) })).ok) { this.id = old; return; }
-    const res = await post('/api/sessions', {});
+    const res = await post('/api/sessions', this.newSession);
     if (!res.ok) throw new Error(`run server: HTTP ${res.status}`);
     this.id = (await res.json()).id;
     remember(this.id);

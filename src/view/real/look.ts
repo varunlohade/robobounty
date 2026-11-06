@@ -20,6 +20,24 @@ export function parseLook(raw: unknown): Look {
   return out;
 }
 
+// The built-in colours of a v5 world, from policy/highrise5/world5.py. A world that still has one of these has no colour of its own for that part.
+const BUILT = { tower: [0.26, 0.31, 0.37], glass: [0.2, 0.3, 0.4], alu: [0.62, 0.63, 0.65] };
+const hexOf = (rgba: number[]) => `#${rgba.slice(0, 3).map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('')}`;
+
+// The look of a v5 world, from its own blocks. There is no other source.
+export function lookOf(world: Record<string, any>): Look {
+  const out: Look = {};
+  for (const [field, name] of [['building', 'tower'], ['glass_tint', 'glass'], ['frames', 'alu']] as const) {
+    const rgba = world.materials[name].rgba, own = hexOf(rgba);
+    if (own !== hexOf(BUILT[name])) out[field] = own;
+  }
+  if (world.light.time !== 'noon') out.time = world.light.time;
+  if (world.light.fog) out.fog = world.light.fog;
+  if (world.surroundings.city !== 'default') out.city = world.surroundings.city;
+  for (const k of ['rain', 'snow', 'dust_air'] as const) if (world.air[k]) out[k] = true;
+  return out;
+}
+
 const rgb = (r: number, g: number, b: number) => new THREE.Color(r, g, b);
 export const TIMES = {
   noon: { haze: HAZE.clone(), sun: rgb(1, 0.965, 0.92), sunLevel: 0.95, env: 0.85, flat: rgb(0.5, 0.54, 0.55), body: rgb(1.75, 1.75, 1.72), day: 1, lights: 0, rooms: 0, skyMix: 0, skyLow: rgb(1, 1, 1), skyHigh: rgb(1, 1, 1) },

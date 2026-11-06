@@ -1,7 +1,7 @@
 import { el, icon } from './dom.ts';
 import { Replay } from './replay.ts';
 import { SimView, restoreOnLoss, type OnFix } from './view.ts';
-import type { Trial } from './trial.ts';
+import { worldFacts, type Trial } from './trial.ts';
 
 export const LABEL = 'Simulated. Replay of a recorded run.';
 const SPARK_POINTS = 96;
@@ -94,8 +94,8 @@ export function worldPage(trial: Trial, statusRight: HTMLElement, onFix?: OnFix)
   const facts = el('div', 'facts');
   facts.append(
     fact('Phase', position.phase), fact('x', position.x), fact('z', position.z),
-    fact('Seed', String(result.seed)), fact('Wetness', String(world.wetness)), fact('Suction setting', `${String(world.suction_pa)} Pa`),
-    fact('Seal leak', `${String(world.seal_leak_mm2)} mm²`),
+    fact('Seed', String(result.seed)), fact('Wetness', String(worldFacts(world).wetness)), fact('Suction setting', `${String(worldFacts(world).suction)} Pa`),
+    fact('Seal leak', `${String(worldFacts(world).leak)} mm²`),
   );
 
   const fired = Object.entries(result.fired).sort((a, b) => a[1].t - b[1].t);

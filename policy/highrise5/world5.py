@@ -72,11 +72,18 @@ BLOCKS = {
     "light": {"sun_level": (NUM, 0.2, 1.0), "azimuth_deg": (NUM, -180.0, 180.0), "haze": (NUM, 0.0, 1.0)},
     "surroundings": {"city_seed": (INT, 0, 1000000), "density": (NUM, 0.0, 1.0), "radius_m": (NUM, 100.0, 640.0)},
 }
+# The picture's own fields of a block. Physics never reads them.
+TIMES = ("noon", "dusk", "night")
+CITIES = ("default", "dubai", "generic_desert", "generic_coast")
+LIGHT_PICTURE = {"fog": (INT, 0, 3)}
+AIR_FLAGS = ("rain", "snow", "dust_air")
+AIR_BEFORE = {"wetness": (NUM, 0.0, 1.0), "temperature_c": (NUM, -20.0, 50.0), "dust_gm2": (NUM, 0.0, 60.0)}
 TOWER_FIELDS = {"height_m": (NUM, 40.0, 300.0), "width_m": (NUM, 10.0, 80.0), "floor_m": (NUM, 3.0, 5.0)}
 CORNER_FIELDS = {"x_m": (NUM, -3.0, 9.0), "side": (INT, -1, 1)}
 SETBACK_FIELDS = {"above_top_m": (NUM, 0.6, 5.0), "depth_m": (NUM, 0.5, 4.0)}
 MATERIAL_FIELDS = {"roughness": (NUM, 0.0, 1.0), "metal": (NUM, 0.0, 1.0)}
-POS_FIELDS = {"x_m": (NUM, -200.0, 200.0), "below_top_m": (NUM, -60.0, 300.0), "out_m": (NUM, 0.0, 300.0)}
+TOWER_DEPTH_M = 28.0  # the picture's tower box, front to back
+POS_FIELDS = {"x_m": (NUM, -200.0, 200.0), "below_top_m": (NUM, -200.0, 300.0), "out_m": (NUM, -TOWER_DEPTH_M, 300.0)}  # a negative out_m stands on the roof, see _check_geometry
 
 SHAPES = {"box": 3, "cyl": 2, "sphere": 1, "capsule": 2}  # size entries: box w,out,h; cyl and capsule radius,length; sphere radius
 SIZE_RANGE = (0.0005, 100.0)
@@ -262,6 +269,28 @@ def _materials(raw):
     return out
 
 
+def _picture_field(raw, key, allowed, where):
+    """The block without its one word field, and that word."""
+    if not isinstance(raw, dict) or not isinstance(raw.get(key), str) or raw[key] not in allowed:
+        raise WorldError(f"{where}.{key} is unknown")
+    return {k: v for k, v in raw.items() if k != key}, raw[key]
+
+
+def _air(raw):
+    """The weather on screen. "before" holds the world values a weather replaced, so turning it off puts them back."""
+    _keys(raw, {*AIR_FLAGS, "before"}, "air")
+    out = {}
+    for flag in AIR_FLAGS:
+        if not isinstance(raw[flag], bool):
+            raise WorldError(f"air.{flag} must be true or false")
+        out[flag] = raw[flag]
+    before = raw["before"]
+    if not isinstance(before, dict) or set(before) - set(AIR_BEFORE):
+        raise WorldError("air.before has unknown fields")
+    out["before"] = {k: _number(v, AIR_BEFORE[k], f"air.before.{k}") for k, v in before.items()}
+    return out
+
+
 def _object(raw, i, materials):
     where = f"objects[{i}]"
     _keys(raw, OBJECT_FIELDS, where)
@@ -325,7 +354,10 @@ def half_extents(obj):
 def gap_m(obj):
     """Distance from the shape's nearest point to the plane of the glass. Measured to the plane and not the
     glass rectangle, because the robot body overhangs the glass edge and must still hit a solid there."""
-    return max(0.0, obj["pos"]["out_m"] - half_extents(obj)[1])
+    half = half_extents(obj)[1]
+    if obj["pos"]["out_m"] + half <= 0.0:
+        return math.inf  # wholly behind the glass plane, on the roof
+    return max(0.0, obj["pos"]["out_m"] - half)
 
 
 def effect_of(obj):
@@ -441,6 +473,8 @@ def _check_geometry(world):
     if sx - h < g["x0"] or sx + h > g["x1"] or sz + h > g["z1"] or sz - h < g["z0"]:
         raise WorldError("start pose is not on glass")
     for o in world["objects"]:
+        if o["pos"]["out_m"] < 0.0 and object_center(world, o)[2] - half_extents(o)[2] < t["height_m"]:
+            raise WorldError("an object behind the glass must stand on the roof")
         if not o["solid"] or effect_of(o) != "physics":
             continue
         x, _, z = object_center(world, o)
@@ -452,14 +486,17 @@ def _check_geometry(world):
 def validate(raw):
     if not isinstance(raw, dict):
         raise WorldError("world must be an object")
-    top = {"schema", "tower", "objects", "materials", "sky"} | set(BLOCKS)
+    top = {"schema", "tower", "objects", "materials", "sky", "air"} | set(BLOCKS)
     if set(raw) != top:
         raise WorldError(f"world has {len(top - set(raw))} missing and {len(set(raw) - top)} unknown fields")
     if raw["schema"] != SCHEMA:
         raise WorldError("bad schema")
     world = {"schema": SCHEMA, "tower": _tower(raw["tower"])}
+    light, around = _picture_field(raw["light"], "time", TIMES, "light"), _picture_field(raw["surroundings"], "city", CITIES, "surroundings")
     for block, rules in BLOCKS.items():
-        world[block] = _fields(raw[block], rules, block)
+        world[block] = _fields({"light": light[0], "surroundings": around[0]}.get(block, raw[block]), {**rules, **(LIGHT_PICTURE if block == "light" else {})}, block)
+    world["light"]["time"], world["surroundings"]["city"] = light[1], around[1]
+    world["air"] = _air(raw["air"])
     _keys(raw["sky"], {"top", "bottom"}, "sky")
     world["sky"] = {k: _vector(raw["sky"][k], 3, 0.0, 1.0, f"sky.{k}") for k in ("top", "bottom")}
     world["materials"] = _materials(raw["materials"])
@@ -574,8 +611,9 @@ def upgrade(raw):
     # The old tower stood 12 m past the glass on each side, measured after a corner cut the glass.
     world["tower"]["width_m"] = glass["x1"] - glass["x0"] + 2 * LEGACY_TOWER_MARGIN_M
     world["materials"] = {k: {"rgba": list(map(float, rgba)), "metal": metal, "roughness": rough} for k, (rgba, metal, rough) in DEFAULT_MATERIALS.items()}
-    world["light"].update(azimuth_deg=round(math.degrees(math.atan2(-0.45, 0.6)), 4), haze=0.5)
-    world["surroundings"] = {"city_seed": 0, "density": 1.0, "radius_m": 640.0}
+    world["light"].update(azimuth_deg=round(math.degrees(math.atan2(-0.45, 0.6)), 4), haze=0.5, time="noon", fog=0)
+    world["surroundings"] = {"city_seed": 0, "density": 1.0, "radius_m": 640.0, "city": "default"}
+    world["air"] = {"rain": False, "snow": False, "dust_air": False, "before": {}}
     world["sky"] = {"top": [0.42, 0.58, 0.80], "bottom": [0.95, 0.82, 0.70]}
     return validate(world)
 

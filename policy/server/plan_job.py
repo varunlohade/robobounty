@@ -92,6 +92,35 @@ def route(req):
     return {"ok": True, "reply": raw, "seconds": round(time.perf_counter() - t0, 1), "model": ROUTE_MODEL}
 
 
+AGENT_TIMEOUT_S = 200
+
+
+def agent(req):
+    """One model call for policy/highrise5/agent5.py. The reply is data, and engine5 checks every call in it. A check reads stored replies from agent5.json, by message and round."""
+    t0 = time.perf_counter()
+    folder = os.environ.get("CRASHLAB_RECORDED_REPLIES")
+    if folder and not os.environ.get("CRASHLAB_LIVE_ROUTE"):
+        path = Path(folder) / "agent5.json"
+        stored = json.loads(path.read_text()) if path.exists() else {}
+        if req["text"] not in stored:
+            return {"ok": False, "rejection": "llm_no_stored_reply", "seconds": 0.0}
+        rounds = stored[req["text"]]
+        return {"ok": True, "reply": rounds[req["round"] - 1] if req["round"] <= len(rounds) else {"calls": [], "say": ""}, "seconds": 0.0}
+    os.environ["CRASHLAB_LLM"] = "claude"
+    os.environ["CRASHLAB_LLM_MODEL"] = req["model"]
+    llm.TIMEOUT_S = AGENT_TIMEOUT_S
+    try:
+        raw = llm.complete_json(req["prompt"], req["schema"])
+    except llm.LLMError as e:
+        return {"ok": False, "rejection": f"llm_{e}", "seconds": round(time.perf_counter() - t0, 1)}
+    if os.environ.get("CRASHLAB_SAVE_AGENT"):  # A check keeps the replies of a live run, so later runs of it need no AI.
+        path = Path(os.environ["CRASHLAB_SAVE_AGENT"])
+        kept = json.loads(path.read_text()) if path.exists() else {}
+        kept.setdefault(req["text"], []).append(raw)
+        path.write_text(json.dumps(kept, indent=1))
+    return {"ok": True, "reply": raw, "seconds": round(time.perf_counter() - t0, 1)}
+
+
 class KeepBase:
     """A follow-up samples only the fields it changed. Every other value comes from the current world, so a dropped sample or an integer draw cannot move it."""
     open_builder = staticmethod(plugin.open_builder)
@@ -141,7 +170,7 @@ def main():
         if os.environ.get("CRASHLAB_RECORDED_REPLIES"):
             llm.BACKENDS["recorded"] = _recorded
             os.environ["CRASHLAB_LLM"] = "recorded"
-        reply = {"plan": plan, "build": build, "scenarios": propose, "route": route}[sys.argv[1]](req)
+        reply = {"plan": plan, "build": build, "scenarios": propose, "route": route, "agent": agent}[sys.argv[1]](req)
     json.dump(reply, sys.stdout, allow_nan=False)
 
 

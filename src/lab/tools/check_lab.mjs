@@ -1,6 +1,6 @@
 // Drives lab.html end to end: a brief, one run, a follow-up, a second run of the same world.
 // node src/lab/tools/check_lab.mjs [--recorded DIR] [--out DIR] [--brief text] [--change text]
-// Needs vite on port 5199. It starts its own run server on a free port, so one already open stays untouched and stops it. With no --recorded it makes 2 real LLM calls.
+// Needs vite on port 5199. It starts its own run server on a free port, so one already open stays untouched and stops it. With no --recorded it makes real LLM calls, about 7 for the 3 messages.
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -13,6 +13,7 @@ const OUT = resolve(arg('out', join(ROOT, 'design/shell')));
 const RECORDED = arg('recorded', null);
 const BRIEF = arg('brief', 'Window robot for towers in Dubai. High floor.');
 const CHANGE = arg('change', 'Make the wind stronger and wet the glass.');
+const WINDY = 'make the wind 14 m/s';
 const SERVER_PORT = await new Promise(r => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => r(port)); }); });
 const SERVER = `http://127.0.0.1:${SERVER_PORT}`;
 const ORIGIN = 'http://localhost:5199';
@@ -143,17 +144,18 @@ try {
   const r1 = await (await get('trials/normal-1/result.json')).json();
   const r2 = await (await get('trials/normal-2/result.json')).json();
   const log = await events();
-  const planned = log.filter(e => e.type === 'tool' && e.title === 'plan_world').pop();
-  const cited = Object.keys(JSON.parse(planned.lines[0]));
-  const moved = Object.keys(w2).filter(k => JSON.stringify(w1[k]) !== JSON.stringify(w2[k]));
-  console.log('cited', cited.join(','), '| moved', moved.join(','));
+  // A v5 world is nested, and each change is an engine call, so the fields come from those calls.
+  const BLOCKS = { set_wind: 'wind', set_weather: 'weather', set_robot: 'robot', set_tower: 'tower' };
+  const cited = log.filter(e => e.type === 'tool' && e.title === 'engine_call').map(e => BLOCKS[e.lines[0].split('(')[0]]).filter(Boolean);
+  const moved = [];
+  for (const block of Object.keys(w2)) if (block !== 'schema' && typeof w2[block] === 'object' && !Array.isArray(w2[block])) for (const k of Object.keys(w2[block])) if (JSON.stringify(w1[block][k]) !== JSON.stringify(w2[block][k])) moved.push([block, k]);
+  console.log('cited', cited.join(','), '| moved', moved.map(m => m.join('.')).join(','));
   check('world_2 differs from world_1', moved.length > 0);
-  check('world_2 differs only in the cited fields', moved.every(k => cited.includes(k)), moved.filter(k => !cited.includes(k)).join(','));
+  check('world_2 differs only in the cited blocks', moved.every(([b]) => cited.includes(b)), moved.map(m => m[0]).filter(b => !cited.includes(b)).join(','));
   check('the run seed stays', r1.seed === r2.seed, `${r1.seed} and ${r2.seed}`);
   const said = log.filter(e => e.type === 'text' && !e.fail).map(e => e.text).filter(t => / \u2192 .*\d/.test(t)).pop() ?? '';
   console.log('said:', said);
-  const shown = v => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(1) : String(Number(v.toPrecision(3))));
-  check('chat says each moved value in plain numbers', moved.length > 0 && moved.every(k => said.includes(`${shown(w1[k])} \u2192 ${shown(w2[k])}`)), said);
+  check('chat says each moved value in plain numbers', moved.length > 0 && moved.every(([b, k]) => said.includes(`${b} ${k.replaceAll('_', ' ')} ${w1[b][k]} \u2192 ${w2[b][k]}`)), said);
   check('chat shows those numbers', (await chatText()).includes(said) && said.length > 0);
   const f1 = await frame();
   await wait(1500);
@@ -191,14 +193,14 @@ try {
   n = await idle();
   await type(BRIEF);
   await idleAfter(n, 90);
-  for (let q = 0; await js(`[...document.querySelectorAll('.chat-option')].some(b => !b.disabled)`); q++) {
-    n = await idle();
-    await js(`[...document.querySelectorAll('.chat-card')].pop().querySelectorAll('.chat-option')[${q === 0 ? 2 : 0}].click()`);
-    await idleAfter(n, 90);
-  }
-  await until(playing('normal-1'), 'held run plays', 60);
+  await until(playing('normal-1'), 'first run plays', 60);
+  // A v5 chat asks no quick question, so a windy world comes from a message.
+  n = await idle();
+  await type(WINDY);
+  await idleAfter(n, 150);
+  await until(playing('normal-2'), 'held run plays', 60);
   const heldSid = await js(`sessionStorage.getItem('crashlab-session')`);
-  const heldFile = name => fetch(`${SERVER}/api/sessions/${heldSid}/trials/normal-1/${name}`, { headers: { Origin: ORIGIN } }).then(r => r.json());
+  const heldFile = name => fetch(`${SERVER}/api/sessions/${heldSid}/trials/normal-2/${name}`, { headers: { Origin: ORIGIN } }).then(r => r.json());
   const heldResult = await heldFile('result.json'), heldWind = await heldFile('wind.json');
   const peak = Math.max(...heldWind).toFixed(1), held = await chatText();
   check('the run held for wind', heldResult.outcome === 'wind_hold', heldResult.outcome);

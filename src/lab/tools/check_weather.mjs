@@ -72,8 +72,8 @@ const shot = async name => {
 const seek = frame => js(`(() => { const s = document.querySelector('input[aria-label="Timeline"]'); s.value = ${frame}; s.dispatchEvent(new Event('input')); })()`);
 const weather = () => js(`JSON.parse(document.querySelector('.viewport').dataset.weather)`);
 const trial = async (tid, file) => (await fetch(`${SERVER}/api/sessions/${await js(`sessionStorage.getItem('crashlab-session')`)}/trials/${tid}/${file}`, { headers: { Origin: ORIGIN } })).json();
-// A new chat with one brief. pick gives the option number for each quick question.
-async function brief(pick, label) {
+// A new chat with one brief, then one message if given. A v5 chat asks no quick question. It returns the id of the run on screen.
+async function brief(message, label) {
   await send('Page.navigate', { url: 'about:blank' });
   await wait(300);
   await send('Page.navigate', { url: PAGE });
@@ -84,13 +84,13 @@ async function brief(pick, label) {
   let n = await idle();
   await type(BRIEF);
   await quiet(n);
-  let asked = 0;
-  while (await js(`[...document.querySelectorAll('.chat-option')].some(b => !b.disabled)`)) {
-    n = await idle();
-    await js(`[...document.querySelectorAll('.chat-card')].pop().querySelectorAll('.chat-option')[${pick[asked++] ?? 0}].click()`);
-    await quiet(n);
-  }
   await until(`document.querySelector('.viewport')?.dataset.tid === 'normal-1' && Number(document.querySelector('.viewport').dataset.frame) > 0`, `${label} run plays`, 120);
+  if (!message) return 'normal-1';
+  n = await idle();
+  await type(message);
+  await quiet(n);
+  await until(`document.querySelector('.viewport')?.dataset.tid === 'normal-2' && Number(document.querySelector('.viewport').dataset.frame) > 0`, `${label} second run plays`, 120);
+  return 'normal-2';
 }
 // The streak speed the view really used over half a second, against the record for that frame.
 async function measure(frame) {
@@ -128,8 +128,9 @@ try {
   await wait(1000);
 
   // 1. A calm world: no streaks to speak of.
-  await brief([0, 0], 'calm');
-  const calmWind = await trial('normal-1', 'wind.json');
+  // The nominal world has light wind and gusts, so a calm world comes from a message, as the windy one does.
+  await brief('make it calm', 'calm');
+  const calmWind = await trial('normal-2', 'wind.json');
   const calm = await measure(600);
   await wait(800);
   const calmMoved = await motion();
@@ -138,9 +139,9 @@ try {
   console.log(`calm wind range ${Math.min(...calmWind)} to ${Math.max(...calmWind)}`);
 
   // 2. A very windy world: speed against the record at 3 frames.
-  await brief([2, 0], 'windy');
-  const wind = await trial('normal-1', 'wind.json');
-  const world = await trial('normal-1', 'world.json');
+  await brief('make the wind 14 m/s', 'windy');
+  const wind = await trial('normal-2', 'wind.json');
+  const world = await trial('normal-2', 'world.json');
   const peak = wind.indexOf(Math.max(...wind)), low = wind.indexOf(Math.min(...wind));
   for (const f of [low + 1, 2000, peak + 1]) {
     const m = await measure(f);
@@ -148,7 +149,7 @@ try {
     check(`streak speed at frame ${f} equals wind.json`, Math.abs(m.speed - want) <= 0.03 * want && m.ms === want, `drew ${m.speed.toFixed(2)} m/s, record ${want} m/s, ${m.streaks} streaks`);
   }
   const view = await weather();
-  check('direction is the world\'s', view.dir === world.wind_dir_deg, `${view.dir} degrees`);
+  check('direction is the world\'s', view.dir === world.wind.dir_deg, `${view.dir} degrees`);
   await seek(peak + 1);
   await wait(500);
   const windMoved = await motion();
@@ -157,7 +158,7 @@ try {
 
   if (!WIND_ONLY) {
     // 3. One word: the picture and the physics, then a new run.
-    let round = 1;
+    let round = 2;
     for (const [word, png, field, modelled] of [['make the weather dusty', 'weather-dust.png', 'dust_gm2', 'Blowing dust on screen is scenery.'], ['make it rain', 'weather-rain.png', 'wetness', 'Rain on screen is scenery.'], ['make it snow', 'weather-snow.png', 'temperature_c', 'Snow on screen is scenery.']]) {
       const n = await idle();
       const before = await trial(`normal-${round}`, 'world.json');
@@ -168,7 +169,7 @@ try {
       await until(`document.querySelector('.viewport')?.dataset.tid === 'normal-${round}' && Number(document.querySelector('.viewport').dataset.frame) > 0`, `${word} re-run`, 60);
       const after = await trial(`normal-${round}`, 'world.json');
       const result = await trial(`normal-${round}`, 'result.json');
-      check(`"${word}" moves ${field}`, before[field] !== after[field], `${before[field]} -> ${after[field]}`);
+      check(`"${word}" moves ${field}`, before.weather[field] !== after.weather[field], `${before.weather[field]} -> ${after.weather[field]}`);
       check(`"${word}" re-runs with a new final state`, result.final_state_sha256 !== sha);
       check(`"${word}" says what is scenery`, (await chatText()).includes(modelled));
       await seek(4000);
@@ -178,11 +179,11 @@ try {
     check('the old reply is gone', !(await chatText()).includes('does not draw'));
 
     // 4. A wet world at a late frame: drops on the glass the robot has not reached, none on the lanes it cleaned.
-    await brief([0, 1], 'wet');
+    await brief('wet the glass', 'wet');
     await seek(0);
     await wait(1000);
     await shot('drops-start.png');
-    const frames = Number((await trial('normal-1', 'manifest.json')).frames);
+    const frames = Number((await trial('normal-2', 'manifest.json')).frames);
     await seek(Math.floor(frames * 0.45));
     await wait(1200);
     console.log('cleaned share at that frame', await js(`document.querySelector('.viewport').dataset.drawnClean`));

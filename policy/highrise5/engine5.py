@@ -11,6 +11,7 @@ The later call wins.
 Groups live in the engine state and not in the world file, because the v5 schema has no field for them.
 """
 import copy
+import re
 
 import compile5 as C
 import scene5 as E
@@ -25,7 +26,7 @@ MAX_DELTA_M = 300.0
 
 CODES = frozenset({
     "bad_args", "bad_name", "bad_shape", "fixed_by_kind", "glass_below_ground", "glass_wider_than_tower", "invalid_world",
-    "name_taken", "no_glass_to_clean", "no_such_material", "no_such_object", "nothing_to_undo", "one_cradle_only", "out_of_range",
+    "must_stand_on_roof", "name_taken", "no_glass_to_clean", "no_such_material", "no_such_object", "nothing_to_undo", "one_cradle_only", "out_of_range",
     "reserved_material", "setback_above_roof", "start_blocked", "start_not_on_glass", "too_many_geoms", "too_many_groups",
     "too_many_materials", "too_many_objects", "too_many_solids", "unknown_function",
 })
@@ -40,7 +41,7 @@ PLANNED_PARTS = ["crane", "antenna", "ac_unit", "billboard", "cradle_parked", "t
 # Fragments of the fixed text in world5, in match order. A WorldError holds no input, but only the code leaves this file.
 WORLD_ERRORS = (
     ("runs below the ground", "glass_below_ground"), ("wider than the tower", "glass_wider_than_tower"),
-    ("start pose is not on glass", "start_not_on_glass"), ("blocks the start pose", "start_blocked"),
+    ("must stand on the roof", "must_stand_on_roof"), ("start pose is not on glass", "start_not_on_glass"), ("blocks the start pose", "start_blocked"),
     ("setback must stay", "setback_above_roof"), ("more than one cradle", "one_cradle_only"),
     (f"more than {W.MAX_GEOMS} geoms", "too_many_geoms"), (f"more than {W.MAX_SOLIDS} solids", "too_many_solids"),
     (f"more than {W.MAX_OBJECTS} objects", "too_many_objects"), (f"more than {W.MAX_MATERIALS} materials", "too_many_materials"),
@@ -53,6 +54,14 @@ EDGE_NOTE = ("A margin or setback may change nothing. It moves only the glass ed
              "On the nominal world neither does, at the smallest margin or the lowest setback. With strong suction on dry glass the robot climbs past the area top, and then both matter.")
 SPEED_NOTE = (f"clean_speed_ms above {W.MAX_CLEAN_SPEED_MS} refuses with out_of_range. Speeds just above that cap failed the nominal world on some seeds, and "
               "a faster pass removes less dirt.")
+
+
+# One weather word sets the fields that have a model. The same values as policy/server/look.py, and policy/server/check_look.py checks that.
+WEATHER_PHYSICS = {"rain": {"wetness": 0.9}, "snow": {"temperature_c": -5.0, "wetness": 0.6}, "dust_air": {"dust_gm2": 25.0}}
+LOOK_MATERIALS = {"building": "tower", "glass_tint": "glass", "frames": "alu"}
+LOOK_NOTE = ("Colours of the building, glass and frames, the time of day, fog, the city scenery, and rain, snow or dust in the air. Each colour is #RRGGBB, or default. "
+             "A colour, time, fog or city is picture only. A city named Dubai is scenery, and any other named place is not supported. "
+             "rain, snow and dust_air also set the physics that weather has a model for, so make no set_weather call for the same words. Set only what the message asks for.")
 
 
 class Refuse(Exception):
@@ -103,7 +112,10 @@ def _check_value(rule, v):
     if t == "string":
         if not isinstance(v, str):
             raise Refuse("bad_args")
-        if "enum" in rule:
+        if rule.get("colour"):
+            if not (v == "default" or v == rule["colour"] or re.fullmatch(r"#[0-9a-fA-F]{6}", v)):
+                raise Refuse("bad_args")
+        elif "enum" in rule:
             if v not in rule["enum"]:
                 raise Refuse("bad_args")
         elif not W.NAME_RE.fullmatch(v):
@@ -314,13 +326,53 @@ def set_dirt(w, a, groups):
     w["area"]["dirt_level"] = a["level"]
 
 
+def _hex_rgba(text):
+    return [round(int(text[i:i + 2], 16) / 255, 6) for i in (1, 3, 5)] + [1.0]
+
+
+def _rgba_hex(rgba):
+    return "#" + "".join(f"{round(v * 255):02x}" for v in rgba[:3])
+
+
+def set_look(w, a, groups):
+    for arg, material in LOOK_MATERIALS.items():
+        if arg in a:
+            w["materials"][material]["rgba"] = list(map(float, W.DEFAULT_MATERIALS[material][0])) if a[arg] in ("default", "clear") else _hex_rgba(a[arg])
+    _update(w["light"], a, {"time": "time", "fog": "fog"})
+    _update(w["surroundings"], a, {"city": "city"})
+    if not any(k in a for k in W.AIR_FLAGS):
+        return
+    air, weather = w["air"], w["weather"]
+    # A new weather replaces the old one, unless the same message asks for both.
+    if any(a.get(k) for k in W.AIR_FLAGS):
+        air.update({k: False for k in W.AIR_FLAGS})
+    air.update({k: a[k] for k in W.AIR_FLAGS if k in a})
+    target = {}
+    for flag in W.AIR_FLAGS:
+        if air[flag]:
+            for field, value in WEATHER_PHYSICS[flag].items():
+                target[field] = max(target.get(field, value), value)
+    for field in target:
+        air["before"].setdefault(field, weather[field])
+    for field in [f for f in air["before"] if f not in target]:
+        target[field] = air["before"].pop(field)
+    weather.update(target)
+
+
+def look_of(world):
+    """The world's picture settings in the words of policy/server/look.py, for the chat lines."""
+    out = {arg: _rgba_hex(world["materials"][m]["rgba"]) for arg, m in LOOK_MATERIALS.items() if _rgba_hex(world["materials"][m]["rgba"]) != _rgba_hex(W.DEFAULT_MATERIALS[m][0])}
+    out.update({k: True for k in W.AIR_FLAGS if world["air"][k]})
+    return out
+
+
 def set_light(w, a, groups):
-    _update(w["light"], a, {"sun_level": "sun_level", "azimuth": "azimuth_deg", "haze": "haze"})
+    _update(w["light"], a, {"sun_level": "sun_level", "azimuth": "azimuth_deg", "haze": "haze", "time": "time", "fog": "fog"})
     _update(w["sky"], a, {"sky_top": "top", "sky_bottom": "bottom"})
 
 
 def set_surroundings(w, a, groups):
-    _update(w["surroundings"], a, {"city_seed": "city_seed", "density": "density", "radius": "radius_m"})
+    _update(w["surroundings"], a, {"city_seed": "city_seed", "density": "density", "radius": "radius_m", "city": "city"})
 
 
 def read_world(state, a):
@@ -390,9 +442,13 @@ def _registry():
         row(name, _block_schema(W.BLOCKS[block]), "yes", _block_setter(block), note=SPEED_NOTE if block == "robot" else None)
     row("set_dirt", _schema({"level": _rule(a["dirt_level"])}, {"level"}), "yes", set_dirt)
     light, around = W.BLOCKS["light"], W.BLOCKS["surroundings"]
-    row("set_light", _schema({"sun_level": _rule(light["sun_level"]), "azimuth": _rule(light["azimuth_deg"]), "haze": _rule(light["haze"]),
+    time_word, city_word = {"type": "string", "enum": list(W.TIMES)}, {"type": "string", "enum": list(W.CITIES)}
+    row("set_light", _schema({"sun_level": _rule(light["sun_level"]), "azimuth": _rule(light["azimuth_deg"]), "haze": _rule(light["haze"]), "time": time_word, "fog": _rule(W.LIGHT_PICTURE["fog"]),
                               "sky_top": _vec(3, 0.0, 1.0), "sky_bottom": _vec(3, 0.0, 1.0)}, some=True), "no", set_light)
-    row("set_surroundings", _schema({"city_seed": _rule(around["city_seed"]), "density": _rule(around["density"]), "radius": _rule(around["radius_m"])}, some=True), "no", set_surroundings)
+    row("set_surroundings", _schema({"city_seed": _rule(around["city_seed"]), "density": _rule(around["density"]), "radius": _rule(around["radius_m"]), "city": city_word}, some=True), "no", set_surroundings)
+    colour, tint = {"type": "string", "colour": "default"}, {"type": "string", "colour": "clear"}
+    row("set_look", _schema({"building": colour, "glass_tint": tint, "frames": colour, "time": time_word, "fog": _rule(W.LIGHT_PICTURE["fog"]), "city": city_word,
+                             "rain": BOOL, "snow": BOOL, "dust_air": BOOL}, some=True), "if_physics", set_look, note=LOOK_NOTE)
     empty = _schema({})
     for name, read in (("read_world", read_world), ("read_result", read_result), ("list_parts", list_parts), ("explain_limits", explain_limits)):
         row(name, empty, "no", read=read)

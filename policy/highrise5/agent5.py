@@ -15,9 +15,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.append(str(HERE.parent / "crashlab"))
+sys.path.append(str(HERE.parent / "server"))
 import compile5 as C
 import controller5
 import engine5 as G
+import look
 import llm  # before diagnose, which puts policy/highrise first on the path
 import diagnose
 import run_trial5 as R
@@ -49,6 +51,7 @@ ENGINE_REASONS = {
     "bad_args": "the arguments do not fit the function",
     "bad_name": "the name is not allowed",
     "bad_shape": "the size does not fit the shape",
+    "must_stand_on_roof": "an object behind the glass plane must stand on the roof",
     "fixed_by_kind": "this kind of object cannot move that way",
     "glass_below_ground": "the glass would run below the ground",
     "glass_wider_than_tower": "the glass would be wider than the tower",
@@ -129,7 +132,7 @@ def world_summary(world, groups, result):
     effects = {o["name"]: W.effect_of(o) for o in world["objects"]}
     return {
         "tower": world["tower"], "area": world["area"], "panes": world["panes"], "weather": world["weather"], "wind": world["wind"],
-        "robot": world["robot"], "robot_start": world["robot_start"], "light": world["light"], "surroundings": world["surroundings"],
+        "robot": world["robot"], "robot_start": world["robot_start"], "light": world["light"], "surroundings": world["surroundings"], "air": world["air"], "look": G.look_of(world),
         "materials": sorted(world["materials"]), "groups": groups,
         "objects": [{k: o[k] for k in ("name", "kind", "shape", "size", "pos", "euler_deg", "material", "solid")} | {"effect": effects[o["name"]]} for o in world["objects"]],
         "robot_lanes_x_m": lanes(world), "roof_below_top_m": round(W.area_rect(world)["z1"] - world["tower"]["height_m"], 3),
@@ -139,6 +142,7 @@ def world_summary(world, groups, result):
 
 def build_prompt(state, message, history, feedback, round_no):
     limits = G.call(state, "explain_limits")["data"]
+    tower_width = state["world"]["tower"]["width_m"]
     return f"""You edit a simulated world for a window-cleaning robot by calling engine functions. Code validates each call. You write no code and no MJCF. A call outside the list below does nothing.
 
 Functions:
@@ -148,11 +152,18 @@ Limits: {json.dumps(limits)}
 
 Positions:
 - x_m is along the glass from the left edge of the work area. below_top_m is down from the top of the work area, so a negative value is above it.
-- out_m is outward from the glass plane and is never below 0, so nothing can stand inside the tower footprint, and that includes the middle of the roof.
+- out_m is outward from the glass plane. A negative out_m is behind the plane, down to -{W.TOWER_DEPTH_M:g}, and is allowed only for an object wholly above the roof. That is how a thing stands on the roof.
+- roof_below_top_m in the world below is the below_top_m of the roof. It is negative. On the roof, the centre of a thing of height h has below_top_m = roof_below_top_m - h/2.
 - The robot cleans vertical lanes at robot_lanes_x_m, from above the top of the work area to below its bottom. Heading is fixed.
 - An object has effect physics only if it is solid and within {W.NEAR_GLASS_M} m of the glass. The effect shows in the objects list.
 - Names match {W.NAME_RE.pattern}. add_object size: box [width along x, depth out from the glass, height], cyl and capsule [radius, length], sphere [radius]. Each size is a full length, except a radius.
-- Materials: tower is the building, glass is the glass, alu is the frames, concrete is the parapet.
+- Materials: tower is the building, glass is the glass, alu is the frames, concrete is the parapet. Others you can name for an object: el_sign0 (red), el_sign1 (blue), el_sign2 (yellow), el_steel, el_cradle (yellow), el_dark. set_material with rgba, roughness and metal makes a new one.
+
+Building things:
+- Build at real size, and in a colour that stands out from a grey tower, because people look at the result. The robot is {W.BODY_SIDE} m wide. The tower is {tower_width:g} m wide.
+- Set solid false for anything the robot cannot reach, such as anything on the roof. A solid thing above the roof that crosses the glass plane would count as physics for nothing.
+- To block the robot: a solid box centred on one of robot_lanes_x_m, below_top_m between 1 and 2.5, with out_m equal to half its depth so it touches the glass. A big one is at least 1 m wide, 0.8 m tall and 0.3 m deep, and it uses a strong colour.
+- A thing made of parts must read as that thing from the street, so lay its long parts along x and use up to {MAX_CALLS} add_object calls. For example, a tower crane on the roof is 25 to 40 m tall: a thin mast, a long horizontal jib near the top with a short counter-jib on the other side, a heavy counterweight under the counter-jib, a cab under the jib at the mast, and a thin cable with a hook hanging from the far part of the jib, all at the same out_m. Give its parts names that start with the thing's name.
 
 Reply rules:
 - Reply with calls, say and, if needed, cannot_build. Change only what the message asks for.
@@ -222,6 +233,7 @@ def check_say(text, allowed, outcome):
 
 class History:
     """world_N.json for each applied batch, with batch_N.json beside it. Files are never overwritten or removed, so an undo only moves the pointer to N's parent."""
+    STOPS = ()  # Errors from a run that end the whole turn. Any other run error is one failed call.
 
     def __init__(self, folder):
         self.dir = Path(folder)
@@ -319,8 +331,22 @@ def _physics_event(text, before, after):
     return {**event, "status": "changed nothing", "line": f"{text}: changed nothing in the result. The model changed and the end state differs, and no reported number moved."}
 
 
+def _browser_picture(world):
+    """The picture settings only the browser reads, because the view model has no field for them."""
+    return world["light"]["time"], world["light"]["fog"], world["surroundings"]["city"], world["air"]
+
+
 def _apply_one(state, fn, args, history):
     """One call. Returns the new state and its event."""
+    new, event = _apply_call(state, fn, args, history)
+    if fn == "set_look" and event.get("applied"):
+        # The chat's plain words for a look, with what is modelled and what is scenery. Code writes them from checked values.
+        patch = look.one_weather(look.validate(event["applied"]["args"]))
+        event["words"] = look.words(patch, G.look_of(state["world"]), True)
+    return new, event
+
+
+def _apply_call(state, fn, args, history):
     out = G.call(state, fn, args)
     res = out["result"]
     if res.startswith("cannot_build:"):
@@ -337,6 +363,8 @@ def _apply_one(state, fn, args, history):
         try:
             C.compile(new["world"])
             before, after = history.run(state), history.run(new)
+        except history.STOPS:
+            raise
         except Exception as e:
             return state, {**_failed(text, "run_error", OWN_REASONS), "error_type": type(e).__name__}
         return new, {**_physics_event(text, before, after), "applied": {"fn": fn, "args": checked}}
@@ -345,16 +373,33 @@ def _apply_one(state, fn, args, history):
         return new, {**event, "status": "ok", "line": f"{text}: ok. A group only, with no re-run."}
     if new["world"] == state["world"]:
         return new, {**event, "status": "changed nothing", "line": f"{text}: changed nothing. The world already held these values."}
-    if C.compile(new["world"])[1] == C.compile(state["world"])[1]:
+    if C.compile(new["world"])[1] == C.compile(state["world"])[1] and _browser_picture(new["world"]) == _browser_picture(state["world"]):
         return new, {**event, "status": "changed nothing", "line": f"{text}: changed nothing in the compiled picture or the physics."}
     return new, {**event, "status": G.PICTURE, "line": f"{text}: {G.PICTURE}."}
 
 
-def turn(world, message, history, complete=None):
+class _Events(list):
+    """The turn's events. notify sees each one as it happens, so a page can show them while the turn runs."""
+
+    def __init__(self, notify):
+        super().__init__()
+        self.notify = notify
+
+    def append(self, event):
+        super().append(event)
+        if self.notify:
+            self.notify(event)
+
+    def extend(self, new):
+        for event in new:
+            self.append(event)
+
+
+def turn(world, message, history, complete=None, notify=None):
     """One chat message. complete(prompt, schema) is the model; a fixture can stand in for it, and the rest of the loop stays real."""
     complete = complete or _complete
     t0 = time.time()
-    events = []
+    events = _Events(notify)
     timing = {"llm_s": 0.0, "llm_calls": 0, "runs": 0}
 
     def finish(final_world):
@@ -461,6 +506,8 @@ def _undo(state, history):
         return event, restored
     try:
         a, b = result_table(history.run(state)), result_table(history.run(restored))
+    except history.STOPS:
+        raise
     except Exception as e:
         return {**_failed("undo", "run_error", OWN_REASONS), "error_type": type(e).__name__}, restored
     moved = _moved(a, b)
@@ -480,6 +527,34 @@ def _say_events(events, say, stale, allowed, outcome):
         events.append({"kind": "say_hidden", "reasons": bad, "line": "The AI's words broke a truth rule, so they are not shown. The lines above come from code."})
     else:
         events.append({"kind": "say", "text": say, "line": f"AI says: {say}"})
+
+
+def _box_of(world, objects):
+    boxes = []
+    for o in objects:
+        c, e = W.object_center(world, o), W.half_extents(o)
+        boxes.append([c[0] - e[0], c[1] - e[1], c[2] - e[2], c[0] + e[0], c[1] + e[1], c[2] + e[2]])
+    return [min(b[i] for b in boxes) for i in range(3)] + [max(b[i] for b in boxes) for i in range(3, 6)]
+
+
+def focus_of(before, after):
+    """Where the default view will not show a change: a new or moved object away from the robot's path, or a changed tower. None when the default view shows it."""
+    old = {o["name"]: o for o in before["objects"]} if before else {}
+    new = [o for o in after["objects"] if o["name"] not in old or o["pos"] != old[o["name"]]["pos"] or o["size"] != old[o["name"]]["size"]]
+    a = W.area_rect(after)
+    if new:
+        box = _box_of(after, new)
+        if box[0] < a["x1"] + 2 and box[3] > a["x0"] - 2 and box[2] < a["z1"] + 2 and box[5] > a["z0"] - 2 and box[1] > -2 and box[4] < 1:
+            return None
+        lift = box[2] - a["z1"]
+        where = f"{lift:.0f} m above the top of the work area" if lift > 0 else f"{-lift:.0f} m below the top of the work area"
+        on_roof = box[2] >= after["tower"]["height_m"] - 0.5
+        return {"kind": "object", "box": box, "line": f"It {'stands on the roof, ' if on_roof else 'is '}{where}, so the default view cannot show it. The view moved to it. Back to robot returns."}
+    if before and any(before["tower"][k] != after["tower"][k] for k in ("height_m", "width_m")):
+        t, g = after["tower"], W.glass_rect(after)
+        cx = (g["x0"] + g["x1"]) / 2
+        return {"kind": "tower", "box": [cx - t["width_m"] / 2, 0.0, 0.0, cx + t["width_m"] / 2, 0.0, t["height_m"]], "line": "The view moved out to show the whole tower. Then it returns to the robot."}
+    return None
 
 
 def lines(events):

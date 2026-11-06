@@ -6,12 +6,12 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { HAZE, SKY_URL, bakeDrops, bakeGrime, skyDome } from '../view/real/air.ts';
 import { cityGeometry, cityMaterial } from '../view/real/city.ts';
 import { barGeometry, brushedTextures, glassMaterial, type FacadeGrid } from '../view/real/facade.ts';
-import { AIR, CITIES, FOG_THICKNESS, TIMES, luminance, parseLook, tintOf, type Look } from '../view/real/look.ts';
+import { AIR, CITIES, FOG_THICKNESS, TIMES, lookOf, luminance, parseLook, tintOf, type Look } from '../view/real/look.ts';
 import { compositeMaterial } from '../view/real/post.ts';
 import { buildRobot } from '../view/real/robot.ts';
 import { Weather } from '../view/real/weather.ts';
 import type { Replay } from './replay.ts';
-import type { Trial } from './trial.ts';
+import { isV5, worldFacts, type Trial } from './trial.ts';
 
 const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const PATH_OFF_GLASS_M = 0.004;
@@ -23,6 +23,12 @@ const LOOK_FROM_ROBOT = new THREE.Vector3(-0.92, -0.43, -0.23);
 const MAX_PIXELS = 3.2e6; // A big window keeps its frame rate: past this, the picture scales up.
 const FOLLOW_RATE = 2.6; // Per second.
 const FOLLOW_MARGIN_M = 1.5; // A falling robot leaves the frame: the camera stays with the assigned area.
+const FRAME_FROM = new THREE.Vector3(0.42, -0.9, 0.1).normalize(); // Where a framed object is seen from: the street, a little to one side.
+const FRAME_GLIDE_MS = 700;
+const FRAME_ABOVE_M = 80;
+const BASE_SUN_LEVEL = 0.7, BASE_HAZE = 0.5, BASE_AZIMUTH = (Math.atan2(-0.45, 0.6) * 180) / Math.PI; // The nominal world's light: at these values the picture is the approved one.
+const BASE_SKY = '0.42,0.58,0.8|0.95,0.82,0.7';
+const FULL_RADIUS_M = 640; // A world's largest surroundings radius draws the view's whole city.
 
 export type Quality = 'high' | 'medium' | 'low';
 const TIERS: Record<Quality, { dpr: number; hdr: boolean; samples: number; mirror: number; dof: boolean; grain: number; radius: number; grime: number; shadow: number }> = {
@@ -82,6 +88,12 @@ export class SimView {
   onLost: (() => void) | null = null;
   private loopRun = 0; private lookNow: unknown = {};
   private weather: Weather; private air = { rain: false, snow: false, dust: false };
+  private built = new THREE.Group(); private builtDisposers: (() => void)[] = [];
+  private bars: { x: number[]; z: number[] } = { x: [], z: [] };
+  private cityMesh!: THREE.Mesh; private cityKey = ''; private wallBox: number[] = [];
+  private sunOffset = new THREE.Vector3(-1.5, -2.2, 2.4);
+  private framed = false; private glide: { t0: number; pos0: THREE.Vector3; tgt0: THREE.Vector3; pos1: THREE.Vector3; tgt1: THREE.Vector3 } | null = null;
+  private backButton: HTMLButtonElement | null = null; private backTimer = 0;
 
   constructor(private host: HTMLElement, private replay: Replay, private trial: Trial) {
     const built = performance.now();
@@ -129,11 +141,9 @@ export class SimView {
     const { model } = replay;
     const mj = replay.mj;
     const geomId = (name: string) => mj.mj_name2id(model, mj.mjtObj.mjOBJ_GEOM.value, name);
-    const towerId = geomId('tower');
-    const tower = {
-      x: model.geom_pos[towerId * 3], y: model.geom_pos[towerId * 3 + 1], z: model.geom_pos[towerId * 3 + 2],
-      hx: model.geom_size[towerId * 3], hy: model.geom_size[towerId * 3 + 1], hz: model.geom_size[towerId * 3 + 2],
-    };
+    this.scene.add(this.built);
+    this.disposers.push(() => this.clearBuilt());
+    const tower = this.towerBox();
     const grid = this.buildFrame(geomId, tower);
 
     // Sky and city go in both the main pass and the mirror pass.
@@ -143,21 +153,19 @@ export class SimView {
     this.scene.add(this.dome);
     this.city = cityMaterial(noise);
     this.city.uniforms.uHaze.value = this.haze;
-    const cityMesh = new THREE.Mesh(cityGeometry(tower.x, tower.y, tier.radius), this.city);
+    const cityMesh = new THREE.Mesh(this.cityShape(tower), this.city);
     cityMesh.frustumCulled = false;
     cityMesh.layers.enable(MIRROR_LAYER);
+    this.cityMesh = cityMesh;
     this.scene.add(cityMesh);
     this.disposers.push(() => this.city.dispose());
 
     // The glass wall: one plane, with its panes in the shader.
     this.glass = glassMaterial(noise, { value: dropsRt.texture }, grid);
-    this.glass.uniforms.uWet.value = Number(trial.world?.wetness ?? 0);
+    this.glass.uniforms.uWet.value = Number(worldFacts(trial.world).wetness ?? 0);
     this.glass.uniforms.uHaze.value = this.haze;
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(tower.hx * 2, tower.z + tower.hz).rotateX(Math.PI / 2), this.glass);
-    wall.position.set(tower.x, 0, (tower.z + tower.hz) / 2);
-    wall.receiveShadow = false;
-    this.scene.add(wall);
-    this.disposers.push(() => { wall.geometry.dispose(); this.glass.dispose(); });
+    this.addWall(tower);
+    this.disposers.push(() => this.glass.dispose());
 
     // Soft directional light under the overcast: it shapes the robot and throws its soft shadow. The sky map does the rest.
     this.sun = new THREE.DirectionalLight(0xfff6ea, 0.95);
@@ -213,7 +221,7 @@ export class SimView {
     gu.uDirtRect.value.set(hasGrid ? area.x0 - PAD * cellX : -1e6, hasGrid ? area.z0 - PAD * cellZ : -1e6, hasGrid ? w * cellX : 1, hasGrid ? h * cellZ : 1);
     const c = d.clean_below / this.levelRef;
     gu.uClean.value.set(hasGrid ? c * 0.55 : -1, hasGrid ? c * 1.6 : 0);
-    const level = Number(trial.world?.dirt_level ?? 0.6);
+    const level = Number(worldFacts(trial.world).dirtLevel ?? 0.6);
     gu.uFilm.value = Math.min(1.4, 0.55 + 0.75 * level) * 0.8;
 
     const firedTimes = Object.values(trial.result.fired).map(f => f.t);
@@ -287,11 +295,16 @@ export class SimView {
     fresh.camera.position.copy(old.camera.position);
     fresh.controls.target.copy(old.controls.target);
     fresh.sync();
+    fresh.camera.position.copy(old.camera.position);
+    fresh.controls.target.copy(old.controls.target);
+    fresh.framed = old.framed;
     return fresh;
   }
 
   dispose() {
     this.stopped = true;
+    clearTimeout(this.backTimer);
+    this.backButton?.remove();
     this.observer.disconnect();
     this.controls.dispose();
     for (const d of this.disposers) d();
@@ -394,11 +407,146 @@ export class SimView {
       if (air.snow) m.color.lerp(new THREE.Color(1.4, 1.42, 1.48), 0.85);
     }
 
+    this.applyLight();
+
     const envKey = `${look.time ?? 'noon'}|${fog}|${look.city ?? 'default'}|${air.rain}|${air.snow}|${air.dust}`;
     if (envKey !== this.envKey) { this.envKey = envKey; this.buildEnv(); }
     else this.scene.environmentIntensity = this.envStrength;
     this.host.dataset.look = JSON.stringify(look);
     this.dirty = true;
+  }
+
+  // A v5 world's own light, on top of its time of day. At the nominal values it changes nothing.
+  private applyLight() {
+    if (!isV5(this.trial.world)) return;
+    const { light, sky } = this.trial.world as Record<string, any>;
+    this.sun.intensity *= light.sun_level / BASE_SUN_LEVEL;
+    const turn = ((light.azimuth_deg - BASE_AZIMUTH) * Math.PI) / 180;
+    this.sunOffset.set(-1.5, -2.2, 2.4).applyAxisAngle(new THREE.Vector3(0, 0, 1), turn);
+    const k = light.haze / BASE_HAZE;
+    this.glass.uniforms.uFogK.value *= k;
+    this.city.uniforms.uFogK.value *= k;
+    if (`${sky.top}|${sky.bottom}` !== BASE_SKY) {
+      const u = (this.dome.material as THREE.ShaderMaterial).uniforms;
+      u.uSkyMix.value = 1;
+      u.uSkyLow.value.setRGB(sky.bottom[0], sky.bottom[1], sky.bottom[2], THREE.SRGBColorSpace);
+      u.uSkyHigh.value.setRGB(sky.top[0], sky.top[1], sky.top[2], THREE.SRGBColorSpace);
+    }
+  }
+
+  private towerBox() {
+    const m = this.replay.model, mj = this.replay.mj;
+    const id = mj.mj_name2id(m, mj.mjtObj.mjOBJ_GEOM.value, 'tower');
+    return { x: m.geom_pos[id * 3], y: m.geom_pos[id * 3 + 1], z: m.geom_pos[id * 3 + 2], hx: m.geom_size[id * 3], hy: m.geom_size[id * 3 + 1], hz: m.geom_size[id * 3 + 2] };
+  }
+
+  // The city from the world's surroundings, around the tower.
+  private cityShape(tower: { x: number; y: number }) {
+    const radius = TIERS[this.quality].radius, world = this.trial.world as Record<string, any> | undefined;
+    if (!isV5(world)) return cityGeometry(tower.x, tower.y, radius);
+    const s = world!.surroundings;
+    this.cityKey = `${tower.x}|${s.city_seed}|${s.density}|${s.radius_m}`;
+    return cityGeometry(tower.x, tower.y, (radius * s.radius_m) / FULL_RADIUS_M, s.city_seed, s.density);
+  }
+
+  // The glass wall: one plane, with its panes in the shader. It spans the tower's front, up to the tower's top.
+  private addWall(tower: { x: number; z: number; hx: number; hz: number }) {
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(tower.hx * 2, tower.z + tower.hz).rotateX(Math.PI / 2), this.glass);
+    wall.position.set(tower.x, 0, (tower.z + tower.hz) / 2);
+    wall.receiveShadow = false;
+    this.built.add(wall);
+    this.wallBox = [tower.x - tower.hx, tower.x + tower.hx, 0, tower.z + tower.hz];
+    this.builtDisposers.push(() => wall.geometry.dispose());
+  }
+
+  private clearBuilt() {
+    for (const d of this.builtDisposers) d();
+    this.builtDisposers = [];
+    this.built.clear();
+    this.drawn = [];
+    this.towerMat = null;
+  }
+
+  /** A new view model and world with no new run. The camera and the playback stay where they are. The recording still fits, because a picture edit keeps the physics. */
+  applyWorld(xml: string, world: Record<string, unknown>) {
+    this.trial.world = world;
+    this.glass.uniforms.uWet.value = Number(worldFacts(world).wetness ?? 0);
+    if (xml !== this.trial.xml) {
+      this.replay.swapModel(xml);
+      const mj = this.replay.mj, m = this.replay.model;
+      this.robotBody = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY.value, 'robot');
+      this.anchorSite = mj.mj_name2id(m, mj.mjtObj.mjOBJ_SITE.value, 'anchor');
+      this.robotSite = mj.mj_name2id(m, mj.mjtObj.mjOBJ_SITE.value, 'tether_point');
+      const geomId = (name: string) => mj.mj_name2id(m, mj.mjtObj.mjOBJ_GEOM.value, name);
+      this.clearBuilt();
+      const tower = this.towerBox();
+      const grid = this.buildFrame(geomId, tower);
+      this.glass.uniforms.uGrid.value.set(grid.offsetX, grid.spacingX, grid.offsetZ, grid.spacingZ);
+      this.addWall(tower);
+      this.buildGeoms(geomId);
+      const before = this.cityKey;
+      const shape = this.cityShape(tower);
+      if (this.cityKey !== before) this.cityMesh.geometry = shape;
+    }
+    this.setLook(lookOf(world));
+    this.sync();
+  }
+
+  /** Moves the camera to a box [x0, y0, z0, x1, y1, z1] the default view cannot show, from the street. holdMs above 0 goes back to the robot after that time. */
+  frameOn(box: number[], holdMs = 0) {
+    const c = new THREE.Vector3((box[0] + box[3]) / 2, (box[1] + box[4]) / 2, (box[2] + box[5]) / 2);
+    const r = Math.max(Math.hypot(box[3] - box[0], box[4] - box[1], box[5] - box[2]) / 2, 1.2);
+    const half = (this.camera.fov * Math.PI) / 360;
+    const fit = Math.min(Math.sin(half), Math.sin(Math.atan(Math.tan(half) * this.camera.aspect)));
+    const distance = (r / fit) * 1.12;
+    const to = c.clone().addScaledVector(FRAME_FROM, distance);
+    to.y = Math.min(to.y, -1);
+    to.z = Math.max(to.z, FRAME_ABOVE_M); // Above the street's nearest roofs, or a neighbour blocks the view.
+    const reach = to.distanceTo(c);
+    this.controls.maxDistance = Math.max(70, reach * 1.6);
+    this.glide = { t0: performance.now(), pos0: this.camera.position.clone(), tgt0: this.controls.target.clone(), pos1: to, tgt1: c };
+    this.framed = true;
+    this.host.dataset.framed = 'true';
+    clearTimeout(this.backTimer);
+    if (holdMs > 0) this.backTimer = window.setTimeout(() => this.backToRobot(), holdMs);
+    if (!this.backButton) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'view-back';
+      button.textContent = 'Back to robot';
+      button.addEventListener('click', () => this.backToRobot());
+      this.host.append(button);
+      this.backButton = button;
+    }
+    this.dirty = true;
+  }
+
+  backToRobot() {
+    clearTimeout(this.backTimer);
+    this.framed = false;
+    this.glide = null;
+    this.backButton?.remove();
+    this.backButton = null;
+    delete this.host.dataset.framed;
+    this.controls.maxDistance = 70;
+    this.follow.copy(this.followTo);
+    this.camera.position.copy(this.followTo).add(VIEW_FROM_ROBOT);
+    this.controls.target.copy(this.followTo).add(LOOK_FROM_ROBOT);
+    this.controls.update();
+    this.dirty = true;
+  }
+
+  /** What is drawn, for a check against the physics: each named geom's drawn bounds, the wall and the bars. */
+  drawnScene() {
+    const { model: m, mj } = this.replay;
+    const geoms: Record<string, number[]> = {};
+    for (const { mesh, geom } of this.drawn) {
+      mesh.updateMatrixWorld(true);
+      const b = new THREE.Box3().setFromObject(mesh, true);
+      const name = mj.mj_id2name ? mj.mj_id2name(m, mj.mjtObj.mjOBJ_GEOM.value, geom) : String(geom);
+      geoms[name] = [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z];
+    }
+    return { geoms, wall: this.wallBox, bars: this.bars };
   }
 
   private useSky(img: HTMLImageElement) {
@@ -454,14 +602,18 @@ export class SimView {
     };
     const mullions = read('mullion', 0), transoms = read('transom', 2);
     const x0 = tower.x - tower.hx, x1 = tower.x + tower.hx, top = tower.z + tower.hz;
-    const spacingX = mullions.length > 1 ? mullions[1].at - mullions[0].at : 1.5;
-    const spacingZ = transoms.length > 1 ? transoms[1].at - transoms[0].at : 3.6;
-    const offsetX = mullions.length ? mullions[0].at : 0;
-    const offsetZ = transoms.length ? transoms[0].at : 0;
+    // A v5 world names its panes. An older record has only the joints.
+    const panes = isV5(this.trial.world) ? (this.trial.world as Record<string, any>).panes : null;
+    const spacingX = panes ? panes.width_m : mullions.length > 1 ? mullions[1].at - mullions[0].at : 1.5;
+    const spacingZ = panes ? panes.height_m : transoms.length > 1 ? transoms[1].at - transoms[0].at : 3.6;
+    const offsetX = panes ? panes.offset_x_m : mullions.length ? mullions[0].at : 0;
+    const offsetZ = panes ? panes.offset_z_m : transoms.length ? transoms[0].at : 0;
+    const skip = panes ? panes.skip_every : 0;
     const crown = mullions[0]?.crownY ?? -0.005, crownT = (transoms[0]?.crownY ?? crown) + 0.0004;
     const bars: Parameters<typeof barGeometry>[0] = [];
-    for (let k = Math.ceil((x0 - offsetX) / spacingX); offsetX + k * spacingX < x1; k++) bars.push({ axis: 'z', at: offsetX + k * spacingX, from: 0, to: top, crownY: crown });
+    for (let k = Math.ceil((x0 - offsetX) / spacingX); offsetX + k * spacingX < x1; k++) if (!skip || k % skip) bars.push({ axis: 'z', at: offsetX + k * spacingX, from: 0, to: top, crownY: crown });
     for (let k = Math.ceil(-offsetZ / spacingZ); offsetZ + k * spacingZ < top; k++) bars.push({ axis: 'x', at: offsetZ + k * spacingZ, from: x0, to: x1, crownY: crownT });
+    this.bars = { x: bars.filter(b => b.axis === 'z').map(b => b.at), z: bars.filter(b => b.axis === 'x').map(b => b.at) };
     const { metal, seal } = barGeometry(bars);
     const metalMat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0.72, 0.735, 0.75), metalness: 1, roughness: 0.75, map: this.brushed.color, roughnessMap: this.brushed.rough, anisotropy: 0.55, anisotropyRotation: Math.PI / 2 });
     this.metalMat = metalMat;
@@ -475,8 +627,8 @@ export class SimView {
     corners.position.set(x0, 0.085, top / 2);
     const corners2 = corners.clone();
     corners2.position.x = x1;
-    this.scene.add(metalMesh, sealMesh, corners, corners2);
-    this.disposers.push(() => { metal.dispose(); seal.dispose(); metalMat.dispose(); sealMat.dispose(); corners.geometry.dispose(); });
+    this.built.add(metalMesh, sealMesh, corners, corners2);
+    this.builtDisposers.push(() => { metal.dispose(); seal.dispose(); metalMat.dispose(); sealMat.dispose(); corners.geometry.dispose(); });
     return { spacingX, offsetX, spacingZ, offsetZ, x0, x1, z1: top };
   }
 
@@ -502,15 +654,20 @@ export class SimView {
       const c = mat >= 0 ? m.mat_rgba : m.geom_rgba, o = (mat >= 0 ? mat : i) * 4;
       const color = new THREE.Color(c[o], c[o + 1], c[o + 2]);
       const isTower = i === geomId('tower');
-      const material = new THREE.MeshStandardMaterial({ color: isTower ? new THREE.Color(0.03, 0.035, 0.038) : color, roughness: isTower ? 0.12 : 0.7, metalness: isTower ? 0.8 : 0.05 });
+      // A v5 world's materials are what the world file says: display colour, roughness and metal. The MJCF carries metal as specular and 1 - roughness as shininess.
+      const own = isV5(this.trial.world) && mat >= 0 && !isTower;
+      if (own) color.setRGB(c[o], c[o + 1], c[o + 2], THREE.SRGBColorSpace);
+      const material = new THREE.MeshStandardMaterial({ color: isTower ? new THREE.Color(0.03, 0.035, 0.038) : color,
+        roughness: isTower ? 0.12 : own ? 1 - m.mat_shininess[mat] : 0.7, metalness: isTower ? 0.8 : own ? m.mat_specular[mat] : 0.05 });
+      if (own && c[o + 3] < 1) { material.transparent = true; material.opacity = c[o + 3]; }
       if (isTower) this.towerMat = material;
       const mesh = new THREE.Mesh(g, material);
       mesh.matrixAutoUpdate = false;
       mesh.castShadow = !isTower;
       mesh.receiveShadow = !isTower;
-      this.scene.add(mesh);
+      this.built.add(mesh);
       this.drawn.push({ mesh, geom: i });
-      this.disposers.push(() => { g.dispose(); material.dispose(); });
+      this.builtDisposers.push(() => { g.dispose(); material.dispose(); });
     }
   }
 
@@ -587,7 +744,7 @@ export class SimView {
       r.render(this.scene, this.camera);
       r.setRenderTarget(null);
       const u = this.composite.uniforms;
-      u.uFocus.value = Math.max(0.2, this.camera.position.distanceTo(this.robotPos));
+      u.uFocus.value = Math.max(0.2, this.camera.position.distanceTo(this.framed ? this.controls.target : this.robotPos));
       u.uSeed.value = this.seed;
       r.render(this.postScene, this.postCam);
     } else {
@@ -602,9 +759,10 @@ export class SimView {
     const dt = Math.min(0.25, (now - this.lastTick) / 1000);
     const { wind, world } = this.trial;
     const row = Math.max(0, this.replay.frame - 1);
-    const speed = wind.length ? wind[Math.min(row, wind.length - 1)] : Number(world?.steady_wind_ms ?? 0);
+    const facts = worldFacts(world);
+    const speed = wind.length ? wind[Math.min(row, wind.length - 1)] : Number(facts.steadyWind ?? 0);
     this.glass.uniforms.uTime.value = now / 1000;
-    if (this.weather.step(dt, speed, Number(world?.wind_dir_deg ?? 0), this.camera, now / 1000, (2 * Math.tan((this.camera.fov * Math.PI) / 360)) / Math.max(1, this.host.clientHeight))) this.dirty = true;
+    if (this.weather.step(dt, speed, Number(facts.windDir ?? 0), this.camera, now / 1000, (2 * Math.tan((this.camera.fov * Math.PI) / 360)) / Math.max(1, this.host.clientHeight))) this.dirty = true;
     this.host.dataset.weather = JSON.stringify({ ms: this.weather.speed, dir: this.weather.dirDeg, travel: Number(this.weather.travel.toFixed(4)), at: Number(now.toFixed(2)), streaks: this.weather.streaks });
   }
 
@@ -617,7 +775,14 @@ export class SimView {
 
   // The camera glides after the robot so it stays in frame while the wall moves past. A viewer's orbit stays as an offset.
   private stepCamera(now: number) {
-    if (!this.followed) return;
+    if (this.glide) {
+      const g = this.glide, t = Math.min(1, (now - g.t0) / FRAME_GLIDE_MS), k = t * t * (3 - 2 * t);
+      this.camera.position.lerpVectors(g.pos0, g.pos1, k);
+      this.controls.target.lerpVectors(g.tgt0, g.tgt1, k);
+      this.dirty = true;
+      if (t >= 1) this.glide = null;
+    }
+    if (!this.followed || this.framed) return;
     const dt = Math.min(0.1, (now - this.lastTick) / 1000);
     const k = 1 - Math.exp(-dt * FOLLOW_RATE);
     const step = this.followTo.clone().sub(this.follow).multiplyScalar(k);
@@ -676,7 +841,7 @@ export class SimView {
     this.glass.uniforms.uRobotNear.value = 1 - Math.min(1, Math.max(0, (-this.robotPos.y - 0.04) / 0.4));
 
     this.sun.target.position.copy(this.robotPos);
-    this.sun.position.copy(this.robotPos).add(new THREE.Vector3(-1.5, -2.2, 2.4));
+    this.sun.position.copy(this.robotPos).add(this.sunOffset);
     this.sun.target.updateMatrixWorld();
     this.shadowsDirty = true;
 

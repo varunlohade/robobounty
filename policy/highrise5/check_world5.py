@@ -350,7 +350,7 @@ def random_world(rng, base):
         return rng.choice([rule[1], rule[2], draw(rule), draw(rule)])
     w = copy.deepcopy(base)
     for block, rules in W.BLOCKS.items():
-        w[block] = {k: num(r) for k, r in rules.items()}
+        w[block] = {**w[block], **{k: num(r) for k, r in rules.items()}}
     w["tower"].update({k: num(r) for k, r in W.TOWER_FIELDS.items()})
     w["tower"]["corner"] = rng.choice([None, {k: num(r) for k, r in W.CORNER_FIELDS.items()}])
     w["tower"]["setback"] = rng.choice([None, {k: num(r) for k, r in W.SETBACK_FIELDS.items()}])
