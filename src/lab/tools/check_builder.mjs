@@ -32,6 +32,8 @@ const STEPS = [
   { text: 'make the glass curved', png: 'curved', physics: false, nothing: true },
 ];
 
+const FOCUS_ONLY = process.argv.includes('--focus');
+if (FOCUS_ONLY) STEPS.splice(0, STEPS.length, { text: 'add an antenna on the roof', png: 'antenna', physics: false, keepFrame: true }, { text: 'focus on the machine please', png: 'focus', physics: false, focus: true });
 const server = spawn(PY, [join(ROOT, 'policy/server/supervise.py'), '--port', String(SERVER_PORT), ...(RECORDED ? ['--recorded', resolve(RECORDED)] : [])],
   { stdio: 'inherit', env: { ...process.env, ...(RECORDED ? {} : { CRASHLAB_SAVE_AGENT: SAVED }) } });
 const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', ['--headless=new', `--remote-debugging-port=${DEBUG}`, `--user-data-dir=${work}/chrome`, '--window-size=1440,900',
@@ -154,7 +156,9 @@ try {
     const firstPicture = before ? null : await canvas();
     await until(`Number(document.getElementById('lab').dataset.idle ?? 0) > ${n}`, `"${step.text}" finished`, 500);
     const log = await events();
-    const fresh = log.slice(seen);
+    // Only what this message caused. A Show it press from the step before also adds a line.
+    const asked = log.findLastIndex(e => e.type === 'user');
+    const fresh = log.slice(Math.max(seen, asked));
     seen = log.length;
     const now = await current(log);
     if (now.tid) await until(`document.querySelector('.viewport')?.dataset.tid === ${JSON.stringify(now.tid)}`, 'replay loads', 60);
@@ -168,7 +172,13 @@ try {
     const card = fresh.find(e => e.type === 'card')?.result;
     const cannot = fresh.find(e => e.type === 'tool' && e.title === 'cannot_build')?.lines[0];
     const result = cannot ? cannot.split(':').slice(0, 2).join(':') : card ?? (hashMoved ? 'no run shown' : 'picture only, no re-run');
-    const framed = await js(`document.querySelector('.viewport').dataset.framed === 'true'`);
+    // The owner's rule: an edit never moves the view. It moves only for the Show it button or a focus call.
+    const stayed = await js(`window.__lab.view().drawnScene()`);
+    const movedByItself = !step.focus && await js(`document.querySelector('.viewport').dataset.framed === 'true'`);
+    check(`"${step.text}": the view stays on the robot`, !movedByItself && stayed.robotInFrame && stayed.robotMetres < 6, `${stayed.robotMetres.toFixed(1)} m away`);
+    const showIt = !step.focus && await js(`(() => { const b = [...document.querySelectorAll('.chat-card button')].pop(); if (!b || b.textContent !== 'Show it' || b.dataset.used) return false; b.dataset.used = '1'; b.click(); return true; })()`);
+    if (showIt) { await until(`document.querySelector('.viewport').dataset.framed === 'true'`, 'Show it moves the view', 10); await wait(1400); }
+    const framed = showIt;
 
     let pixels;
     if (framed) {
@@ -211,12 +221,31 @@ try {
     if (now.result) check(`"${step.text}": the label is the v5 one`, /^sim highrise5 [0-9a-f]{12}$/.test(now.result.label), now.result.label);
     if (step.nothing) check(`"${step.text}": says it cannot`, !!cannot, cannot ?? said.join(' | '));
     await compareGeoms(now.world, step.png);
-    if (await js(`document.querySelector('.viewport').dataset.framed === 'true'`)) await js(`document.querySelector('.view-back').click()`);
+    if (step.focus) {
+      const drawn = await js(`window.__lab.view().drawnScene()`);
+      check('the robot is in frame after focus', drawn.robotInFrame && drawn.robotMetres < 6, `${drawn.robotMetres.toFixed(1)} m away`);
+      check('focus: no world change', before.hash === now.hash && JSON.stringify(before.world) === JSON.stringify(now.world));
+      check('focus: one plain line in the chat', said.length === 1, said.join(' | '));
+      check('focus: costs no run', !fresh.some(e => e.type === 'trial' || (e.type === 'tool' && e.title === 'run_trial')));
+      // Pressing play from a roof view comes back to the robot.
+      await js(`[...document.querySelectorAll('.chat-card button')].filter(b => b.textContent === 'Show it').pop().click()`);
+      await until(`document.querySelector('.viewport').dataset.framed === 'true'`, 'Show it moves the view', 10);
+      await wait(1000);
+      const button = await js(`(() => { const b = document.querySelector('.view-back'); const r = b.getBoundingClientRect(); return { w: r.width, h: r.height, bg: getComputedStyle(b).backgroundColor }; })()`);
+      check('Back to robot is plainly visible', button.w > 90 && button.h > 30, JSON.stringify(button));
+      await save('build-focus-back-button.png');
+      if (!(await js(`document.querySelector('.viewport').dataset.playing === 'true'`))) await js(`document.querySelector('[aria-label^="Play or pause"]').click()`);
+      else { await js(`document.querySelector('[aria-label^="Play or pause"]').click()`); await js(`document.querySelector('[aria-label^="Play or pause"]').click()`); }
+      await wait(600);
+      check('pressing play returns the view to the robot', !(await js(`document.querySelector('.viewport').dataset.framed === 'true'`)));
+    }
+    if (!step.keepFrame && await js(`document.querySelector('.viewport').dataset.framed === 'true'`)) await js(`document.querySelector('.view-back').click()`);
     before = now;
     count++;
     console.log(`chat for "${step.text}":\n  ${said.join('\n  ')}`);
   }
 
+  if (FOCUS_ONLY) throw new Error('STOP');
   // Tower height from 40 to 300 m, in the same view. The worlds come from the real compiler, with no AI.
   const base = before.world;
   for (const height of [40, 300]) {
@@ -253,7 +282,7 @@ print(json.dumps({"world": s["world"], "names": out}))`], { maxBuffer: 1 << 26 }
   await compareGeoms(onWall.world, 'parts');
   check('no console errors', problems.length === 0, [...new Set(problems)].slice(0, 6).join('\n'));
 } catch (err) {
-  check('the flow finished', false, String(err));
+  if (String(err) !== 'Error: STOP') check('the flow finished', false, String(err));
 }
 const col = (k, w) => r => String(r[k]).padEnd(w).slice(0, w);
 console.log('\nwords                                       | calls                                   | AI | hash | result                                                     | pixels | s');

@@ -571,7 +571,7 @@ class Session:
             if self.shown and self.shown in self.exports:
                 self.emit(type="trial", tid=self.shown, label="Normal run", passed=self.normal["passed"], open=True)
                 if self.v5:
-                    self.emit_view5(None)
+                    self.emit_view5()
         elif show:
             self.emit(type="no_world")
         return self.world is not None
@@ -749,6 +749,8 @@ class Session:
         return reply
 
     def action(self, name, value):
+        if name == "focus" and self.v5 and isinstance(value, str):
+            return self.focus5(value)
         if name == "answer" and self.phase == "asking" and type(value) is int:
             return self.start(self.answer, value)
         if name == "scene_ok" and self.phase == "review_scene":
@@ -784,9 +786,22 @@ class Session:
         return {"world": world, "hash": A.C.physics_hash(world), "xml": view_xml, "area": A.W.area_rect(world), "moved": [], "n": self.history5().n,
                 "facts": {"friction": round(A.W.friction(world), 3), "m_below_roof": world["area"]["drop_below_roof_m"]}}
 
-    def emit_view5(self, focus):
+    def emit_view5(self):
         w = self.world
-        self.emit(type="view", xml=w["xml"], world=w["world"], hash=w["hash"], focus=focus, sent=time.time() * 1000)
+        self.emit(type="view", xml=w["xml"], world=w["world"], hash=w["hash"], sent=time.time() * 1000)
+
+    def focus5(self, target):
+        """The Show it button: the same typed function the AI calls. No AI, no world change and no run."""
+        A = agent5()
+        hist = self.history5()
+        if self.world is None:
+            return 409, {"error": "not_now"}
+        out = A.G.call(hist._state(hist.n), "focus", {"target": target})
+        if out["result"] != A.G.OK:
+            return 409, {"error": "not_now"}
+        self.emit(type="camera", target=target, box=out["data"]["box"])
+        self.say(A.focus_line(target))
+        return 200, {"ok": True}
 
     def complete5(self, text):
         """The model for one turn. A failed first call falls back to the simple parser, whose words pass the same engine checks."""
@@ -842,13 +857,15 @@ class Session:
         lines = A.plain_lines(events, before, new)
         for line in lines:
             self.say(line)
-        said = [e["line"] for e in events if e["kind"] == "say"]
+        moved_camera = [e["focus"] for e in events if e.get("focus")]
+        only_camera = bool(moved_camera) and not any(e.get("applied") for e in events)
+        said = [] if only_camera else [e["line"] for e in events if e["kind"] == "say"]  # One plain line is enough for a camera move.
         for line in said:
             self.say(line)
         if not lines and not said and not any(e["kind"] == "refused" or e.get("applied") for e in events):
             self.say("Nothing changed. The world stays as it was.")
         raw = [e["line"] for e in events if e["kind"] in ("call", "result", "cannot", "saved", "timing")]
-        if raw:
+        if raw and not only_camera:
             self.tool("details", "", raw)
 
     def turn5(self, text):
@@ -877,6 +894,11 @@ class Session:
         self.working()
         self.speak5(events, before, new)
         self.finish5(before, new, first, A.result_change(events))
+        for target in [e["focus"] for e in events if e.get("focus")][-1:]:
+            self.emit(type="camera", target=target["target"], box=target["box"])
+        away = A.focus_of(before, new, hist._state(hist.n)["groups"])
+        if away and new != before:
+            self.emit(type="card", title=away["line"], body="", actions=[{"label": "Show it", "action": "focus", "value": away["target"]}])
 
     def finish5(self, before, new, first, change):
         """A physics change shows a new run. A picture change updates the view in place, with no run."""
@@ -884,13 +906,10 @@ class Session:
         hist = self.history5()
         old_xml = None if first else self.world["xml"]
         self.world = self.record5(new)
-        focus = A.focus_of(before, new)
         self.phase = "review_scene"
-        if focus:
-            self.say(focus["line"])
         if not first and self.normal and self.normal["physics_sha256"] == self.world["hash"]:
             if self.world["xml"] != old_xml or new != before:  # Time, fog and the city live in the world and not in the view model.
-                self.emit_view5(focus)
+                self.emit_view5()
             return
         moved = A.moved_lines(before, new)
         if moved:
@@ -918,7 +937,7 @@ class Session:
         self.exports[tid] = out
         self.shown = tid
         self.emit(type="sim", sha=result["code_sha256"]["sim5.py"], now=A.R.code_hashes()["sim5.py"], label=result["label"])
-        self.emit(type="trial", tid=tid, label="Normal run", passed=result["passed"], open=True, focus=focus)
+        self.emit(type="trial", tid=tid, label="Normal run", passed=result["passed"], open=True)
         cleaned = f"It cleaned {result['coverage'] * 100:.1f}%."
         if result["failure"] == "sim_diverged":
             self.say(f"The physics could not finish this run ({str(result['diverged_reason']).replace('_', ' ')}), so it counts as a failed run. I did not retry it.", fail=True)

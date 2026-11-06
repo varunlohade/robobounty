@@ -69,13 +69,13 @@ GOOD = {
     "set_corner": [{"x_m": 2.0, "side": 1}],
     "set_setback": [{"above_top_m": 0.8, "depth_m": 2.0}],
     "add_object": [
-        {"name": "far", "shape": "box", "size": [1, 1, 200], "x_m": 1.0, "below_top_m": 40.0, "out_m": 5.0, "material": "alu", "solid": True},
+        {"name": "far", "shape": "box", "size": [1, 1, 100], "x_m": 1.0, "below_top_m": 88.2, "out_m": 5.0, "material": "alu", "solid": True},
         {"name": "cyl", "shape": "cyl", "size": [0.1, 0.5], "x_m": 1.0, "below_top_m": 2.0, "out_m": 0.1, "euler_deg": [90.0, 0.0, 0.0], "solid": True},
         {"name": "ball", "shape": "sphere", "size": [0.1], "x_m": 1.0, "below_top_m": 2.0, "out_m": 0.1, "solid": True},
         {"name": "cap", "shape": "capsule", "size": [0.05, 0.4], "x_m": 1.0, "below_top_m": 2.0, "out_m": 0.05, "solid": False}],
     "group": [{"name": "grp", "members": ["box", "ledge"]}],
     "repeat": [{"name": "box", "count": 3, "dx": 0.6, "dbelow": 0.1}, {"name": "ledge", "count": 1, "dbelow": 1.0}],
-    "move_object": [{"name": "box", "dx": 0.5}, {"name": "box", "dout": 0.5}],
+    "move_object": [{"name": "box", "dx": 0.5}, {"name": "box", "dout": 0.01}],
     "rotate_object": [{"name": "box", "delta_deg": [0.0, 30.0, 0.0]}],
     "remove_object": [{"name": "box"}, {"name": "ledge"}],
     "set_material": [{"name": "glass", "rgba": [0.1, 0.2, 0.3, 1.0]}, {"name": "new_paint", "rgba": [1.0, 0.0, 0.0, 1.0], "roughness": 0.3, "metal": 0.1}],
@@ -89,10 +89,11 @@ GOOD = {
     "set_light": [{"sun_level": 0.3}, {"azimuth": 40.0}, {"haze": 0.9}, {"sky_top": [0.1, 0.1, 0.1]}, {"sky_bottom": [0.9, 0.9, 0.9]}, {"time": "night"}, {"fog": 1}],
     "set_surroundings": [{"city_seed": 7}, {"density": 0.5}, {"radius": 300.0}, {"city": "dubai"}],
     "set_look": [{"building": "#0a0a0a"}, {"glass_tint": "#1f5fbf"}, {"frames": "#f7f7f5"}, {"time": "dusk"}, {"fog": 2}, {"city": "dubai"}],
+    "focus": [{"target": "robot"}, {"target": "overview"}, {"target": "box"}],
     "read_world": [{}], "read_result": [{}], "undo": [{}], "list_parts": [{}], "explain_limits": [{}],
 }
-PICTURE_ONLY = {"set_tower": [{"width": 60.0}], "add_object": [GOOD["add_object"][0], GOOD["add_object"][3]], "group": GOOD["group"], "set_look": GOOD["set_look"]}
-READS = {"read_world", "read_result", "list_parts", "explain_limits", "undo"}
+PICTURE_ONLY = {"set_tower": [{"width": 60.0}], "add_object": [GOOD["add_object"][0], GOOD["add_object"][3]], "group": GOOD["group"], "set_look": GOOD["set_look"], "add_part": GOOD["add_part"][1:]}
+READS = {"focus", "read_world", "read_result", "list_parts", "explain_limits", "undo"}
 
 
 def seeded():
@@ -459,7 +460,9 @@ def part2_box():
     rl = new_run(low)
     print(f"INFO  (b) low box 12 mm on lane {brief(rl)}")
     check("(b) a low box the robot may cross also changes the run", rl["final_state_sha256"] != base["final_state_sha256"], diff_numbers(base, rl))
-    tall = apply(world, "add_object", {**args, "size": [0.5, 0.05, 0.4], "out_m": 0.05})  # inner face 2.5 cm off the glass, so no lip leak
+    # Inner face 2.5 cm off the glass, so no lip leak. A thin picture-only mount holds it, because nothing may float.
+    mount = apply(world, "add_object", {"name": "mount", "shape": "box", "size": [0.04, 0.05, 0.04], "x_m": args["x_m"] + 0.27, "below_top_m": 1.5, "out_m": 0.025, "solid": False})
+    tall = apply(mount, "add_object", {**args, "size": [0.5, 0.05, 0.4], "out_m": 0.05})
     rt = new_run(tall)
     print(f"INFO  (b) box 2.5 cm off the glass on lane {brief(rt)}")
     check("(b) a box that floats 2.5 cm off the glass still changes the run", rt["final_state_sha256"] != base["final_state_sha256"], diff_numbers(base, rt))

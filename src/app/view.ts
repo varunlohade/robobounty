@@ -96,7 +96,7 @@ export class SimView {
   private sunOffset = new THREE.Vector3(-1.5, -2.2, 2.4);
   private framed = false; private glide: { t0: number; pos0: THREE.Vector3; tgt0: THREE.Vector3; pos1: THREE.Vector3; tgt1: THREE.Vector3 } | null = null;
   private blocksDirty = false;
-  private backButton: HTMLButtonElement | null = null; private backTimer = 0;
+  private backButton: HTMLButtonElement | null = null;
 
   constructor(private host: HTMLElement, private replay: Replay, private trial: Trial) {
     const built = performance.now();
@@ -307,7 +307,6 @@ export class SimView {
 
   dispose() {
     this.stopped = true;
-    clearTimeout(this.backTimer);
     this.backButton?.remove();
     this.observer.disconnect();
     this.controls.dispose();
@@ -497,8 +496,8 @@ export class SimView {
     this.sync();
   }
 
-  /** Moves the camera to a box [x0, y0, z0, x1, y1, z1] the default view cannot show, from the street. holdMs above 0 goes back to the robot after that time. */
-  frameOn(box: number[], holdMs = 0) {
+  /** Moves the camera to a box [x0, y0, z0, x1, y1, z1] the default view cannot show, from the street. Only the focus function calls this: an edit never moves the view. */
+  frameOn(box: number[]) {
     const c = new THREE.Vector3((box[0] + box[3]) / 2, (box[1] + box[4]) / 2, (box[2] + box[5]) / 2);
     const r = Math.max(Math.hypot(box[3] - box[0], box[4] - box[1], box[5] - box[2]) / 2, 1.2);
     const half = (this.camera.fov * Math.PI) / 360;
@@ -512,8 +511,6 @@ export class SimView {
     this.glide = { t0: performance.now(), pos0: this.camera.position.clone(), tgt0: this.controls.target.clone(), pos1: to, tgt1: c };
     this.framed = true;
     this.host.dataset.framed = 'true';
-    clearTimeout(this.backTimer);
-    if (holdMs > 0) this.backTimer = window.setTimeout(() => this.backToRobot(), holdMs);
     if (!this.backButton) {
       const button = document.createElement('button');
       button.type = 'button';
@@ -527,7 +524,7 @@ export class SimView {
   }
 
   backToRobot() {
-    clearTimeout(this.backTimer);
+    if (!this.framed) return;
     this.framed = false;
     this.glide = null;
     this.backButton?.remove();
@@ -551,7 +548,8 @@ export class SimView {
       const name = mj.mj_id2name ? mj.mj_id2name(m, mj.mjtObj.mjOBJ_GEOM.value, geom) : String(geom);
       geoms[name] = [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z];
     }
-    return { geoms, wall: this.wallBox, bars: this.bars };
+    const seen = this.robotPos.clone().project(this.camera);
+    return { geoms, wall: this.wallBox, bars: this.bars, robotInFrame: Math.abs(seen.x) < 1 && Math.abs(seen.y) < 1 && seen.z < 1, robotMetres: this.camera.position.distanceTo(this.robotPos) };
   }
 
   private useSky(img: HTMLImageElement) {

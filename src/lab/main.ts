@@ -11,7 +11,6 @@ const NS = 'http://www.w3.org/2000/svg';
 const HEALTH_RETRY_MS = 2_000;
 const TRIAL_TRIES = 3;
 const TRIAL_RETRY_MS = 3_000;
-const FRAMED_HOLD_MS = 8_000; // A new run shows the changed tower for this long, then goes back to the robot.
 // Lucide 0.400 outlines: panel-left, layout-grid, settings.
 const ACTIVITY = [
   ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M9 3v18'],
@@ -108,7 +107,8 @@ async function live(root: HTMLElement) {
       case 'no_world': clear(); clear = () => {}; current = () => null; host.replaceChildren(empty); setName('new'); chat.worldGone(); break;
       case 'look': applyLook(e); break;
       case 'view': applyView(e); break;
-      case 'trial': await showTrial(e.tid, e.focus); break;
+      case 'camera': if (e.box) current()?.frameOn(e.box); else current()?.backToRobot(); break;
+      case 'trial': await showTrial(e.tid); break;
       case 'llm_count': aiLine.textContent = `AI calls ${e.used} of ${e.cap}`; break;
       case 'sim': simLine.textContent = e.label ? String(e.label) : `Sim ${e.sha ? String(e.sha).slice(0, 8) : 'unknown'}${e.sha && e.sha !== e.now ? `, now ${String(e.now).slice(0, 8)}: this run is from older code` : ''}`; break;
       case 'idle':
@@ -148,7 +148,6 @@ async function live(root: HTMLElement) {
     const view = current();
     if (!view) return;
     view.applyWorld(e.xml, e.world);
-    if (e.focus) view.frameOn(e.focus.box);
     const viewport = document.querySelector<HTMLElement>('.viewport');
     if (viewport) {
       viewport.dataset.hash = String(e.hash);
@@ -211,7 +210,7 @@ async function live(root: HTMLElement) {
     }
   }
 
-  async function showTrial(tid: string, focus?: { box: number[] } | null) {
+  async function showTrial(tid: string) {
     const trial = await fetchTrial(tid);
     if (!trial) return;
     const world = worldPage(trial, statusRight, fixed);
@@ -219,7 +218,6 @@ async function live(root: HTMLElement) {
     current = () => world.view;
     await world.start();
     if (!isV5(trial.world)) world.view?.setLook(look);
-    if (focus) world.view?.frameOn(focus.box, FRAMED_HOLD_MS);
     world.viewport.dataset.tid = tid;
   }
 

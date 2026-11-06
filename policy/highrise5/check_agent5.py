@@ -121,7 +121,7 @@ def part_loop():
     check("margin 3.0 on nominal: end state differs, no number moved, and the line says so", c["status"] == "changed nothing" and c["state_changed"] and not c["run_changed"], c["line"])
     events, *_ = go([{"calls": [{"fn": "add_object", "args": lane_box()}], "say": ""}, done()])
     check("a box on the lane moves the numbers", call_events(events)[0]["status"] == "ok" and call_events(events)[0]["run_changed"], call_events(events)[0]["line"])
-    far = {**lane_box(), "out_m": 3.0, "size": [0.5, 0.05, 200.0], "below_top_m": 40.0}  # a post on the street, so nothing floats
+    far = {**lane_box(), "out_m": 3.0, "size": [0.5, 0.05, 100.0], "below_top_m": 88.2}  # a post on the street, so nothing floats
     events, *_ = go([{"calls": [{"fn": "add_object", "args": far}], "say": ""}])
     check("a far solid is picture only", call_events(events)[0]["status"] == G.PICTURE, call_events(events)[0]["line"])
 
@@ -204,7 +204,7 @@ HOSTILE_REPLIES = {
     "too many calls": {"calls": [{"fn": "read_world"}] * (A.MAX_CALLS + 1), "say": ""},
 }
 HOSTILE_CALLS = (
-    ({"fn": "exec", "args": {"code": "import os"}}, "unknown_function"), ({"fn": "__import__", "args": {"name": "os"}}, "unknown_function"), ({"fn": "add_part", "args": {}}, "unknown_function"),
+    ({"fn": "exec", "args": {"code": "import os"}}, "unknown_function"), ({"fn": "__import__", "args": {"name": "os"}}, "unknown_function"), ({"fn": "add_part", "args": {}}, "bad_args"),
     ({"fn": "generate_object", "args": {}}, "unknown_function"), ({"fn": ["set_wind"], "args": {}}, "unknown_function"), ({"fn": None}, "unknown_function"),
     ({"fn": "set_wind", "args": {"steady_ms": "12; import os"}}, "bad_args"), ({"fn": "set_wind", "args": {"steady_ms": float("nan")}}, "out_of_range"), ({"fn": "set_wind", "args": {"python": "x"}}, "bad_args"),
     ({"fn": "add_object", "args": {**lane_box(), "name": "<geom/>../x"}}, "bad_name"), ({"fn": "set_wind", "args": "steady_ms=12"}, "bad_args"),

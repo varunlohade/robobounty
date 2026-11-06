@@ -163,6 +163,7 @@ Positions:
 - Materials: tower is the building, glass is the glass, alu is the frames, concrete is the parapet. Others you can name for an object: el_sign0 (red), el_sign1 (blue), el_sign2 (yellow), el_steel, el_cradle (yellow), el_dark. set_material with rgba, roughness and metal makes a new one.
 
 Building things:
+- A request about what to look at is focus, and never an edit. "Focus on the robot", "look at the machine" and "go back" are focus with target robot, because the machine means the robot. "Show the whole building" is target overview. "Show the antenna" is target with that object's or part's name from the world below, using the name in groups when it has one. It needs no other call.
 - Anything you place must look like it belongs on this tower, not added for the sake of adding. Prefer add_part. It brings its own brackets or mounts, in the building's materials.
 - A vague request becomes something plausible on a tower. "A big box in the robot's path" or "an obstacle" becomes an ac_unit on one of robot_lanes_x_m, with below_top_m between 1 and 2.5. Say in your say text what you chose.
 - If the user clearly asks for a plain box or names a colour, obey with add_object and set_material. A box on the wall has out_m equal to half its depth, so it touches the glass.
@@ -360,6 +361,8 @@ def _apply_call(state, fn, args, history):
     row = G.REGISTRY[fn]
     checked = G.check_args(row["args"], args)
     text = _call_text(fn, checked)
+    if fn == "focus":
+        return state, {"kind": "call", "status": "ok", "focus": out["data"], "physics_changed": False, "run_changed": False, "line": f"{text}: ok. The camera only, with no change and no re-run."}
     if row["read"]:
         return state, {"kind": "call", "status": "ok", "read": True, "data": out["data"], "physics_changed": False, "run_changed": False, "line": f"{text}: ok. A read, with no re-run."}
     new = out["state"]
@@ -542,8 +545,8 @@ def _box_of(world, objects):
     return [min(b[i] for b in boxes) for i in range(3)] + [max(b[i] for b in boxes) for i in range(3, 6)]
 
 
-def focus_of(before, after):
-    """Where the default view will not show a change: a new or moved object away from the robot's path, or a changed tower. None when the default view shows it."""
+def focus_of(before, after, groups):
+    """Where a change sits outside the default view: one plain line and the target of a focus call. None when the default view shows it. The view itself never moves for an edit."""
     old = {o["name"]: o for o in before["objects"]} if before else {}
     new = [o for o in after["objects"] if o["name"] not in old or o["pos"] != old[o["name"]]["pos"] or o["size"] != old[o["name"]]["size"]]
     a = W.area_rect(after)
@@ -551,15 +554,19 @@ def focus_of(before, after):
         box = _box_of(after, new)
         if box[0] < a["x1"] + 2 and box[3] > a["x0"] - 2 and box[2] < a["z1"] + 2 and box[5] > a["z0"] - 2 and box[1] > -2 and box[4] < 1:
             return None
+        names = {o["name"] for o in new}
+        target = next((g for g, members in groups.items() if names <= set(members)), new[0]["name"])
         lift = box[2] - a["z1"]
         where = f"{lift:.0f} m above the top of the work area" if lift > 0 else f"{-lift:.0f} m below the top of the work area"
         on_roof = box[2] >= after["tower"]["height_m"] - 0.5
-        return {"kind": "object", "box": box, "line": f"It {'stands on the roof, ' if on_roof else 'is '}{where}, so the default view cannot show it. The view moved to it. Back to robot returns."}
+        return {"target": target, "line": f"It {'stands on the roof, ' if on_roof else 'is '}{where}, outside this view."}
     if before and any(before["tower"][k] != after["tower"][k] for k in ("height_m", "width_m")):
-        t, g = after["tower"], W.glass_rect(after)
-        cx = (g["x0"] + g["x1"]) / 2
-        return {"kind": "tower", "box": [cx - t["width_m"] / 2, 0.0, 0.0, cx + t["width_m"] / 2, 0.0, t["height_m"]], "line": "The view moved out to show the whole tower. Then it returns to the robot."}
+        return {"target": "overview", "line": "The whole tower is outside this view."}
     return None
+
+
+def focus_line(target):
+    return "The view is back on the robot." if target == "robot" else "The view shows the whole building." if target == "overview" else f"The view moved to {_thing(target)}."
 
 
 # The chat's words for world values: label and unit.
@@ -637,6 +644,9 @@ def plain_lines(events, before, after):
     last_good = max((i for i, e in enumerate(calls) if e["status"] != "failed"), default=-1)
     applied = [e["applied"] for e in calls if e.get("applied")]
     out = [line for e in calls for line in e.get("words", [])]
+    for e in calls:
+        if e.get("focus"):
+            out.append(focus_line(e["focus"]["target"]))
     out += _part_lines(applied, after) + _added_lines(applied, after)
     for fn in dict.fromkeys(a["fn"] for a in applied):
         if fn in FN_WORDS and fn not in SILENT:

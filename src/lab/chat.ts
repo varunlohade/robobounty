@@ -181,7 +181,7 @@ export class LabChat {
       this.note(`${event.result.replaceAll('_', ' ')} Watch the run. Say what to change.`);
       return;
     }
-    const options = (event.actions ?? []).filter(a => a.action === 'answer');
+    const options = (event.actions ?? []).filter(a => a.action === 'answer' || a.action === 'focus');
     if (!options.length) return;
     const card = el('div', 'chat-card');
     const row = el('div', 'chat-options');
@@ -194,6 +194,7 @@ export class LabChat {
     const b = el('button', 'chat-option', action.label);
     b.type = 'button';
     b.addEventListener('click', () => {
+      if (action.action === 'focus') { void this.backend.act(action); return; } // Only the camera moves, so no job starts and the button stays.
       for (const other of b.parentElement!.querySelectorAll('button')) other.disabled = true;
       this.setBusy(true);
       void this.backend.act(action);

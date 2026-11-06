@@ -403,6 +403,20 @@ def read_result(state, a):
     return {"last_result": copy.deepcopy(state["last_result"])}
 
 
+def focus(state, a):
+    """Where the camera should go. It reads the world and changes nothing."""
+    world, target = state["world"], a["target"]
+    if target == "robot":
+        return {"target": target, "box": None}
+    if target == "overview":
+        t, g = world["tower"], W.glass_rect(world)
+        cx = (g["x0"] + g["x1"]) / 2
+        return {"target": target, "box": [cx - t["width_m"] / 2, 0.0, 0.0, cx + t["width_m"] / 2, 0.0, t["height_m"]]}
+    found = _targets(world, state["groups"], target)
+    boxes = [W._bounds(world, o) for o in found]
+    return {"target": target, "box": [min(b[0][i] for b in boxes) for i in range(3)] + [max(b[1][i] for b in boxes) for i in range(3)]}
+
+
 def list_parts(state, a):
     return {"parts": {name: words for name, (_, _, words) in P.PARTS.items()}, "planned": []}
 
@@ -473,6 +487,8 @@ def _registry():
     empty = _schema({})
     for name, read in (("read_world", read_world), ("read_result", read_result), ("list_parts", list_parts), ("explain_limits", explain_limits)):
         row(name, empty, "no", read=read)
+    row("focus", _schema({"target": NAME}, {"target"}), "no", read=focus,
+        note="Moves the camera only: no world change, no undo step and no run. target is robot, overview (the whole building) or the name of an object or part.")
     row("undo", empty, "no")
     return rows
 

@@ -199,6 +199,7 @@ export function worldPage(trial: Trial, statusRight: HTMLElement, onFix?: OnFix)
     const toggle = () => {
       if (!playing && at >= maxFrame) at = 0;
       setPlaying(!playing);
+      if (playing) simView.backToRobot(); // Pressing play shows the run, so a roof view never hides it.
     };
     const jump = (frame: number) => {
       setPlaying(false);
