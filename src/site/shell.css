@@ -1,0 +1,34 @@
+/* Tokens from design/site2/claude/site.css, with text raised for contrast. Prefixed, so a page's own stylesheet cannot clash. */
+@font-face{font-family:Inter;src:url(../lab/fonts/inter-latin-wght-normal.woff2) format("woff2");font-weight:100 900;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url(../lab/fonts/jetbrains-mono-latin-wght-normal.woff2) format("woff2");font-weight:100 800;font-display:swap}
+html,body{height:100%;margin:0;background:#0B0C0E;overflow:hidden}
+.sh-app{--sh-line:rgba(255,255,255,.08);--sh-t1:#ECEEF1;--sh-t2:#B6BCC5;--sh-raised:#16191E;--sh-hover:#1E2228;--sh-ease:cubic-bezier(.23,1,.32,1);
+  display:grid;grid-template-columns:216px minmax(0,1fr);grid-template-rows:minmax(0,1fr) 28px;height:100vh;width:100%;
+  font:400 14px/20px Inter,system-ui,sans-serif;color:var(--sh-t1);font-feature-settings:"tnum","cv11";font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;background:#0B0C0E}
+.sh-app *{box-sizing:border-box}
+.sh-nav{display:flex;flex-direction:column;gap:2px;padding:12px 8px 0;border-right:1px solid var(--sh-line);min-height:0}
+.sh-brand{display:flex;align-items:center;height:32px;padding:0 8px;margin-bottom:12px;font-size:15px;font-weight:500;letter-spacing:-.01em;color:var(--sh-t1);text-decoration:none}
+.sh-item{display:flex;align-items:center;gap:10px;height:34px;padding:0 8px;border-radius:6px;color:var(--sh-t2);text-decoration:none;transition:background-color 120ms var(--sh-ease),color 120ms var(--sh-ease)}
+.sh-item:hover{background:var(--sh-raised);color:var(--sh-t1)}
+.sh-item[aria-current]{background:var(--sh-hover);color:var(--sh-t1)}
+.sh-item:focus-visible,.sh-out:focus-visible,.sh-brand:focus-visible{outline:2px solid rgba(62,123,250,.6);outline-offset:1px}
+.sh-who{margin:auto -8px 0;display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 12px 8px 16px;border-top:1px solid var(--sh-line);line-height:18px}
+.sh-who-name{min-width:0;flex:1}
+.sh-who-name span{display:block}
+.sh-who-name small{display:block;font-size:12px;line-height:16px;color:var(--sh-t2)}
+.sh-mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.sh-ok{color:#5CC186;flex:none}
+.sh-out{flex:none;width:28px;height:28px;display:grid;place-items:center;padding:0;border:0;background:none;border-radius:6px;color:var(--sh-t2);cursor:pointer;transition:background-color 120ms var(--sh-ease),color 120ms var(--sh-ease),transform 160ms var(--sh-ease)}
+.sh-out:hover{background:var(--sh-raised);color:var(--sh-t1)}
+.sh-out:active{transform:scale(.97)}
+.sh-column{display:flex;flex-direction:column;min-width:0;min-height:0}
+.sh-head{display:flex;align-items:center;gap:12px;min-height:56px;padding:0 24px;flex:none}
+.sh-title{margin:0;font-size:20px;line-height:28px;font-weight:500;letter-spacing:-.01em}
+.sh-sub{margin:0;color:var(--sh-t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sh-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
+.sh-main{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;animation:sh-in 140ms var(--sh-ease)}
+@keyframes sh-in{from{opacity:0}to{opacity:1}}
+.sh-status{grid-column:1/3;display:flex;align-items:center;gap:24px;padding:0 12px;border-top:1px solid var(--sh-line);font-size:12px;line-height:16px;color:var(--sh-t2);white-space:nowrap;min-width:0;overflow:hidden}
+.sh-status-l{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sh-status-r{margin-left:auto;display:flex;gap:20px;flex:none}
+@media (prefers-reduced-motion:reduce){.sh-app *{transition-duration:1ms!important;animation-duration:1ms!important}}
