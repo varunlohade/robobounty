@@ -6,7 +6,7 @@
 1. App, instant recorded run: http://localhost:5199/app.html?recorded=1 (needs the dev server: `npx vite --port 5199`, and the run server in `policy/server/` for live mode).
 2. Site draft: `design/site-draft/index.html`.
 3. Film concept stills: `design/film/keyframes/_sheet.png`.
-4. Blender clips: `design/render/clip.mp4` (older run), `design/render/clip_slip.mp4`. See status below.
+4. Blender clips on the final sim, silent: `design/render/clip_pass.mp4`, `design/render/clip_slip.mp4`. Motion matches the recording to 0.008 mm. The robot and slip look convincing; the city and street trees still look CG. The slip is an extreme 36 m/s gust, and it repeated only 2 of 3 times, so it is good footage but not a bounty-grade failure.
 
 ## Results (simulated; hand-built physics; not checked against real hardware)
 Dubai brief, campaign_dubai_final, sim 0e36d3bf. `policy/crashlab/check_numbers.py` recomputes 97 numbers and they all match.
