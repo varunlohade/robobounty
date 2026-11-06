@@ -141,6 +141,13 @@ DEFAULT_MATERIALS = {
     "el_steel": ((0.55, 0.57, 0.60, 1), 0.6, 0.4),
     "el_wet": ((0.08, 0.20, 0.45, 0.45), 0.9, 0.1),
     "el_cradle": ((0.78, 0.62, 0.12, 1), 0.4, 0.5),
+    # The library for things placed on the building. They match the tower. A bright colour comes only from a user who asks.
+    "brushed_alu": ((0.66, 0.67, 0.69, 1), 0.9, 0.42),
+    "painted_steel": ((0.58, 0.59, 0.58, 1), 0.25, 0.55),
+    "weathered_concrete": ((0.5, 0.48, 0.44, 1), 0.0, 0.92),
+    "dark_sealant": ((0.05, 0.05, 0.055, 1), 0.0, 0.7),
+    "galvanised": ((0.6, 0.62, 0.62, 1), 0.75, 0.6),
+    "safety_paint": ((0.66, 0.55, 0.2, 1), 0.2, 0.6),
 }
 
 # The legacy schema, copied from policy/highrise so this folder has no runtime link to it.
@@ -437,6 +444,49 @@ def city_blocks(world):
                 continue
             out.append((ix, iy, 12 + (ix * 37 + iy * 53 + seed * 17) % 45))
     return out
+
+
+TOUCH_M = 0.02  # how near two shapes must be to hold each other
+PARAPET_OUT_M, PARAPET_TOP_M = 0.6, 1.0
+
+
+def _bounds(world, o):
+    c, e = object_center(world, o), half_extents(o)
+    return [c[i] - e[i] for i in range(3)], [c[i] + e[i] for i in range(3)]
+
+
+def floating(world):
+    """Free-form objects that nothing holds up: each must touch the wall, stand on the roof, parapet or ground, or touch one that does. Names, in world order."""
+    roof, half = world["tower"]["height_m"], world["tower"]["width_m"] / 2
+    g = glass_rect(world)
+    cx = (g["x0"] + g["x1"]) / 2
+    boxes = {o["name"]: _bounds(world, o) for o in world["objects"]}
+
+    def held_by_building(o):
+        lo, hi = boxes[o["name"]]
+        over_tower = lo[0] < cx + half and hi[0] > cx - half
+        if lo[2] <= TOUCH_M:
+            return True
+        on_wall = hi[1] >= -TOUCH_M and lo[2] < roof and over_tower
+        on_roof = abs(lo[2] - roof) <= TOUCH_M and over_tower and hi[1] >= -PARAPET_OUT_M and lo[1] <= TOWER_DEPTH_M
+        on_parapet = roof < lo[2] <= roof + PARAPET_TOP_M + TOUCH_M and over_tower and lo[1] < PARAPET_OUT_M and hi[1] > -PARAPET_OUT_M
+        return on_wall or on_roof or on_parapet
+
+    held = {o["name"] for o in world["objects"] if o["kind"] != "object" or held_by_building(o)}
+    waiting = [o["name"] for o in world["objects"] if o["name"] not in held]
+    grew = True
+    while grew and waiting:
+        grew = False
+        for name in list(waiting):
+            lo, hi = boxes[name]
+            for other in held:
+                a, b = boxes[other]
+                if all(lo[i] <= b[i] + TOUCH_M and hi[i] >= a[i] - TOUCH_M for i in range(3)):
+                    held.add(name)
+                    waiting.remove(name)
+                    grew = True
+                    break
+    return waiting
 
 
 def vent_bar_count(obj):

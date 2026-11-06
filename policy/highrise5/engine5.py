@@ -14,6 +14,7 @@ import copy
 import re
 
 import compile5 as C
+import parts5 as P
 import scene5 as E
 import world5 as W
 
@@ -25,18 +26,19 @@ MAX_REPEAT = 50
 MAX_DELTA_M = 300.0
 
 CODES = frozenset({
-    "bad_args", "bad_name", "bad_shape", "fixed_by_kind", "glass_below_ground", "glass_wider_than_tower", "invalid_world",
+    "bad_args", "bad_name", "bad_shape", "fixed_by_kind", "floating", "wrong_place", "glass_below_ground", "glass_wider_than_tower", "invalid_world",
     "must_stand_on_roof", "name_taken", "no_glass_to_clean", "no_such_material", "no_such_object", "nothing_to_undo", "one_cradle_only", "out_of_range",
     "reserved_material", "setback_above_roof", "start_blocked", "start_not_on_glass", "too_many_geoms", "too_many_groups",
     "too_many_materials", "too_many_objects", "too_many_solids", "unknown_function",
 })
 LIMITS = {
     "cannot_build": ["curved glass", "fluids", "cloth", "moving machinery, except the cradle", "people"],
-    "not_built_yet": ["add_part", "generate_object"],
+    "not_built_yet": ["generate_object"],
     "caps": {"objects": W.MAX_OBJECTS, "solids": W.MAX_SOLIDS, "geoms": W.MAX_GEOMS, "materials": W.MAX_MATERIALS, "cradles": 1},
     "note": "Results are simulated with hand-built physics. The robot heading stays fixed.",
 }
-PLANNED_PARTS = ["crane", "antenna", "ac_unit", "billboard", "cradle_parked", "tree", "car"]
+PART_NOTE = ("A part is several shapes with its own brackets or mounts, in the building's own materials. ac_unit, sign, vent_hood and window_frame_bracket go on the facade and need below_top_m. "
+             "ac_unit can also take place=roof. maintenance_cradle_parked, antenna and crane stand on the roof and take no height. Remove or move a part by its name.")
 
 # Fragments of the fixed text in world5, in match order. A WorldError holds no input, but only the code leaves this file.
 WORLD_ERRORS = (
@@ -246,7 +248,24 @@ def add_object(w, a, groups):
     w["objects"].append({
         "name": a["name"], "kind": "object", "shape": a["shape"], "size": a["size"],
         "pos": {"x_m": a["x_m"], "below_top_m": a["below_top_m"], "out_m": a["out_m"]},
-        "euler_deg": a.get("euler_deg", [0.0, 0.0, 0.0]), "material": _material(w, a.get("material", "concrete")), "solid": a["solid"], "props": {}})
+        "euler_deg": a.get("euler_deg", [0.0, 0.0, 0.0]), "material": _material(w, a.get("material", "weathered_concrete")), "solid": a["solid"], "props": {}})
+
+
+def add_part(w, a, groups):
+    _name_free(w, groups, a["name"])
+    if len(groups) >= MAX_GROUPS:
+        raise Refuse("too_many_groups")
+    if "material" in a:
+        _material(w, a["material"])
+    made = P.build(w, a)
+    if made is None:
+        raise Refuse("wrong_place")
+    if any(not W.NAME_RE.fullmatch(o["name"]) for o in made):
+        raise Refuse("bad_name")
+    for o in made:
+        _name_free(w, groups, o["name"])
+    w["objects"].extend(made)
+    groups[a["name"]] = [o["name"] for o in made]
 
 
 def group(w, a, groups):
@@ -385,7 +404,7 @@ def read_result(state, a):
 
 
 def list_parts(state, a):
-    return {"parts": [], "planned": list(PLANNED_PARTS)}
+    return {"parts": {name: words for name, (_, _, words) in P.PARTS.items()}, "planned": []}
 
 
 def explain_limits(state, a):
@@ -406,16 +425,16 @@ def _registry():
                                     "joint_depth": p["joint_depth_m"], "joint_gap": p["joint_gap_m"], "skip": p["skip_every"]}), "yes", set_panes)
     row("set_work_area", _block_schema({"w": a["width_m"], "h": a["height_m"], "drop": a["drop_below_roof_m"], "margin": a["margin_m"]}), "yes", set_work_area, note=EDGE_NOTE)
     kinds = {
-        "ledge": ("concrete", {0: "width_m", 1: "depth_m", 2: "thick_m"}),
-        "sill": ("concrete", {0: "width_m", 1: "depth_m", 2: "thick_m"}),
-        "fin": ("alu", {0: "thick_m", 1: "depth_m", 2: "height_m"}),
-        "sign": ("el_sign0", {0: "width_m", 1: "depth_m", 2: "height_m"}),
-        "balcony": ("concrete", {0: "width_m", 1: "depth_m", 2: "slab_m"}),
-        "vent": ("el_dark", {0: "width_m", 2: "height_m"}),
-        "frame_step": ("alu", {0: "width_m", 1: "step_m", 2: "height_m"}),
+        "ledge": ("weathered_concrete", {0: "width_m", 1: "depth_m", 2: "thick_m"}),
+        "sill": ("weathered_concrete", {0: "width_m", 1: "depth_m", 2: "thick_m"}),
+        "fin": ("brushed_alu", {0: "thick_m", 1: "depth_m", 2: "height_m"}),
+        "sign": ("painted_steel", {0: "width_m", 1: "depth_m", 2: "height_m"}),
+        "balcony": ("weathered_concrete", {0: "width_m", 1: "depth_m", 2: "slab_m"}),
+        "vent": ("dark_sealant", {0: "width_m", 2: "height_m"}),
+        "frame_step": ("brushed_alu", {0: "width_m", 1: "step_m", 2: "height_m"}),
         "wet_patch": ("el_wet", {0: "width_m", 2: "height_m"}),
         "dirt_patch": ("el_wet", {0: "width_m", 2: "height_m"}),
-        "cradle": ("el_cradle", {0: "width_m", 2: "height_m"}),
+        "cradle": ("painted_steel", {0: "width_m", 2: "height_m"}),
     }
     for kind, (material, fields) in kinds.items():
         fixed = {1: W.KIND_BOXES[kind][1][0]} if 1 not in fields else None
@@ -429,6 +448,8 @@ def _registry():
         "x_m": _rule(pos["x_m"]), "below_top_m": _rule(pos["below_top_m"]), "out_m": _rule(pos["out_m"]),
         "euler_deg": _vec(3, -180.0, 180.0), "material": NAME, "solid": BOOL,
     }, {"name", "shape", "size", "x_m", "below_top_m", "out_m", "solid"}), "if_physics", add_object)
+    row("add_part", _schema({"name": NAME, "part": {"type": "string", "enum": sorted(P.PARTS)}, "x_m": _rule(pos["x_m"]), "below_top_m": _rule(pos["below_top_m"]),
+                             "place": {"type": "string", "enum": [P.FACADE, P.ROOF]}, "scale": _num(0.5, 2.0), "material": NAME}, {"name", "part", "x_m"}), "if_physics", add_part, note=PART_NOTE)
     row("group", _schema({"name": NAME, "members": {"type": "array", "items": NAME, "minItems": 1, "maxItems": W.MAX_OBJECTS}}, {"name", "members"}), "if_physics", group)
     deltas = {"dx": _num(-MAX_DELTA_M, MAX_DELTA_M), "dbelow": _num(-MAX_DELTA_M, MAX_DELTA_M), "dout": _num(-MAX_DELTA_M, MAX_DELTA_M)}
     row("repeat", _schema({"name": NAME, "count": _int(1, MAX_REPEAT), **deltas}, {"name", "count"}), "if_physics", repeat)
@@ -493,6 +514,8 @@ def _edit(state, row, args):
     world = W.validate(world)
     if not E.clean_mask(world).any():
         raise Refuse("no_glass_to_clean")
+    if W.floating(world):
+        raise Refuse("floating")
     physics = C.physics_hash(world)
     changed = physics != state["physics_hash"]
     snapshot = {k: state[k] for k in ("world", "groups", "last_result", "physics_hash")}

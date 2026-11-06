@@ -5,7 +5,7 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { HAZE, SKY_URL, bakeDrops, bakeGrime, skyDome } from '../view/real/air.ts';
 import { cityGeometry, cityMaterial } from '../view/real/city.ts';
-import { barGeometry, brushedTextures, glassMaterial, type FacadeGrid } from '../view/real/facade.ts';
+import { MAX_BLOCKS, barGeometry, brushedTextures, glassMaterial, type FacadeGrid } from '../view/real/facade.ts';
 import { AIR, CITIES, FOG_THICKNESS, TIMES, lookOf, luminance, parseLook, tintOf, type Look } from '../view/real/look.ts';
 import { compositeMaterial } from '../view/real/post.ts';
 import { buildRobot } from '../view/real/robot.ts';
@@ -28,6 +28,8 @@ const FRAME_GLIDE_MS = 700;
 const FRAME_ABOVE_M = 80;
 const BASE_SUN_LEVEL = 0.7, BASE_HAZE = 0.5, BASE_AZIMUTH = (Math.atan2(-0.45, 0.6) * 180) / Math.PI; // The nominal world's light: at these values the picture is the approved one.
 const BASE_SKY = '0.42,0.58,0.8|0.95,0.82,0.7';
+const GRIME_AMOUNT = 0.42; // How much weather a placed object shows. The same noise as the glass film, so it sits in the same world.
+const WALL_REACH_M = 0.2; // A shape this near the glass throws a contact shadow on it.
 const FULL_RADIUS_M = 640; // A world's largest surroundings radius draws the view's whole city.
 
 export type Quality = 'high' | 'medium' | 'low';
@@ -93,6 +95,7 @@ export class SimView {
   private cityMesh!: THREE.Mesh; private cityKey = ''; private wallBox: number[] = [];
   private sunOffset = new THREE.Vector3(-1.5, -2.2, 2.4);
   private framed = false; private glide: { t0: number; pos0: THREE.Vector3; tgt0: THREE.Vector3; pos1: THREE.Vector3; tgt1: THREE.Vector3 } | null = null;
+  private blocksDirty = false;
   private backButton: HTMLButtonElement | null = null; private backTimer = 0;
 
   constructor(private host: HTMLElement, private replay: Replay, private trial: Trial) {
@@ -179,6 +182,7 @@ export class SimView {
     this.scene.add(this.sun, this.sun.target);
 
     this.buildGeoms(geomId);
+    this.blocksDirty = true;
 
     this.weather = new Weather(noise);
     this.scene.add(this.weather.group);
@@ -484,6 +488,7 @@ export class SimView {
       this.glass.uniforms.uGrid.value.set(grid.offsetX, grid.spacingX, grid.offsetZ, grid.spacingZ);
       this.addWall(tower);
       this.buildGeoms(geomId);
+      this.blocksDirty = true;
       const before = this.cityKey;
       const shape = this.cityShape(tower);
       if (this.cityKey !== before) this.cityMesh.geometry = shape;
@@ -660,15 +665,52 @@ export class SimView {
       const material = new THREE.MeshStandardMaterial({ color: isTower ? new THREE.Color(0.03, 0.035, 0.038) : color,
         roughness: isTower ? 0.12 : own ? 1 - m.mat_shininess[mat] : 0.7, metalness: isTower ? 0.8 : own ? m.mat_specular[mat] : 0.05 });
       if (own && c[o + 3] < 1) { material.transparent = true; material.opacity = c[o + 3]; }
+      if (own && c[o + 3] === 1) this.weathered(material);
       if (isTower) this.towerMat = material;
       const mesh = new THREE.Mesh(g, material);
       mesh.matrixAutoUpdate = false;
       mesh.castShadow = !isTower;
       mesh.receiveShadow = !isTower;
+      if (own) mesh.layers.enable(MIRROR_LAYER); // The glass reflects what is fixed to it.
       this.built.add(mesh);
       this.drawn.push({ mesh, geom: i });
       this.builtDisposers.push(() => { g.dispose(); material.dispose(); });
     }
+  }
+
+  // Weather on a placed object: darker patches and streaks that run down, and rougher where it is dirty. World-space noise, so parts of one object share one stain.
+  private weathered(material: THREE.MeshStandardMaterial) {
+    const noise = this.grime.texture;
+    material.onBeforeCompile = shader => {
+      shader.uniforms.uStain = { value: noise };
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vStainAt;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvStainAt = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vStainAt;\nuniform sampler2D uStain;\nfloat stainNow = 0.0;')
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          vec4 st = texture2D(uStain, vec2(vStainAt.x + vStainAt.y, vStainAt.z) * 0.4);
+          vec4 run = texture2D(uStain, vec2((vStainAt.x + vStainAt.y) * 1.3, vStainAt.z * 0.12));
+          stainNow = clamp(smoothstep(0.3, 0.72, st.r) * 0.6 + smoothstep(0.42, 0.7, run.g) * 0.6, 0.0, 1.0);
+          diffuseColor.rgb *= 1.0 - ${GRIME_AMOUNT.toFixed(2)} * stainNow;`)
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = min(1.0, roughnessFactor + 0.25 * stainNow);');
+    };
+    material.customProgramCacheKey = () => 'weathered';
+  }
+
+  // The rectangles on the wall that throw a contact shadow: the largest shapes that reach the glass.
+  private placeBlocks() {
+    const out: { box: THREE.Box3; area: number }[] = [];
+    const { model: m, mj } = this.replay;
+    for (const { mesh, geom } of this.drawn) {
+      if (!String(mj.mj_id2name(m, mj.mjtObj.mjOBJ_GEOM.value, geom)).startsWith('obj_')) continue;
+      mesh.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(mesh);
+      if (box.max.y < -WALL_REACH_M || box.min.y > 0 || box.max.z < 0) continue;
+      out.push({ box, area: (box.max.x - box.min.x) * (box.max.z - box.min.z) });
+    }
+    out.sort((a, b) => b.area - a.area);
+    const u = this.glass.uniforms;
+    u.uBlockN.value = Math.min(MAX_BLOCKS, out.length);
+    out.slice(0, MAX_BLOCKS).forEach(({ box }, i) => u.uBlocks.value[i].set((box.min.x + box.max.x) / 2, (box.min.z + box.max.z) / 2, (box.max.x - box.min.x) / 2, (box.max.z - box.min.z) / 2));
   }
 
   private resize() {
@@ -826,6 +868,7 @@ export class SimView {
       const a = i * 9, b = i * 3;
       mesh.matrix.set(r[a], r[a + 1], r[a + 2], p[b], r[a + 3], r[a + 4], r[a + 5], p[b + 1], r[a + 6], r[a + 7], r[a + 8], p[b + 2], 0, 0, 0, 1);
     }
+    if (this.blocksDirty && isV5(this.trial.world)) { this.placeBlocks(); this.blocksDirty = false; }
     // The robot takes its body pose straight from MuJoCo.
     const bp = data.xpos, bm = data.xmat, bi = this.robotBody * 3, ba = this.robotBody * 9;
     const root = this.robot.root;

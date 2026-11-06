@@ -69,7 +69,7 @@ GOOD = {
     "set_corner": [{"x_m": 2.0, "side": 1}],
     "set_setback": [{"above_top_m": 0.8, "depth_m": 2.0}],
     "add_object": [
-        {"name": "far", "shape": "box", "size": [1, 1, 1], "x_m": 1.0, "below_top_m": 2.0, "out_m": 5.0, "material": "alu", "solid": True},
+        {"name": "far", "shape": "box", "size": [1, 1, 200], "x_m": 1.0, "below_top_m": 40.0, "out_m": 5.0, "material": "alu", "solid": True},
         {"name": "cyl", "shape": "cyl", "size": [0.1, 0.5], "x_m": 1.0, "below_top_m": 2.0, "out_m": 0.1, "euler_deg": [90.0, 0.0, 0.0], "solid": True},
         {"name": "ball", "shape": "sphere", "size": [0.1], "x_m": 1.0, "below_top_m": 2.0, "out_m": 0.1, "solid": True},
         {"name": "cap", "shape": "capsule", "size": [0.05, 0.4], "x_m": 1.0, "below_top_m": 2.0, "out_m": 0.05, "solid": False}],
@@ -80,6 +80,7 @@ GOOD = {
     "remove_object": [{"name": "box"}, {"name": "ledge"}],
     "set_material": [{"name": "glass", "rgba": [0.1, 0.2, 0.3, 1.0]}, {"name": "new_paint", "rgba": [1.0, 0.0, 0.0, 1.0], "roughness": 0.3, "metal": 0.1}],
     "assign_material": [{"name": "box", "material": "cream"}],
+    "add_part": [{"name": "part", "part": "ac_unit", "x_m": 1.0, "below_top_m": 2.0}, {"name": "part", "part": "crane", "x_m": 1.0}],
     "set_weather": [{"wetness": 0.5}, {"temperature_c": -5.0}, {"humidity_pct": 90.0}, {"dust_gm2": 20.0}],
     "set_wind": [{"steady_ms": 5.0}, {"gust_ms": 15.0}, {"gust_start_s": 10.0}, {"gust_duration_s": 20.0}, {"gust_count": 5}, {"gust_period_s": 40.0}, {"dir_deg": 90.0}],
     "set_robot": [{"suction_pa": 1500.0}, {"seal_leak_mm2": 800.0}, {"battery_start_frac": 0.5}, {"pad_force_n": 50.0}, {"clean_speed_ms": 0.2}],
@@ -110,7 +111,7 @@ def outward(out):
 
 def part1_good():
     check("every function in the registry has a good call", set(GOOD) == set(G.REGISTRY), sorted(set(G.REGISTRY) ^ set(GOOD)))
-    check("add_part and generate_object are not in the registry", not {"add_part", "generate_object"} & set(G.REGISTRY))
+    check("generate_object is not in the registry", "generate_object" not in G.REGISTRY)
     json.dumps(G.catalog())
     rows = G.catalog()
     check("the registry holds name, schema and re-run, as JSON", all(set(r) - {"note"} == {"name", "args", "rerun"} and r["rerun"] in ("yes", "no", "if_physics") for r in rows), f"{len(rows)} functions")
@@ -225,10 +226,36 @@ def expect_refused(start, fn, args, problems):
         problems.append(f"{fn}: echoed input")
 
 
+def part1_parts():
+    """Each library part compiles and nothing in it floats, at every scale. A free object in the air refuses, and one on a mount does not."""
+    from parts5 import PARTS
+    start = seeded()
+    bad = []
+    for name in PARTS:
+        for scale in (0.5, 1.0, 2.0):
+            out = G.call(start, "add_part", {"name": "p", "part": name, "x_m": 3.0, "below_top_m": 2.0, "scale": scale})
+            if out["result"].startswith("cannot_build"):
+                bad.append((name, scale, out["result"]))
+            else:
+                C.compile(out["state"]["world"])
+    check("every part at every scale builds with nothing floating", not bad, bad)
+    air = G.call(start, "add_object", {"name": "air", "shape": "box", "size": [1.0, 1.0, 1.0], "x_m": 1.0, "below_top_m": 2.0, "out_m": 5.0, "solid": False})
+    check("an object in the air is cannot_build:floating", air["result"] == "cannot_build:floating", air["result"])
+    roof = W.area_rect(start["world"])["z1"] - start["world"]["tower"]["height_m"]
+    high = G.call(start, "add_object", {"name": "high", "shape": "box", "size": [1.0, 1.0, 1.0], "x_m": 1.0, "below_top_m": roof - 3.0, "out_m": -3.0, "solid": False})
+    check("an object above the roof and touching nothing is floating", high["result"] == "cannot_build:floating", high["result"])
+    standing = G.call(start, "add_object", {"name": "pad", "shape": "box", "size": [1.0, 1.0, 1.0], "x_m": 1.0, "below_top_m": roof - 0.5, "out_m": -3.0, "solid": False})
+    check("an object on the roof stands", not standing["result"].startswith("cannot_build"), standing["result"])
+    on_pad = G.call(standing["state"], "add_object", {"name": "top", "shape": "box", "size": [1.0, 1.0, 1.0], "x_m": 1.0, "below_top_m": roof - 1.5, "out_m": -3.0, "solid": False})
+    check("an object on a mount stands", not on_pad["result"].startswith("cannot_build"), on_pad["result"])
+    gone = G.call(on_pad["state"], "remove_object", {"name": "pad"})
+    check("removing the mount under an object refuses", gone["result"] == "cannot_build:floating", gone["result"])
+
+
 def part1_hostile():
     start = seeded()
     problems = []
-    for fn in (None, 5, [], {}, b"set_tower", "__class__", "add_part", "generate_object", "exec", MARK + "<x/>", "set_tower ", "A" * 100000):
+    for fn in (None, 5, [], {}, b"set_tower", "__class__", "generate_object", "exec", MARK + "<x/>", "set_tower ", "A" * 100000):
         try:
             expect_refused(start, fn, {}, problems)
         except TypeError:
@@ -612,6 +639,7 @@ def part2_scene_matches_model():
 def main():
     print("== engine ==")
     part1_good()
+    part1_parts()
     part1_hostile()
     part1_fuzz()
     print("== sim ==")

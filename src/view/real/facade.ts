@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { AIR_GLSL, HASH_GLSL, HAZE } from './air.ts';
 
 // The curtain wall. Its pane lines come from the MJCF's mullion and transom geoms. The film on it comes from the recorded dirt grid.
+export const MAX_BLOCKS = 16;
 export interface FacadeGrid { spacingX: number; offsetX: number; spacingZ: number; offsetZ: number; x0: number; x1: number; z1: number }
 
 export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { value: THREE.Texture | null }, grid: FacadeGrid) {
@@ -15,6 +16,7 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
       uDirtRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uDirtSize: { value: new THREE.Vector2(1, 1) },
       uClean: { value: new THREE.Vector2(0.1, 0.34) }, uFilm: { value: 0.8 }, uWet: { value: 0.2 },
       uGrid: { value: new THREE.Vector4(grid.offsetX, grid.spacingX, grid.offsetZ, grid.spacingZ) },
+      uBlocks: { value: Array.from({ length: MAX_BLOCKS }, () => new THREE.Vector4()) }, uBlockN: { value: 0 },
       uRobot: { value: new THREE.Vector4(0, 0, 1, 0) }, uRobotNear: { value: 1 }, uFilmTop: { value: 1 }, uFogK: { value: 1 },
       // The look. As built, these change nothing.
       uBody: { value: new THREE.Color(0, 0, 0) }, uBodyLight: { value: new THREE.Color(1, 1, 1) }, uBodyAmt: { value: 0 }, uReflKeep: { value: 1 }, uFilmKeep: { value: 1 },
@@ -29,6 +31,8 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
       uniform float uHasReflect, uDirtMix, uFilm, uWet, uRobotNear, uBodyAmt, uReflKeep, uFilmKeep, uRooms, uSnow, uRain, uTime, uDropBack, uDustFilm;
       uniform vec3 uEnvFlat, uBody, uBodyLight, uTint, uTintGlow, uFrit;
       uniform vec4 uDirtRect, uGrid, uRobot;
+      uniform vec4 uBlocks[${MAX_BLOCKS}];
+      uniform int uBlockN;
       uniform vec2 uDirtSize, uClean;
       ${AIR_GLSL}
       ${HASH_GLSL}
@@ -122,6 +126,13 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
         float sd2 = roundBox(rp2, vec2(0.18), 0.052);
         float contact = uRobotNear * max(exp(-max(sd, 0.0) / 0.018) * 0.78, exp(-max(sd2, 0.0) / 0.075) * 0.62);
         float occl = 1.0 - clamp(contact, 0.0, 0.92);
+        // Whatever is fixed to the wall throws the same soft contact shadow, and a longer one below it, away from the sun.
+        for (int i = 0; i < uBlockN; i++) {
+          vec2 q = p - uBlocks[i].xy;
+          float near = exp(-max(roundBox(q, uBlocks[i].zw, 0.01), 0.0) / 0.03);
+          float drop = exp(-max(roundBox(q + vec2(-0.05, 0.14), uBlocks[i].zw, 0.02), 0.0) / 0.12);
+          occl *= (1.0 - 0.72 * near) * (1.0 - 0.5 * drop);
+        }
 
         // The film: a thin warm-grey mineral layer lit by the overcast.
         vec3 tint = mix(vec3(0.24, 0.235, 0.22), vec3(0.17, 0.17, 0.165), smoothstep(0.3, 0.7, tile.r));

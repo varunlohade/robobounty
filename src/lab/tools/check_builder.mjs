@@ -176,7 +176,12 @@ try {
       await save(`build-${step.png}.png`);
     } else if (step.meet) {
       // The first moment the robot's body reaches the new box, from the recorded path.
-      const box = now.world.objects.filter(o => o.solid && o.pos.out_m < 0.5).pop();
+      // Its bounds, from the new solids near the glass. The AI may have chosen a part of several shapes.
+      const old = new Set(before.world.objects.map(o => o.name));
+      const parts = now.world.objects.filter(o => !old.has(o.name) && o.solid && o.pos.out_m < 0.7);
+      const x0 = Math.min(...parts.map(o => o.pos.x_m - o.size[0] / 2)), x1 = Math.max(...parts.map(o => o.pos.x_m + o.size[0] / 2));
+      const b0 = Math.min(...parts.map(o => o.pos.below_top_m - o.size.at(-1) / 2)), b1 = Math.max(...parts.map(o => o.pos.below_top_m + o.size.at(-1) / 2));
+      const box = { pos: { x_m: (x0 + x1) / 2, below_top_m: (b0 + b1) / 2 }, size: [x1 - x0, 0, b1 - b0] };
       const trace = await (await get(`trials/${now.tid}/trace.json`)).json();
       const X = trace.columns.indexOf('x'), Z = trace.columns.indexOf('z');
       const top = now.world.tower.height_m - now.world.area.drop_below_roof_m;
@@ -223,6 +228,29 @@ try {
     await save(`build-tower-${height}.png`);
     await compareGeoms(validated, `tower ${height} m`);
   }
+  // Parts on the wall and the roof, from the real engine with no AI, each seen close up.
+  const onWall = JSON.parse(execFileSync(PY, ['-c', `import sys,json; sys.path.insert(0, ${JSON.stringify(join(ROOT, 'policy/highrise5'))}); import world5 as W, engine5 as G
+s = G.new_state(W.load(${JSON.stringify(join(work, 'world.json'))}))
+out = {}
+for part, args in (("sign", {"x_m": -0.2, "below_top_m": 3.2}), ("vent_hood", {"x_m": 2.6, "below_top_m": 1.2}), ("window_frame_bracket", {"x_m": 0.8, "below_top_m": 2.0}), ("ac_unit", {"x_m": 0.3, "below_top_m": -3.0}), ("maintenance_cradle_parked", {"x_m": 1.2}), ("antenna", {"x_m": 8.0})):
+    r = G.call(s, "add_part", {"name": part[:5], "part": part, **args})
+    assert not r["result"].startswith("cannot"), part + r["result"]
+    s = r["state"]
+    b = [o for o in s["world"]["objects"] if o["name"].startswith(part[:5] + "_")]
+    out[part] = [o["name"] for o in b]
+print(json.dumps({"world": s["world"], "names": out}))`], { maxBuffer: 1 << 26 }).toString());
+  const facts = physicsFacts(onWall.world);
+  await js(`window.__lab.view().applyWorld(${JSON.stringify(facts.view_xml)}, ${JSON.stringify(onWall.world)})`);
+  await wait(800);
+  const shown = await js(`window.__lab.view().drawnScene().geoms`);
+  for (const [part, names] of Object.entries(onWall.names)) {
+    const boxes = names.map(n => shown[`obj_${n}`]);
+    const box = [0, 1, 2].map(i => Math.min(...boxes.map(b => b[i]))).concat([3, 4, 5].map(i => Math.max(...boxes.map(b => b[i]))));
+    await js(`window.__lab.view().frameOn(${JSON.stringify(box)})`);
+    await wait(1500);
+    await save(`build-part-${part}.png`);
+  }
+  await compareGeoms(onWall.world, 'parts');
   check('no console errors', problems.length === 0, [...new Set(problems)].slice(0, 6).join('\n'));
 } catch (err) {
   check('the flow finished', false, String(err));

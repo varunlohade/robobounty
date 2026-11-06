@@ -21,7 +21,7 @@ import sim5 as S
 import world5 as W
 
 GENESIS = "0" * 64
-CODE_FILES = ("compile5.py", "controller5.py", "engine5.py", "judge5.py", "run_trial5.py", "scene5.py", "sim5.py", "world5.py")
+CODE_FILES = ("compile5.py", "controller5.py", "engine5.py", "judge5.py", "parts5.py", "run_trial5.py", "scene5.py", "sim5.py", "world5.py")
 
 
 def code_hashes():

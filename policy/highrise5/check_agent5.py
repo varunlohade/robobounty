@@ -121,7 +121,7 @@ def part_loop():
     check("margin 3.0 on nominal: end state differs, no number moved, and the line says so", c["status"] == "changed nothing" and c["state_changed"] and not c["run_changed"], c["line"])
     events, *_ = go([{"calls": [{"fn": "add_object", "args": lane_box()}], "say": ""}, done()])
     check("a box on the lane moves the numbers", call_events(events)[0]["status"] == "ok" and call_events(events)[0]["run_changed"], call_events(events)[0]["line"])
-    far = {**lane_box(), "out_m": 3.0}
+    far = {**lane_box(), "out_m": 3.0, "size": [0.5, 0.05, 200.0], "below_top_m": 40.0}  # a post on the street, so nothing floats
     events, *_ = go([{"calls": [{"fn": "add_object", "args": far}], "say": ""}])
     check("a far solid is picture only", call_events(events)[0]["status"] == G.PICTURE, call_events(events)[0]["line"])
 
