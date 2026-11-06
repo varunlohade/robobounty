@@ -72,3 +72,21 @@ Robot pack = model + controller + judge + world functions. Backend per pack: MuJ
 ### Import a robot from the chat (owner, 2026-11-06)
 His words: "a person imports a robot in the channel, like there is an option to import in the chat window, and then we build everything around it."
 A "+" in the chat box offers: import a file (MJCF, URDF or a zip with its meshes) or pick from a library (Menagerie, Newton's robots). The file is untrusted data: strict parse, size caps, no paths outside the upload. The app reads joints, actuators, mass and size, shows the robot in the main area, and says plainly what it found. It then asks only for what is missing: "What drives this robot?" with options: a trained controller if one exists, the user's code, or a passive drop test. A robot with no controller must say so, never fake motion. Then the AI builds the world around it with the engine functions. Build order: after the Newton test and the robot pack split.
+
+### More robot packs the owner wants (2026-11-06)
+His words: "a cleaner robot that cleans submarines underneth as well and other robot that runs on mars".
+Mars rover: gravity 3.71 m/s2, thin air, rough heightfield terrain, rocks, low friction; a rocker-bogie rover with a scripted drive. Loose sand as grains needs Newton MPM, which needs a GPU.
+Hull cleaner: needs curved surface adhesion (surface query, like the curved glass work), magnet or thruster model, water density and drag from MuJoCo's fluid model, a current as a force. No wave or flow simulation.
+Both are robot packs: model, controller, judge, world functions.
+
+### Test flow, owner's full description (2026-11-06)
+His words: "after the world is built and we have all the configurations of the world ... we say agent to figure out all the test cases ... then we say run ... wherever it fails. It corrects the code and tries to run that again ... the main simulation window ... zooms out, and there are like 40 or 50 simulations ... You can hover on a scenario and you can see, oh, this scenario means this, and there would be a detailed log and description panel ... Whenever it gets stuck, it goes to red, and the user can then figure out how to fix it, or ask AI to fix it."
+Steps: world and its settings; agent lists scenarios with a reason each; user says run; main area zooms out to a grid of live runs; hover shows meaning; click opens a log and description panel; failed or stuck goes red; user edits the code or asks the AI to fix; re-run.
+Guards for AI fixes: a fix is a session diff shown to the user. It is tested on held-back worlds, with no regressions. A fix that weakens a safety guard is flagged, since an earlier best patch passed more worlds by removing the low-pressure guard. The controller is the only thing a fix can change: never the judge or the world. Scenarios are the AI's reasoned guesses, not evidence that they occur in real use, and are labelled so.
+
+### Product flow, final order from the owner (2026-11-06)
+1. Import the robot in the chat and say its job. 2. The AI builds the world. 3. The user modifies the world by chat until satisfied. 4. The user asks for all scenarios, and the agent lists them. 5. The user says run. 6. The main window zooms out to a grid of live runs; click for details. 7. Red means failed or stuck; the user or the AI fixes the code and re-runs.
+
+### Objects must belong (owner, 2026-11-06)
+His words: "anything what you are building basically should also mimic the environment, so it shouldn't look just like it's just added for the sake of adding."
+Rule for every pack: objects use realistic materials and are things found at that site, with mounts or supports, never floating. A vague request becomes a plausible object, and the chat says what it chose. Plain shapes or bright colours appear only on a clear request.

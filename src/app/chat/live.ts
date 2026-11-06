@@ -55,7 +55,12 @@ export class LiveBackend implements ChatBackend {
 
   private async session(): Promise<void> {
     const old = remembered();
-    if (old && (await fetch(`${SERVER}/api/sessions/${old}/state`, { signal: AbortSignal.timeout(REPLY_DEADLINE_MS) })).ok) { this.id = old; return; }
+    if (old) {
+      const res = await fetch(`${SERVER}/api/sessions/${old}/state`, { signal: AbortSignal.timeout(REPLY_DEADLINE_MS) });
+      // A tab can remember a session from the other page or an older build. Keep it only if it runs the engine this page asked for.
+      const wanted = (this.newSession as { engine?: string }).engine === 'v5' ? 'v5' : 'old';
+      if (res.ok && (await res.json()).engine === wanted) { this.id = old; return; }
+    }
     const res = await post('/api/sessions', this.newSession);
     if (!res.ok) throw new Error(`run server: HTTP ${res.status}`);
     this.id = (await res.json()).id;

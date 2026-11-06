@@ -1696,7 +1696,7 @@ class Handler(BaseHTTPRequestHandler):
             if s is None:
                 return self.reply(404, {"error": "no_session"})
             if parts[3] == "state" and len(parts) == 4:
-                return self.reply(200, {"phase": s.phase, "busy": s.busy})
+                return self.reply(200, {"phase": s.phase, "busy": s.busy, "engine": "v5" if s.v5 else "old"})
             if parts[3] == "events" and len(parts) == 4:
                 return self.stream(s)
             if parts[3] == "trials" and len(parts) == 6 and _ID.match(parts[4]) and parts[5] in TRIAL_FILES and parts[4] in s.exports:
