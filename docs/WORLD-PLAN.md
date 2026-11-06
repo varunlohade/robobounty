@@ -127,3 +127,6 @@ Chain: no Solidity change. fingerprint = keccak(bountyId, patched_sha), perFailu
 Budget: policy/bounty/budget.py, budget.json {cap, held, spent, stopped, per_bounty_max}, spend.jsonl. agent_post.py: code posts, not the LLM. Triggers: a fix report of did_not_help, rejected or no_change gives fix_failure; a not_tested item mapped to world fields gives find_failure with limits from the campaign. No physics model means "no gate, not posted". Submission text, tester names and source never enter any prompt. POST /api/budget/stop.
 Tasks: 1 board_fix.py, 2 board_fix_gate.py, 3 board_fix_routes.py, 4 bounties.html and src/board, 8 budget and agent_post, 5 grid button, 6 check_board_fix.py, 7 anvil mirror. Cut 7, 6, 5 in that order.
 Later: real_run.v1.json operator upload, labelled unverified until a human checks it.
+
+### Rerun verdict (2026-11-06)
+Add an "Open in Rerun" export from the detail panel after the core flow passes. Do not embed it before the deadline (70 MB wasm), and do not replace the poses player. Copy the ideas: failure markers on every chart, and a before and after overlay beside a code change. Prototype: policy/rerun_lab/.
