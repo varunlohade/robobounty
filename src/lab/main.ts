@@ -100,7 +100,9 @@ async function live(root: HTMLElement) {
   const onEvent = async (e: ServerEvent) => {
     switch (e.type) {
       case 'world': await showWorld(e); break;
+      case 'look': applyLook(e); break;
       case 'trial': await showTrial(e.tid); break;
+      case 'llm_count': aiLine.textContent = `AI calls ${e.used} of ${e.cap}`; break;
       case 'sim': simLine.textContent = `Sim ${e.sha ? String(e.sha).slice(0, 8) : 'unknown'}${e.sha && e.sha !== e.now ? `, now ${String(e.now).slice(0, 8)}: this run is from older code` : ''}`; break;
       case 'idle':
         root.dataset.idle = String(Number(root.dataset.idle ?? 0) + 1);
@@ -113,7 +115,8 @@ async function live(root: HTMLElement) {
   const { main, statusRight, setName } = shell(root, chat.root);
   const simLine = el('span');
   const llmLine = el('span');
-  statusRight.append(llmLine, simLine);
+  const aiLine = el('span');
+  statusRight.append(llmLine, aiLine, simLine);
 
   const host = el('div', 'page');
   const empty = el('div', 'lab-empty');
@@ -122,6 +125,17 @@ async function live(root: HTMLElement) {
   main.append(host);
 
   let clear: () => void = () => {};
+  // The session's look. A view built later starts from it. Scenery only.
+  let look: unknown = {};
+  let current: (() => SimView | null) = () => null;
+  const applyLook = (e: ServerEvent) => {
+    look = e.look;
+    const view = current();
+    view?.setLook(look);
+    const viewport = document.querySelector<HTMLElement>('.viewport');
+    // The time from the AI's answer reaching the server to the next frame drawn.
+    if (viewport) requestAnimationFrame(() => requestAnimationFrame(() => { viewport.dataset.lookLandMs = String(Math.round(Date.now() - e.sent)); }));
+  };
   const swap = (next: HTMLElement, stop: () => void) => {
     clear();
     clear = stop;
@@ -152,6 +166,8 @@ async function live(root: HTMLElement) {
     replay = new Replay(mj, trial);
     replay.seek(0);
     view = new SimView(viewport, replay, trial);
+    view.setLook(look);
+    current = () => view;
     view.sync();
     viewport.dataset.ready = 'true';
     viewport.dataset.hash = String(e.hash);
@@ -161,7 +177,9 @@ async function live(root: HTMLElement) {
     const trial = await loadTrialFrom(backend.trialBase(tid));
     const world = worldPage(trial, statusRight);
     swap(world.page, () => world.stop());
+    current = () => world.view;
     await world.start();
+    world.view?.setLook(look);
     world.viewport.dataset.tid = tid;
   }
 

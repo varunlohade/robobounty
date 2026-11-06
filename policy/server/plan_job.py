@@ -1,4 +1,4 @@
-"""One LLM or build step, run in its own process: plan_job.py <plan|build|scenarios>, with a JSON request on stdin and a JSON reply on stdout.
+"""One LLM or build step, run in its own process: plan_job.py <route|plan|build|scenarios>, with a JSON request on stdin and a JSON reply on stdout.
 
 It stays a separate process because policy/crashlab and policy/highrise each have a module named world.
 Chat text arrives on stdin and goes only to the LLM layer. brief.py and scenarios.py validate what comes back.
@@ -12,8 +12,10 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "crashlab"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import brief
 import brief_highrise as plugin
+import engine
 import llm
 import mujoco
 import scenarios
@@ -21,10 +23,21 @@ from scene import SceneError
 
 INSTRUCTION_REASONS = {"code_or_instructions", "file_or_secret_request"}
 FOLLOW_UP = "This message changes a world that already exists."
+ROUTE_MODEL = os.environ.get("CRASHLAB_ROUTE_MODEL", "claude-opus-5-5")  # Pinned. The route check scored this model on policy/server/check_look.py.
+ROUTE_TIMEOUT_S = 90
+_route_text = ""
 
 
 def _recorded(prompt, schema):
     folder = Path(os.environ["CRASHLAB_RECORDED_REPLIES"])
+    # Stored route replies are by exact message. Any other message fails like a dead AI call, so a check never makes a live call here.
+    if "calls" in schema["properties"]:
+        stored = json.loads((folder / "route.json").read_text()) if (folder / "route.json").exists() and not os.environ.get("CRASHLAB_LIVE_ROUTE") else {}
+        if _route_text not in stored:
+            if os.environ.get("CRASHLAB_LIVE_ROUTE"):
+                return llm._claude(prompt, schema)
+            raise llm.LLMError("no_stored_route")
+        return stored[_route_text]
     path = folder / ("scenarios.json" if "groups" in schema["properties"] else "followup.json" if FOLLOW_UP in prompt and (folder / "followup.json").exists() else "brief.json")
     return json.loads(path.read_text()) if path.exists() else llm._claude(prompt, schema)
 
@@ -63,6 +76,20 @@ def plan(req):
         return {"ok": False, "rejection": "plan_failed_validation", "seconds": round(time.perf_counter() - t0, 1)}
     except llm.LLMError as e:
         return {"ok": False, "rejection": f"llm_{e}", "seconds": round(time.perf_counter() - t0, 1)}
+
+
+def route(req):
+    """The AI chooses engine functions for one message. The server checks the reply with engine.check_reply before anything happens."""
+    global _route_text
+    _route_text = req["text"]
+    t0 = time.perf_counter()
+    os.environ["CRASHLAB_LLM_MODEL"] = ROUTE_MODEL
+    llm.TIMEOUT_S = ROUTE_TIMEOUT_S
+    try:
+        raw = llm.complete_json(engine.prompt(req["text"], req.get("look"), req.get("has_world")), engine.reply_schema())
+    except llm.LLMError as e:
+        return {"ok": False, "rejection": f"llm_{e}", "seconds": round(time.perf_counter() - t0, 1)}
+    return {"ok": True, "reply": raw, "seconds": round(time.perf_counter() - t0, 1), "model": ROUTE_MODEL}
 
 
 class KeepBase:
@@ -114,7 +141,7 @@ def main():
         if os.environ.get("CRASHLAB_RECORDED_REPLIES"):
             llm.BACKENDS["recorded"] = _recorded
             os.environ["CRASHLAB_LLM"] = "recorded"
-        reply = {"plan": plan, "build": build, "scenarios": propose}[sys.argv[1]](req)
+        reply = {"plan": plan, "build": build, "scenarios": propose, "route": route}[sys.argv[1]](req)
     json.dump(reply, sys.stdout, allow_nan=False)
 
 

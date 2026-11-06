@@ -15,15 +15,18 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
       uDirtRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uDirtSize: { value: new THREE.Vector2(1, 1) },
       uClean: { value: new THREE.Vector2(0.1, 0.34) }, uFilm: { value: 0.8 }, uWet: { value: 0.2 },
       uGrid: { value: new THREE.Vector4(grid.offsetX, grid.spacingX, grid.offsetZ, grid.spacingZ) },
-      uRobot: { value: new THREE.Vector4(0, 0, 1, 0) }, uRobotNear: { value: 1 }, uFilmTop: { value: 1 },
+      uRobot: { value: new THREE.Vector4(0, 0, 1, 0) }, uRobotNear: { value: 1 }, uFilmTop: { value: 1 }, uFogK: { value: 1 },
+      // The look. As built, these change nothing.
+      uBody: { value: new THREE.Color(0, 0, 0) }, uBodyLight: { value: new THREE.Color(1, 1, 1) }, uBodyAmt: { value: 0 }, uReflKeep: { value: 1 }, uFilmKeep: { value: 1 },
+      uTint: { value: new THREE.Color(1, 1, 1) }, uTintGlow: { value: new THREE.Color(0, 0, 0) }, uFrit: { value: new THREE.Color(0.01, 0.011, 0.012) }, uRooms: { value: 0 },
     },
     vertexShader: `varying vec3 vW; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
     fragmentShader: /* glsl */`
       varying vec3 vW;
       uniform sampler2D uReflect, uDirtA, uDirtB, uDrops;
       uniform mat4 uTexMat;
-      uniform float uHasReflect, uDirtMix, uFilm, uWet, uRobotNear;
-      uniform vec3 uEnvFlat;
+      uniform float uHasReflect, uDirtMix, uFilm, uWet, uRobotNear, uBodyAmt, uReflKeep, uFilmKeep, uRooms;
+      uniform vec3 uEnvFlat, uBody, uBodyLight, uTint, uTintGlow, uFrit;
       uniform vec4 uDirtRect, uGrid, uRobot;
       uniform vec2 uDirtSize, uClean;
       ${AIR_GLSL}
@@ -67,7 +70,7 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
         float below = fract(gr.y);
         float stain = exp(-(1.0 - below) * uGrid.w * 1.5) * smoothstep(0.4, 0.62, tile.b);
         grimeAmt += 0.4 * stain;
-        float film = clamp(mask * pow(max(level, 0.0), 0.7) * grimeAmt * uFilm, 0.0, 1.0);
+        float film = clamp(mask * pow(max(level, 0.0), 0.7) * grimeAmt * uFilm * uFilmKeep, 0.0, 1.0);
         // A film scatters more at a grazing view: the light crosses more of it.
         film = clamp(film * (0.8 + 0.2 / sqrt(ndv + 0.2)), 0.0, 0.9);
 
@@ -88,12 +91,16 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
         float fz = fract(gr.y);
         float span = 1.0 - smoothstep(0.16, 0.19, min(fz, 1.0 - fz));
         vec3 inner = mix(vec3(0.012, 0.024, 0.024), vec3(0.004, 0.008, 0.008), span) * (0.75 + 0.5 * rnd);
-        vec3 glass = mix(inner, refl * vec3(0.86, 0.96, 0.94), fres);
+        // Lit rooms at dusk and night, pane by pane.
+        inner += (1.0 - span) * vec3(1.0, 0.72, 0.42) * uRooms * 0.75 * step(0.62, rnd2) * (0.5 + 0.5 * rnd3);
+        // The look's building colour shows as a painted panel behind the pane, with a thin glaze of reflection over it.
+        inner = mix(inner, uBody * uBodyLight * (0.92 + 0.16 * rnd3) * (1.0 - 0.18 * span), uBodyAmt) + uTintGlow * (1.0 - span);
+        vec3 glass = mix(inner, refl * vec3(0.86, 0.96, 0.94) * uTint, fres * uReflKeep);
 
         // A dark ceramic frit band around each pane, flush with the glass.
         float aa = fwidth(min(bar.x, bar.y));
         float frit = 1.0 - smoothstep(0.066 - aa, 0.066 + aa, min(bar.x, bar.y));
-        glass = mix(glass, mix(vec3(0.01, 0.011, 0.012), refl, 0.09 + 0.6 * pow(1.0 - ndv, 4.0)), frit);
+        glass = mix(glass, mix(uFrit, refl * uTint, (0.09 + 0.6 * pow(1.0 - ndv, 4.0)) * uReflKeep), frit);
 
         // The robot's soft contact shadow on the film and in the glass. It comes from the recorded pose.
         vec2 rel = p - uRobot.xy;

@@ -1,4 +1,5 @@
 // Reads one exported trial folder from public/trials/<id>/ (see policy/app_export.py).
+import type { Look } from '../view/real/look.ts';
 import type { Failures } from './worlds_page.ts';
 
 export interface Manifest {
@@ -15,7 +16,7 @@ export interface Trial {
   manifest: Manifest; xml: string; qpos: Float64Array; result: TrialResult; world: Record<string, unknown>;
   worldText: string; controller: string;
   trace: { columns: string[]; rows: (string | number | null)[][] };
-  wind: number[]; dirt: Uint8Array;
+  wind: number[]; dirt: Uint8Array; look?: Look;
 }
 export interface WorldRun {
   name: string; group: string; reason: string; seed: number; passed: boolean; failure: string | null;
@@ -46,7 +47,7 @@ export async function trialIndex(): Promise<TrialEntry[]> {
 export const loadTrial = (id: string) => loadTrialFrom(`/trials/${encodeURIComponent(id)}`);
 
 export async function loadTrialFrom(base: string): Promise<Trial> {
-  const [manifest, xml, q, result, worldText, controller, trace, wind, dirt] = await Promise.all([
+  const [manifest, xml, q, result, worldText, controller, trace, wind, dirt, look] = await Promise.all([
     get(`${base}/manifest.json`).then(r => r.json()),
     get(`${base}/model.xml`).then(r => r.text()),
     get(`${base}/qpos.json`).then(r => r.json()),
@@ -56,10 +57,12 @@ export async function loadTrialFrom(base: string): Promise<Trial> {
     get(`${base}/trace.json`).then(r => r.json()),
     get(`${base}/wind.json`).then(r => r.json()),
     get(`${base}/dirt.bin`).then(r => r.arrayBuffer()),
+    // Scenery only. An older export has no look.json, and that means the default look.
+    fetch(`${base}/look.json`).then(r => (r.ok ? r.json() : {})).catch(() => ({})),
   ]);
   const qpos = new Float64Array(q.frames.length * q.nq);
   q.frames.forEach((f: number[], i: number) => qpos.set(f, i * q.nq));
-  return { manifest, xml, qpos, result, world: JSON.parse(worldText), worldText, controller, trace, wind, dirt: new Uint8Array(dirt) };
+  return { manifest, xml, qpos, result, world: JSON.parse(worldText), worldText, controller, trace, wind, dirt: new Uint8Array(dirt), look };
 }
 
 export async function loadWorlds(): Promise<WorldsData> {

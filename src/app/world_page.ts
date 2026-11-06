@@ -149,17 +149,20 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
   statusRight.prepend(statusTime);
   let stop = () => { statusTime.remove(); };
   let toggleRun = () => {};
+  let view: SimView | null = null;
 
   async function start() {
     const replay = await Replay.open(trial);
-    const view = new SimView(viewport, replay, trial);
+    const simView = new SimView(viewport, replay, trial);
+    view = simView;
+    if (trial.look) simView.setLook(trial.look);
     let playing = true;
     let at = 0;
     let last = performance.now();
 
     const show = (frame: number) => {
       replay.seek(frame);
-      view.sync();
+      simView.sync();
       const f = replay.frame;
       const robot = replay.bodyPos('robot');
       viewport.dataset.frame = String(f);
@@ -223,7 +226,8 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
     stop = () => {
       stopped = true;
       removeEventListener('keydown', onKey);
-      view.dispose();
+      view = null;
+      simView.dispose();
       replay.dispose();
       statusTime.remove();
     };
@@ -245,5 +249,5 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
     return replay;
   }
 
-  return { page, start, viewport, stop: () => stop(), toggle: () => toggleRun() };
+  return { page, start, viewport, stop: () => stop(), toggle: () => toggleRun(), get view() { return view; } };
 }

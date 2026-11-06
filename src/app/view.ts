@@ -6,6 +6,7 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { HAZE, SKY_URL, bakeDrops, bakeGrime, skyDome } from '../view/real/air.ts';
 import { cityGeometry, cityMaterial } from '../view/real/city.ts';
 import { barGeometry, brushedTextures, glassMaterial, type FacadeGrid } from '../view/real/facade.ts';
+import { CITIES, FOG_THICKNESS, TIMES, luminance, parseLook, tintOf, type Look } from '../view/real/look.ts';
 import { compositeMaterial } from '../view/real/post.ts';
 import { buildRobot } from '../view/real/robot.ts';
 import type { Replay } from './replay.ts';
@@ -68,6 +69,8 @@ export class SimView {
   private skyTexture: THREE.Texture | null = null; private skyUniform: { value: THREE.Texture | null } = { value: null };
   private dome: THREE.Mesh; private env: THREE.WebGLRenderTarget | null = null;
   private sun: THREE.DirectionalLight;
+  private haze = HAZE.clone(); private metalMat!: THREE.MeshPhysicalMaterial; private towerMat: THREE.MeshStandardMaterial | null = null;
+  private envStrength = 0.85; private envKey = 'noon|0|default';
   private disposers: (() => void)[] = [];
   private level: Float32Array; private levelRef = 1; private dirtMask: Uint8Array;
   private follow = new THREE.Vector3(); private followTo = new THREE.Vector3(); private followed = false;
@@ -132,8 +135,10 @@ export class SimView {
     // Sky and city go in both the main pass and the mirror pass.
     this.dome = skyDome(this.skyUniform);
     this.dome.layers.enable(MIRROR_LAYER);
+    (this.dome.material as THREE.ShaderMaterial).uniforms.uHaze.value = this.haze;
     this.scene.add(this.dome);
     this.city = cityMaterial(noise);
+    this.city.uniforms.uHaze.value = this.haze;
     const cityMesh = new THREE.Mesh(cityGeometry(tower.x, tower.y, tier.radius), this.city);
     cityMesh.frustumCulled = false;
     cityMesh.layers.enable(MIRROR_LAYER);
@@ -143,6 +148,7 @@ export class SimView {
     // The glass wall: one plane, with its panes in the shader.
     this.glass = glassMaterial(noise, { value: dropsRt.texture }, grid);
     this.glass.uniforms.uWet.value = Number(trial.world?.wetness ?? 0);
+    this.glass.uniforms.uHaze.value = this.haze;
     const wall = new THREE.Mesh(new THREE.PlaneGeometry(tower.hx * 2, tower.z + tower.hz).rotateX(Math.PI / 2), this.glass);
     wall.position.set(tower.x, 0, (tower.z + tower.hz) / 2);
     wall.receiveShadow = false;
@@ -282,6 +288,69 @@ export class SimView {
     return url;
   }
 
+  /** Changes the scenery in place: uniforms and material colours, then a new light probe when the sky changes. It feeds nothing to physics, so a run is the same under any look. */
+  setLook(raw: unknown) {
+    const look: Look = parseLook(raw);
+    const time = TIMES[look.time ?? 'noon'], city = CITIES[look.city ?? 'default'], fog = look.fog ?? 0;
+    const glass = this.glass.uniforms, sky = (this.dome.material as THREE.ShaderMaterial).uniforms, c = this.city.uniforms;
+
+    this.haze.copy(time.haze).multiply(city.haze);
+    this.renderer.setClearColor(this.haze);
+    glass.uEnvFlat.value.copy(time.flat);
+    glass.uFogK.value = c.uFogK.value = FOG_THICKNESS[fog];
+    sky.uSkyMix.value = time.skyMix; sky.uSkyLow.value.copy(time.skyLow); sky.uSkyHigh.value.copy(time.skyHigh); sky.uSkyFog.value = fog * 0.3;
+    c.uDay.value = time.day; c.uLights.value = time.lights; c.uCityTint.value.copy(city.tint); c.uGround.value.copy(city.ground); c.uLift.value = city.lift; c.uShore.value = city.shore;
+    this.sun.color.copy(time.sun); this.sun.intensity = time.sunLevel;
+    this.envStrength = time.env;
+    glass.uRooms.value = time.rooms;
+
+    // The building: a painted panel behind each pane, the frit band, and the tower's other sides.
+    const body = look.building ? new THREE.Color(look.building) : null;
+    glass.uBodyAmt.value = body ? 1 : 0;
+    glass.uBodyLight.value.copy(time.body);
+    if (body) {
+      const lum = luminance(body);
+      glass.uBody.value.copy(body);
+      // A dark colour keeps almost no reflection, or a bright sky would turn black into grey.
+      glass.uReflKeep.value = 0.06 + 0.24 * Math.sqrt(lum);
+      glass.uFilmKeep.value = 0.16 + 0.3 * Math.sqrt(lum);
+      glass.uFrit.value.copy(body).multiply(time.body).multiplyScalar(0.55);
+    } else {
+      glass.uReflKeep.value = 1; glass.uFilmKeep.value = 1;
+      glass.uFrit.value.setRGB(0.01, 0.011, 0.012);
+    }
+    this.towerMat?.color.copy(body ?? new THREE.Color(0.03, 0.035, 0.038));
+    if (this.towerMat) { this.towerMat.roughness = body ? 0.6 : 0.12; this.towerMat.metalness = body ? 0.1 : 0.8; }
+
+    // The glass tint colours the reflection and the view into the rooms, and glows a little so a dark pane still shows it.
+    if (look.glass_tint) {
+      const tint = tintOf(look.glass_tint);
+      glass.uTint.value.copy(tint);
+      glass.uTintGlow.value.copy(tint).multiply(time.body).multiplyScalar(0.11);
+      // Over a painted building the tint is a stain on the paint.
+      if (body) glass.uBody.value.copy(body).lerp(body.clone().multiply(tint), 0.75).lerp(tint, 0.15);
+    } else {
+      glass.uTint.value.setRGB(1, 1, 1);
+      glass.uTintGlow.value.setRGB(0, 0, 0);
+    }
+
+    // The frames follow the building until someone names their own colour. Painted metal shows its colour better than bare metal.
+    const frames = look.frames ?? look.building;
+    if (frames) {
+      this.metalMat.color.set(frames).multiplyScalar(1.3);
+      this.metalMat.metalness = 0.2; this.metalMat.roughness = 0.6;
+    } else {
+      this.metalMat.color.setRGB(0.72, 0.735, 0.75);
+      this.metalMat.metalness = 1; this.metalMat.roughness = 0.75;
+    }
+
+    const envKey = `${look.time ?? 'noon'}|${fog}|${look.city ?? 'default'}`;
+    if (envKey !== this.envKey) { this.envKey = envKey; this.buildEnv(); }
+    else this.scene.environmentIntensity = this.envStrength;
+    this.host.dataset.look = JSON.stringify(look);
+    this.dirty = true;
+  }
+
   private useSky(img: HTMLImageElement) {
     const t = new THREE.Texture(img);
     t.colorSpace = THREE.NoColorSpace;
@@ -314,7 +383,7 @@ export class SimView {
     this.env?.dispose();
     this.env = next;
     this.scene.environment = next.texture;
-    this.scene.environmentIntensity = 0.85;
+    this.scene.environmentIntensity = this.envStrength;
     pmrem.dispose();
     wallBack.geometry.dispose();
     (wallBack.material as THREE.Material).dispose();
@@ -345,6 +414,7 @@ export class SimView {
     for (let k = Math.ceil(-offsetZ / spacingZ); offsetZ + k * spacingZ < top; k++) bars.push({ axis: 'x', at: offsetZ + k * spacingZ, from: x0, to: x1, crownY: crownT });
     const { metal, seal } = barGeometry(bars);
     const metalMat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0.72, 0.735, 0.75), metalness: 1, roughness: 0.75, map: this.brushed.color, roughnessMap: this.brushed.rough, anisotropy: 0.55, anisotropyRotation: Math.PI / 2 });
+    this.metalMat = metalMat;
     const metalMesh = new THREE.Mesh(metal, metalMat);
     metalMesh.receiveShadow = true;
     metalMesh.layers.enable(MIRROR_LAYER);
@@ -383,6 +453,7 @@ export class SimView {
       const color = new THREE.Color(c[o], c[o + 1], c[o + 2]);
       const isTower = i === geomId('tower');
       const material = new THREE.MeshStandardMaterial({ color: isTower ? new THREE.Color(0.03, 0.035, 0.038) : color, roughness: isTower ? 0.12 : 0.7, metalness: isTower ? 0.8 : 0.05 });
+      if (isTower) this.towerMat = material;
       const mesh = new THREE.Mesh(g, material);
       mesh.matrixAutoUpdate = false;
       mesh.castShadow = !isTower;

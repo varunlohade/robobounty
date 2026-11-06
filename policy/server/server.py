@@ -27,7 +27,9 @@ from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import engine
 import ledger as ledger_module
+import look as look_module
 from stored_fix import STORED_FIX, ab_rows, recorded_fix
 
 POLICY = HERE.parent
@@ -44,15 +46,15 @@ MAX_BRIEF_CHARS = 1800
 QUICK_WORLDS = 12
 HELD_BACK_SHARE = 5  # one world in this many, from each group of 3 or more
 LLM_CAP_USD = "0.50"
-MAX_LLM_PER_SESSION = 10
-MAX_LLM_PER_HOUR = 40  # across all sessions
+MAX_LLM_PER_SESSION = 60  # Every chat message is one AI call, and a physics change is a second. 60 is 30 to 60 messages in one chat.
+MAX_LLM_PER_HOUR = 200  # across all sessions
 MAX_SUBMIT_BODY_BYTES = 64 * 1024  # the gate applies its own lower limit to the world file
 GATE = POLICY / "bounty" / "gate.py"
 CONTROLLER = HIGHRISE / "controller.py"
 # Local test addresses for the ledger's separate roles. They have no key and no wallet.
 COMPANY, RESOLVER, ARBITER = ("0x" + c * 40 for c in "abc")
 _FINGERPRINT = re.compile(r"^0x[0-9a-f]{64}$")
-TRIAL_FILES = {"manifest.json", "model.xml", "qpos.json", "result.json", "world.json", "controller.py.txt", "trace.json", "wind.json", "dirt.bin"}
+TRIAL_FILES = {"manifest.json", "model.xml", "qpos.json", "result.json", "world.json", "controller.py.txt", "trace.json", "wind.json", "dirt.bin", "look.json"}
 _ID = re.compile(r"^[a-z0-9-]{1,40}$")
 _SID = re.compile(r"^[0-9a-f]{32}$")
 YES = {"yes", "y", "yep", "ok", "okay", "looks right", "looks good", "it looks right", "correct"}
@@ -225,6 +227,9 @@ class Session:
         self.events, self.cond = [], threading.Condition()
         self.lock = threading.Lock()
         self.busy = False
+        self.routing = False  # One AI reading of a message at a time.
+        self.look = {}  # Scenery for the viewer. It feeds nothing to physics and stays out of world.json.
+        self.working_now = None
         self.phase = "brief"
         self.brief = ""
         self.plan, self.answers, self.mapped_fields, self.questions = {}, {}, set(), []
@@ -259,6 +264,7 @@ class Session:
         self.emit(type="tool", id=tool_id, title=title, meta=meta, lines=lines)
 
     def working(self, text=None):
+        self.working_now = text
         self.emit(type="working", text=text)
 
     def chapter(self, name, note=None):
@@ -286,15 +292,28 @@ class Session:
         return 202, {"ok": True}
 
     def message(self, text):
-        if self.busy:
-            return 409, {"error": "busy"}
-        self.emit(type="user", text=text)
         said = " ".join(text.lower().strip(" .!").split())
+        with self.lock:
+            if self.routing:
+                return 409, {"error": "busy"}
+            self.routing = True
+            busy = self.busy
+        if busy:
+            # A running job does not stop a look change. The physics part of the message waits.
+            self.emit(type="user", text=text)
+            threading.Thread(target=self.take_brief, args=(text, True), daemon=True).start()
+            return 202, {"ok": True}
+        self.emit(type="user", text=text)
         if self.phase == "review_scene" and said in YES:
+            self.routing = False
             return self.start(self.scene_ok)
         if self.phase == "review_campaign" and said in APPROVE:
+            self.routing = False
             return self.start(self.approve, None)
-        return self.start(self.take_brief, text)
+        reply = self.start(self.take_brief, text)
+        if reply[0] != 202:
+            self.routing = False
+        return reply
 
     def action(self, name, value):
         if name == "answer" and self.phase == "asking" and type(value) is int:
@@ -320,8 +339,62 @@ class Session:
             return self.ledger_step(name, value)
         return 409, {"error": "not_now"}
 
+    # Every message goes to the AI first. It chooses engine functions and code checks them. The simple parser stands in only when the AI call fails.
+    def route(self, text):
+        """(look patch, words for the planner, words nothing can do, whether the AI answered, whether a planner call may follow)."""
+        if not self.llm_allowed():
+            patch, _ = look_module.parse(text)
+            return patch, "", [], True, False
+        previous = self.working_now
+        self.working("reading your message")
+        reply = job(HERE / "plan_job.py", {"text": text, "look": self.look, "has_world": self.world is not None}, "route")
+        if reply is None or not reply["ok"]:
+            self.tool("read_message", "failed", [str((reply or {}).get("rejection", "process_died"))])
+            self.say("AI did not answer, so I used the simple parser.")
+            patch, leftover = look_module.parse(text)
+            return patch, leftover, [], False, True
+        routed = engine.check_reply(reply["reply"], text)
+        self.tool("read_message", f"ok, {reply['seconds']} s", [json.dumps({"tools": routed.tools, "refused": routed.refused})])
+        if previous:
+            self.working(previous)
+        return routed.look, routed.planner_words, routed.uncovered, True, True
+
+    def apply_look(self, patch):
+        before = self.look
+        self.look = look_module.merged(before, patch)
+        self.write_look()
+        self.emit(type="look", look=self.look, sent=time.time() * 1000)
+        for line in look_module.words(patch, before, self.world is not None):
+            self.say(line)
+
+    def write_look(self):
+        for folder in list(self.exports.values()):
+            (folder / "look.json").write_text(json.dumps(self.look))
+
+    def take_brief(self, text, job_running=False):
+        try:
+            patch, words, uncovered, _, planner_ok = self.route(text)
+        except Exception as e:
+            traceback.print_exc()
+            self.say(f"Job failed: {type(e).__name__}. See the run server log.", fail=True)
+            return
+        finally:
+            self.routing = False
+        if patch:
+            self.apply_look(patch)
+        if uncovered:
+            self.say(f"I cannot do that yet: {' '.join(uncovered)}.")
+        elif not patch and not words and planner_ok:
+            self.say("I cannot do that yet.")
+        if not words or not planner_ok:
+            return
+        if job_running:
+            self.say("I am still working on the last step. Send the rest again when it finishes.")
+            return
+        self.plan_words(words, patch)
+
     # Steps 1 to 4: quick questions, build, look, requirements, one normal run.
-    def take_brief(self, text):
+    def plan_words(self, text, patch):
         self.emit(type="retire")
         joined = f"{self.brief} {text}".strip()
         if len(joined) > MAX_BRIEF_CHARS:
@@ -348,6 +421,9 @@ class Session:
         self.tool("plan_world", f"ok, {reply['seconds']} s", [json.dumps({k: sorted(v) if k == "elements" else [v["min"], v["max"]] for k, v in new.items()}) if new
                                                                else "The brief sets no value, so defaults stand for now."])
         for item in reply["could_not_build"]:
+            # A word the look already used is done, so the chat does not also call it not built.
+            if set(look_module.parse(item["words"])[0]) & set(patch):
+                continue
             self.tool("could_not_build", item["reason"], [item["words"], item["why"]])
         if reply["not_accounted_for"]:
             self.tool("not_used", "words", [" ".join(reply["not_accounted_for"])])
@@ -355,7 +431,7 @@ class Session:
             if new:
                 self.build(change=(old, set(new)))
             else:
-                self.say("I found nothing to change in that, so the world stays as it was.")
+                self.say("I cannot do that yet. The world stays as it was.")
             return
         self.questions = [q for q in QUESTIONS if q["id"] not in self.answered and not set(q["fields"]) & set(self.plan)][:2]
         self.answers = {}
@@ -469,6 +545,7 @@ class Session:
             self.say("The replay export refused this run. The sim may have changed since it was recorded. Run it again.", fail=True)
             return False
         self.exports[tid] = out
+        (out / "look.json").write_text(json.dumps(self.look))
         return True
 
     def replay(self, index):
@@ -1049,11 +1126,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=5198)
     ap.add_argument("--recorded", help="folder of stored LLM replies. For offline checks only, and the status line says so.")
+    ap.add_argument("--live-route", action="store_true", help="with --recorded: the AI reads each message live, and the planner still uses stored replies. For timing checks.")
     ap.add_argument("--llm-session-cap", type=int, default=MAX_LLM_PER_SESSION)
     ap.add_argument("--llm-hour-cap", type=int, default=MAX_LLM_PER_HOUR)
     a = ap.parse_args()
     LLM_LIMIT.session_cap, LLM_LIMIT.hour_cap = a.llm_session_cap, a.llm_hour_cap
     RECORDED = str(Path(a.recorded).resolve()) if a.recorded else None
+    if a.live_route:
+        os.environ["CRASHLAB_LIVE_ROUTE"] = "1"
     RUNS.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer((HOST, a.port), Handler)
     server.daemon_threads = True

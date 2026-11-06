@@ -187,14 +187,19 @@ export function cityGeometry(tcx: number, tcy: number, radius: number): THREE.Bu
 export function cityMaterial(noise: { value: THREE.Texture | null }) {
   return new THREE.ShaderMaterial({
     toneMapped: true,
-    uniforms: { uHaze: { value: HAZE }, uNoise: noise, uClipY: { value: 1e9 } },
+    uniforms: {
+      uHaze: { value: HAZE }, uNoise: noise, uClipY: { value: 1e9 }, uFogK: { value: 1 },
+      uDay: { value: 1 }, uLights: { value: 0 }, uCityTint: { value: new THREE.Color(1, 1, 1) }, uGround: { value: new THREE.Color(1, 1, 1) }, uLift: { value: 1 }, uShore: { value: -1e9 },
+    },
     vertexShader: /* glsl */`
       attribute vec3 aColor; attribute float aKind;
+      uniform float uLift;
       varying vec3 vW; varying vec3 vN; varying vec2 vUv2; varying vec3 vCol; varying float vKind;
-      void main() { vW = position; vN = normal; vUv2 = uv; vCol = aColor * aColor; vKind = aKind / 40.0; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0); }`,
+      void main() { vec3 at = vec3(position.xy, position.z * uLift); vW = at; vN = normal; vUv2 = uv; vCol = aColor * aColor; vKind = aKind / 40.0; gl_Position = projectionMatrix * viewMatrix * vec4(at, 1.0); }`,
     fragmentShader: /* glsl */`
       varying vec3 vW; varying vec3 vN; varying vec2 vUv2; varying vec3 vCol; varying float vKind;
-      uniform float uClipY;
+      uniform float uClipY, uDay, uLights, uLift, uShore;
+      uniform vec3 uCityTint, uGround;
       ${AIR_GLSL}
       ${HASH_GLSL}
       // A periodic pulse, box-filtered over the pixel, so far windows settle to their average and do not shimmer.
@@ -203,6 +208,10 @@ export function cityMaterial(noise: { value: THREE.Texture | null }) {
       const vec3 SUN = vec3(-0.46, -0.58, 0.67);
       void main() {
         if (vW.y > uClipY) discard;
+        // The look's coast: past this wavy line the buildings do not draw and the ground plane is water.
+        bool sea = vW.y < uShore + 70.0 * sin(vW.x / 260.0) + 30.0 * sin(vW.x / 83.0);
+        if (sea && vKind < 3.5) discard;
+        vec3 glow = vec3(0.0);
         vec3 n = normalize(vN);
         vec3 alb;
         float gloss = 0.0;
@@ -222,10 +231,17 @@ export function cityMaterial(noise: { value: THREE.Texture | null }) {
           gloss = win * (0.22 + 0.2 * curtain);
           // A few rooms have the lights on.
           alb += vec3(1.0, 0.82, 0.62) * 0.1 * step(0.985, cell) * win * detail;
+          // At dusk and night many more do. A far building settles to the same average.
+          float lit = mix(0.28, step(0.72, hash12(floor(g) + 29.0)), detail);
+          glow += vec3(1.0, 0.76, 0.5) * uLights * 0.34 * lit * win;
+          alb *= uCityTint;
         } else if (vKind > 3.5) {
-          alb = vCol;
+          alb = sea ? vec3(0.018, 0.07, 0.1) : vCol * uGround;
+          if (sea) gloss = 0.5;
+          glow += sea ? vec3(0.0) : vec3(1.0, 0.7, 0.42) * uLights * 0.012;
         } else if (vKind > 2.5) {
-          alb = vCol * (0.75 + 0.5 * texture2D(uNoise, vW.xy / 60.0).r);
+          alb = vCol * (0.75 + 0.5 * texture2D(uNoise, vW.xy / 60.0).r) * uGround;
+          glow += vec3(1.0, 0.7, 0.42) * uLights * 0.03;
         } else if (vKind > 1.5) {
           alb = vCol;
           gloss = 0.1;
@@ -251,6 +267,7 @@ export function cityMaterial(noise: { value: THREE.Texture | null }) {
         vec3 col = alb * (sky + sun) * 1.42 * (n.z > 0.8 ? mix(0.7, 1.0, smoothstep(0.0, 8.0, vW.z)) : canyon);
         vec3 v = normalize(cameraPosition - vW);
         col += gloss * uHaze * (0.5 + 0.9 * pow(1.0 - max(dot(n, v), 0.0), 4.0));
+        col = col * uDay + glow;
         gl_FragColor = vec4(mix(col, uHaze, clamp(airAmount(vW, cameraPosition), 0.0, 1.0)), 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

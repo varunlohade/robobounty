@@ -1,0 +1,182 @@
+{
+ "Window robot for towers in Dubai. High floor.": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "in Dubai",
+    "args": {
+     "city": "dubai"
+    }
+   },
+   {
+    "tool": "set_physics",
+    "words": "Window robot for towers. High floor."
+   }
+  ]
+ },
+ "Make the wind stronger and wet the glass.": {
+  "calls": [
+   {
+    "tool": "set_physics",
+    "words": "Make the wind stronger and wet the glass."
+   }
+  ]
+ },
+ "make the building black": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "make the building black",
+    "args": {
+     "building": "#0a0a0a"
+    }
+   }
+  ]
+ },
+ "make the building white": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "make the building white",
+    "args": {
+     "building": "#f7f7f5"
+    }
+   }
+  ]
+ },
+ "make the building grey": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "make the building grey",
+    "args": {
+     "building": "#808285"
+    }
+   }
+  ]
+ },
+ "make the building bronze": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "make the building bronze",
+    "args": {
+     "building": "#cd7f32"
+    }
+   }
+  ]
+ },
+ "make the building teal": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "make the building teal",
+    "args": {
+     "building": "#008080"
+    }
+   }
+  ]
+ },
+ "blue glass": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "blue glass",
+    "args": {
+     "glass_tint": "#1f5fbf"
+    }
+   }
+  ]
+ },
+ "green glass": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "green glass",
+    "args": {
+     "glass_tint": "#2e8b57"
+    }
+   }
+  ]
+ },
+ "gold glass": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "gold glass",
+    "args": {
+     "glass_tint": "#d4a017"
+    }
+   }
+  ]
+ },
+ "clear glass": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "clear glass",
+    "args": {
+     "glass_tint": "clear"
+    }
+   }
+  ]
+ },
+ "dusk": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "dusk",
+    "args": {
+     "time": "dusk"
+    }
+   }
+  ]
+ },
+ "night": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "night",
+    "args": {
+     "time": "night"
+    }
+   }
+  ]
+ },
+ "noon": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "noon",
+    "args": {
+     "time": "noon"
+    }
+   }
+  ]
+ },
+ "fog 2": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "fog 2",
+    "args": {
+     "fog": 2
+    }
+   }
+  ]
+ },
+ "no fog": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "no fog",
+    "args": {
+     "fog": 0
+    }
+   }
+  ]
+ },
+ "make the robot dance": {
+  "calls": []
+ }
+}

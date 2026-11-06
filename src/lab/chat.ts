@@ -4,7 +4,8 @@ import type { LiveBackend } from '../app/chat/live.ts';
 
 // Server tool titles the chat shows, in plain words. Any other title stays hidden.
 const STEP_WORDS: Record<string, string> = {
-  plan_world: 'Read your message',
+  read_message: 'Read your message',
+  plan_world: 'Planned the change',
   build_world: 'Built the world',
   change_world: 'Changed the world',
   run_trial: 'Ran one test',
@@ -82,7 +83,8 @@ export class LabChat {
 
   private submit() {
     const text = this.input.value;
-    if (!text.trim() || this.busy) return;
+    // A message may go while a job runs: a look change lands at once, and the server says if the rest must wait.
+    if (!text.trim()) return;
     this.input.value = '';
     if (this.hasWorld && CONFIRM.has(text.toLowerCase().replace(/[ .!]+$/, '').trim())) {
       this.append(el('div', 'chat-me', text));

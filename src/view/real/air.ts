@@ -8,12 +8,13 @@ export const SKY_URL = '/assets/sky/overcast_soil_top.jpg';
 export const AIR_GLSL = /* glsl */`
 uniform vec3 uHaze;
 uniform sampler2D uNoise;
+uniform float uFogK;
 // Aerial perspective. The air gets thicker near the ground, with slow patches of mist over the streets.
 float airAmount(vec3 w, vec3 cam) {
   float d = length(w - cam);
   float mist = texture2D(uNoise, w.xy / 1400.0 + vec2(0.13, 0.41)).r;
   float dens = 0.9 + (0.5 + 3.0 * smoothstep(0.34, 0.74, mist)) * exp(-max(w.z, 0.0) / 62.0);
-  return 1.0 - exp(-d * dens / 2300.0);
+  return 1.0 - exp(-d * dens * uFogK / 2300.0);
 }
 `;
 
@@ -87,11 +88,11 @@ export function bakeGrime(renderer: THREE.WebGLRenderer, size: number): THREE.We
 export function skyDome(texture: { value: THREE.Texture | null }): THREE.Mesh {
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthTest: false, depthWrite: false, toneMapped: true,
-    uniforms: { uSky: texture, uHaze: { value: HAZE }, uHas: { value: 0 } },
+    uniforms: { uSky: texture, uHaze: { value: HAZE }, uHas: { value: 0 }, uSkyMix: { value: 0 }, uSkyLow: { value: new THREE.Color(1, 1, 1) }, uSkyHigh: { value: new THREE.Color(1, 1, 1) }, uSkyFog: { value: 0 } },
     vertexShader: `varying vec3 vDir; void main() { vDir = position; vec4 p = projectionMatrix * vec4(mat3(viewMatrix) * position, 1.0); gl_Position = p; }`,
     fragmentShader: /* glsl */`
       varying vec3 vDir;
-      uniform sampler2D uSky; uniform vec3 uHaze; uniform float uHas;
+      uniform sampler2D uSky; uniform vec3 uHaze, uSkyLow, uSkyHigh; uniform float uHas, uSkyMix, uSkyFog;
       const float PI = 3.14159265;
       void main() {
         vec3 d = normalize(vDir);
@@ -99,6 +100,10 @@ export function skyDome(texture: { value: THREE.Texture | null }): THREE.Mesh {
         float az = atan(d.y, d.x) + 0.7;
         vec2 uv = vec2(fract(az / (2.0 * PI)), clamp(el / (PI / 2.0), 0.0, 1.0));
         vec3 sky = uHas > 0.5 ? pow(texture2D(uSky, uv).rgb, vec3(2.2)) * ${SKY_LMAX.toFixed(4)} * 0.62 : uHaze * (1.2 + 0.8 * d.z);
+        // Dusk and night: the same clouds, relit by a gradient from the horizon up.
+        float cloud = clamp(dot(sky, vec3(0.33)) / 1.2, 0.0, 1.0);
+        sky = mix(sky, mix(uSkyLow, uSkyHigh, pow(clamp(d.z, 0.0, 1.0), 0.45)) * (0.55 + 0.75 * cloud), uSkyMix);
+        sky = mix(sky, uHaze, uSkyFog);
         float lift = smoothstep(-0.015, 0.11, d.z);
         gl_FragColor = vec4(mix(uHaze, sky, lift), 1.0);
         #include <tonemapping_fragment>

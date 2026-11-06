@@ -137,6 +137,8 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
     replay = new Replay(mj, trial);
     replay.seek(0);
     view = new SimView(viewport, replay, trial);
+    view.setLook(look);
+    currentView = () => view;
     view.sync();
     const t2 = performance.now();
     viewport.dataset.ready = 'true';
@@ -160,7 +162,9 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
     const statusRight = el('div');
     const world = worldPage(trial, statusRight);
     swap(world.page, () => world.stop());
+    currentView = () => world.view;
     await world.start();
+    world.view?.setLook(look);
     world.viewport.dataset.tid = tid;
     bar.play.disabled = false;
     bar.play.onclick = () => world.toggle();
@@ -189,10 +193,13 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
   }
 
   void loadMujoco();
+  let look: unknown = {};
+  let currentView: () => SimView | null = () => null;
   const onEvent = async (e: ServerEvent) => {
     switch (e.type) {
       case 'chapter': bar.set(e.index, e.note); break;
       case 'world': await showWorld(e); break;
+      case 'look': look = e.look; currentView()?.setLook(look); break;
       case 'trial': await showTrial(e.tid, e.open); break;
       case 'sim': simLine.textContent = `sim ${e.sha ? String(e.sha).slice(0, 8) : 'unknown'}${e.sha && e.sha !== e.now ? `, now ${String(e.now).slice(0, 8)}: results are from older code` : ''}`; break;
       case 'plan':
