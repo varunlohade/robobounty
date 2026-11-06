@@ -1,340 +1,10 @@
 {
- "count_reason": "A hand-written list for the plumbing check, one group per failure idea.",
+ "count_reason": "Fifteen separate failure ideas matter for a blind walking robot on this plant route: grip, trips, snags, body strikes, climbs, tight passages, blockage, load and turning. Three or four severity levels each gives 49 worlds. Gravity was left out because it does not vary in a plant.",
  "scenarios": [
   {
-   "name": "pipe radius 0.03 at x 2.5",
-   "group": "Low pipes",
-   "reason": "A low pipe across the walkway may catch a blind foot.",
-   "calls": [
-    {
-     "fn": "add_pipe",
-     "args": {
-      "name": "process_pipe_0",
-      "x": 2.5,
-      "y": 0.0,
-      "length": 3.2,
-      "radius": 0.03,
-      "clearance": 0.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "pipe radius 0.05 at x 2.5",
-   "group": "Low pipes",
-   "reason": "A low pipe across the walkway may catch a blind foot.",
-   "calls": [
-    {
-     "fn": "add_pipe",
-     "args": {
-      "name": "process_pipe_1",
-      "x": 2.5,
-      "y": 0.0,
-      "length": 3.2,
-      "radius": 0.05,
-      "clearance": 0.02
-     }
-    }
-   ]
-  },
-  {
-   "name": "pipe radius 0.07 at x 2.5",
-   "group": "Low pipes",
-   "reason": "A low pipe across the walkway may catch a blind foot.",
-   "calls": [
-    {
-     "fn": "add_pipe",
-     "args": {
-      "name": "process_pipe_2",
-      "x": 2.5,
-      "y": 0.0,
-      "length": 3.2,
-      "radius": 0.07,
-      "clearance": 0.04
-     }
-    }
-   ]
-  },
-  {
-   "name": "pipe radius 0.1 at x 3",
-   "group": "Low pipes",
-   "reason": "A low pipe across the walkway may catch a blind foot.",
-   "calls": [
-    {
-     "fn": "add_pipe",
-     "args": {
-      "name": "process_pipe_3",
-      "x": 3.0,
-      "y": 0.0,
-      "length": 3.2,
-      "radius": 0.1,
-      "clearance": 0.05
-     }
-    }
-   ]
-  },
-  {
-   "name": "pipe radius 0.14 at x 3.5",
-   "group": "Low pipes",
-   "reason": "A low pipe across the walkway may catch a blind foot.",
-   "calls": [
-    {
-     "fn": "add_pipe",
-     "args": {
-      "name": "process_pipe_4",
-      "x": 3.5,
-      "y": 0.0,
-      "length": 3.2,
-      "radius": 0.14,
-      "clearance": 0.08
-     }
-    }
-   ]
-  },
-  {
-   "name": "pipe radius 0.2 at x 2.5",
-   "group": "Low pipes",
-   "reason": "A low pipe across the walkway may catch a blind foot.",
-   "calls": [
-    {
-     "fn": "add_pipe",
-     "args": {
-      "name": "process_pipe_5",
-      "x": 2.5,
-      "y": 0.0,
-      "length": 3.2,
-      "radius": 0.2,
-      "clearance": 0.1
-     }
-    }
-   ]
-  },
-  {
-   "name": "dropped tray 0.04 m yaw 0",
-   "group": "Dropped cable trays",
-   "reason": "A tray left across the path is a low uneven step for a blind walker.",
-   "calls": [
-    {
-     "fn": "add_cable_tray",
-     "args": {
-      "name": "dropped_tray_0",
-      "x": 2.5,
-      "y": 0.0,
-      "length": 2.8,
-      "width": 0.35,
-      "height": 0.04,
-      "yaw_deg": 0.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "dropped tray 0.08 m yaw 12",
-   "group": "Dropped cable trays",
-   "reason": "A tray left across the path is a low uneven step for a blind walker.",
-   "calls": [
-    {
-     "fn": "add_cable_tray",
-     "args": {
-      "name": "dropped_tray_1",
-      "x": 2.5,
-      "y": 0.0,
-      "length": 2.8,
-      "width": 0.35,
-      "height": 0.08,
-      "yaw_deg": 12.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "dropped tray 0.12 m yaw 30",
-   "group": "Dropped cable trays",
-   "reason": "A tray left across the path is a low uneven step for a blind walker.",
-   "calls": [
-    {
-     "fn": "add_cable_tray",
-     "args": {
-      "name": "dropped_tray_2",
-      "x": 3.0,
-      "y": 0.0,
-      "length": 2.8,
-      "width": 0.35,
-      "height": 0.12,
-      "yaw_deg": 30.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "dropped tray 0.16 m yaw -20",
-   "group": "Dropped cable trays",
-   "reason": "A tray left across the path is a low uneven step for a blind walker.",
-   "calls": [
-    {
-     "fn": "add_cable_tray",
-     "args": {
-      "name": "dropped_tray_3",
-      "x": 2.2,
-      "y": 0.0,
-      "length": 2.8,
-      "width": 0.35,
-      "height": 0.16,
-      "yaw_deg": -20.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "dropped tray 0.2 m yaw 45",
-   "group": "Dropped cable trays",
-   "reason": "A tray left across the path is a low uneven step for a blind walker.",
-   "calls": [
-    {
-     "fn": "add_cable_tray",
-     "args": {
-      "name": "dropped_tray_4",
-      "x": 3.2,
-      "y": 0.0,
-      "length": 2.8,
-      "width": 0.35,
-      "height": 0.2,
-      "yaw_deg": 45.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "dropped tray 0.1 m yaw 80",
-   "group": "Dropped cable trays",
-   "reason": "A tray left across the path is a low uneven step for a blind walker.",
-   "calls": [
-    {
-     "fn": "add_cable_tray",
-     "args": {
-      "name": "dropped_tray_5",
-      "x": 5.0,
-      "y": 2.0,
-      "length": 2.8,
-      "width": 0.35,
-      "height": 0.1,
-      "yaw_deg": 80.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "leak friction 0.4",
-   "group": "Leaks",
-   "reason": "A slippery leak on the path can take the feet out from under the robot.",
-   "calls": [
-    {
-     "fn": "add_wet_patch",
-     "args": {
-      "name": "oil_leak_0",
-      "x": 3.0,
-      "y": 0.0,
-      "sx": 1.5,
-      "sy": 2.6,
-      "friction": 0.4
-     }
-    }
-   ]
-  },
-  {
-   "name": "leak friction 0.2",
-   "group": "Leaks",
-   "reason": "A slippery leak on the path can take the feet out from under the robot.",
-   "calls": [
-    {
-     "fn": "add_wet_patch",
-     "args": {
-      "name": "oil_leak_1",
-      "x": 3.0,
-      "y": 0.0,
-      "sx": 2.0,
-      "sy": 2.6,
-      "friction": 0.2
-     }
-    }
-   ]
-  },
-  {
-   "name": "leak friction 0.1",
-   "group": "Leaks",
-   "reason": "A slippery leak on the path can take the feet out from under the robot.",
-   "calls": [
-    {
-     "fn": "add_wet_patch",
-     "args": {
-      "name": "oil_leak_2",
-      "x": 3.0,
-      "y": 0.0,
-      "sx": 2.4,
-      "sy": 2.6,
-      "friction": 0.1
-     }
-    }
-   ]
-  },
-  {
-   "name": "leak friction 0.05",
-   "group": "Leaks",
-   "reason": "A slippery leak on the path can take the feet out from under the robot.",
-   "calls": [
-    {
-     "fn": "add_wet_patch",
-     "args": {
-      "name": "oil_leak_3",
-      "x": 3.0,
-      "y": 0.0,
-      "sx": 2.6,
-      "sy": 2.6,
-      "friction": 0.05
-     }
-    }
-   ]
-  },
-  {
-   "name": "leak friction 0.03",
-   "group": "Leaks",
-   "reason": "A slippery leak on the path can take the feet out from under the robot.",
-   "calls": [
-    {
-     "fn": "add_wet_patch",
-     "args": {
-      "name": "oil_leak_4",
-      "x": 3.0,
-      "y": 0.0,
-      "sx": 3.0,
-      "sy": 2.6,
-      "friction": 0.03
-     }
-    }
-   ]
-  },
-  {
-   "name": "leak friction 0.02",
-   "group": "Leaks",
-   "reason": "A slippery leak on the path can take the feet out from under the robot.",
-   "calls": [
-    {
-     "fn": "add_wet_patch",
-     "args": {
-      "name": "oil_leak_5",
-      "x": 3.0,
-      "y": 0.0,
-      "sx": 4.0,
-      "sy": 2.6,
-      "friction": 0.02
-     }
-    }
-   ]
-  },
-  {
-   "name": "floor friction 0.5",
-   "group": "Slick floor",
-   "reason": "A slick floor over the whole route lowers grip at every step.",
+   "name": "floor_damp_film",
+   "group": "low floor grip",
+   "reason": "A slightly slick floor reduces the grip margin the policy relies on when it pushes off and turns.",
    "calls": [
     {
      "fn": "set_floor",
@@ -345,9 +15,9 @@
    ]
   },
   {
-   "name": "floor friction 0.35",
-   "group": "Slick floor",
-   "reason": "A slick floor over the whole route lowers grip at every step.",
+   "name": "floor_oily_film",
+   "group": "low floor grip",
+   "reason": "A thin oil film across the floor could make the feet slide during the two corners.",
    "calls": [
     {
      "fn": "set_floor",
@@ -358,9 +28,9 @@
    ]
   },
   {
-   "name": "floor friction 0.2",
-   "group": "Slick floor",
-   "reason": "A slick floor over the whole route lowers grip at every step.",
+   "name": "floor_greasy",
+   "group": "low floor grip",
+   "reason": "A greasy floor may give too little grip for stance feet to hold while the body moves forward.",
    "calls": [
     {
      "fn": "set_floor",
@@ -371,9 +41,9 @@
    ]
   },
   {
-   "name": "floor friction 0.1",
-   "group": "Slick floor",
-   "reason": "A slick floor over the whole route lowers grip at every step.",
+   "name": "floor_very_slick",
+   "group": "low floor grip",
+   "reason": "A nearly frictionless floor could let the feet slip out from under the body and cause a fall.",
    "calls": [
     {
      "fn": "set_floor",
@@ -384,466 +54,897 @@
    ]
   },
   {
-   "name": "floor friction 0.05",
-   "group": "Slick floor",
-   "reason": "A slick floor over the whole route lowers grip at every step.",
+   "name": "leak_across_straight",
+   "group": "local leak slip",
+   "reason": "A sudden change to a slick puddle on the straight can surprise a policy that cannot see it.",
    "calls": [
     {
-     "fn": "set_floor",
+     "fn": "add_wet_patch",
      "args": {
+      "name": "coolant_leak_puddle",
+      "x": 3,
+      "y": 0,
+      "sx": 2.5,
+      "sy": 3,
+      "friction": 0.25
+     }
+    }
+   ]
+  },
+  {
+   "name": "leak_at_first_corner",
+   "group": "local leak slip",
+   "reason": "Turning on a slick puddle needs sideways grip that the feet may not have at the first corner.",
+   "calls": [
+    {
+     "fn": "add_wet_patch",
+     "args": {
+      "name": "hydraulic_oil_leak_at_corner",
+      "x": 4.8,
+      "y": -0.2,
+      "sx": 2,
+      "sy": 1.6,
+      "friction": 0.1
+     }
+    }
+   ]
+  },
+  {
+   "name": "leak_under_left_legs",
+   "group": "local leak slip",
+   "reason": "Slick ground under only the left legs creates uneven grip that may yaw the body or tip it.",
+   "calls": [
+    {
+     "fn": "add_wet_patch",
+     "args": {
+      "name": "oil_leak_along_left_side",
+      "x": 3,
+      "y": 0.5,
+      "sx": 2.5,
+      "sy": 1,
       "friction": 0.05
      }
     }
    ]
   },
   {
-   "name": "crossover rise 0.03 x2",
-   "group": "Steel crossovers",
-   "reason": "A crossover needs the legs to lift more than flat walking does.",
+   "name": "leak_before_cable_ramp",
+   "group": "local leak slip",
+   "reason": "A slick puddle right before the cable ramp may cost the feet their grip just as the climb begins.",
    "calls": [
     {
-     "fn": "add_steps",
+     "fn": "add_wet_patch",
      "args": {
-      "name": "pipe_crossover_0",
-      "x": 1.5,
-      "y": 0.0,
-      "width": 3.2,
-      "depth": 0.35,
-      "rise": 0.03,
-      "count": 2
+      "name": "oil_leak_at_ramp_foot",
+      "x": 6.3,
+      "y": 4,
+      "sx": 1.2,
+      "sy": 3,
+      "friction": 0.08
      }
     }
    ]
   },
   {
-   "name": "crossover rise 0.06 x2",
-   "group": "Steel crossovers",
-   "reason": "A crossover needs the legs to lift more than flat walking does.",
+   "name": "small_drain_pipe_on_floor",
+   "group": "floor pipe trip",
+   "reason": "A small pipe on the floor can catch a swinging foot that has no warning of it.",
    "calls": [
     {
-     "fn": "add_steps",
+     "fn": "add_pipe",
      "args": {
-      "name": "pipe_crossover_1",
-      "x": 1.5,
-      "y": 0.0,
-      "width": 3.2,
-      "depth": 0.35,
-      "rise": 0.06,
-      "count": 2
+      "name": "small_drain_pipe_on_floor",
+      "x": 2.5,
+      "y": 0,
+      "length": 3.4,
+      "radius": 0.04,
+      "clearance": 0
      }
     }
    ]
   },
   {
-   "name": "crossover rise 0.1 x3",
-   "group": "Steel crossovers",
-   "reason": "A crossover needs the legs to lift more than flat walking does.",
+   "name": "water_pipe_on_floor",
+   "group": "floor pipe trip",
+   "reason": "A pipe about as high as the normal foot lift may stop the swing leg and trip the robot.",
+   "calls": [
+    {
+     "fn": "add_pipe",
+     "args": {
+      "name": "water_pipe_on_floor",
+      "x": 3.5,
+      "y": 0,
+      "length": 3.4,
+      "radius": 0.08,
+      "clearance": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "process_pipe_on_floor_second_leg",
+   "group": "floor pipe trip",
+   "reason": "A taller pipe placed soon after the first turn must be crossed while the gait is still settling.",
+   "calls": [
+    {
+     "fn": "add_pipe",
+     "args": {
+      "name": "process_pipe_on_floor",
+      "x": 5,
+      "y": 3.3,
+      "yaw_deg": 90,
+      "length": 3.4,
+      "radius": 0.13,
+      "clearance": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "large_header_pipe_on_floor",
+   "group": "floor pipe trip",
+   "reason": "A large pipe 40 cm tall could be higher than a blind step can clear and may block the robot.",
+   "calls": [
+    {
+     "fn": "add_pipe",
+     "args": {
+      "name": "large_header_pipe_on_floor",
+      "x": 3,
+      "y": 0,
+      "yaw_deg": 10,
+      "length": 3.4,
+      "radius": 0.2,
+      "clearance": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "pipe_just_above_robot",
+   "group": "low pipe body strike",
+   "reason": "A pipe just above the robot may clear the body or strike its top during normal body bounce.",
+   "calls": [
+    {
+     "fn": "add_pipe",
+     "args": {
+      "name": "low_steam_pipe_on_saddles",
+      "x": 3,
+      "y": 0,
+      "length": 3.4,
+      "radius": 0.05,
+      "clearance": 0.7
+     }
+    }
+   ]
+  },
+  {
+   "name": "pipe_at_top_of_body",
+   "group": "low pipe body strike",
+   "reason": "A pipe at the height of the upper body can hit the robot, which has no way to know to crouch.",
+   "calls": [
+    {
+     "fn": "add_pipe",
+     "args": {
+      "name": "low_air_pipe_on_saddles",
+      "x": 3.5,
+      "y": 0,
+      "length": 3.4,
+      "radius": 0.05,
+      "clearance": 0.55
+     }
+    }
+   ]
+  },
+  {
+   "name": "pipe_at_body_centre",
+   "group": "low pipe body strike",
+   "reason": "A pipe at body height may stop the robot outright or push it backward until it falls.",
+   "calls": [
+    {
+     "fn": "add_pipe",
+     "args": {
+      "name": "low_water_pipe_on_saddles",
+      "x": 2.5,
+      "y": 0,
+      "length": 3.4,
+      "radius": 0.05,
+      "clearance": 0.42
+     }
+    }
+   ]
+  },
+  {
+   "name": "pipe_at_shin_height",
+   "group": "raised pipe leg snag",
+   "reason": "A raised pipe at shin height can hook a swinging leg instead of being stepped over.",
+   "calls": [
+    {
+     "fn": "add_pipe",
+     "args": {
+      "name": "shin_height_pipe_on_saddles",
+      "x": 3,
+      "y": 0,
+      "length": 3.4,
+      "radius": 0.04,
+      "clearance": 0.12
+     }
+    }
+   ]
+  },
+  {
+   "name": "pipe_at_knee_height",
+   "group": "raised pipe leg snag",
+   "reason": "A pipe at knee height could trap a leg between the pipe and the body as the robot moves on.",
+   "calls": [
+    {
+     "fn": "add_pipe",
+     "args": {
+      "name": "knee_height_pipe_on_saddles",
+      "x": 3.5,
+      "y": 0,
+      "length": 3.4,
+      "radius": 0.05,
+      "clearance": 0.22
+     }
+    }
+   ]
+  },
+  {
+   "name": "pipe_under_belly",
+   "group": "raised pipe leg snag",
+   "reason": "A pipe just under the belly may pass the body yet catch the thighs or scrape the underside.",
+   "calls": [
+    {
+     "fn": "add_pipe",
+     "args": {
+      "name": "belly_height_pipe_on_saddles",
+      "x": 2.5,
+      "y": 0,
+      "length": 3.4,
+      "radius": 0.04,
+      "clearance": 0.32
+     }
+    }
+   ]
+  },
+  {
+   "name": "narrow_low_dropped_tray",
+   "group": "dropped cable tray",
+   "reason": "A low tray with loose cables gives an uneven foothold that can turn a foot on landing.",
+   "calls": [
+    {
+     "fn": "add_cable_tray",
+     "args": {
+      "name": "dropped_ladder_cable_tray_small",
+      "x": 3,
+      "y": 0,
+      "length": 3.4,
+      "width": 0.3,
+      "height": 0.05
+     }
+    }
+   ]
+  },
+  {
+   "name": "medium_dropped_tray",
+   "group": "dropped cable tray",
+   "reason": "A tray 10 cm high and half a metre wide may trip a foot or leave it landing on the rungs.",
+   "calls": [
+    {
+     "fn": "add_cable_tray",
+     "args": {
+      "name": "dropped_ladder_cable_tray_medium",
+      "x": 3.5,
+      "y": 0,
+      "length": 3.4,
+      "width": 0.5,
+      "height": 0.1
+     }
+    }
+   ]
+  },
+  {
+   "name": "wide_tall_tray_at_angle",
+   "group": "dropped cable tray",
+   "reason": "A wide, tall tray lying at an angle meets each leg at a different time and may upset the gait.",
+   "calls": [
+    {
+     "fn": "add_cable_tray",
+     "args": {
+      "name": "dropped_ladder_cable_tray_large",
+      "x": 3,
+      "y": 0,
+      "yaw_deg": 30,
+      "length": 3.8,
+      "width": 0.8,
+      "height": 0.2
+     }
+    }
+   ]
+  },
+  {
+   "name": "crossover_shallow_steps",
+   "group": "crossover stair climb",
+   "reason": "Even shallow steps may catch the toes of a blind policy that expects mostly level ground.",
    "calls": [
     {
      "fn": "add_steps",
      "args": {
-      "name": "pipe_crossover_2",
+      "name": "steel_crossover_shallow",
       "x": 1.5,
-      "y": 0.0,
-      "width": 3.2,
-      "depth": 0.35,
+      "y": 0,
+      "width": 2,
+      "depth": 0.3,
+      "rise": 0.08,
+      "count": 3,
+      "landing": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "crossover_typical_steps",
+   "group": "crossover stair climb",
+   "reason": "Typical plant stair rises could stop the feet or cause a stumble on the way up or down.",
+   "calls": [
+    {
+     "fn": "add_steps",
+     "args": {
+      "name": "steel_crossover_typical",
+      "x": 1.5,
+      "y": 0,
+      "width": 2,
+      "depth": 0.3,
+      "rise": 0.13,
+      "count": 3,
+      "landing": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "crossover_steep_steps",
+   "group": "crossover stair climb",
+   "reason": "Tall, steep steps may exceed what the swing foot reaches and could pitch the robot on the descent.",
+   "calls": [
+    {
+     "fn": "add_steps",
+     "args": {
+      "name": "steel_crossover_steep",
+      "x": 1.5,
+      "y": 0,
+      "width": 2,
+      "depth": 0.3,
+      "rise": 0.18,
+      "count": 3,
+      "landing": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "crossover_very_tall_steps",
+   "group": "crossover stair climb",
+   "reason": "Steps of 25 cm are likely too tall for a blind climb and may cause a block or a tumble.",
+   "calls": [
+    {
+     "fn": "add_steps",
+     "args": {
+      "name": "steel_crossover_very_tall",
+      "x": 1.5,
+      "y": 0,
+      "width": 2,
+      "depth": 0.3,
+      "rise": 0.25,
+      "count": 3,
+      "landing": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "crossover_barely_wider_than_robot",
+   "group": "narrow crossover handrails",
+   "reason": "Handrails barely wider than the robot can catch the hips or feet, since it cannot centre itself by sight.",
+   "calls": [
+    {
+     "fn": "add_steps",
+     "args": {
+      "name": "narrow_steel_crossover_tight",
+      "x": 1.6,
+      "y": 0,
+      "width": 0.6,
+      "depth": 0.3,
       "rise": 0.1,
-      "count": 3
+      "count": 2,
+      "landing": 1.2
      }
     }
    ]
   },
   {
-   "name": "crossover rise 0.15 x3",
-   "group": "Steel crossovers",
-   "reason": "A crossover needs the legs to lift more than flat walking does.",
+   "name": "crossover_tight_passage",
+   "group": "narrow crossover handrails",
+   "reason": "A tight passage leaves little room for sideways drift before a leg hits a handrail post.",
    "calls": [
     {
      "fn": "add_steps",
      "args": {
-      "name": "pipe_crossover_3",
-      "x": 1.5,
-      "y": 0.0,
-      "width": 3.2,
-      "depth": 0.35,
-      "rise": 0.15,
-      "count": 3
+      "name": "narrow_steel_crossover_medium",
+      "x": 1.6,
+      "y": 0,
+      "width": 0.75,
+      "depth": 0.3,
+      "rise": 0.1,
+      "count": 2,
+      "landing": 1.2
      }
     }
    ]
   },
   {
-   "name": "crossover rise 0.2 x3",
-   "group": "Steel crossovers",
-   "reason": "A crossover needs the legs to lift more than flat walking does.",
+   "name": "crossover_modest_passage",
+   "group": "narrow crossover handrails",
+   "reason": "A modest width may still let foot placement drift into the rails during the step transitions.",
    "calls": [
     {
      "fn": "add_steps",
      "args": {
-      "name": "pipe_crossover_4",
-      "x": 1.5,
-      "y": 0.0,
-      "width": 3.2,
-      "depth": 0.35,
-      "rise": 0.2,
-      "count": 3
+      "name": "narrow_steel_crossover_modest",
+      "x": 1.6,
+      "y": 0,
+      "width": 0.95,
+      "depth": 0.3,
+      "rise": 0.1,
+      "count": 2,
+      "landing": 1.2
      }
     }
    ]
   },
   {
-   "name": "crossover rise 0.28 x4",
-   "group": "Steel crossovers",
-   "reason": "A crossover needs the legs to lift more than flat walking does.",
-   "calls": [
-    {
-     "fn": "add_steps",
-     "args": {
-      "name": "pipe_crossover_5",
-      "x": 1.5,
-      "y": 0.0,
-      "width": 3.2,
-      "depth": 0.35,
-      "rise": 0.28,
-      "count": 4
-     }
-    }
-   ]
-  },
-  {
-   "name": "sensor box 5 kg",
-   "group": "Payload",
-   "reason": "The policy never trained with a load on its back.",
-   "calls": [
-    {
-     "fn": "set_payload",
-     "args": {
-      "mass_kg": 5.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "sensor box 10 kg",
-   "group": "Payload",
-   "reason": "The policy never trained with a load on its back.",
-   "calls": [
-    {
-     "fn": "set_payload",
-     "args": {
-      "mass_kg": 10.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "sensor box 15 kg",
-   "group": "Payload",
-   "reason": "The policy never trained with a load on its back.",
-   "calls": [
-    {
-     "fn": "set_payload",
-     "args": {
-      "mass_kg": 15.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "sensor box 20 kg",
-   "group": "Payload",
-   "reason": "The policy never trained with a load on its back.",
-   "calls": [
-    {
-     "fn": "set_payload",
-     "args": {
-      "mass_kg": 20.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "sensor box 28 kg",
-   "group": "Payload",
-   "reason": "The policy never trained with a load on its back.",
-   "calls": [
-    {
-     "fn": "set_payload",
-     "args": {
-      "mass_kg": 28.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "sensor box 35 kg",
-   "group": "Payload",
-   "reason": "The policy never trained with a load on its back.",
-   "calls": [
-    {
-     "fn": "set_payload",
-     "args": {
-      "mass_kg": 35.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "sensor box 40 kg",
-   "group": "Payload",
-   "reason": "The policy never trained with a load on its back.",
-   "calls": [
-    {
-     "fn": "set_payload",
-     "args": {
-      "mass_kg": 40.0
-     }
-    }
-   ]
-  },
-  {
-   "name": "ramp 0.05 over 1",
-   "group": "Ramps",
-   "reason": "A temporary cable ramp tilts the base and may upset the gait.",
+   "name": "cable_ramp_about_11_degrees",
+   "group": "steep ramp climb",
+   "reason": "A moderate slope shifts weight toward the rear legs and tests the balance of a level-ground gait.",
    "calls": [
     {
      "fn": "add_ramp",
      "args": {
-      "name": "temp_ramp_0",
-      "x": 2.0,
-      "y": 0.0,
-      "length": 1.0,
-      "width": 3.2,
-      "height": 0.05,
-      "landing": 0.5
-     }
-    }
-   ]
-  },
-  {
-   "name": "ramp 0.1 over 1",
-   "group": "Ramps",
-   "reason": "A temporary cable ramp tilts the base and may upset the gait.",
-   "calls": [
-    {
-     "fn": "add_ramp",
-     "args": {
-      "name": "temp_ramp_1",
-      "x": 2.0,
-      "y": 0.0,
-      "length": 1.0,
-      "width": 3.2,
-      "height": 0.1,
-      "landing": 0.5
-     }
-    }
-   ]
-  },
-  {
-   "name": "ramp 0.2 over 1.2",
-   "group": "Ramps",
-   "reason": "A temporary cable ramp tilts the base and may upset the gait.",
-   "calls": [
-    {
-     "fn": "add_ramp",
-     "args": {
-      "name": "temp_ramp_2",
-      "x": 2.0,
-      "y": 0.0,
-      "length": 1.2,
-      "width": 3.2,
-      "height": 0.2,
-      "landing": 0.5
-     }
-    }
-   ]
-  },
-  {
-   "name": "ramp 0.3 over 1",
-   "group": "Ramps",
-   "reason": "A temporary cable ramp tilts the base and may upset the gait.",
-   "calls": [
-    {
-     "fn": "add_ramp",
-     "args": {
-      "name": "temp_ramp_3",
-      "x": 2.0,
-      "y": 0.0,
-      "length": 1.0,
-      "width": 3.2,
+      "name": "cable_cover_ramp_moderate",
+      "x": 1.1,
+      "y": 0,
+      "length": 1.5,
+      "width": 2.5,
       "height": 0.3,
-      "landing": 0.5
+      "landing": 0.8
      }
     }
    ]
   },
   {
-   "name": "ramp 0.45 over 1.2",
-   "group": "Ramps",
-   "reason": "A temporary cable ramp tilts the base and may upset the gait.",
+   "name": "cable_ramp_about_20_degrees",
+   "group": "steep ramp climb",
+   "reason": "A slope near 20 degrees with sharp crests may scrape the belly or pitch the body at each edge.",
    "calls": [
     {
      "fn": "add_ramp",
      "args": {
-      "name": "temp_ramp_4",
-      "x": 2.0,
-      "y": 0.0,
+      "name": "cable_cover_ramp_steep",
+      "x": 1.4,
+      "y": 0,
       "length": 1.2,
-      "width": 3.2,
+      "width": 2.5,
       "height": 0.45,
-      "landing": 0.5
+      "landing": 0.8
      }
     }
    ]
   },
   {
-   "name": "valve 0.05 at 2.8 0",
-   "group": "Valves on the floor",
-   "reason": "A floor valve in the path is a knee height thing the robot cannot see.",
+   "name": "cable_ramp_about_31_degrees",
+   "group": "steep ramp climb",
+   "reason": "A slope near 31 degrees may make the robot slide back on the way up or tip forward on the way down.",
    "calls": [
     {
-     "fn": "add_valve",
+     "fn": "add_ramp",
      "args": {
-      "name": "gate_valve_0",
-      "x": 2.8,
-      "y": 0.0,
-      "size": 0.05
+      "name": "cable_cover_ramp_very_steep",
+      "x": 1.5,
+      "y": 0,
+      "length": 1,
+      "width": 2.5,
+      "height": 0.6,
+      "landing": 0.8
      }
     }
    ]
   },
   {
-   "name": "valve 0.09 at 2.8 0.2",
-   "group": "Valves on the floor",
-   "reason": "A floor valve in the path is a knee height thing the robot cannot see.",
+   "name": "worn_rubber_ramp",
+   "group": "slick ramp slide",
+   "reason": "A worn ramp surface on a gentle slope may lower grip enough for the feet to creep downhill.",
+   "calls": [
+    {
+     "fn": "add_ramp",
+     "args": {
+      "name": "worn_rubber_cable_ramp",
+      "x": 1.1,
+      "y": 0,
+      "length": 1.5,
+      "width": 2.5,
+      "height": 0.25,
+      "landing": 0.8,
+      "friction": 0.3
+     }
+    }
+   ]
+  },
+  {
+   "name": "wet_steel_ramp",
+   "group": "slick ramp slide",
+   "reason": "A wet steel slope near 14 degrees leaves little spare grip and may send the robot sliding back.",
+   "calls": [
+    {
+     "fn": "add_ramp",
+     "args": {
+      "name": "wet_steel_cable_ramp",
+      "x": 1.4,
+      "y": 0,
+      "length": 1.2,
+      "width": 2.5,
+      "height": 0.3,
+      "landing": 0.8,
+      "friction": 0.2
+     }
+    }
+   ]
+  },
+  {
+   "name": "oily_plate_ramp",
+   "group": "slick ramp slide",
+   "reason": "An oily plate on even a mild slope may offer less grip than the slope demands, so the feet slide.",
+   "calls": [
+    {
+     "fn": "add_ramp",
+     "args": {
+      "name": "oily_steel_plate_cable_ramp",
+      "x": 1.1,
+      "y": 0,
+      "length": 1.5,
+      "width": 2.5,
+      "height": 0.2,
+      "landing": 0.8,
+      "friction": 0.1
+     }
+    }
+   ]
+  },
+  {
+   "name": "fine_low_bars",
+   "group": "raised grating bars",
+   "reason": "Closely spaced low bars change foot contact in many small jolts that could unsettle the gait.",
+   "calls": [
+    {
+     "fn": "add_grating",
+     "args": {
+      "name": "fine_steel_floor_grating",
+      "x": 2.2,
+      "y": 0,
+      "length": 2,
+      "width": 3,
+      "bar_height": 0.02,
+      "pitch": 0.1
+     }
+    }
+   ]
+  },
+  {
+   "name": "foot_sized_bar_gaps",
+   "group": "raised grating bars",
+   "reason": "Bars spaced near the foot size can wedge a foot in a gap or tilt it as it lands.",
+   "calls": [
+    {
+     "fn": "add_grating",
+     "args": {
+      "name": "medium_steel_floor_grating",
+      "x": 2.2,
+      "y": 0,
+      "length": 2,
+      "width": 3,
+      "bar_height": 0.05,
+      "pitch": 0.2
+     }
+    }
+   ]
+  },
+  {
+   "name": "tall_wide_bars",
+   "group": "raised grating bars",
+   "reason": "Tall, widely spaced bars can act like repeated small steps and may trip a foot with no warning.",
+   "calls": [
+    {
+     "fn": "add_grating",
+     "args": {
+      "name": "heavy_steel_floor_grating",
+      "x": 2.2,
+      "y": 0,
+      "length": 2,
+      "width": 3,
+      "bar_height": 0.1,
+      "pitch": 0.35
+     }
+    }
+   ]
+  },
+  {
+   "name": "cabinet_near_miss",
+   "group": "cabinet in the path",
+   "reason": "A cabinet close beside the route may be clipped by a swinging leg when the robot drifts slightly.",
+   "calls": [
+    {
+     "fn": "add_box",
+     "args": {
+      "name": "electrical_cabinet_near_route",
+      "x": 3,
+      "y": 0.75,
+      "sx": 0.6,
+      "sy": 0.6,
+      "sz": 1.9
+     }
+    }
+   ]
+  },
+  {
+   "name": "cabinet_clips_shoulder",
+   "group": "cabinet in the path",
+   "reason": "A cabinet overlapping the robot's width will strike one shoulder and may spin it off the route.",
+   "calls": [
+    {
+     "fn": "add_box",
+     "args": {
+      "name": "electrical_cabinet_clipping_route",
+      "x": 3,
+      "y": 0.55,
+      "sx": 0.6,
+      "sy": 0.6,
+      "sz": 1.9
+     }
+    }
+   ]
+  },
+  {
+   "name": "cabinet_blocks_route",
+   "group": "cabinet in the path",
+   "reason": "A cabinet squarely on the route cannot be seen or avoided, so the robot may push against it and fall or time out.",
+   "calls": [
+    {
+     "fn": "add_box",
+     "args": {
+      "name": "control_cabinet_blocking_route",
+      "x": 3,
+      "y": 0,
+      "sx": 0.6,
+      "sy": 1,
+      "sz": 1.9
+     }
+    }
+   ]
+  },
+  {
+   "name": "small_valve_on_route",
+   "group": "valve on the route",
+   "reason": "A small valve and handwheel on the route can catch a foot or shin as the robot walks over it.",
    "calls": [
     {
      "fn": "add_valve",
      "args": {
-      "name": "gate_valve_1",
-      "x": 2.8,
+      "name": "small_gate_valve_on_spool",
+      "x": 3,
+      "y": 0,
+      "size": 0.06
+     }
+    }
+   ]
+  },
+  {
+   "name": "medium_valve_off_centre",
+   "group": "valve on the route",
+   "reason": "A medium valve slightly off centre may snag the legs on one side and turn the robot off its line.",
+   "calls": [
+    {
+     "fn": "add_valve",
+     "args": {
+      "name": "medium_gate_valve_on_spool",
+      "x": 3,
       "y": 0.2,
-      "size": 0.09
-     }
-    }
-   ]
-  },
-  {
-   "name": "valve 0.14 at 3 -0.2",
-   "group": "Valves on the floor",
-   "reason": "A floor valve in the path is a knee height thing the robot cannot see.",
-   "calls": [
-    {
-     "fn": "add_valve",
-     "args": {
-      "name": "gate_valve_2",
-      "x": 3.0,
-      "y": -0.2,
-      "size": 0.14
-     }
-    }
-   ]
-  },
-  {
-   "name": "valve 0.2 at 3.2 0",
-   "group": "Valves on the floor",
-   "reason": "A floor valve in the path is a knee height thing the robot cannot see.",
-   "calls": [
-    {
-     "fn": "add_valve",
-     "args": {
-      "name": "gate_valve_3",
-      "x": 3.2,
-      "y": 0.0,
-      "size": 0.2
-     }
-    }
-   ]
-  },
-  {
-   "name": "valve 0.12 at 5 1.8",
-   "group": "Valves on the floor",
-   "reason": "A floor valve in the path is a knee height thing the robot cannot see.",
-   "calls": [
-    {
-     "fn": "add_valve",
-     "args": {
-      "name": "gate_valve_4",
-      "x": 5.0,
-      "y": 1.8,
+      "yaw_deg": 90,
       "size": 0.12
      }
     }
    ]
   },
   {
-   "name": "cabinet at 2.5 0",
-   "group": "Cabinets",
-   "reason": "A control cabinet parked on the walkway blocks the route, and the robot cannot see it.",
+   "name": "large_valve_after_turn",
+   "group": "valve on the route",
+   "reason": "A large valve just before the second corner may hit the belly and legs and stop the robot from passing.",
    "calls": [
     {
-     "fn": "add_box",
+     "fn": "add_valve",
      "args": {
-      "name": "control_cabinet_0",
-      "x": 2.5,
-      "y": 0.0,
-      "sx": 0.6,
-      "sy": 0.6,
-      "sz": 1.9
+      "name": "large_gate_valve_on_spool",
+      "x": 5,
+      "y": 3,
+      "size": 0.2
      }
     }
    ]
   },
   {
-   "name": "cabinet at 2.5 0.5",
-   "group": "Cabinets",
-   "reason": "A control cabinet parked on the walkway blocks the route, and the robot cannot see it.",
+   "name": "light_sensor_box",
+   "group": "untrained back payload",
+   "reason": "A light sensor box the policy never trained with slightly shifts balance and adds load through the route.",
    "calls": [
     {
-     "fn": "add_box",
+     "fn": "set_payload",
      "args": {
-      "name": "control_cabinet_1",
-      "x": 2.5,
-      "y": 0.5,
-      "sx": 0.6,
-      "sy": 0.8,
-      "sz": 1.9
+      "mass_kg": 8
      }
     }
    ]
   },
   {
-   "name": "cabinet at 3 -0.5",
-   "group": "Cabinets",
-   "reason": "A control cabinet parked on the walkway blocks the route, and the robot cannot see it.",
+   "name": "heavy_sensor_box",
+   "group": "untrained back payload",
+   "reason": "A heavier box raises leg load and moves the balance point, which may upset the ramp climb.",
    "calls": [
     {
-     "fn": "add_box",
+     "fn": "set_payload",
      "args": {
-      "name": "control_cabinet_2",
-      "x": 3.0,
-      "y": -0.5,
-      "sx": 0.6,
-      "sy": 1.0,
-      "sz": 1.9
+      "mass_kg": 18
      }
     }
    ]
   },
   {
-   "name": "cabinet at 5 2",
-   "group": "Cabinets",
-   "reason": "A control cabinet parked on the walkway blocks the route, and the robot cannot see it.",
+   "name": "overweight_sensor_box",
+   "group": "untrained back payload",
+   "reason": "A box this heavy may exceed what the leg motors can carry and cause the body to sag or collapse.",
    "calls": [
     {
-     "fn": "add_box",
+     "fn": "set_payload",
      "args": {
-      "name": "control_cabinet_3",
-      "x": 5.0,
-      "y": 2.0,
-      "sx": 0.6,
-      "sy": 0.6,
-      "sz": 1.9
+      "mass_kg": 35
+     }
+    }
+   ]
+  },
+  {
+   "name": "zigzag_on_damp_floor",
+   "group": "sharp turns with low grip",
+   "reason": "Repeated sharp direction changes on a damp floor demand sideways grip that may run out.",
+   "calls": [
+    {
+     "fn": "set_floor",
+     "args": {
+      "friction": 0.5
+     }
+    },
+    {
+     "fn": "set_route",
+     "args": {
+      "waypoints": [
+       {
+        "x": 2.5,
+        "y": 1.2
+       },
+       {
+        "x": 3.5,
+        "y": -1.2
+       },
+       {
+        "x": 4.5,
+        "y": 1.2
+       },
+       {
+        "x": 5,
+        "y": 4
+       },
+       {
+        "x": 11,
+        "y": 4
+       }
+      ],
+      "time_limit_s": 45
+     }
+    }
+   ]
+  },
+  {
+   "name": "hairpin_on_oily_floor",
+   "group": "sharp turns with low grip",
+   "reason": "A near reversal on an oily floor may make the robot skid or overshoot while it turns around.",
+   "calls": [
+    {
+     "fn": "set_floor",
+     "args": {
+      "friction": 0.35
+     }
+    },
+    {
+     "fn": "set_route",
+     "args": {
+      "waypoints": [
+       {
+        "x": 4,
+        "y": 0
+       },
+       {
+        "x": 1.5,
+        "y": 0.5
+       },
+       {
+        "x": 4,
+        "y": 1
+       },
+       {
+        "x": 5,
+        "y": 4
+       },
+       {
+        "x": 11,
+        "y": 4
+       }
+      ],
+      "time_limit_s": 50
+     }
+    }
+   ]
+  },
+  {
+   "name": "tight_zigzag_on_greasy_floor",
+   "group": "sharp turns with low grip",
+   "reason": "Tight zigzags on a greasy floor leave no time to recover from one slip before the next turn begins.",
+   "calls": [
+    {
+     "fn": "set_floor",
+     "args": {
+      "friction": 0.25
+     }
+    },
+    {
+     "fn": "set_route",
+     "args": {
+      "waypoints": [
+       {
+        "x": 2,
+        "y": 1
+       },
+       {
+        "x": 2.8,
+        "y": -1
+       },
+       {
+        "x": 3.6,
+        "y": 1
+       },
+       {
+        "x": 4.4,
+        "y": -1
+       },
+       {
+        "x": 5,
+        "y": 0
+       },
+       {
+        "x": 5,
+        "y": 4
+       },
+       {
+        "x": 11,
+        "y": 4
+       }
+      ],
+      "time_limit_s": 40
      }
     }
    ]
@@ -851,12 +952,48 @@
  ],
  "not_tested": [
   {
-   "factor": "Stairs with real risers",
-   "reason": "Only a crossover is modelled."
+   "factor": "Moving people and vehicles",
+   "reason": "Every object added here is static, so workers, forklifts and other moving hazards cannot be placed on the route."
   },
   {
-   "factor": "Steam or dark rooms",
-   "reason": "The policy is blind, so these change nothing."
+   "factor": "Sensor faults and pose error",
+   "reason": "The route follower is given its pose, and no function adds drift, dropouts or noisy joint and body readings."
+  },
+  {
+   "factor": "Motor wear, heat and battery",
+   "reason": "No function can weaken a motor, overheat a joint or lower the battery during a walk."
+  },
+  {
+   "factor": "Sideways shoves and gas or steam jets",
+   "reason": "No function applies an outside force to the body, so bumps from people or jets from a leak are missing."
+  },
+  {
+   "factor": "Flexible or sinking ground",
+   "reason": "Objects and floor are rigid, so sagging plates, soft mats, loose cables and mud cannot be represented."
+  },
+  {
+   "factor": "Objects that move when hit",
+   "reason": "Objects behave as fixed, so a tray or panel that shifts, tips or falls under a foot is not covered."
+  },
+  {
+   "factor": "Depth of liquid and drag",
+   "reason": "A leak is only a thin slippery layer, so standing water, thick sludge and water getting into hardware are missing."
+  },
+  {
+   "factor": "Falling off open edges",
+   "reason": "The functions cannot make pits, missing grating panels or open floor drops for a foot or the robot to fall into."
+  },
+  {
+   "factor": "Plant air and lighting conditions",
+   "reason": "Dust, heat, darkness and corrosive air affect hardware and any cameras, but they are not part of this physics world."
+  },
+  {
+   "factor": "Gas readings and inspection work",
+   "reason": "The list covers walking only, so sensor reading quality and inspection tasks at stops are not measured."
+  },
+  {
+   "factor": "Gravity away from normal",
+   "reason": "The function exists, but it was left out because gravity does not change at a plant site."
   }
  ]
 }

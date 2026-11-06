@@ -22,7 +22,7 @@ MODEL = "claude-opus-5-5"
 AI_TIMEOUT_S = 420
 AI_BUDGET_USD = "2.00"
 MAX_WORLDS = 50
-MAX_GROUPS = 12
+MAX_GROUPS = 20  # The first real replies used 15 groups.
 MAX_CALLS = 6
 MAX_NOT_TESTED = 20
 HELD_BACK_SHARE = 5
@@ -172,7 +172,7 @@ def code_not_tested(info, agent_items, worlds, scenarios):
     moved = {c["fn"] for s in scenarios for c in s["calls"]}
     for row in _physics_functions(info["catalog"]):
         if row["name"] not in moved and row["name"] not in ("repeat", "move_object", "rotate_object", "remove_object", "assign_material", "set_material", "add_object"):
-            items.append({"factor": row["name"], "reason": "The world has physics for this, but no world in this list used it.", "source": "code"})
+            items.append({"factor": row["name"].replace("_", " "), "reason": "The world has physics for this, but no world in this list used it.", "source": "code"})
     return items
 
 

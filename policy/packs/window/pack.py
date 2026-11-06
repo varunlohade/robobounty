@@ -90,7 +90,7 @@ def _rule_words(rule, event, result):
     return {
         "detach": f"The robot came off the glass at {t:.1f} s.",
         "tether_load": f"The tether load reached {value:.0f} N at {t:.1f} s. The limit is {J.TETHER_LOAD_LIMIT_N:.0f} N.",
-        "slip_distance": f"The robot slid {value:.2f} m in one slide at {t:.1f} s. The limit is {J.SLIP_LIMIT_M:.2f} m.",
+        "slip_distance": f"The robot slid {value:.3f} m in one slide at {t:.1f} s. The limit is {J.SLIP_LIMIT_M:.2f} m.",
         "stalled": f"The robot stayed still on the glass for {value:.0f} s at the end, with no wind or battery reason.",
         "time_limit": f"The robot did not finish in {t:.0f} s.",
         "coverage": f"The robot cleaned {result['coverage'] * 100:.1f}% of the glass. The job needs {J.COVERAGE_REQUIRED * 100:.0f}%.",
