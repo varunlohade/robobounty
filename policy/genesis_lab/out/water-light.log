@@ -1,0 +1,5 @@
+/Users/varun/robobounty/policy/genesis_lab/.venv/lib/python3.12/site-packages/quadrants/_test_tools/warnings_helper.py:11: UserWarning: cannot create weak reference to 'tuple' object. Template mapper caching disabled.
+  warnings.warn(message)
+UNSUPPORTED (log once): POSSIBLE ISSUE: unit 4 GLD_TEXTURE_INDEX_CUBE_MAP is unloadable and bound to sampler type (Float) - using zero texture because texture unloadable
+particles 25992 body mass 1.0723302364349365
+RESULT {"label": "sim genesis_lab, not calibrated", "backend": "metal", "solver": "WCSPH", "rho_body": 500.0, "psize": 0.02, "particles": 25992, "dt": 0.004, "substeps": 10, "steps": 700, "sim_time_s": 2.8, "build_s": 4.5, "wall_s": 72.4, "steps_per_s": 9.7, "rtf": 0.0387, "body_z_trace_m": [0.275, 0.194, 0.244, 0.259, 0.243, 0.22, 0.241, 0.252, 0.232, 0.233, 0.243, 0.241, 0.234, 0.239], "water_top_p99_m": 0.217, "water_mean_z": 0.107, "nan": false, "state_sha256": "79f62a8c3f1f4ff8"}

@@ -1,0 +1,4 @@
+/Users/varun/robobounty/policy/genesis_lab/.venv/lib/python3.12/site-packages/quadrants/_test_tools/warnings_helper.py:11: UserWarning: cannot create weak reference to 'tuple' object. Template mapper caching disabled.
+  warnings.warn(message)
+particles 12000
+RESULT {"label": "sim genesis_lab, not calibrated", "mode": "column", "backend": "cpu", "seed": 0, "grid": 64, "g": 3.71, "friction_angle": 20.0, "particles": 12000, "dt": 0.002, "substeps": 10, "steps": 1000, "sim_time_s": 2.0, "build_s": 5.7, "wall_s": 98.1, "steps_per_s": 10.2, "rtf": 0.0204, "state_sha256": "bef4a72111306eb9", "mean_speed_mps": 0.0022, "nan": false, "min_z": 0.0045, "peak_height_m": 0.063, "runout_m_p99": 0.365, "pile_slope_deg": 7.6}

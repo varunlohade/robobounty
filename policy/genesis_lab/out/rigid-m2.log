@@ -1,0 +1,7 @@
+[38;5;226m[Genesis] [15:24:46] [WARNING] Neutral robot position (qpos0) exceeds joint limits.[0m
+UNSUPPORTED (log once): POSSIBLE ISSUE: unit 4 GLD_TEXTURE_INDEX_CUBE_MAP is unloadable and bound to sampler type (Float) - using zero texture because texture unloadable
+mass 15.019000053405762 box mass 9.600000381469727 nq 19 ndof 18 links 13 geoms 27
+RESULT {"label": "sim genesis_lab, not calibrated", "backend": "metal", "seed": 0, "steps": 3000, "dt": 0.005, "substeps": 2, "build_s": 6.18, "steps_per_s": 111.1, "rtf": 0.56, "state_sha256": "2d6bf55bcafcc877", "base_xyz_every_1s": [[0.0, -0.0, 0.42], [-0.24, -0.069, 0.324], [-0.835, -0.208, 0.317], [-1.498, -0.448, 0.312], [-2.165, -0.73, 0.311], [-2.823, -1.026, 0.309], [-3.49, -1.277, 0.311], [-4.173, -1.543, 0.31], [-4.822, -1.809, 0.313], [-5.456, -2.101, 0.315], [-6.065, -2.426, 0.317], [-6.681, -2.781, 0.318], [-7.283, -3.141, 0.315], [-7.913, -3.516, 0.318], [-8.542, -3.852, 0.313]], "box_final": [1.2, 0.0, 0.1], "machine": "arm64"}
+real 46.09
+user 18.14
+sys 6.59

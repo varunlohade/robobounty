@@ -1,0 +1,26 @@
+[W 11/06/26 15:40:27.716 10352484] QuadrantsWarning
+While compiling `func_solve_init_c694_0`, File "/Users/varun/robobounty/policy/genesis_lab/.venv/lib/python3.12/site-packages/genesis/engine/solvers/rigid/constraint/linesearch.py", line 1596, in func_exit_islands_coop:
+            is_active = constraint_state.island.improved[i_island, i_b]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Assign may lose precision: u1 <- i32
+/Users/varun/robobounty/policy/genesis_lab/.venv/lib/python3.12/site-packages/quadrants/lang/ast/ast_transformers/function_def_transformer.py:781: DeprecationWarning: ast.Str is deprecated and will be removed in Python 3.14; use ast.Constant instead
+  return index == 0 and isinstance(stmt, ast.Expr) and isinstance(stmt.value, (ast.Constant, ast.Str))
+[W 11/06/26 15:40:31.416 10352484] QuadrantsWarning
+While compiling `_kernel_solve_graph_c700_0`, File "/Users/varun/robobounty/policy/genesis_lab/.venv/lib/python3.12/site-packages/genesis/engine/solvers/rigid/constraint/linesearch.py", line 1258, in func_linesearch_islands_coop:
+            is_active = constraint_state.island.improved[i_island, i_b]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Assign may lose precision: u1 <- i32
+[W 11/06/26 15:40:31.416 10352484] QuadrantsWarning
+While compiling `_kernel_solve_graph_c700_0`, File "/Users/varun/robobounty/policy/genesis_lab/.venv/lib/python3.12/site-packages/genesis/engine/solvers/rigid/constraint/solver_breakdown.py", line 147, in _func_update_qfrc_constraint_per_dof:
+                is_island_moving = constraint_state.island.improved[i_island,
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Assign may lose precision: u1 <- i32
+[W 11/06/26 15:40:31.417 10352484] QuadrantsWarning
+While compiling `_kernel_solve_graph_c700_0`, File "/Users/varun/robobounty/policy/genesis_lab/.venv/lib/python3.12/site-packages/genesis/engine/solvers/rigid/constraint/linesearch.py", line 1596, in func_exit_islands_coop:
+            is_active = constraint_state.island.improved[i_island, i_b]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Assign may lose precision: u1 <- i32
+/Users/varun/robobounty/policy/genesis_lab/.venv/lib/python3.12/site-packages/quadrants/_test_tools/warnings_helper.py:11: UserWarning: cannot create weak reference to 'tuple' object. Template mapper caching disabled.
+  warnings.warn(message)
+particles 25992 body mass 1.0723302364349365
+RESULT {"label": "sim genesis_lab, not calibrated", "backend": "metal", "solver": "WCSPH", "rho_body": 500.0, "psize": 0.02, "particles": 25992, "dt": 0.004, "substeps": 10, "steps": 100, "sim_time_s": 0.4, "build_s": 23.9, "wall_s": 10.3, "steps_per_s": 9.7, "rtf": 0.0388, "body_z_trace_m": [0.275, 0.194], "water_top_p99_m": 0.246, "water_mean_z": 0.11, "nan": false, "state_sha256": "a725573b6fde7ad3"}
