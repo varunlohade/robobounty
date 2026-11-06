@@ -35,6 +35,7 @@ import ledger as ledger_module
 import look as look_module
 import pack_campaign
 import pack_job
+import recorded_batch
 from stored_fix import STORED_FIX, ab_rows, recorded_fix
 
 POLICY = HERE.parent
@@ -217,6 +218,7 @@ SLOTS = Slots(MAX_PROCS)
 LIVE = set()
 LIVE_LOCK = threading.Lock()
 RECORDED = None
+BATCH = None  # A recorded batch folder: sessions play it, with no AI and no child process.
 
 
 class LlmLimit:
@@ -244,6 +246,8 @@ LLM_LIMIT = LlmLimit()
 
 
 def spawn(argv, **kw):
+    if BATCH:
+        raise RuntimeError("a recorded batch starts no child")
     # Own process group, so shutdown can stop a campaign and its pool. Low priority, so the Mac stays usable.
     env = {**os.environ, "CRASHLAB_RECORDED_REPLIES": RECORDED} if RECORDED else None
     p = subprocess.Popen(["nice", "-n", "5", *argv], start_new_session=True, env=env, **kw)
@@ -394,6 +398,8 @@ def run_one(name, argv, stdout_file, paths=()):
 
 
 def llm_label():
+    if BATCH:
+        return f"{recorded_batch.LABEL}, no AI and no sim"
     if not RECORDED:
         return "claude headless"
     stored = [n for n in ("brief", "followup", "scenarios", "agent5") if (Path(RECORDED) / f"{n}.json").exists()]
@@ -799,6 +805,8 @@ class Session:
                 return self.start(self.list_scenarios, text)
             if self.pack and self.pending_campaign and said in RUN_WORDS:
                 return self.start(self.run_campaign)
+            if BATCH:
+                return self.start(recorded_batch.no_chat, self)
             return self.start(self.turn5 if self.v5 else self.turn_pack, text)
         with self.lock:
             if self.routing:
@@ -978,6 +986,8 @@ class Session:
 
     def list_scenarios(self, words):
         """Step 4 of the product flow: the AI lists scenario worlds for the current world. Code checks each one."""
+        if BATCH:
+            return recorded_batch.list_scenarios(self, BATCH)
         self.emit(type="retire")
         if not self.llm_allowed():
             return
@@ -1032,12 +1042,14 @@ class Session:
                 if row["status"] in ("queued", "running", "stuck"):
                     row.update(status="stuck", verdict="froze", verdict_reason="The run server restarted before this run ended. It was not retried.")
             grid["running"] = False
-            grid["counts"] = {s: sum(r["status"] == s for r in grid["rows"]) for s in pack_campaign.STATUSES}
+            grid["counts"] = pack_campaign.count_rows(grid["rows"])
             folders[-1].write_text(json.dumps(grid))
         self.grid = grid
 
     def run_campaign(self):
         """Steps 5 and 6: every world not held back, each in its own child. A failed run is a result and is never retried."""
+        if BATCH:
+            return recorded_batch.run_campaign(self, BATCH)
         cid, self.pending_campaign = self.pending_campaign, None
         if self.world is None or self.world["hash"] != self.pending_base:
             self.say("The world changed after that list, so it no longer fits. Ask for the scenarios again.", fail=True)
@@ -1064,7 +1076,7 @@ class Session:
         results = [pack_campaign.read_json(folder / f"w{w['index']:03d}" / "job_result.json") for w in plan["worlds"]]
         label = next((r["label"] for r in results if r), None)
         self.emit(type="campaign_done", campaign=cid, counts=counts, wall_s=grid["elapsed_s"], max_procs=limit, label=label, note=plan["note"])
-        self.say(f"Done in {grid['elapsed_s']:.0f} s: {counts['passed']} passed, {counts['failed']} failed, {counts['stuck']} stuck, {counts['held']} not pass or fail. Simulated. {len(plan['not_tested'])} things stay not tested.")
+        self.say(f"Done in {grid['elapsed_s']:.0f} s: {counts['passed']} passed, {counts['failed']} failed, {counts['stuck']} stuck, {counts['safe_hold']} safe holds, {counts['held']} held back. Simulated. {len(plan['not_tested'])} things stay not tested.")
 
     def world_replay(self, cid, index):
         """How to play one finished run. The window robot's run goes through export5, which replays it and refuses a mismatch."""
@@ -1072,6 +1084,8 @@ class Session:
         run = folder / f"w{index:03d}"
         if not (run / "job_result.json").exists():
             return None
+        if BATCH and self.pack != "inspection":
+            return recorded_batch.trial(self, cid, index, BATCH)
         if self.pack == "inspection":
             return {"kind": "poses", "url": f"/api/sessions/{self.id}/campaigns/{cid}/worlds/{index}/poses"} if (run / "replay.json.gz").exists() else None
         tid = f"{cid}-{index:03d}"
@@ -2075,6 +2089,13 @@ class Handler(BaseHTTPRequestHandler):
                 except StageHung:
                     replay = None
                 return self.reply(200, replay) if replay else self.reply(404, {"error": "no_replay"})
+            if rest[2] in ("latest.jpg", "film.jpg"):
+                path = folder / f"w{index:03d}" / rest[2]
+                if not path.exists():
+                    return self.reply(404, {"error": "no_frame"})
+                data = path.read_bytes()
+                self.head(200, "image/jpeg", len(data))
+                return self.wfile.write(data)
             if rest[2] == "poses" and s.pack == "inspection":
                 return self.gzip_json(folder / f"w{index:03d}" / "replay.json.gz")
         self.reply(404, {"error": "not_found"})
@@ -2152,7 +2173,9 @@ class Handler(BaseHTTPRequestHandler):
                 s.v5 = s.pack == "window"
                 s.save()
                 SESSIONS[s.id] = s
-            if s.pack == "inspection":
+            if BATCH and s.pack:
+                s.start(recorded_batch.open_session, s, BATCH)
+            elif s.pack == "inspection":
                 s.start(s.open_pack)
             return self.reply(201, {"id": s.id, "pack": s.pack})
         if len(parts) == 4 and parts[:2] == ["api", "sessions"]:
@@ -2190,10 +2213,10 @@ def watchdog():
 
 
 def main():
-    global RECORDED, PORT, RESTART_CAUSE, SCENARIO_LIMIT
+    global RECORDED, BATCH, PORT, RESTART_CAUSE, SCENARIO_LIMIT
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=5198)
-    ap.add_argument("--recorded", help="folder of stored LLM replies. For offline checks only, and the status line says so.")
+    ap.add_argument("--recorded", help="folder of stored LLM replies, for offline checks, or a recorded batch (policy/runs/demo), played with no AI and no sim. The status line says which.")
     ap.add_argument("--live-route", action="store_true", help="with --recorded: the AI reads each message live, and the planner still uses stored replies. For timing checks.")
     ap.add_argument("--scenario-limit", type=int, help="for checks: keep this many scenario worlds, from each group in turn.")
     ap.add_argument("--llm-session-cap", type=int, default=MAX_LLM_PER_SESSION)
@@ -2203,6 +2226,7 @@ def main():
     RESTART_CAUSE, SCENARIO_LIMIT = a.restart_cause, a.scenario_limit
     LLM_LIMIT.session_cap, LLM_LIMIT.hour_cap = a.llm_session_cap, a.llm_hour_cap
     RECORDED = str(Path(a.recorded).resolve()) if a.recorded else None
+    BATCH = RECORDED if RECORDED and recorded_batch.is_batch(RECORDED) else None
     if a.live_route:
         os.environ["CRASHLAB_LIVE_ROUTE"] = "1"
     RUNS.mkdir(parents=True, exist_ok=True)

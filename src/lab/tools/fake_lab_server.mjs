@@ -61,7 +61,7 @@ const poseWorld = pack => {
 function gridOf(s, now) {
   const c = s.campaign;
   const elapsed = ((now - c.t0) / 1000) * SPEED;
-  const counts = { queued: 0, running: 0, passed: 0, failed: 0, stuck: 0, held: 0 };
+  const counts = { queued: 0, running: 0, passed: 0, failed: 0, stuck: 0, held: 0, safe_hold: 0 };
   const rows = c.worlds.map(w => {
     const outline = w.pack === 'window' ? AREA : { kind: 'route', points: ROUTE };
     const row = { index: w.index, name: w.name, group: w.group, reason: w.reason, held_back: w.held_back, status: 'queued', t: null, t_limit: null, x: null, y: null, outline, verdict: null, verdict_reason: null };
@@ -84,7 +84,7 @@ function gridOf(s, now) {
     }
     if (status === 'stuck') { row.verdict_reason = 'No progress for 30 s while the run is alive.'; }
     row.status = status;
-    counts[status]++;
+    counts[status === 'held' ? 'safe_hold' : status]++;
     return row;
   });
   const running = counts.queued + counts.running > 0 || c.worlds.some(w => w.sticks === 'stays' && !c.ended);

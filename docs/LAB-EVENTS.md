@@ -78,10 +78,11 @@ It arrives on the normal event stream as a plain `data:` message with `"type": "
 
 ```json
 {"type": "grid", "campaign": "c1", "pack": "window", "running": true, "elapsed_s": 41.2, "max_procs": 8,
- "counts": {"queued": 20, "running": 8, "passed": 5, "failed": 3, "stuck": 0, "held": 8},
+ "counts": {"queued": 20, "running": 8, "passed": 5, "failed": 3, "stuck": 0, "held": 8, "safe_hold": 0},
  "rows": [{"index": 0, "name": "gust_on_top_lane", "group": "High wind", "reason": "Reasoned guess: ...",
            "status": "running", "held_back": false, "t": 37.5, "t_limit": 600.0, "x": 1.2, "y": 41.7,
            "outline": {"kind": "area", "x0": -1.2, "x1": 1.2, "z0": 40.0, "z1": 43.0},
+           "marks": [{"kind": "value", "icon": "wind", "text": "12/26 m/s"}], "frames": 12, "film": null,
            "verdict": null, "verdict_reason": null}]}
 ```
 
@@ -93,18 +94,24 @@ It arrives on the normal event stream as a plain `data:` message with `"type": "
 | `running` | Child is alive and moving. | live |
 | `passed` | The judge passed it. | pass |
 | `failed` | The judge failed it, the physics blew up, or the process crashed. A result. It is never retried. | red |
-| `stuck` | No progress for 30 s while the run is alive. It returns to `running` if progress resumes. A run killed at its deadline stays `stuck`, with a reason. | red |
+| `stuck` | No progress for 30 s while the run is alive, or the judge's own verdict `stuck`. It returns to `running` if progress resumes. A run killed at its deadline stays `stuck`, with a reason. | red |
 | `held` | Not a pass and not a fail, see below. | amber or grey |
 
 `held` covers two cases, and `held_back` tells them apart:
 - `held_back: true`: this world is kept back as the fresh set for testing a fix. It does not run in the campaign. `t`, `x`, `y` are null.
 - `held_back: false`: the run ended with the robot safely holding itself (`verdict` is `wind_hold` or `battery_stop`). The job did not finish, and nothing failed.
 
+`counts.held` counts only held-back worlds. `counts.safe_hold` counts safe holds. A row's `status` is `held` for both.
+
 **Position**: `t` is simulated seconds, `t_limit` is the end of the run's simulated time. All three are null before the first progress.
 - window: `x` is metres across the glass, `y` is the height in metres (world z).
 - inspection: `x`, `y` are metres on the floor.
 
 **`outline`**: window `{"kind": "area", "x0", "x1", "z0", "z1"}`. inspection `{"kind": "route", "points": [[x, y], ...]}`, starting at the origin.
+
+**`marks`** say what this scenario changed, from its world, in the outline's axes. `{"kind": "shape", "what": "wet_patch", "name": "...", "points": [[x, y], ...]}` is a new or moved object's outline. `{"kind": "value", "icon": "wind", "text": "12/26 m/s"}` is a changed setting. The list is empty for a world from before marks.
+
+**`frames`** counts live frames so far: fetch `.../worlds/<index>/latest.jpg` when it grows, about twice a second while a run lives. **`film`** is null until the run ends, then `{"count", "cols", "w", "h"}`: `.../worlds/<index>/film.jpg` holds `count` frames in rows of `cols`, evenly through the recorded run. Both are drawn from real recorded state in a separate model, and never touch the physics.
 
 **`verdict`** is a code once a run ended: `passed`, `wind_hold`, `battery_stop`, `sim_diverged`, `process_crashed`, `froze`, a window rule (`detach`, `tether_load`, `slip_distance`, `stalled`, `time_limit`, `coverage`, `false_done`) or an inspection verdict (`fell`, `stuck`, `timed_out`, `off_route`, `sim_failed`). **`verdict_reason`** is one plain sentence from code. Show it as it is.
 

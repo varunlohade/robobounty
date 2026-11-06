@@ -19,6 +19,11 @@ PACKS = {
 }
 PROGRESS_EVERY_S = 1.0
 LOG_EVERY_SIM_S = 10.0
+FRAME_EVERY_S = 0.5  # Newest frame, by the wall clock.
+FILM_FRAMES = 24  # Frames of the loop a square plays after its run, evenly through the run.
+FILM_COLS = 6
+FRAME_QUALITY = 60
+NO_FRAMES_ENV = "CRASHLAB_NO_FRAMES"  # For the cost measurement.
 
 
 def argv(pack, command):
@@ -33,19 +38,64 @@ def ask(pack, command, request, timeout=None):
     return json.loads(done.stdout)
 
 
+def frames_on(progress):
+    return progress.path is not None and not os.environ.get(NO_FRAMES_ENV)
+
+
+class FrameClock:
+    """Writes latest.jpg about twice a second from a shooter that returns a PIL image. A frame that fails to draw stops the frames and leaves the run alone: a picture never changes a result."""
+
+    def __init__(self, out, shoot):
+        self.path, self.shoot = Path(out) / "latest.jpg", shoot
+        self.last, self.count, self.broken = 0.0, 0, False
+
+    def tick(self, *state):
+        now = time.monotonic()
+        if self.broken or now - self.last < FRAME_EVERY_S:
+            return
+        self.last = now
+        try:
+            tmp = self.path.with_suffix(".tmp")
+            self.shoot(*state).save(tmp, format="JPEG", quality=FRAME_QUALITY)
+            tmp.replace(self.path)
+            self.count += 1
+        except Exception as e:
+            self.broken = True
+            print(f"frames stopped: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+
+
+def write_film(out, images):
+    """One JPEG holding the run's frames in rows, so a square loads one file and draws by rectangle. None if no frame could be drawn. A film that fails leaves the result alone."""
+    from PIL import Image
+    try:
+        frames = list(images)
+        if not frames:
+            return None
+        w, h = frames[0].size
+        sheet = Image.new("RGB", (w * min(FILM_COLS, len(frames)), h * (1 + (len(frames) - 1) // FILM_COLS)))
+        for i, frame in enumerate(frames):
+            sheet.paste(frame, ((i % FILM_COLS) * w, (i // FILM_COLS) * h))
+        sheet.save(Path(out) / "film.jpg", format="JPEG", quality=FRAME_QUALITY)
+        return {"count": len(frames), "cols": FILM_COLS, "w": w, "h": h}
+    except Exception as e:
+        print(f"film stopped: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        return None
+
+
 class Progress:
     """Written from inside the sim loop, so a frozen sim writes nothing."""
 
     def __init__(self, path, t_limit):
         self.path, self.t_limit = Path(path) if path else None, t_limit
         self.last, self.logged, self.at = 0.0, -LOG_EVERY_SIM_S, (None, None, None)
+        self.frames = 0
         self.write(None, None, None, "starting")
 
     def write(self, t, x, y, status):
         if self.path is None:
             return
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"t": t, "x": x, "y": y, "status": status, "t_limit": self.t_limit}))
+        tmp.write_text(json.dumps({"t": t, "x": x, "y": y, "status": status, "t_limit": self.t_limit, "frames": self.frames}))
         tmp.replace(self.path)
 
     def update(self, t, x, y):
@@ -77,7 +127,7 @@ def replay_calls(hooks, req):
             worlds.append({"ok": False, "refused": refused})
         else:
             key = hooks.physics_hash(world)
-            worlds.append({"ok": True, "world": world, "hash": key, "physics_changed": key != start_hash, "lines": lines, "outline": hooks.outline(world), "t_limit": hooks.t_limit(world)})
+            worlds.append({"ok": True, "world": world, "hash": key, "physics_changed": key != start_hash, "lines": lines, "outline": hooks.outline(world), "t_limit": hooks.t_limit(world), "marks": hooks.marks(base, world)})
     return {"worlds": worlds}
 
 

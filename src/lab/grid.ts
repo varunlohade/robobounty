@@ -5,10 +5,14 @@ import { fmtTime } from '../app/world_page.ts';
 
 export type Status = 'queued' | 'running' | 'passed' | 'failed' | 'stuck' | 'held';
 type Outline = { kind: 'area'; x0: number; x1: number; z0: number; z1: number } | { kind: 'route'; points: number[][] };
+// What this scenario changed, from its world: an object's outline in the outline's axes, or a changed setting.
+type Mark = { kind: 'shape'; what: string; name: string; text: string; points: number[][] } | { kind: 'value'; icon: string; text: string };
+interface Film { count: number; cols: number; w: number; h: number }
 export interface Row {
   index: number; name: string; group: string; reason: string; status: Status; held_back: boolean;
   t: number | null; t_limit: number | null; x: number | null; y: number | null;
-  outline: Outline; verdict: string | null; verdict_reason: string | null;
+  outline: Outline; marks?: Mark[]; frames?: number; film?: Film | null; verdict: string | null; verdict_reason: string | null;
+  first?: { status: Status; verdict: string | null; verdict_reason: string | null };
 }
 export interface Played { page: HTMLElement; start: () => Promise<void>; stop: () => void; jump: (t: number) => void }
 interface Deps { base: string; statusRight: HTMLElement; play: (how: ServerEvent) => Promise<Played | null> }
@@ -24,14 +28,25 @@ const ASPECT_MAX = 1.25;
 const OUTLINE_MARGIN = 0.14;
 
 const INK = { text: '#ECEEF1', text2: '#A3A9B3', muted: '#737A85', faint: '#4B515B', line: '#2A2F37', red: '#E5534B', redText: '#F27B73', amberText: '#E3B04F', greenText: '#5CC186' };
+const MARK_FILL: Record<string, [string, string]> = { wet_patch: ['rgba(90,170,235,.38)', '#6FB7EE'], dirt_patch: ['rgba(176,140,90,.42)', '#C39C66'] };
+const MARK_SOLID: [string, string] = ['rgba(236,238,241,.26)', '#C9CDD3'];
+const MARK_MIN_PX = 2;
+const FILM_MS = 250; // Each frame of a run's loop.
+const FILM_HOLD = 6; // The last frame waits this many steps, so the end of the run reads before the loop restarts.
+const FILM_STAGGER_MS = 137; // Squares do not step on the same beat.
+const SCRIM = 'rgba(10,12,15,.72)';
+const INSET_W = 0.42, INSET_H = 0.48;
+const VALUE_ROW = 14;
+const VALUE_ROWS_MAX = 2;
+const ICON = 10;
 const SANS = 'Inter, -apple-system, "Helvetica Neue", Arial, sans-serif';
 
 const VERDICT_WORDS: Record<string, string> = {
   passed: 'Passed', fell: 'Fell', stuck: 'Stuck', timed_out: 'Timed out', off_route: 'Off route', sim_failed: 'Sim failed', sim_diverged: 'Sim failed', process_crashed: 'Crashed', froze: 'Froze',
-  detach: 'Came off', tether_load: 'Tether load', slip_distance: 'Slipped', stalled: 'Stalled', time_limit: 'Time limit', coverage: 'Low coverage', false_done: 'False finish', wind_hold: 'Wind hold', battery_stop: 'Battery stop',
+  detach: 'Came off', tether_load: 'Tether load', slip_distance: 'Slipped', stalled: 'Stalled', time_limit: 'Time limit', coverage: 'Low coverage', false_done: 'False finish', wind_hold: 'Safe hold, wind', battery_stop: 'Safe hold, battery',
 };
-const COUNT_ROWS: [keyof Counts, string][] = [['running', 'Running'], ['queued', 'Queued'], ['passed', 'Passed'], ['failed', 'Failed'], ['stuck', 'Stuck'], ['held', 'Held']];
-type Counts = Record<Status, number>;
+const COUNT_ROWS: [keyof Counts, string][] = [['running', 'Running'], ['queued', 'Queued'], ['passed', 'Passed'], ['failed', 'Failed'], ['stuck', 'Stuck'], ['safe_hold', 'Safe hold'], ['held', 'Held back']];
+type Counts = Record<Status | 'safe_hold', number>;
 
 const plainName = (name: string) => { const s = name.replaceAll('_', ' '); return s.charAt(0).toUpperCase() + s.slice(1); };
 
@@ -39,7 +54,7 @@ export function statusWord(r: Row): string {
   if (r.status === 'held' && r.held_back) return 'Held back';
   if (r.status === 'stuck' && !r.verdict) return 'Stuck';
   if (r.verdict) return VERDICT_WORDS[r.verdict] ?? plainName(r.verdict);
-  return { queued: 'Queued', running: 'Running', passed: 'Passed', failed: 'Failed', stuck: 'Stuck', held: 'Held on' }[r.status];
+  return { queued: 'Queued', running: 'Running', passed: 'Passed', failed: 'Failed', stuck: 'Stuck', held: 'Safe hold' }[r.status];
 }
 
 // One square: a button around a canvas. The button carries focus, hover and the border. The canvas carries the picture.
@@ -51,10 +66,13 @@ class Square {
   private fromX = 0; private fromY = 0; private toX = 0; private toY = 0; private movedAt = 0; private placed = false;
   private trail: number[] = [];
   private shortName = ''; private shortFor = 0;
+  private shown: HTMLImageElement | null = null; // The newest live frame, or the film sheet.
+  private loading = false; private seenFrames = 0; private filmStep = -1;
+  private film: Film | null = null;
   row: Row;
   stale = true;
 
-  constructor(row: Row) {
+  constructor(row: Row, private base: string) {
     this.row = row;
     this.root.type = 'button';
     this.root.dataset.index = String(row.index);
@@ -72,12 +90,63 @@ class Square {
       this.trail.push(row.x, row.y);
       if (this.trail.length > TRAIL_MAX * 2) this.trail.splice(0, 2);
     }
+    if (row.status === 'queued' && this.row.status !== 'queued') { this.trail = []; this.placed = false; }
     const stale = row.status !== this.row.status || row.t !== this.row.t || row.x !== this.row.x || row.y !== this.row.y || row.verdict !== this.row.verdict;
     if (stale) this.stale = true;
     this.row = row;
+    this.fetchPicture();
     this.root.dataset.status = row.status;
     this.root.dataset.held = String(row.held_back);
+    this.root.dataset.marks = String(row.marks?.length ?? 0);
     this.root.setAttribute('aria-label', `${plainName(row.name)}. ${statusWord(row)}.`);
+  }
+
+  // At most one image in flight per square. A real frame of this run replaces the last when it has loaded.
+  private fetchPicture() {
+    const { row } = this;
+    if (this.loading || this.film) return;
+    const film = row.film ?? null;
+    const frames = row.frames ?? 0;
+    if (!film && frames <= this.seenFrames) return;
+    this.loading = true;
+    this.seenFrames = frames;
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      this.loading = false;
+      this.shown = image;
+      if (film) this.film = film;
+      this.stale = true;
+      this.root.dataset.picture = film ? 'film' : 'live';
+    };
+    image.onerror = () => { this.loading = false; };
+    image.src = `${this.base}/worlds/${row.index}/${film ? 'film.jpg' : `latest.jpg?n=${frames}`}`;
+  }
+
+  /** A film moves to its next frame on its own clock. */
+  tick(now: number) {
+    if (!this.film) return;
+    const step = Math.floor((now + this.row.index * FILM_STAGGER_MS) / FILM_MS);
+    if (step !== this.filmStep) { this.filmStep = step; this.stale = true; }
+  }
+
+  // The run's real picture, cut to fill the square. Words and the map sit on it.
+  private picture() {
+    const { c, w, h, shown } = this;
+    if (!shown) return false;
+    const film = this.film;
+    const fw = film?.w ?? shown.naturalWidth, fh = film?.h ?? shown.naturalHeight;
+    let sx = 0, sy = 0;
+    if (film) {
+      const at = Math.min(film.count - 1, ((this.filmStep % (film.count + FILM_HOLD)) + film.count + FILM_HOLD) % (film.count + FILM_HOLD));
+      sx = (at % film.cols) * fw; sy = Math.floor(at / film.cols) * fh;
+    }
+    const scale = Math.max(w / fw, h / fh), cw = w / scale, ch = h / scale;
+    c.drawImage(shown, sx + (fw - cw) / 2, sy + (fh - ch) / 2, cw, ch, 0, 0, w, h);
+    const { row } = this;
+    if (row.status === 'failed' || row.status === 'stuck') { c.fillStyle = 'rgba(229,83,75,.2)'; c.fillRect(0, 0, w, h); }
+    else if (row.status === 'held') { c.fillStyle = 'rgba(214,154,45,.14)'; c.fillRect(0, 0, w, h); }
+    return true;
   }
 
   private at(now: number): [number, number] {
@@ -111,8 +180,26 @@ class Square {
     c.fillRect(0, 0, w, h);
     if (row.held_back) this.hatch();
 
-    const top = 22, foot = 20;
-    this.outline(top, h - foot, now);
+    const pictured = this.picture();
+    const lines = this.valueLines();
+    const foot = 20;
+    const head = Math.max(22, lines ? 20 + lines * VALUE_ROW : 22);
+    if (pictured) {
+      c.fillStyle = SCRIM;
+      c.fillRect(0, 0, w, head);
+      c.fillRect(0, h - foot, w, foot);
+    }
+    const valuesBottom = this.values();
+    const top = Math.max(22, valuesBottom + 2);
+    if (pictured) {
+      // On a picture the plan view shrinks to a corner map, since the camera's view does not line up with it.
+      const iw = Math.round(w * INSET_W), ih = Math.round((h - foot - top) * INSET_H), ix = w - iw - 3, iy = h - foot - ih - 3;
+      c.fillStyle = SCRIM;
+      c.fillRect(ix, iy, iw, ih);
+      this.outline(ix, iy + 2, iw, iy + ih - 2, now);
+    } else {
+      this.outline(0, top, w, h - foot, now);
+    }
 
     c.textBaseline = 'middle';
     c.font = `400 10.5px ${SANS}`;
@@ -129,7 +216,7 @@ class Square {
     c.fillText(word, x, h - 11);
     const wordEnd = x + c.measureText(word).width;
     c.font = `400 10.5px ${SANS}`;
-    const time = row.t === null ? '' : `${Math.round(row.t)} s`;
+    const time = row.first && (row.first.verdict !== row.verdict) ? `was ${statusWord({ ...row, ...row.first })}` : row.t === null ? '' : `${Math.round(row.t)} s`;
     if (time && wordEnd + 6 + c.measureText(time).width <= w - PAD) {
       c.textAlign = 'right';
       c.fillStyle = red ? INK.redText : INK.muted;
@@ -144,6 +231,60 @@ class Square {
     }
   }
 
+  private markWords() {
+    return [...new Map((this.row.marks ?? []).map(m => [m.text, m])).values()];
+  }
+
+  private valueLines() {
+    const { c, w } = this;
+    const words = this.markWords();
+    if (!words.length) return 0;
+    c.font = `400 10px ${SANS}`;
+    let x = PAD, rows = 1;
+    for (const m of words) {
+      const width = c.measureText(m.text).width + (m.kind === 'value' ? ICON + 3 : ICON);
+      if (x > PAD && x + width > w - PAD) {
+        if (rows === VALUE_ROWS_MAX) break;
+        x = PAD; rows++;
+      }
+      x += width + 8;
+    }
+    return rows;
+  }
+
+  // One line of small icons and values under the name, from the row's marks. Same words only once: a part brings many rectangles.
+  private values() {
+    const { c, w, row } = this;
+    const words = this.markWords();
+    if (!words.length) return 0;
+    const dim = row.status === 'queued' || row.held_back;
+    c.font = `400 10px ${SANS}`;
+    c.textBaseline = 'middle';
+    c.textAlign = 'left';
+    let x = PAD, y = 26, rows = 1;
+    for (const m of words) {
+      const hasIcon = m.kind === 'value';
+      const width = c.measureText(m.text).width + (hasIcon ? ICON + 3 : ICON);
+      if (x > PAD && x + width > w - PAD) {
+        if (rows === VALUE_ROWS_MAX) break;
+        x = PAD; y += VALUE_ROW; rows++;
+      }
+      const ink = dim ? INK.muted : this.shown ? INK.text : INK.text2;
+      if (m.kind === 'value') { markIcon(c, m.icon, x, y, ink); x += ICON + 3; } else {
+        const [fill, edge] = MARK_FILL[m.what] ?? MARK_SOLID;
+        c.fillStyle = fill; c.strokeStyle = edge; c.lineWidth = 1;
+        c.fillRect(x, y - 3.5, 7, 7); c.strokeRect(x + 0.5, y - 3.5 + 0.5, 6, 6);
+        x += ICON;
+      }
+      c.fillStyle = ink;
+      const room = w - PAD - x;
+      const text = c.measureText(m.text).width <= room ? m.text : fit(c, m.text, room);
+      c.fillText(text, x, y);
+      x += c.measureText(text).width + 8;
+    }
+    return y + 6;
+  }
+
   private hatch() {
     const { c, w, h } = this;
     c.strokeStyle = 'rgba(255,255,255,.035)';
@@ -154,30 +295,48 @@ class Square {
   }
 
   // The world's outline, the path the robot took, and the robot.
-  private outline(top: number, bottom: number, now: number) {
-    const { c, w, row } = this;
+  private outline(left: number, top: number, w: number, bottom: number, now: number) {
+    const { c, row } = this;
     const o = row.outline;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     const take = (x: number, y: number) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); };
     if (o.kind === 'area') { take(o.x0, o.z0); take(o.x1, o.z1); } else for (const [x, y] of o.points) take(x, y);
     if (!Number.isFinite(x0)) return;
+    const shapes = (row.marks ?? []).filter((m): m is Extract<Mark, { kind: 'shape' }> => m.kind === 'shape');
+    for (const m of shapes) for (const [x, y] of m.points) take(x, y);
     // A robot that leaves the outline stays in the square, with the scale eased to fit it.
     for (let i = 0; i < this.trail.length; i += 2) take(this.trail[i], this.trail[i + 1]);
     const spanX = Math.max(x1 - x0, 0.5), spanY = Math.max(y1 - y0, 0.5);
-    const aw = w - PAD * 2, ah = bottom - top - 4;
+    const pad = left ? 3 : PAD;
+    const aw = w - pad * 2, ah = bottom - top - 4;
     const scale = Math.min(aw / (spanX * (1 + OUTLINE_MARGIN)), ah / (spanY * (1 + OUTLINE_MARGIN)));
-    const ox = w / 2 - ((x0 + x1) / 2) * scale, oy = top + 2 + ah / 2 + ((y0 + y1) / 2) * scale;
+    const ox = left + w / 2 - ((x0 + x1) / 2) * scale, oy = top + 2 + ah / 2 + ((y0 + y1) / 2) * scale;
     const px = (x: number) => ox + x * scale, py = (y: number) => oy - y * scale;
     const red = row.status === 'failed' || row.status === 'stuck';
     const dim = row.status === 'queued' || row.held_back;
 
     c.save();
     c.beginPath();
-    c.rect(0, top - 2, w, bottom - top + 4);
+    c.rect(left, top - 2, w, bottom - top + 4);
     c.clip();
     c.lineWidth = 1;
     c.strokeStyle = dim ? INK.faint : red ? 'rgba(242,123,115,.45)' : INK.muted;
     c.lineJoin = 'round';
+    const ink = c.strokeStyle;
+    for (const m of shapes) {
+      const [fill, edge] = MARK_FILL[m.what] ?? MARK_SOLID;
+      c.fillStyle = fill; c.strokeStyle = edge;
+      c.beginPath();
+      // A thin sill still shows: a shape keeps a width and height of a few pixels.
+      const xs = m.points.map(p => px(p[0])), ys = m.points.map(p => py(p[1]));
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+      const growX = Math.max(1, MARK_MIN_PX / Math.max(Math.max(...xs) - Math.min(...xs), 0.01)), growY = Math.max(1, MARK_MIN_PX / Math.max(Math.max(...ys) - Math.min(...ys), 0.01));
+      xs.forEach((sx, i) => { const qx = cx + (sx - cx) * growX, qy = cy + (ys[i] - cy) * growY; if (i) c.lineTo(qx, qy); else c.moveTo(qx, qy); });
+      c.closePath();
+      c.fill();
+      c.stroke();
+    }
+    c.strokeStyle = ink;
     c.beginPath();
     if (o.kind === 'area') c.rect(px(o.x0) + 0.5, py(o.z1) + 0.5, (o.x1 - o.x0) * scale, (o.z1 - o.z0) * scale);
     else o.points.forEach(([x, y], i) => { if (i) c.lineTo(px(x), py(y)); else c.moveTo(px(x), py(y)); });
@@ -247,6 +406,76 @@ class Square {
   }
 }
 
+// A small line icon, 10 px wide, centred on y. It only says which setting the value beside it is.
+function markIcon(c: CanvasRenderingContext2D, name: string, x: number, y: number, ink: string) {
+  c.save();
+  c.translate(x, y - ICON / 2);
+  c.strokeStyle = ink; c.fillStyle = ink; c.lineWidth = 1; c.lineCap = 'round'; c.lineJoin = 'round';
+  c.beginPath();
+  const line = (...p: number[]) => { c.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) c.lineTo(p[i], p[i + 1]); };
+  switch (name) {
+    case 'wind':
+      c.moveTo(0.5, 3.5); c.lineTo(6.5, 3.5); c.arc(6.5, 2, 1.5, Math.PI / 2, -Math.PI / 2, true);
+      c.moveTo(0.5, 6); c.lineTo(8, 6); c.arc(8, 7.5, 1.5, -Math.PI / 2, Math.PI / 2);
+      break;
+    case 'rain':
+      line(3, 1, 1, 4.5); line(6, 1, 4, 4.5); line(9, 1, 7, 4.5); line(3, 5.5, 1, 9); line(6, 5.5, 4, 9); line(9, 5.5, 7, 9);
+      break;
+    case 'leak':
+      c.moveTo(5, 0.5); c.lineTo(8, 5.5); c.arc(5, 6.5, 3, -0.32, Math.PI + 0.32); c.closePath();
+      break;
+    case 'suction':
+      line(0.5, 9, 9.5, 9); line(5, 1, 5, 6.5); line(2.8, 4.3, 5, 6.5, 7.2, 4.3);
+      break;
+    case 'pad':
+      line(1, 8, 9, 8); line(2, 5.5, 8, 5.5, 8, 8); line(2, 5.5, 2, 8); line(5, 0.5, 5, 3.5);
+      break;
+    case 'battery':
+      c.rect(0.5, 2.5, 8, 5); line(9.5, 4, 9.5, 6);
+      break;
+    case 'speed':
+      line(1, 2, 4, 5, 1, 8); line(5, 2, 8, 5, 5, 8);
+      break;
+    case 'dirt':
+      for (const [dx, dy] of [[1.5, 2], [5, 1], [8.5, 3], [3, 5.5], [7, 6.5], [1.5, 8.5], [5, 9]]) { c.moveTo(dx + 0.7, dy); c.arc(dx, dy, 0.7, 0, 7); }
+      break;
+    case 'panes':
+      c.rect(0.5, 0.5, 9, 9); line(5, 0.5, 5, 9.5); line(0.5, 5, 9.5, 5);
+      break;
+    case 'margin':
+      c.rect(0.5, 0.5, 9, 9); c.rect(3, 3, 4, 4);
+      break;
+    case 'corner':
+      line(1, 9.5, 1, 1, 9.5, 1);
+      break;
+    case 'setback':
+      line(0.5, 1, 4, 1, 4, 5, 9.5, 5, 9.5, 9.5);
+      break;
+    case 'heat':
+      line(5, 1, 5, 6); c.moveTo(7, 7.5); c.arc(5, 7.5, 2, 0, 7);
+      break;
+    case 'grip':
+      line(0.5, 8, 3, 3, 5.5, 8, 8, 3, 9.5, 6);
+      break;
+    case 'payload':
+      c.rect(1, 3.5, 8, 6); line(3.5, 3.5, 3.5, 1, 6.5, 1, 6.5, 3.5);
+      break;
+    case 'gravity':
+      line(5, 0.5, 5, 7); line(2.5, 4.8, 5, 7.3, 7.5, 4.8); line(1, 9.5, 9, 9.5);
+      break;
+    case 'route':
+      line(1, 8.5, 5, 8.5, 5, 1.5, 9, 1.5);
+      break;
+    case 'time':
+      c.moveTo(9.5, 5); c.arc(5, 5, 4.5, 0, 7); line(5, 2.5, 5, 5, 7, 6);
+      break;
+    default:
+      c.moveTo(6.5, 5); c.arc(5, 5, 1.5, 0, 7);
+  }
+  c.stroke();
+  c.restore();
+}
+
 function fit(c: CanvasRenderingContext2D, text: string, width: number) {
   if (c.measureText(text).width <= width) return text;
   let lo = 0, hi = text.length;
@@ -264,6 +493,7 @@ export class Grid {
   private back = el('button', 'grid-back', 'Back to grid');
   private countsBox = el('div', 'grid-counts');
   private clock = el('span', 'grid-clock');
+  private recorded = el('span', 'grid-recorded', 'Recorded run');
   private notTestedBtn = el('button', 'grid-btn', 'Not tested');
   private main = el('div', 'grid-main');
   private stage = el('div', 'grid-stage');
@@ -305,7 +535,8 @@ export class Grid {
     this.notTestedBtn.hidden = true;
     this.notTestedBtn.addEventListener('click', () => this.toggleNotTested());
     const end = el('div', 'grid-bar-end');
-    end.append(this.clock, this.notTestedBtn);
+    this.recorded.hidden = true;
+    end.append(this.recorded, this.clock, this.notTestedBtn);
     this.bar.append(this.back, this.countsBox, end);
 
     this.replayHost.hidden = true;
@@ -336,6 +567,7 @@ export class Grid {
 
   update(e: ServerEvent) {
     this.campaign = String(e.campaign);
+    this.recorded.hidden = !e.recorded;
     let added = false;
     for (const row of e.rows as Row[]) {
       const had = this.squares.get(row.index);
@@ -344,7 +576,7 @@ export class Grid {
         had.set(row);
         if (changed && this.selected === row.index) void this.refreshDetail(row.index);
       } else {
-        const s = new Square(row);
+        const s = new Square(row, this.deps.base);
         this.squares.set(row.index, s);
         this.board.append(s.root);
         added = true;
@@ -394,7 +626,10 @@ export class Grid {
     const t0 = performance.now();
     let any = 0;
     const live = now - this.lastLive >= LIVE_DRAW_MS;
-    for (const s of this.squares.values()) if (s.stale || (live && s.live)) { s.draw(now); any++; }
+    for (const s of this.squares.values()) {
+      s.tick(now);
+      if (s.stale || (live && s.live)) { s.draw(now); any++; }
+    }
     if (live) this.lastLive = now;
     if (any) { this.drawMs += performance.now() - t0; this.drawn++; }
   }
@@ -459,6 +694,8 @@ export class Grid {
   private showHover(s: Square) {
     const { row } = s;
     this.hover.replaceChildren(el('div', 'grid-hover-name', plainName(row.name)), el('div', 'grid-hover-group', row.group), el('div', 'grid-hover-reason', row.reason));
+    const marks = [...new Set((row.marks ?? []).map(m => m.text))];
+    if (marks.length) this.hover.append(el('div', 'grid-hover-group', marks.join(', ')));
     if (row.verdict_reason) this.hover.append(el('div', `grid-hover-verdict${row.status === 'failed' || row.status === 'stuck' ? ' bad' : ''}`, row.verdict_reason));
     this.hover.hidden = false;
     const r = s.root.getBoundingClientRect(), box = this.root.getBoundingClientRect(), hw = this.hover.offsetWidth, hh = this.hover.offsetHeight;

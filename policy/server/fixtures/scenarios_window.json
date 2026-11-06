@@ -1,101 +1,119 @@
 {
- "count_reason": "Fifteen separate failure ideas matter here, covering holding force, seal, wetness, wind, fixtures, surface shape, moving equipment, cleaning, power and glass edges. Most need three values from likely to harsh, and a few need a fourth, which gives 48 worlds.",
+ "count_reason": "Fifteen distinct failure ideas matter for a suction climber on this facade: adhesion, wind, energy, cleaning, joints, obstacles, a moving cradle and glass edges. Three or four worlds each spread from mild to harsh gives 49.",
  "scenarios": [
   {
-   "name": "suction_mildly_low",
-   "group": "Weak suction",
-   "reason": "Less vacuum lowers the grip on the glass, so the robot might start to slip on its climbs.",
+   "name": "suction_slightly_reduced",
+   "group": "Suction loss",
+   "reason": "Slightly weaker suction reduces the grip that holds the robot on the glass and may start slow slipping.",
    "calls": [
     {
      "fn": "set_robot",
      "args": {
-      "suction_pa": 2000
+      "suction_pa": 2400
      }
     }
    ]
   },
   {
-   "name": "suction_well_below_nominal",
-   "group": "Weak suction",
-   "reason": "Under half the nominal vacuum might not hold the robot weight together with pad drag.",
+   "name": "suction_moderately_reduced",
+   "group": "Suction loss",
+   "reason": "Moderately weak suction may leave too little friction to carry the robot's weight while climbing.",
    "calls": [
     {
      "fn": "set_robot",
      "args": {
-      "suction_pa": 1300
+      "suction_pa": 1700
      }
     }
    ]
   },
   {
-   "name": "suction_near_lowest",
-   "group": "Weak suction",
-   "reason": "Vacuum near the lowest setting might let the robot slide off the glass early in the run.",
+   "name": "suction_severely_reduced",
+   "group": "Suction loss",
+   "reason": "Very weak suction may let the robot slide down or detach from the glass.",
    "calls": [
     {
      "fn": "set_robot",
      "args": {
-      "suction_pa": 700
+      "suction_pa": 900
      }
     }
    ]
   },
   {
-   "name": "seal_leak_moderate",
-   "group": "Worn seal leak",
-   "reason": "A worn seal leaks air and could reduce the holding pressure under the body.",
+   "name": "seal_leak_small_increase",
+   "group": "Seal leak",
+   "reason": "A slightly larger leak takes away some of the vacuum margin the robot relies on.",
    "calls": [
     {
      "fn": "set_robot",
      "args": {
-      "seal_leak_mm2": 500
+      "seal_leak_mm2": 240
      }
     }
    ]
   },
   {
-   "name": "seal_leak_large",
-   "group": "Worn seal leak",
-   "reason": "A large leak might exceed what the fan can replace, leaving too little grip.",
+   "name": "seal_leak_worn_skirt",
+   "group": "Seal leak",
+   "reason": "A worn skirt leaks enough air that the pump may not hold the pressure needed to grip.",
    "calls": [
     {
      "fn": "set_robot",
      "args": {
-      "seal_leak_mm2": 1000
+      "seal_leak_mm2": 600
      }
     }
    ]
   },
   {
-   "name": "seal_leak_severe",
-   "group": "Worn seal leak",
-   "reason": "A badly torn seal might lose nearly all holding pressure and drop the robot.",
+   "name": "seal_leak_torn_skirt",
+   "group": "Seal leak",
+   "reason": "A torn skirt may lose so much vacuum that the robot can no longer stay attached.",
    "calls": [
     {
      "fn": "set_robot",
      "args": {
-      "seal_leak_mm2": 1800
+      "seal_leak_mm2": 1600
      }
     }
    ]
   },
   {
-   "name": "glass_wet_from_drizzle",
-   "group": "Wet glass reduces grip",
-   "reason": "A wetter pane lowers friction, so the same suction might no longer stop slipping.",
+   "name": "glass_slightly_wetter",
+   "group": "Wet glass",
+   "reason": "A little more water lowers friction between the drive and the glass and may add some slip.",
    "calls": [
     {
      "fn": "set_weather",
      "args": {
+      "wetness": 0.25
+     }
+    }
+   ]
+  },
+  {
+   "name": "local_wet_runoff_patch",
+   "group": "Wet glass",
+   "reason": "A sudden wet patch can drop traction partway up a lane and cause an abrupt slide.",
+   "calls": [
+    {
+     "fn": "add_wet_patch",
+     "args": {
+      "name": "facade_water_runoff",
+      "x_m": 1.6,
+      "below_top_m": 1.5,
+      "width_m": 1.2,
+      "height_m": 1.5,
       "wetness": 0.6
      }
     }
    ]
   },
   {
-   "name": "glass_fully_wet_in_rain",
-   "group": "Wet glass reduces grip",
-   "reason": "Fully wet glass gives the lowest friction and might make the robot slide down its lanes.",
+   "name": "glass_fully_soaked",
+   "group": "Wet glass",
+   "reason": "Fully soaked glass may leave too little traction for the robot to climb or hold position.",
    "calls": [
     {
      "fn": "set_weather",
@@ -106,65 +124,42 @@
    ]
   },
   {
-   "name": "condensate_run_across_lanes",
-   "group": "Wet glass reduces grip",
-   "reason": "A sudden wet band could cost traction partway up a lane after the robot was gripping well.",
+   "name": "steady_wind_small_rise",
+   "group": "Wind load",
+   "reason": "A slightly stronger steady wind adds a small constant load against the grip.",
    "calls": [
     {
-     "fn": "add_wet_patch",
+     "fn": "set_wind",
      "args": {
-      "name": "condensate_run_patch",
-      "x_m": 1.2,
-      "below_top_m": 1.5,
-      "width_m": 2.4,
-      "height_m": 1,
-      "wetness": 0.9
+      "steady_ms": 2.4
      }
     }
    ]
   },
   {
-   "name": "breezy_with_moderate_gusts",
-   "group": "Wind gusts peel the robot",
-   "reason": "Stronger gusts add sideways load that could push the robot out of its lane.",
+   "name": "gusts_moderately_stronger",
+   "group": "Wind load",
+   "reason": "Stronger gusts from a different angle may push the robot sideways out of its lane.",
    "calls": [
     {
      "fn": "set_wind",
      "args": {
-      "steady_ms": 7,
-      "gust_ms": 16
+      "gust_ms": 9,
+      "dir_deg": -30
      }
     }
    ]
   },
   {
-   "name": "strong_repeated_gusts_angled",
-   "group": "Wind gusts peel the robot",
-   "reason": "Repeated strong gusts from a steep angle might build up drift and overcome the grip.",
+   "name": "fresh_wind_with_strong_gusts",
+   "group": "Wind load",
+   "reason": "Fresh wind with repeated strong gusts may overcome friction and cause drift or sliding.",
    "calls": [
     {
      "fn": "set_wind",
      "args": {
-      "steady_ms": 12,
-      "gust_ms": 26,
-      "gust_count": 3,
-      "gust_period_s": 40,
-      "dir_deg": 60
-     }
-    }
-   ]
-  },
-  {
-   "name": "storm_gusts_long_duration",
-   "group": "Wind gusts peel the robot",
-   "reason": "Long storm gusts could pull harder than the suction holds and tear the robot off.",
-   "calls": [
-    {
-     "fn": "set_wind",
-     "args": {
-      "steady_ms": 18,
-      "gust_ms": 42,
-      "gust_duration_s": 15,
+      "steady_ms": 8,
+      "gust_ms": 20,
       "gust_count": 4,
       "gust_period_s": 30
      }
@@ -172,155 +167,247 @@
    ]
   },
   {
-   "name": "gusts_on_low_floor_area",
-   "group": "Wind gusts peel the robot",
-   "reason": "Working far down the tower with strong gusts from another direction might load the robot differently.",
+   "name": "gale_with_violent_gusts",
+   "group": "Wind load",
+   "reason": "Gale force wind with violent gusts may pull the robot off the glass completely.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 18,
+      "gust_ms": 50,
+      "gust_count": 6,
+      "gust_period_s": 20,
+      "gust_duration_s": 10,
+      "dir_deg": 70
+     }
+    }
+   ]
+  },
+  {
+   "name": "battery_partly_used",
+   "group": "Low battery",
+   "reason": "Starting with a somewhat used battery reduces the reserve for the full job.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "battery_start_frac": 0.85
+     }
+    }
+   ]
+  },
+  {
+   "name": "battery_about_one_third",
+   "group": "Low battery",
+   "reason": "With a third of the charge the robot may run out of energy before finishing all lanes.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "battery_start_frac": 0.35
+     }
+    }
+   ]
+  },
+  {
+   "name": "battery_nearly_empty",
+   "group": "Low battery",
+   "reason": "A nearly empty battery may stop the pump and drive early and leave the robot stranded on the glass.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "battery_start_frac": 0.06
+     }
+    }
+   ]
+  },
+  {
+   "name": "work_area_slightly_larger",
+   "group": "Larger work area",
+   "reason": "A slightly larger area adds lanes and travel, which uses up more time and energy.",
    "calls": [
     {
      "fn": "set_work_area",
      "args": {
-      "drop": 80
+      "w": 2.9,
+      "h": 3.5
+     }
+    }
+   ]
+  },
+  {
+   "name": "work_area_much_larger",
+   "group": "Larger work area",
+   "reason": "A much larger area means longer climbs and more lanes, which may expose drift and energy limits.",
+   "calls": [
+    {
+     "fn": "set_work_area",
+     "args": {
+      "w": 3.8,
+      "h": 4.5
+     }
+    }
+   ]
+  },
+  {
+   "name": "work_area_maximum_size",
+   "group": "Larger work area",
+   "reason": "The largest area may exceed what one charge can cover and let lane errors build up.",
+   "calls": [
+    {
+     "fn": "set_work_area",
+     "args": {
+      "w": 5,
+      "h": 6
+     }
+    }
+   ]
+  },
+  {
+   "name": "overall_dirt_small_rise",
+   "group": "Heavy dirt",
+   "reason": "Slightly heavier dirt may leave faint residue after the normal number of passes.",
+   "calls": [
+    {
+     "fn": "set_dirt",
+     "args": {
+      "level": 0.7
+     }
+    }
+   ]
+  },
+  {
+   "name": "local_grime_patch",
+   "group": "Heavy dirt",
+   "reason": "A local band of thicker grime may survive a pass that is enough for the surrounding glass.",
+   "calls": [
+    {
+     "fn": "add_dirt_patch",
+     "args": {
+      "name": "pollution_grime_streak",
+      "x_m": 1,
+      "below_top_m": 1.6,
+      "width_m": 1,
+      "height_m": 1,
+      "level": 1.5
+     }
+    }
+   ]
+  },
+  {
+   "name": "heavy_dirt_with_baked_grime",
+   "group": "Heavy dirt",
+   "reason": "Heavy dirt everywhere plus baked grime may be far more than the pad can remove in one job.",
+   "calls": [
+    {
+     "fn": "set_dirt",
+     "args": {
+      "level": 2
      }
     },
     {
-     "fn": "set_wind",
+     "fn": "add_dirt_patch",
      "args": {
-      "steady_ms": 10,
-      "gust_ms": 30,
-      "dir_deg": -70
+      "name": "baked_on_grime_streak",
+      "x_m": 0.7,
+      "below_top_m": 0.8,
+      "width_m": 1.2,
+      "height_m": 1.6,
+      "level": 3
      }
     }
    ]
   },
   {
-   "name": "shallow_window_sill_in_area",
-   "group": "Ledge or sill across lanes",
-   "reason": "A shallow sill might lift the seal as the robot crosses it and let the vacuum escape.",
+   "name": "clean_speed_slightly_faster",
+   "group": "Fast cleaning pass",
+   "reason": "A slightly faster pass removes less dirt and demands more grip from the drive.",
    "calls": [
     {
-     "fn": "add_sill",
+     "fn": "set_robot",
      "args": {
-      "name": "aluminium_window_sill",
-      "material": "brushed_alu",
-      "x_m": 1.2,
-      "below_top_m": 1.5,
-      "width_m": 2.4,
-      "depth_m": 0.012,
-      "thick_m": 0.04
+      "clean_speed_ms": 0.17
      }
     }
    ]
   },
   {
-   "name": "existing_ledge_in_area",
-   "group": "Ledge or sill across lanes",
-   "reason": "With the building ledge inside the area, a robot blind to objects might jam against it on every lane.",
+   "name": "clean_speed_much_faster",
+   "group": "Fast cleaning pass",
+   "reason": "A notably faster pass may start leaving dirt and reduce the margin for traction.",
    "calls": [
     {
-     "fn": "move_object",
+     "fn": "set_robot",
      "args": {
-      "name": "ledge",
-      "dbelow": -6.5
+      "clean_speed_ms": 0.185
      }
     }
    ]
   },
   {
-   "name": "deep_concrete_band_near_bottom",
-   "group": "Ledge or sill across lanes",
-   "reason": "A deep concrete band could stop the robot and strand the lower part of the area uncleaned.",
+   "name": "clean_speed_at_cap",
+   "group": "Fast cleaning pass",
+   "reason": "Running at the speed cap sits close to where the robot may become unstable and clean poorly.",
    "calls": [
     {
-     "fn": "add_ledge",
+     "fn": "set_robot",
      "args": {
-      "name": "concrete_string_course",
-      "material": "weathered_concrete",
-      "x_m": 1.2,
-      "below_top_m": 2.2,
-      "width_m": 2.4,
-      "depth_m": 0.2,
-      "thick_m": 0.2
+      "clean_speed_ms": 0.2
      }
     }
    ]
   },
   {
-   "name": "thin_mullion_fin_mid_area",
-   "group": "Mounted fixtures in a lane",
-   "reason": "A thin fin in a lane might catch the body and twist or stall the robot.",
+   "name": "joints_slightly_deeper_wider",
+   "group": "Pane joints",
+   "reason": "Slightly larger joints let a little air under the skirt as the robot crosses them.",
    "calls": [
     {
-     "fn": "add_fin",
+     "fn": "set_panes",
      "args": {
-      "name": "aluminium_mullion_fin",
-      "material": "brushed_alu",
-      "x_m": 1.2,
-      "below_top_m": 1,
-      "thick_m": 0.05,
-      "depth_m": 0.08,
-      "height_m": 1.2
+      "joint_depth": 0.006,
+      "joint_gap": 0.005
      }
     }
    ]
   },
   {
-   "name": "tenant_sign_on_first_lanes",
-   "group": "Mounted fixtures in a lane",
-   "reason": "A low sign in the early lanes could block the robot before it has covered much glass.",
+   "name": "joints_moderately_deep_shifted",
+   "group": "Pane joints",
+   "reason": "Deeper, wider joints in a shifted position may cause a brief vacuum dip at each crossing.",
    "calls": [
     {
-     "fn": "add_sign",
+     "fn": "set_panes",
      "args": {
-      "name": "tenant_name_sign",
-      "material": "painted_steel",
-      "x_m": 0.6,
-      "below_top_m": 1.4,
-      "width_m": 0.8,
-      "depth_m": 0.03,
-      "height_m": 0.5
+      "joint_depth": 0.015,
+      "joint_gap": 0.012,
+      "offx": 1.2
      }
     }
    ]
   },
   {
-   "name": "ac_unit_mounted_on_facade",
-   "group": "Mounted fixtures in a lane",
-   "reason": "A bulky wall unit and its brackets might stop the robot and leave nearby glass uncleaned.",
+   "name": "joints_deepest_and_widest",
+   "group": "Pane joints",
+   "reason": "The deepest and widest joints, placed more often, may break the seal and drop the robot.",
    "calls": [
     {
-     "fn": "add_part",
+     "fn": "set_panes",
      "args": {
-      "name": "facade_ac_unit",
-      "part": "ac_unit",
-      "x_m": 1.5,
-      "below_top_m": 2
+      "joint_depth": 0.04,
+      "joint_gap": 0.03,
+      "w": 1,
+      "offz": 1.5
      }
     }
    ]
   },
   {
-   "name": "balcony_slab_across_area",
-   "group": "Mounted fixtures in a lane",
-   "reason": "A balcony slab could wall off the lower glass from every lane the robot tries to finish.",
-   "calls": [
-    {
-     "fn": "add_balcony",
-     "args": {
-      "name": "concrete_balcony",
-      "material": "weathered_concrete",
-      "x_m": 1.2,
-      "below_top_m": 2,
-      "width_m": 3,
-      "depth_m": 1,
-      "slab_m": 0.2
-     }
-    }
-   ]
-  },
-  {
-   "name": "small_frame_step_across_area",
-   "group": "Raised frame step under the seal",
-   "reason": "A small raised step could briefly break the seal contact as the robot rolls over it.",
+   "name": "tiny_frame_step",
+   "group": "Low step across lane",
+   "reason": "A tiny frame step may lift the skirt slightly as the robot passes over it.",
    "calls": [
     {
      "fn": "add_frame_step",
@@ -328,132 +415,175 @@
       "name": "glazing_bead_step",
       "material": "brushed_alu",
       "x_m": 1.2,
-      "below_top_m": 1.5,
-      "width_m": 2.4,
-      "step_m": 0.004,
-      "height_m": 1
-     }
-    }
-   ]
-  },
-  {
-   "name": "narrow_medium_frame_step",
-   "group": "Raised frame step under the seal",
-   "reason": "A narrow step might leave one side of the seal lifted and tilt the robot off its lane.",
-   "calls": [
-    {
-     "fn": "add_frame_step",
-     "args": {
-      "name": "retrofit_panel_frame",
-      "material": "painted_steel",
-      "x_m": 0.6,
       "below_top_m": 1.2,
-      "width_m": 0.8,
-      "step_m": 0.012,
-      "height_m": 1
+      "width_m": 1,
+      "step_m": 0.003,
+      "height_m": 0.6
      }
     }
    ]
   },
   {
-   "name": "tall_frame_step_limit",
-   "group": "Raised frame step under the seal",
-   "reason": "The tallest step might be more than the wheels and seal can climb, so the robot could stall or lose suction.",
+   "name": "larger_frame_step",
+   "group": "Low step across lane",
+   "reason": "A larger step may tilt the body and open a leak path under the skirt.",
    "calls": [
     {
      "fn": "add_frame_step",
      "args": {
-      "name": "heavy_curtain_wall_frame",
+      "name": "window_frame_step",
       "material": "brushed_alu",
+      "x_m": 0.6,
+      "below_top_m": 2,
+      "width_m": 1.2,
+      "step_m": 0.008,
+      "height_m": 0.8
+     }
+    }
+   ]
+  },
+  {
+   "name": "metal_window_sill",
+   "group": "Low step across lane",
+   "reason": "A metal sill may be too tall to cross and could stall the robot or break its seal.",
+   "calls": [
+    {
+     "fn": "add_sill",
+     "args": {
+      "name": "aluminium_window_sill",
+      "material": "brushed_alu",
+      "x_m": 1.6,
+      "below_top_m": 0.9,
+      "width_m": 1.6,
+      "depth_m": 0.025,
+      "thick_m": 0.04
+     }
+    }
+   ]
+  },
+  {
+   "name": "concrete_ledge_across_area",
+   "group": "Low step across lane",
+   "reason": "A concrete ledge across every lane may block the robot and trap it or cause it to detach.",
+   "calls": [
+    {
+     "fn": "add_ledge",
+     "args": {
+      "name": "concrete_spandrel_ledge",
+      "material": "weathered_concrete",
       "x_m": 1.2,
+      "below_top_m": 1.7,
+      "width_m": 2.6,
+      "depth_m": 0.1,
+      "thick_m": 0.15
+     }
+    }
+   ]
+  },
+  {
+   "name": "small_tenant_nameplate",
+   "group": "Wall mounted obstacle",
+   "reason": "The robot knows nothing about objects, so even a small plate may catch its body in one lane.",
+   "calls": [
+    {
+     "fn": "add_sign",
+     "args": {
+      "name": "tenant_nameplate",
+      "material": "brushed_alu",
+      "x_m": 2,
+      "below_top_m": 0.8,
+      "width_m": 0.4,
+      "depth_m": 0.03,
+      "height_m": 0.3
+     }
+    }
+   ]
+  },
+  {
+   "name": "vertical_shading_fin",
+   "group": "Wall mounted obstacle",
+   "reason": "A vertical fin may wedge the robot against its side or force it out of its lane.",
+   "calls": [
+    {
+     "fn": "add_fin",
+     "args": {
+      "name": "aluminium_shading_fin",
+      "material": "brushed_alu",
+      "x_m": 0.9,
       "below_top_m": 1.5,
-      "width_m": 2.4,
-      "step_m": 0.03,
+      "thick_m": 0.05,
+      "depth_m": 0.1,
       "height_m": 1
      }
     }
    ]
   },
   {
-   "name": "pane_joint_inside_area",
-   "group": "Deep pane joints leak and jolt",
-   "reason": "A wider joint inside the area might leak air under the seal each time the robot crosses it.",
+   "name": "window_air_conditioner",
+   "group": "Wall mounted obstacle",
+   "reason": "A bulky air conditioner in a lane may stop the robot dead and push it off line.",
    "calls": [
     {
-     "fn": "set_panes",
+     "fn": "add_part",
      "args": {
-      "h": 2.2,
-      "offz": 0.6,
-      "joint_depth": 0.012,
-      "joint_gap": 0.01
+      "name": "window_air_conditioner",
+      "part": "ac_unit",
+      "x_m": 1.5,
+      "below_top_m": 2,
+      "scale": 1
      }
     }
    ]
   },
   {
-   "name": "many_small_panes_deep_joints",
-   "group": "Deep pane joints leak and jolt",
-   "reason": "Small panes with deep joints mean many crossings, and each one could cost vacuum and traction.",
+   "name": "balcony_slab_across_area",
+   "group": "Wall mounted obstacle",
+   "reason": "A balcony slab across all lanes blocks every climb and may leave glass uncleaned or jam the robot.",
    "calls": [
     {
-     "fn": "set_panes",
+     "fn": "add_balcony",
      "args": {
-      "w": 0.8,
-      "h": 2,
-      "joint_depth": 0.025,
-      "joint_gap": 0.02
-     }
-    }
-   ]
-  },
-  {
-   "name": "deepest_widest_joints_offset",
-   "group": "Deep pane joints leak and jolt",
-   "reason": "The deepest and widest joints might catch the wheels or open the seal enough to lose grip.",
-   "calls": [
-    {
-     "fn": "set_panes",
-     "args": {
-      "w": 0.8,
-      "h": 2,
-      "offx": 0.3,
-      "offz": 0.5,
-      "joint_depth": 0.04,
-      "joint_gap": 0.03
-     }
-    }
-   ]
-  },
-  {
-   "name": "small_louvre_vent_in_lane",
-   "group": "Open vent breaks the seal",
-   "reason": "A small louvre under the body could let air in and reduce suction for a short stretch.",
-   "calls": [
-    {
-     "fn": "add_vent",
-     "args": {
-      "name": "small_louvre_vent",
-      "material": "galvanised",
+      "name": "residential_balcony_slab",
+      "material": "weathered_concrete",
       "x_m": 1.2,
-      "below_top_m": 1.5,
-      "width_m": 0.4,
-      "height_m": 0.2,
-      "open_frac": 0.2
+      "below_top_m": 1.4,
+      "width_m": 4,
+      "depth_m": 1.2,
+      "slab_m": 0.2
      }
     }
    ]
   },
   {
-   "name": "medium_vent_on_early_lanes",
-   "group": "Open vent breaks the seal",
-   "reason": "A larger open vent might cover enough of the seal area to make the robot slip.",
+   "name": "small_exhaust_louvre",
+   "group": "Vent opening in glass",
+   "reason": "A small open louvre may let some air in under the skirt as the robot passes.",
    "calls": [
     {
      "fn": "add_vent",
      "args": {
-      "name": "exhaust_grille_vent",
+      "name": "bathroom_exhaust_louvre",
       "material": "galvanised",
-      "x_m": 0.6,
+      "x_m": 2.1,
+      "below_top_m": 2.4,
+      "width_m": 0.3,
+      "height_m": 0.2,
+      "open_frac": 0.15
+     }
+    }
+   ]
+  },
+  {
+   "name": "medium_air_intake_grille",
+   "group": "Vent opening in glass",
+   "reason": "A larger grille may vent enough of the suction chamber to cause a sharp grip loss.",
+   "calls": [
+    {
+     "fn": "add_vent",
+     "args": {
+      "name": "air_intake_grille",
+      "material": "galvanised",
+      "x_m": 0.7,
       "below_top_m": 1.2,
       "width_m": 0.8,
       "height_m": 0.5,
@@ -464,8 +594,8 @@
   },
   {
    "name": "wide_open_plant_room_louvre",
-   "group": "Open vent breaks the seal",
-   "reason": "A wide and mostly open louvre could remove the vacuum entirely as the robot crosses it.",
+   "group": "Vent opening in glass",
+   "reason": "A wide, mostly open louvre may collapse the vacuum across several lanes and release the robot.",
    "calls": [
     {
      "fn": "add_vent",
@@ -482,57 +612,57 @@
    ]
   },
   {
-   "name": "cradle_stopped_on_the_glass",
+   "name": "parked_cradle_near_edge",
    "group": "Maintenance cradle in the way",
-   "reason": "A stopped cradle in the area could block several lanes and trap the robot beneath it.",
+   "reason": "A stationary cradle near the area edge may touch the robot in the outer lane.",
    "calls": [
     {
      "fn": "add_cradle",
      "args": {
-      "name": "stopped_maintenance_cradle",
-      "material": "galvanised",
-      "x_m": 1.2,
-      "below_top_m": 1,
-      "width_m": 2,
-      "height_m": 1,
+      "name": "parked_maintenance_cradle",
+      "material": "painted_steel",
+      "x_m": 2.2,
+      "below_top_m": 2.6,
+      "width_m": 1,
+      "height_m": 0.5,
       "travel_m": 0,
-      "period_s": 60
+      "period_s": 200
      }
     }
    ]
   },
   {
-   "name": "cradle_descending_slowly",
+   "name": "slow_moving_cradle",
    "group": "Maintenance cradle in the way",
-   "reason": "A slowly moving cradle might descend onto the robot, which knows nothing about objects on the glass.",
+   "reason": "A cradle moving slowly through the area may strike the robot, which cannot sense it.",
    "calls": [
     {
      "fn": "add_cradle",
      "args": {
-      "name": "slow_descending_cradle",
-      "material": "galvanised",
-      "x_m": 1.2,
-      "below_top_m": -1,
+      "name": "slow_window_washing_cradle",
+      "material": "painted_steel",
+      "x_m": 1.6,
+      "below_top_m": 1.5,
       "width_m": 2,
       "height_m": 1,
-      "travel_m": 3,
-      "period_s": 120
+      "travel_m": 2,
+      "period_s": 100
      }
     }
    ]
   },
   {
-   "name": "wide_cradle_fast_full_travel",
+   "name": "fast_wide_cradle_sweep",
    "group": "Maintenance cradle in the way",
-   "reason": "A wide cradle moving fast over the full area might strike the robot and knock it off the glass.",
+   "reason": "A wide cradle sweeping quickly over the whole area may knock the robot off the glass.",
    "calls": [
     {
      "fn": "add_cradle",
      "args": {
-      "name": "wide_fast_cradle",
-      "material": "galvanised",
-      "x_m": 1.2,
-      "below_top_m": -2,
+      "name": "fast_facade_access_cradle",
+      "material": "painted_steel",
+      "x_m": 0.8,
+      "below_top_m": -0.5,
       "width_m": 4,
       "height_m": 1.5,
       "travel_m": 6,
@@ -542,156 +672,56 @@
    ]
   },
   {
-   "name": "twice_the_usual_dirt",
-   "group": "Heavy dirt left behind",
-   "reason": "Twice the nominal grime might need more pad work than one pass over the glass can give.",
+   "name": "corner_just_beyond_margin",
+   "group": "Building corner near lanes",
+   "reason": "A corner just past the area reduces the spare glass if the robot drifts sideways.",
    "calls": [
     {
-     "fn": "set_dirt",
+     "fn": "set_corner",
      "args": {
-      "level": 1.2
+      "x_m": 3.1,
+      "side": 1
      }
     }
    ]
   },
   {
-   "name": "heaviest_dirt_at_top_speed",
-   "group": "Heavy dirt left behind",
-   "reason": "The heaviest grime at the fastest allowed speed might leave the glass visibly dirty.",
+   "name": "corner_left_of_start",
+   "group": "Building corner near lanes",
+   "reason": "A corner just beside the start may put the first lane's body or sensor off the glass.",
    "calls": [
     {
-     "fn": "set_dirt",
+     "fn": "set_corner",
      "args": {
-      "level": 2
-     }
-    },
-    {
-     "fn": "set_robot",
-     "args": {
-      "clean_speed_ms": 0.2
+      "x_m": -0.1,
+      "side": -1
      }
     }
    ]
   },
   {
-   "name": "grime_band_below_a_ledge_line",
-   "group": "Heavy dirt left behind",
-   "reason": "A heavy local band of grime could stay dirty after the pass that cleans the rest of the area.",
+   "name": "corner_inside_work_area",
+   "group": "Building corner near lanes",
+   "reason": "A corner inside the work area removes glass under planned lanes and may drive the robot off the edge.",
    "calls": [
     {
-     "fn": "add_dirt_patch",
+     "fn": "set_corner",
      "args": {
-      "name": "soot_streak_band",
-      "x_m": 1.2,
-      "below_top_m": 1.5,
-      "width_m": 2.4,
-      "height_m": 1,
-      "level": 3
+      "x_m": 1.6,
+      "side": 1
      }
     }
    ]
   },
   {
-   "name": "pad_pressed_harder",
-   "group": "Pad force out of balance",
-   "reason": "A harder pressed pad adds drag that might slow the drive or make the wheels slip.",
+   "name": "top_margin_slightly_smaller",
+   "group": "Glass ends above climbing robot",
+   "reason": "With strong grip the robot climbs past the area top, and a smaller margin brings the glass edge closer.",
    "calls": [
     {
      "fn": "set_robot",
      "args": {
-      "pad_force_n": 55
-     }
-    }
-   ]
-  },
-  {
-   "name": "pad_at_maximum_force",
-   "group": "Pad force out of balance",
-   "reason": "Maximum pad force might push the body off the glass or overwhelm wheel traction.",
-   "calls": [
-    {
-     "fn": "set_robot",
-     "args": {
-      "pad_force_n": 90
-     }
-    }
-   ]
-  },
-  {
-   "name": "light_pad_on_dirtier_glass",
-   "group": "Pad force out of balance",
-   "reason": "A light pad on dirtier glass might glide across the grime without removing enough of it.",
-   "calls": [
-    {
-     "fn": "set_robot",
-     "args": {
-      "pad_force_n": 8
-     }
-    },
-    {
-     "fn": "set_dirt",
-     "args": {
-      "level": 1.2
-     }
-    }
-   ]
-  },
-  {
-   "name": "battery_quarter_charged",
-   "group": "Battery runs out mid job",
-   "reason": "A quarter charge might run out before the last lane once fan and drive power are counted.",
-   "calls": [
-    {
-     "fn": "set_robot",
-     "args": {
-      "battery_start_frac": 0.25
-     }
-    }
-   ]
-  },
-  {
-   "name": "battery_nearly_empty",
-   "group": "Battery runs out mid job",
-   "reason": "With almost no charge the fan could stop while the robot is still on the glass.",
-   "calls": [
-    {
-     "fn": "set_robot",
-     "args": {
-      "battery_start_frac": 0.06
-     }
-    }
-   ]
-  },
-  {
-   "name": "large_area_slow_part_charge",
-   "group": "Battery runs out mid job",
-   "reason": "A large area at slow speed on a part charge could take longer than the battery lasts.",
-   "calls": [
-    {
-     "fn": "set_work_area",
-     "args": {
-      "w": 5,
-      "h": 6
-     }
-    },
-    {
-     "fn": "set_robot",
-     "args": {
-      "clean_speed_ms": 0.08,
-      "battery_start_frac": 0.6
-     }
-    }
-   ]
-  },
-  {
-   "name": "strong_climb_with_smallest_margin",
-   "group": "Climbing past the glass edge",
-   "reason": "Strong suction on dry glass could carry the robot past the area top and reach a close glass edge.",
-   "calls": [
-    {
-     "fn": "set_robot",
-     "args": {
-      "suction_pa": 5000
+      "suction_pa": 4500
      }
     },
     {
@@ -703,20 +733,71 @@
     {
      "fn": "set_work_area",
      "args": {
-      "margin": 0.4
+      "margin": 0.85
      }
     }
    ]
   },
   {
-   "name": "strong_climb_under_low_setback",
-   "group": "Climbing past the glass edge",
-   "reason": "A setback just above the area might end the glass under a robot that has climbed too far.",
+   "name": "high_setback_above_area",
+   "group": "Glass ends above climbing robot",
+   "reason": "A setback above the area may meet the nose sensor of a robot that overclimbs on dry glass.",
    "calls": [
     {
      "fn": "set_robot",
      "args": {
-      "suction_pa": 5000
+      "suction_pa": 4500
+     }
+    },
+    {
+     "fn": "set_weather",
+     "args": {
+      "wetness": 0
+     }
+    },
+    {
+     "fn": "set_setback",
+     "args": {
+      "above_top_m": 1.5,
+      "depth_m": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "top_margin_half_size",
+   "group": "Glass ends above climbing robot",
+   "reason": "A half size margin may let an overclimbing robot reach the glass edge before it turns back.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "suction_pa": 4500
+     }
+    },
+    {
+     "fn": "set_weather",
+     "args": {
+      "wetness": 0
+     }
+    },
+    {
+     "fn": "set_work_area",
+     "args": {
+      "margin": 0.5
+     }
+    }
+   ]
+  },
+  {
+   "name": "lowest_deep_setback",
+   "group": "Glass ends above climbing robot",
+   "reason": "The lowest, deepest setback leaves almost no room above the area, so an overclimbing body may run off the glass.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "suction_pa": 4500
      }
     },
     {
@@ -729,139 +810,7 @@
      "fn": "set_setback",
      "args": {
       "above_top_m": 0.6,
-      "depth_m": 2
-     }
-    }
-   ]
-  },
-  {
-   "name": "firm_climb_under_higher_setback",
-   "group": "Climbing past the glass edge",
-   "reason": "A higher setback with slightly less suction sits near the limit of how far the robot might overshoot.",
-   "calls": [
-    {
-     "fn": "set_robot",
-     "args": {
-      "suction_pa": 4200
-     }
-    },
-    {
-     "fn": "set_weather",
-     "args": {
-      "wetness": 0
-     }
-    },
-    {
-     "fn": "set_setback",
-     "args": {
-      "above_top_m": 1.2,
-      "depth_m": 1
-     }
-    }
-   ]
-  },
-  {
-   "name": "strong_climb_near_building_corner",
-   "group": "Climbing past the glass edge",
-   "reason": "A building corner just past the last lane could leave the robot with no glass under one side if it drifts.",
-   "calls": [
-    {
-     "fn": "set_robot",
-     "args": {
-      "suction_pa": 5000
-     }
-    },
-    {
-     "fn": "set_weather",
-     "args": {
-      "wetness": 0
-     }
-    },
-    {
-     "fn": "set_corner",
-     "args": {
-      "x_m": 2.9,
-      "side": 1
-     }
-    }
-   ]
-  },
-  {
-   "name": "drizzle_breeze_slightly_worn_seal",
-   "group": "Rain wind and worn seal together",
-   "reason": "Each mild problem may be harmless alone, but together they might use up the grip margin.",
-   "calls": [
-    {
-     "fn": "set_weather",
-     "args": {
-      "wetness": 0.5
-     }
-    },
-    {
-     "fn": "set_robot",
-     "args": {
-      "seal_leak_mm2": 400
-     }
-    },
-    {
-     "fn": "set_wind",
-     "args": {
-      "steady_ms": 6,
-      "gust_ms": 14
-     }
-    }
-   ]
-  },
-  {
-   "name": "rain_gusts_worn_seal_weak_fan",
-   "group": "Rain wind and worn seal together",
-   "reason": "Lower friction, less vacuum and more wind load could combine to make the robot slip.",
-   "calls": [
-    {
-     "fn": "set_weather",
-     "args": {
-      "wetness": 0.8
-     }
-    },
-    {
-     "fn": "set_robot",
-     "args": {
-      "seal_leak_mm2": 700,
-      "suction_pa": 2400
-     }
-    },
-    {
-     "fn": "set_wind",
-     "args": {
-      "steady_ms": 9,
-      "gust_ms": 20
-     }
-    }
-   ]
-  },
-  {
-   "name": "heavy_rain_storm_torn_seal",
-   "group": "Rain wind and worn seal together",
-   "reason": "Fully wet glass, a badly leaking seal and storm gusts might detach the robot quickly.",
-   "calls": [
-    {
-     "fn": "set_weather",
-     "args": {
-      "wetness": 1
-     }
-    },
-    {
-     "fn": "set_robot",
-     "args": {
-      "seal_leak_mm2": 1000,
-      "suction_pa": 2000
-     }
-    },
-    {
-     "fn": "set_wind",
-     "args": {
-      "steady_ms": 14,
-      "gust_ms": 32
+      "depth_m": 3
      }
     }
    ]
@@ -869,48 +818,44 @@
  ],
  "not_tested": [
   {
-   "factor": "Safety tether and recovery",
-   "reason": "No function represents a safety line, its drag, or how a detached robot is caught and recovered."
+   "factor": "Safety tether and fall arrest",
+   "reason": "No function adds a tether, an anchor or a catch system, so what happens after a detachment cannot be judged."
   },
   {
-   "factor": "Ice on the glass",
-   "reason": "No function places an ice film, and these worlds do not rely on temperature to stand in for frozen glass."
+   "factor": "Wear over many jobs",
+   "reason": "Seal leak and suction can be set for one run, but gradual ageing of the skirt, pump and drive is not represented."
   },
   {
-   "factor": "Heat and cold on seal rubber",
-   "reason": "The functions set seal leak directly, so stiffening or softening of the rubber with temperature is not represented."
+   "factor": "Sudden pump or motor faults",
+   "reason": "Settings hold for the whole run, so a pump, drive or power failure partway up the glass cannot be triggered."
+  },
+  {
+   "factor": "Glass damage and scratches",
+   "reason": "The functions do not represent cracked panes, or scratches from grit trapped under the pad."
+  },
+  {
+   "factor": "Cleaning fluid supply",
+   "reason": "No function covers a fluid tank, spray nozzles or fluid running out during a job."
   },
   {
    "factor": "Sensor faults",
-   "reason": "No function can blind, block or corrupt the nose sensors or other onboard sensing."
+   "reason": "There is no way to add sensor noise, a dirty sensor or a failed nose sensor, including from reflections on glass."
   },
   {
-   "factor": "Fan or motor failure",
-   "reason": "Suction can be set lower at the start, but a sudden fan or drive failure during a run cannot be scripted."
+   "factor": "Control link and operator actions",
+   "reason": "Loss of communication, operator commands and manual recovery from a stuck robot cannot be set."
   },
   {
-   "factor": "Damage to glass and coatings",
-   "reason": "The world does not represent scratches, coating wear or cracked panes caused by the pad or wheels."
+   "factor": "Building airflow effects",
+   "reason": "Wind is set by speed and direction only, so corner acceleration and updrafts along the facade are not modelled by these calls."
   },
   {
-   "factor": "Cleaning fluid and streaks",
-   "reason": "Fluid supply, dripping and streak marks are not available as settings, only dirt level and wetness."
+   "factor": "Temperature effects on hardware",
+   "reason": "These worlds leave temperature alone because it is unclear that it changes the run, so stiff seals, ice and hot glass remain untested."
   },
   {
-   "factor": "Human placement and handling",
-   "reason": "Errors while an operator attaches the robot to the glass or lifts it off cannot be represented."
-  },
-  {
-   "factor": "Communication loss",
-   "reason": "No function models a lost control link or how the robot should behave when it happens."
-  },
-  {
-   "factor": "Falling debris and birds",
-   "reason": "Only fixed or scheduled building equipment fits here, so sudden loose debris or bird strikes are left out."
-  },
-  {
-   "factor": "Worn or dirty wheels",
-   "reason": "Wheel wear and grime on the drive surfaces have no setting, so their loss of traction is not separated out."
+   "factor": "Placing and retrieving the robot",
+   "reason": "The run begins with the robot already on the glass, so installing it and taking it off at height are not covered."
   }
  ]
 }

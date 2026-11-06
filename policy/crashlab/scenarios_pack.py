@@ -89,7 +89,8 @@ About this world:
 {notes}
 
 Rules:
-- Each scenario tests one idea and must change the physics. "group" names the failure idea and "reason" says in one plain sentence why this might break the robot. Use the same group name for all scenarios of one idea, with 3 to 8 per group. Vary the values and places within a group, from likely to harsh.
+- Each scenario tests one idea and must change the physics. "group" names the failure idea and "reason" says in one plain sentence why this might break the robot. Use the same group name for all scenarios of one idea, with 3 to 8 per group. Vary the places within a group.
+- Spread the values in each group from mild to harsh. Read the current world's value first. The first world in a group is a small step from that value, about 10 to 25 percent, which the robot probably still handles. The next worlds step further, and only the last is harsh. Never start a group at a value that is already far from the current one. About a third of the list should be mild.
 - Reach for cases where the robot could really fail, and also near the edges of what it handles, so that some pass and some fail.
 - Objects must belong here: real things found at this site, with realistic materials and supports, never floating. Give each object a name that says what it is, and no name like box1 or obstacle.
 - You decide the count from how many failure modes matter here. Say why in count_reason. A thorough list is often 30 to {MAX_WORLDS} worlds, and the limit is {MAX_WORLDS}. Use no round default.
@@ -261,7 +262,7 @@ def run(req):
         rows = _spread(rows, req["limit"])
     held = held_back([r["group"] for r in rows])
     worlds = [{"index": i, "name": r["name"], "group": r["group"], "reason": r["reason"], "held_back": i in held, "seed": SEED_BASE + i, "changes": r["lines"], "calls": r["calls"],
-               "world": r["world"], "hash": r["hash"], "outline": r["outline"], "t_limit": r["t_limit"]} for i, r in enumerate(rows)]
+               "world": r["world"], "hash": r["hash"], "outline": r["outline"], "t_limit": r["t_limit"], "marks": r["marks"]} for i, r in enumerate(rows)]
     groups = {}
     for r in rows:
         groups.setdefault(r["group"], {"name": r["group"], "reason": r["reason"], "count": 0})["count"] += 1

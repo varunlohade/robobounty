@@ -171,8 +171,7 @@ try {
   await clickOn(`.sq[data-index="${index}"]`);
   await c.until(`document.querySelector('.grid-replay .viewport')?.dataset.ready === 'true' && Number(document.querySelector('.grid-replay .viewport').dataset.frame) > 0`, 'replay plays', 30);
   const rail = await c.js(`document.querySelector('.grid-rail').innerText`);
-  for (const word of ['Judge', 'Why this scenario', 'Numbers', 'Last log lines', 'Open file', 'Coming next']) check(`detail has ${word}`, rail.includes(word));
-  check('Open file is disabled', await c.js(`[...document.querySelectorAll('.grid-rail .grid-btn')].find(b => b.textContent === 'Open file').disabled`));
+  for (const word of ['Judge', 'Why this scenario', 'Numbers', 'Last log lines', 'Open file']) check(`detail has ${word}`, rail.includes(word));
   check('one WebGL context with the replay open', (await gl()).live === 1, JSON.stringify(await gl()));
   await wait(2500);
   await shot('grid-detail.png');
@@ -196,6 +195,28 @@ try {
   await c.until(`document.querySelector('.grid-page').dataset.done === 'true'`, 'campaign done', REAL ? 900 : 120);
   await wait(300);
   await shot('grid-done.png');
+  // What the top says matches what the squares say.
+  const said = await c.js(`(() => {
+    const word = l => l.split('. ')[1] ?? '';
+    const labels = [...document.querySelectorAll('.sq')].map(b => word(b.getAttribute('aria-label')));
+    const chip = k => Number(document.querySelector('.grid-count[data-status=' + k + '] b').textContent);
+    return { stuckSquares: labels.filter(l => /^Stuck|^Froze/.test(l)).length, stuck: chip('stuck'), backSquares: labels.filter(l => /^Held back/.test(l)).length, back: chip('held'), holdSquares: labels.filter(l => /^Safe hold/.test(l)).length, hold: chip('safe_hold'), failedSquares: document.querySelectorAll('.sq[data-status=failed]').length, failed: chip('failed') };
+  })()`);
+  check('a square that says Stuck counts under Stuck', said.stuckSquares === said.stuck, JSON.stringify(said));
+  check('held back and safe hold each count their own squares', said.backSquares === said.back && said.holdSquares === said.hold && said.failedSquares === said.failed);
+  if (REAL) {
+    const marks = await c.js(`[...document.querySelectorAll('.sq')].map(b => Number(b.dataset.marks))`);
+    check('every square carries marks from its scenario', marks.every(n => n > 0), marks.join(','));
+    await c.shot(join(OUT, `grid-real-${PACK}.png`));
+    await c.until(`document.querySelectorAll('.sq[data-picture=film]').length === document.querySelectorAll('.sq:not([data-held=true])').length`, 'every run has its film', 30);
+    const moved = await c.js(`(async () => {
+      const sums = () => [...document.querySelectorAll('.sq canvas')].map(v => { const d = v.getContext('2d').getImageData(0, 0, v.width, v.height).data; let s = 0; for (let i = 0; i < d.length; i += 40) s = (s + d[i]) % 65521; return s; });
+      const a = sums(); await new Promise(r => setTimeout(r, 1000)); const b = sums();
+      return { changed: a.filter((v, i) => v !== b[i]).length, pictured: document.querySelectorAll('.sq[data-picture]').length };
+    })()`);
+    check('squares move on screen', moved.pictured > 0 && moved.changed >= moved.pictured * 0.7, JSON.stringify(moved));
+    await c.shot(join(OUT, `grid-video-${PACK}.png`));
+  }
   check('Finished line shows', /Finished in/.test(await c.js(`document.querySelector('.grid-clock').textContent`)));
 
   // A reload finds the finished grid again.

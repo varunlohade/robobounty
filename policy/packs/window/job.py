@@ -10,6 +10,9 @@ import pack_job
 
 from . import pack as P
 
+from . import frames as FR
+import scene5 as SCENE
+
 R, W, J = P.R, P.W, P.J
 NAME, ROBOT, BACKEND, NOTE = P.NAME, P.ROBOT, P.BACKEND, P.SIMULATED_NOTE
 catalog, call, physics_hash, controller_files = P.catalog, P.call, P.physics_hash, P.controller_files
@@ -48,6 +51,55 @@ def call_line(fn, args):
     return f"{fn} " + ", ".join(f"{k} {v:g}" if isinstance(v, float) else f"{k} {v}" for k, v in args.items())
 
 
+# (section, fields that trigger it, fields to show, icon, words): a setting the world's functions changed, as one small icon and value on the square.
+WIND_FIELDS = ("steady_ms", "gust_ms", "gust_start_s", "gust_duration_s", "gust_count", "gust_period_s", "dir_deg")
+VALUE_MARKS = (
+    ("wind", WIND_FIELDS, ("steady_ms", "gust_ms"), "wind", lambda s, g: f"{s:g}/{g:g} m/s"),
+    ("weather", ("wetness",), ("wetness",), "rain", lambda v: f"wet {v * 100:.0f}%"),
+    ("weather", ("dust_gm2",), ("dust_gm2",), "dirt", lambda v: f"dust {v:g} g/m2"),
+    ("weather", ("temperature_c",), ("temperature_c",), "heat", lambda v: f"{v:g} C"),
+    ("weather", ("humidity_pct",), ("humidity_pct",), "rain", lambda v: f"humid {v:g}%"),
+    ("robot", ("suction_pa",), ("suction_pa",), "suction", lambda v: f"{v:.0f} Pa"),
+    ("robot", ("seal_leak_mm2",), ("seal_leak_mm2",), "leak", lambda v: f"leak {v:.0f} mm2"),
+    ("robot", ("pad_force_n",), ("pad_force_n",), "pad", lambda v: f"pad {v:g} N"),
+    ("robot", ("battery_start_frac",), ("battery_start_frac",), "battery", lambda v: f"{v * 100:.0f}%"),
+    ("robot", ("clean_speed_ms",), ("clean_speed_ms",), "speed", lambda v: f"{v:g} m/s"),
+    ("area", ("dirt_level",), ("dirt_level",), "dirt", lambda v: f"dirt {v:g}"),
+    ("area", ("margin_m",), ("margin_m",), "margin", lambda v: f"margin {v:g} m"),
+    ("area", ("width_m", "height_m"), ("width_m", "height_m"), "margin", lambda w, h: f"area {w:g}x{h:g} m"),
+    ("area", ("drop_below_roof_m",), ("drop_below_roof_m",), "margin", lambda v: f"{v:g} m down"),
+    ("panes", ("width_m", "height_m", "offset_x_m", "offset_z_m", "skip_every"), ("width_m", "height_m"), "panes", lambda w, h: f"panes {w:g}x{h:g} m"),
+    ("panes", ("joint_depth_m", "joint_gap_m"), ("joint_depth_m", "joint_gap_m"), "panes", lambda d, g: f"joint {d * 1000:g}x{g * 1000:g} mm"),
+    ("tower", ("height_m", "width_m", "floor_m"), ("height_m",), "margin", lambda v: f"tower {v:g} m"),
+    ("robot_start", ("x_m", "above_top_m"), ("x_m", "above_top_m"), "route", lambda x, z: f"start {x:g}, {z:g} m"),
+)
+
+
+def _object_words(o):
+    props, depth_mm = o["props"], o["size"][1] * 1000 if len(o["size"]) > 1 else 0
+    return {"wet_patch": lambda: f"wet patch {props['wetness'] * 100:.0f}%", "dirt_patch": lambda: f"grime {props['level']:g}", "vent": lambda: f"vent {props['open_frac'] * 100:.0f}% open",
+            "cradle": lambda: f"cradle {props['travel_m']:g} m travel", "object": lambda: "fixture"}.get(o["kind"], lambda: f"{o['kind'].replace('_', ' ')} {depth_mm:.0f} mm")()
+
+
+def marks(base, world):
+    """What this scenario changed, from its world: each new or moved object's rectangle on the glass in outline axes, and each changed setting as a value. Nothing else."""
+    base, world = W.validate(base), W.validate(world)
+    was = {o["name"]: o for o in base["objects"]}
+    out = []
+    for o in world["objects"]:
+        if was.get(o["name"]) != o:
+            x0, x1, z0, z1 = SCENE._rect(world, o)
+            out.append({"kind": "shape", "what": o["kind"], "name": o["name"], "text": _object_words(o), "points": [[x0, z0], [x1, z0], [x1, z1], [x0, z1]]})
+    for section, trigger, shown, icon, words in VALUE_MARKS:
+        if any(base[section][f] != world[section][f] for f in trigger):
+            out.append({"kind": "value", "icon": icon, "text": words(*(world[section][f] for f in shown))})
+    for side in ("corner", "setback"):
+        if world["tower"][side] and base["tower"][side] != world["tower"][side]:
+            at = world["tower"][side]
+            out.append({"kind": "value", "icon": side, "text": f"corner at {at['x_m']:g} m" if side == "corner" else f"setback {at['above_top_m']:g} m up"})
+    return out
+
+
 def code_line(result, folder):
     """The controller branch active when the first rule fired. It comes from the recorded phase, and is not an executed-line trace."""
     fired = result["fired"]
@@ -76,15 +128,24 @@ def _finish(result, world, folder):
 
 def run(world, seed, out, progress):
     real_step = P.R.S.Sim.step
+    frames_on = pack_job.frames_on(progress)
+    camera = FR.Camera(world) if frames_on else None
+    clock = pack_job.FrameClock(out, camera.live) if frames_on else None
 
     def step(sim, action):
         x, z = sim.body_xz()
         progress.update(sim.t, x, z)
+        if frames_on:
+            clock.tick(sim.d)  # Copies the state to a separate model and draws there. The sim's state is not touched.
+            progress.frames = clock.count
         return real_step(sim, action)
     P.R.S.Sim.step = step
     folder = out / "run"
     record, meta = P.run(world, seed=seed, out=folder)
-    return _finish(record["result"], meta["world"], folder)
+    done = _finish(record["result"], meta["world"], folder)
+    if frames_on:
+        done["film"] = pack_job.write_film(out, camera.film(folder))
+    return done
 
 
 def judge_again(out):

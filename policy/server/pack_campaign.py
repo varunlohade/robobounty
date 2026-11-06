@@ -18,6 +18,7 @@ STUCK_S = 30.0
 POLL_S = 0.25
 GRID_EVERY_S = 1.0
 STATUSES = ("queued", "running", "passed", "failed", "stuck", "held")
+COUNTS = ("queued", "running", "passed", "failed", "stuck", "held", "safe_hold")  # held is only worlds held back. A run that ended in a safe hold has status held too, and counts under safe_hold.
 LOG_LINES = 30
 LIBRARY_NOISE = re.compile(r"^(Module |Warp |   |Kernel cache|$)")  # Warp's start-up lines hide the run's own.
 HELD_BACK_WORDS = "Held back. It stays out of this campaign, to test a fix on a world the fix never saw."
@@ -50,10 +51,15 @@ def tail(path, n=LOG_LINES):
         return []
 
 
+def count_rows(rows):
+    counts = Counter("safe_hold" if r["status"] == "held" and not r["held_back"] else r["status"] for r in rows)
+    return {k: counts.get(k, 0) for k in COUNTS}
+
+
 def initial_row(world):
     held = world["held_back"]
     return {"index": world["index"], "name": world["name"], "group": world["group"], "reason": world["reason"], "status": "held" if held else "queued", "held_back": held,
-            "t": None, "t_limit": world["t_limit"], "x": None, "y": None, "outline": world["outline"], "verdict": None, "verdict_reason": HELD_BACK_WORDS if held else None}
+            "t": None, "t_limit": world["t_limit"], "x": None, "y": None, "outline": world["outline"], "marks": world.get("marks", []), "frames": 0, "film": None, "verdict": None, "verdict_reason": HELD_BACK_WORDS if held else None}
 
 
 class Child:
@@ -77,9 +83,8 @@ class Campaign:
         self.started, self.running, self.wall = None, False, 0.0
 
     def grid(self):
-        counts = Counter(r["status"] for r in self.rows)
         elapsed = self.wall if not self.running else time.monotonic() - self.started
-        return {"type": "grid", "campaign": self.cid, "pack": self.pack, "running": self.running, "elapsed_s": round(elapsed, 1), "max_procs": self.max_procs, "counts": {s: counts.get(s, 0) for s in STATUSES},
+        return {"type": "grid", "campaign": self.cid, "pack": self.pack, "running": self.running, "elapsed_s": round(elapsed, 1), "max_procs": self.max_procs, "counts": count_rows(self.rows),
                 "rows": [dict(r) for r in self.rows]}
 
     def publish(self):
@@ -113,8 +118,8 @@ class Campaign:
         if code != 0 or not isinstance(result, dict):
             row.update(status="failed", verdict="process_crashed", verdict_reason=f"The run's process ended with exit code {code} and gave no result. It was not retried.")
             return
-        row["status"] = "passed" if result["passed"] else "held" if result.get("safe_hold") else "failed"
-        row.update(verdict=result["verdict"], verdict_reason=result["reason"])
+        row["status"] = "passed" if result["passed"] else "held" if result.get("safe_hold") else "stuck" if result["verdict"] == "stuck" else "failed"  # The judge's stuck reads Stuck on the square, so it counts as stuck.
+        row.update(verdict=result["verdict"], verdict_reason=result["reason"], film=result.get("film"))
         if result.get("end_t") is not None:
             row.update(t=result["end_t"], x=result["end_x"], y=result["end_y"])
 
@@ -132,7 +137,7 @@ class Campaign:
         seen = read_json(child.progress) or {}
         row = child.row
         if seen.get("t") is not None:
-            row.update(t=seen["t"], x=seen["x"], y=seen["y"])
+            row.update(t=seen["t"], x=seen["x"], y=seen["y"], frames=seen.get("frames", 0))
         if seen.get("t") != child.last_t:
             child.last_t, child.moved_at = seen.get("t"), now
         try:
