@@ -5,6 +5,7 @@
   python3 scripts/status.py done hull "Film finished"
   python3 scripts/status.py need world "World ID action name and environment"
   python3 scripts/status.py clear world
+  python3 scripts/status.py show "Login options" design/x.png   # adds a picture or video to the page
   python3 scripts/status.py watch        # rebuilds the page every 15 s
   python3 scripts/status.py build        # rebuilds it once
 
@@ -68,6 +69,16 @@ def need(key, text):
     build()
 
 
+def show(title, path):
+    state = load()
+    state.setdefault("shows", [])
+    state["shows"] = [x for x in state["shows"] if x["path"] != str(path)]
+    state["shows"].insert(0, {"title": title, "path": str(path), "at": now()})
+    state["shows"] = state["shows"][:24]
+    save(state)
+    build()
+
+
 def clear(key):
     state = load()
     state["needs"].pop(key, None)
@@ -115,6 +126,7 @@ main{max-width:980px;margin:0 auto;padding:24px 16px}h1{font-size:20px;font-weig
 .row{display:grid;grid-template-columns:88px 1fr auto;gap:12px;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
 .row b{font-weight:500}.st{font-size:12px}.running{color:var(--blue)}.waiting{color:var(--amber)}.done{color:var(--green)}.failed{color:var(--red)}
 .need{padding:10px 12px;background:#2a2212;color:var(--amber);border-bottom:1px solid var(--line)}.need b{font-weight:500;color:var(--text)}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}figure{margin:0;background:var(--panel);padding:8px}figure img,figure video{width:100%;display:block}figcaption{font-size:12px;padding-top:6px}
 code{font:12px ui-monospace,Menlo,monospace;color:var(--dim)}
 .c{display:grid;grid-template-columns:70px 50px 1fr;gap:8px;padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
 @media(max-width:560px){.row{grid-template-columns:70px 1fr}.row .dim:last-child{grid-column:2}.c{grid-template-columns:50px 1fr}.c code{display:none}}
@@ -129,11 +141,18 @@ def build():
     hours = max(0, left.total_seconds()) / 3600
     work = sorted(state["work"].items(), key=lambda kv: (ORDER.get(kv[1]["status"], 9), kv[1]["title"]))
     parts = [f'<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-             f'<meta http-equiv="refresh" content="15"><title>CrashLab Status</title><style>{CSS}</style><main>',
-             f'<div class="top"><h1>CrashLab build</h1><span class="dim">{now()} now. {hours:.1f} hours to the 09:00 deadline. Reloads every 15 s.</span></div>']
+             f'<meta http-equiv="refresh" content="30"><title>CrashLab Status</title><style>{CSS}</style><main>',
+             f'<div class="top"><h1>CrashLab build</h1><span class="dim">{now()} now. {hours:.1f} hours to the 09:00 deadline. Reloads every 30 s.</span></div>']
     if state["needs"]:
         parts.append("<h2>Needs you</h2>")
         parts += [f'<div class="need"><b>{e(k)}:</b> {e(v)}</div>' for k, v in state["needs"].items()]
+    if state.get("shows"):
+        parts.append("<h2>Latest to look at</h2><div class=\"g\">")
+        for x in state["shows"]:
+            src = "file://" + str((ROOT / x["path"]).resolve())
+            tag = f'<video src="{e(src)}" controls muted loop playsinline></video>' if x["path"].endswith(".mp4") else f'<a href="{e(src)}" target="_blank"><img src="{e(src)}" loading="lazy"></a>'
+            parts.append(f'<figure>{tag}<figcaption>{e(x["title"])} <span class="dim">{e(x["at"])}</span></figcaption></figure>')
+        parts.append("</div>")
     parts.append("<h2>Builders</h2>")
     for _, w in work:
         parts.append(f'<div class="row"><span class="st {e(w["status"])}">{e(w["status"].capitalize())}</span><span><b>{e(w["title"])}</b><br><span class="dim">{e(w["note"])}</span></span><span class="dim">{e(w["at"])}</span></div>')
@@ -157,6 +176,8 @@ def main():
         update(a[1], "done", None, a[2] if len(a) > 2 else "")
     elif a[0] == "need":
         need(a[1], a[2])
+    elif a[0] == "show":
+        show(a[1], a[2])
     elif a[0] == "clear":
         clear(a[1])
     elif a[0] == "watch":
