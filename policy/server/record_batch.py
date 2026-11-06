@@ -98,6 +98,8 @@ def record(port, pack, out, limit):
             for path in (session / "exports" / f"c1-{index:03d}").iterdir():
                 with gzip.GzipFile(run / "export" / f"{path.name}.gz", "wb", mtime=0) as f:
                     f.write(path.read_bytes())
+            (run / "run").mkdir()
+            shutil.copyfile(source / "run" / "actions.jsonl.gz", run / "run" / "actions.jsonl.gz")  # A bounty replays this before it takes the run.
     events = [json.loads(line) for line in (session / "events.jsonl").read_text().splitlines()]
     opening = [e for e in events if e["type"] in ("world", "pose_world")][:1]
     results = [pack_campaign.read_json(folder / f"w{i:03d}" / "job_result.json") for i in ran]

@@ -25,6 +25,6 @@ Warning: in BindingsAtPrim at line 671 of /Users/runner/work/OpenUSD/OpenUSD/pxr
 Warning: in BindingsAtPrim at line 671 of /Users/runner/work/OpenUSD/OpenUSD/pxr/usd/usdShade/materialBindingAPI.cpp -- Found material bindings on prim at path (/anymal/RH_FOOT/visuals/mesh_0) but MaterialBindingAPI is not applied on the prim
 Warning: in BindingsAtPrim at line 671 of /Users/runner/work/OpenUSD/OpenUSD/pxr/usd/usdShade/materialBindingAPI.cpp -- Found material bindings on prim at path (/anymal/RH_FOOT/visuals/mesh_0) but MaterialBindingAPI is not applied on the prim
 t 0 s, x 0.00, y 0.00
-t 10 s, x 1.61, y -0.00
-t 20 s, x 1.62, y -0.08
-verdict fell: The robot fell at 14.5 s, at x 1.6 m, y -0.1 m, after 0 of 3 waypoints, near narrow_steel_crossover_tight.
+t 10 s, x 4.59, y 0.02
+t 20 s, x 7.35, y 4.03
+verdict passed: The robot reached all 3 waypoints in 24.1 s, and stayed within 0.27 m of the route.

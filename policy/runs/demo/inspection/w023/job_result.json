@@ -1,38 +1,51 @@
 {
- "verdict": "stuck",
- "passed": false,
- "reason": "The robot stopped making progress at 7.8 s, after 0 of 3 waypoints, near steel_crossover_steep.",
+ "verdict": "passed",
+ "passed": true,
+ "reason": "The robot reached all 3 waypoints in 25.2 s, and stayed within 0.38 m of the route.",
  "numbers": {
-  "waypoints_reached": 0,
+  "waypoints_reached": 3,
   "waypoints": 3,
-  "stuck_t_s": 7.76,
-  "longest_stall_s": 22.2,
-  "deviation_max_m": 0.79,
-  "deviation_mean_m": 0.619,
-  "min_up_z": 0.894,
-  "min_clearance_m": 0.327,
-  "object_peak_N": 3625.3,
-  "object_contact_s": 13.56,
-  "foot_slip_mps": 0.309,
-  "body_on_ground_peak_N": 815.0
+  "time_s": 25.16,
+  "longest_stall_s": 2.2,
+  "deviation_max_m": 0.379,
+  "deviation_mean_m": 0.084,
+  "min_up_z": 0.922,
+  "min_clearance_m": 0.519,
+  "object_peak_N": 3285.2,
+  "object_contact_s": 18.26,
+  "foot_slip_mps": 0.194,
+  "body_on_ground_peak_N": 0.0
  },
  "events": [
   {
-   "name": "stuck",
-   "t": 7.76,
-   "value": 7.76
+   "name": "waypoint 1",
+   "t": 10.7,
+   "value": 1
+  },
+  {
+   "name": "waypoint 2",
+   "t": 16.64,
+   "value": 2
+  },
+  {
+   "name": "waypoint 3",
+   "t": 25.16,
+   "value": 3
   }
  ],
- "code": {
-  "file": "policy/packs/inspection/controller.py",
-  "line": 37,
-  "why": "RouteFollower picks every walking command here, and it cannot see objects.",
-  "traced": false
- },
- "label": "sim packs/inspection b1c89c64f172",
+ "code": null,
+ "label": "sim packs/inspection 56be05d3c91e",
  "note": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.",
  "safe_hold": false,
- "record_sha256": "5f1c979262f289fe6ca9c9839d822f36382e3c3b24e3ceb180847715cdbe53af",
+ "record_sha256": "aa2bc7ea2f100196ff458d27f042ede1364ede9994e74aa2635ed288a80973a9",
+ "code_sha256": {
+  "packs/inspection/judge.py": "41d49d845bd851178e72a6cb6612e601ac1993c02c80d063b87cfb8d5a8e4928",
+  "packs/inspection/sim.py": "3d5c44379011696c54bb5b8e448499cc0418d452d2d4409f6196d1f648d14e7e",
+  "packs/inspection/world.py": "c9fe30c7eed32da94d529cf60dc344a9d658ddff5e0460477d29a19e17afe353",
+  "packs/inspection/model.py": "6f10190053edc400c5a6b3fbfbf4f7aa72808a8da1e4d5352e1bd838fb22bc00",
+  "packs/inspection/plant.py": "2175c9bc85dd93e287992d31a9fcb1ef280d9b0c48e25c905a3adc853217ce8d",
+  "packs/inspection/controller.py": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38"
+ },
  "film": {
   "count": 24,
   "cols": 6,
@@ -40,8 +53,8 @@
   "h": 150
  },
  "seed": 3123,
- "wall_s": 25.9,
- "end_t": 30.0,
- "end_x": 1.333,
- "end_y": 0.709
+ "wall_s": 22.95,
+ "end_t": 27.3,
+ "end_x": 10.573,
+ "end_y": 3.997
 }

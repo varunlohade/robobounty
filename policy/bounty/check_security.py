@@ -170,7 +170,7 @@ def small_campaign(runs, target, held_back, passed):
     (folder / "grid.json").write_text(json.dumps({"pack": "inspection", "running": False, "rows": rows}))
 
 
-FAKE = {"verdict": "timed_out", "passed": False, "reason": "A test row, with no sim.", "numbers": {}, "events": []}
+FAKE = {"verdict": "timed_out", "passed": False, "reason": "A test row, with no sim.", "numbers": {}, "events": [], "code_sha256": X.frozen_shas("inspection")}
 FAKE_PASS = {**FAKE, "verdict": "passed", "passed": True}
 
 
@@ -444,27 +444,60 @@ def full(root):
     print(f"full section: {time.time() - t0:.0f} s", flush=True)
 
 
-def stale_rule(root):
-    """A stored batch, in the shape of a campaign, against copies of the code. Only compiling runs here, no sim."""
+def demo_campaign(campaign):
+    """The stored window batch in the shape of a finished campaign. Returns its worlds."""
     import gzip
     demo = X.POLICY / "runs" / "demo" / "window"
     with gzip.open(demo / "scenarios.json.gz", "rt") as f:
-        worlds = json.load(f)["worlds"]
-    campaign = root / "stale_campaign"
-    for w in worlds:
-        stored = demo / f"w{w['index']:03d}" / "export" / "result.json.gz"
+        plan = json.load(f)
+    with gzip.open(demo / "timeline.json.gz", "rt") as f:
+        last = json.load(f)[-1]
+    for w in plan["worlds"]:
         if not w["held_back"]:
-            (campaign / f"w{w['index']:03d}" / "run").mkdir(parents=True)
-            with gzip.open(stored, "rb") as f:
-                (campaign / f"w{w['index']:03d}" / "run" / "result.json").write_bytes(f.read())
-    base = hashlib.sha256(WINDOW.encode()).hexdigest()
+            run, source = campaign / f"w{w['index']:03d}", demo / f"w{w['index']:03d}"
+            (run / "run").mkdir(parents=True)
+            shutil.copyfile(source / "job_result.json", run / "job_result.json")
+            shutil.copyfile(source / "run" / "actions.jsonl.gz", run / "run" / "actions.jsonl.gz")
+            with gzip.open(source / "export" / "result.json.gz", "rb") as f:
+                (run / "run" / "result.json").write_bytes(f.read())
+    (campaign / "scenarios.json").write_text(json.dumps(plan))
+    held = {w["index"]: w["held_back"] for w in plan["worlds"]}
+    (campaign / "grid.json").write_text(json.dumps({"pack": "window", "running": False, "rows": [{**r, "held_back": held[r["index"]]} for r in last["rows"]]}))
+    return plan["worlds"]
 
-    def code(edit=None):
-        out = root / f"stale_code_{time.monotonic_ns()}"
-        shutil.copytree(X.POLICY / "highrise5", out / "highrise5", ignore=shutil.ignore_patterns("__pycache__"))
-        if edit:
-            edit(out / "highrise5")
-        return out
+
+def code_copy(root, edit=None):
+    """A copy of what a replay imports, so one test can change it."""
+    out = root / f"stale_code_{time.monotonic_ns()}"
+    shutil.copytree(X.POLICY / "highrise5", out / "highrise5", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(X.POLICY / "packs" / "window", out / "packs" / "window", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copyfile(X.POLICY / "packs" / "__init__.py", out / "packs" / "__init__.py")
+    (out / "bounty").mkdir()
+    shutil.copyfile(HERE / "rejudge.py", out / "bounty" / "rejudge.py")
+    (out / "server").mkdir()
+    shutil.copyfile(X.POLICY / "server" / "pack_job.py", out / "server" / "pack_job.py")
+    if edit:
+        edit(out / "highrise5")
+    return out
+
+
+DENSE_AIR = ("rho = (AIR_PRESSURE_PA - e) / (287.05 * kelvin) + e / (461.5 * kelvin)", "rho = 1.15 * ((AIR_PRESSURE_PA - e) / (287.05 * kelvin) + e / (461.5 * kelvin))")
+
+
+def thicker_air(folder):
+    path = folder / "world5.py"
+    source = path.read_text()
+    if DENSE_AIR[0] not in source:
+        raise SystemExit("The density attack no longer finds its line in world5.py.")
+    path.write_text(source.replace(*DENSE_AIR))
+
+
+def stale_rule(root):
+    """A stored batch, in the shape of a campaign, against copies of the code. Each stored action log replays on the copy, with no controller."""
+    campaign = root / "stale_campaign"
+    worlds = demo_campaign(campaign)
+    base = hashlib.sha256(WINDOW.encode()).hexdigest()
+    code = lambda edit=None: code_copy(root, edit)
     stale = lambda rows, code_root, sha=base: X._is_stale(campaign, rows, "window", sha, code_root)
     append = lambda name, text: (lambda folder: (folder / name).write_text((folder / name).read_text() + text))
     check("the stored batch is not stale on the code as it is", not stale(worlds, code()))
@@ -489,6 +522,146 @@ def compile(world):
     check("a stored run from another controller is refused", stale(worlds, code(), "0" * 64))
     broken = code(append("compile5.py", "\nraise SystemExit(3)\n"))
     check("a compile error counts as changed", stale(worlds, broken))
+    dense = code(thicker_air)
+    physics = [{"world": w["world"], "physics": w["hash"]} for w in worlds]
+    check("attack: air density x1.15 in world5.py leaves every physics hash the same, so a hash alone misses it", X._same_physics(physics, dense / "highrise5"))
+    check("attack: that density change is refused, since the stored actions no longer replay", stale(worlds, dense))
+    grime = code(append("scene5.py", "\n_real_regions = regions\ndef regions(world, kind, value):\n    return [(*r[:4], r[4] * 0.5) for r in _real_regions(world, kind, value)]\n"))
+    check("attack: a sim change in scene5.py leaves every physics hash the same", X._same_physics(physics, grime / "highrise5"))
+    check("attack: that scene5.py change is refused too", stale(worlds, grime))
+    run = campaign / f"w{public['index']:03d}"
+    real = (run / "job_result.json").read_text()
+    verdict = json.loads(real)
+    (run / "job_result.json").write_text(json.dumps({**verdict, "verdict": "passed" if verdict["verdict"] != "passed" else "slip_distance"}))
+    check("attack: a stored verdict the replay does not give is refused", stale(worlds, code()))
+    (run / "job_result.json").write_text(real)
+    actions = (run / "run" / "actions.jsonl.gz").read_bytes()
+    (run / "run" / "actions.jsonl.gz").unlink()
+    check("attack: a public world with no stored actions is refused", stale(worlds, code()))
+    (run / "run" / "actions.jsonl.gz").write_bytes(actions)
+    payout_rule(root, dense)
+
+
+def payout_rule(root, dense):
+    """The whole money path with a real ledger. The proof itself is stubbed, since what this tests is the last check before a payout."""
+    runs = root / "payout_runs"
+    worlds = demo_campaign(runs / SESSION / "campaigns" / "c1")
+    grid = json.loads((runs / SESSION / "campaigns" / "c1" / "grid.json").read_text())
+    group = max(X._fixable_groups("window", grid["rows"]).items(), key=lambda kv: kv[1])[0]
+    made = root / "payout_board"
+    check("attack: a post on the changed code is refused", refused(lambda: X.post(SESSION, "c1", group, "Dense air", "Check company", 40, root=made, runs=runs, code_root=dense), "campaign_stale"))
+    bid = X.post(SESSION, "c1", group, "Honest post", "Check company", 40, root=made, runs=runs)["id"]
+    folder = X.folder_of(bid, made)
+    check("an honest post on the code as it is goes through", B._ledger(folder).bounty["available"] == 40 and len(worlds) > 0)
+    check("the bounty keeps its own copy of the stored actions", all((folder / "campaign" / f"w{w['index']:03d}" / "run" / "actions.jsonl.gz").is_file() for w in worlds if not w["held_back"]))
+
+    def proved(code):
+        return {"accepted": code == "accepted", "code": code, "words": "A stubbed proof.", "stage": "done", "flags": [], "patched_sha256": "ab" * 32, "sets": {}, "target": []}
+    real_run = FG._run
+    try:
+        FG._run = lambda *a: proved("accepted")
+        row = FG.run(X.reserve(bid, "ana", WINDOW + "\n# only a comment\n", made, secret="s1"), made, code_root=dense)
+        check("attack: a comment-only fix on changed physics gets no payout", row["result"]["code"] == "campaign_stale" and row["payout"] is None, row["result"]["code"])
+        check("it holds no units", B._ledger(folder).bounty["available"] == 40)
+        FG._run = lambda *a: proved("awaiting_company")
+        row = FG.run(X.reserve(bid, "ana", WINDOW + "\n# a flagged line\n", made, secret="s2"), made)
+        row = FG.company_decide(bid, row["n"], True, made, code_root=dense)
+        check("attack: a company approval on changed physics gets no payout", row["result"]["code"] == "campaign_stale" and row["payout"] is None and B._ledger(folder).bounty["available"] == 40, row["result"]["code"])
+        FG._run = lambda *a: proved("accepted")
+        public = next(w for w in worlds if not w["held_back"])
+        actions = folder / "campaign" / f"w{public['index']:03d}" / "run" / "actions.jsonl.gz"
+        kept = actions.read_bytes()
+        actions.unlink()
+        row = FG.run(X.reserve(bid, "ana", WINDOW + "\n# a third\n", made, secret="s3"), made)
+        check("attack: a payout with a stored log gone is refused", row["result"]["code"] == "campaign_stale" and row["payout"] is None, row["result"]["code"])
+        actions.write_bytes(kept)
+        row = FG.run(X.reserve(bid, "bob", WINDOW + "\n# a fourth\n", made, secret="s4"), made)
+        check("an accepted proof on the code as it is holds the pay", row["payout"] and row["payout"]["status"] == "Pending" and B._ledger(folder).bounty["available"] == 0, str(row["result"]["code"]))
+    finally:
+        FG._run = real_run
+
+
+def inspection_rule(root):
+    """Finding: inspection skipped the stale rule. Hashes only here, no sim."""
+    base = hashlib.sha256(INSPECTION.encode()).hexdigest()
+    missing = root / "not_there"
+    import gzip
+    demo = X.POLICY / "runs" / "demo" / "inspection"
+    with gzip.open(demo / "scenarios.json.gz", "rt") as f:
+        check("the stored inspection batch names the code as it is", not X._is_stale(demo, json.load(f)["worlds"], "inspection", base))
+    check("attack: an inspection post with nothing stored is refused", X._is_stale(missing, [{}], "inspection", base))
+    check("attack: an inspection post with no worlds is refused", X._is_stale(missing, [], "inspection", base))
+    code_root = root / "inspection_code"
+    for name in X.FROZEN_FILES["inspection"]:
+        (code_root / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(X.POLICY / name, code_root / name)
+    campaign = root / "inspection_campaign"
+    (campaign / "w001").mkdir(parents=True)
+    worlds = [{"index": 1, "hash": "a" * 64, "world": {}, "held_back": False}, {"index": 2, "hash": "b" * 64, "world": {}, "held_back": True}]
+    job = campaign / "w001" / "job_result.json"
+    stale = lambda rows=worlds, sha=base, code=code_root: X._is_stale(campaign, rows, "inspection", sha, code)
+    check("attack: a stored inspection run with no result is refused", stale())
+    job.write_text(json.dumps({"verdict": "timed_out"}))
+    check("attack: a stored inspection run with no code hashes is refused", stale())
+    job.write_text(json.dumps({"verdict": "timed_out", "code_sha256": X.frozen_shas("inspection", code_root)}))
+    check("a stored inspection run with the same code passes", not stale())
+    check("attack: another controller is refused", stale(sha="0" * 64))
+    check("attack: a held-back world with no hash is refused", stale([worlds[0], {**worlds[1], "hash": None}]))
+    check("attack: code that is not there is refused", stale(code=missing))
+    for name in X.FROZEN_FILES["inspection"]:
+        kept = (code_root / name).read_bytes()
+        (code_root / name).write_bytes(kept + b"\n# changed\n")
+        check(f"attack: a change of one line in {Path(name).name} is refused", stale())
+        (code_root / name).write_bytes(kept)
+
+
+def site_rule(root):
+    """The World ID findings, with labelled mock replies. No real World ID call."""
+    sys.path.insert(0, str(X.POLICY / "server"))
+    import site_world as W
+    human = {"PATH": os.environ["PATH"], "WORLD_APP_ID": "app_mock", "WORLD_ACTION": "crashlab-site-login", "WORLD_RP_ID": "rp_mock", "WORLD_RP_SIGNING_KEY": "0x" + "11" * 32, "WORLD_ENVIRONMENT": "staging"}
+    device = {**human, "WORLD_CREDENTIAL": "device"}
+    db = root / "site_world.sqlite"
+
+    def nonce():
+        value = f"n{time.monotonic_ns()}"
+        with W.closing(W._open(db)) as d:
+            d.execute("INSERT INTO nonces VALUES (?,?,?)", (value, "b", time.time() + 60))
+        return value
+
+    def agrees(result, env):
+        return True, {"success": True, "environment": "staging", "protocol_version": result["protocol_version"], "results": [{"identifier": i.get("identifier"), "success": True} for i in result["responses"]]}
+
+    def human_try(*identifiers):
+        spot = time.monotonic_ns()
+        items = [{"identifier": name, "nullifier": hex(spot + n), "proof": ["0x1"]} for n, name in enumerate(identifiers)]
+        result = {"protocol_version": "4.0", "nonce": nonce(), "action": human["WORLD_ACTION"], "session_id": f"session_{spot}", "environment": "staging", "responses": items}
+        try:
+            return W.verify(result, "b", None, human, db, agrees)["credential"]
+        except W.Rejected as r:
+            return r.code
+
+    def device_try(identifier, protocol="3.0"):
+        value = nonce()
+        item = {"identifier": identifier, "nullifier": hex(time.monotonic_ns()), "merkle_root": "0x1", "proof": "0x1", "signal_hash": W._signal_hash(value, device)}
+        result = {"protocol_version": protocol, "nonce": value, "action": device["WORLD_ACTION"], "environment": "staging", "responses": [item]}
+        try:
+            return W.verify(result, "b", None, device, db, agrees)["credential"]
+        except W.Rejected as r:
+            return r.code
+    for name in ("selfie", "passport", "mnc", "device", "orb"):
+        check(f"attack: human mode refuses a client that picks {name}", human_try(name) == "wrong_credential")
+    check("attack: human mode refuses a good proof beside a chosen one", human_try("proof_of_human", "selfie") == "wrong_credential")
+    check("attack: human mode refuses a proof with no identifier", human_try(None) == "wrong_credential")
+    check("human mode takes proof_of_human", human_try("proof_of_human") == "human")
+    for name in ("proof_of_human", "selfie", "passport", "mnc", "orb"):
+        check(f"attack: device mode refuses a client that picks {name}", device_try(name) == "wrong_credential")
+    check("device mode takes the device identifier", device_try("device") == "device")
+    W.add_login("old_human", "0xa", "staging", "human", db)
+    W.add_login("old_device", "0xb", "staging", "device", db)
+    check("attack: an old human login reads as signed out in device mode", W.login_of("old_human", db, env=device) is None)
+    check("attack: an old device login reads as signed out in human mode", W.login_of("old_device", db, env=human) is None)
+    check("a login still works in its own mode", W.login_of("old_human", db, env=human)["human_id"] == "0xa" and W.login_of("old_device", db, env=device)["human_id"] == "0xb")
 
 
 def could_not_run(root):
@@ -543,6 +716,8 @@ def main():
     f1()
     f2()
     stale_rule(root)
+    inspection_rule(root)
+    site_rule(root)
     could_not_run(root)
     f3_and_secret(root)
     if not ARGS.fast:

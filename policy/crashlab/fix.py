@@ -660,7 +660,7 @@ def replay_ok5(run_folder):
     return done.returncode == 0
 
 
-def rejudge5(pack, controller, world, seed, out):
+def rejudge5(pack, controller, world, seed, out, policy=POLICY):
     """The verdict from a process outside the sandbox that never imports the controller. None if this process could not give one, or the source has no numbers it can use."""
     request = {"pack": pack, "world": world, "seed": seed, "run": str(Path(out) / "run" if pack == "window" else out)}
     if pack == "inspection":
@@ -670,7 +670,7 @@ def rejudge5(pack, controller, world, seed, out):
         request["asset"] = str(sandbox_asset())
     env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "USER", "TMPDIR") if k in os.environ}
     try:
-        done = subprocess.run([str(PACK5[pack]["python"]), "-I", str(REJUDGE)], input=json.dumps(request).encode(), capture_output=True, cwd=POLICY, env={**env, "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "VECLIB_MAXIMUM_THREADS": "1", "MUJOCO_LOG": "0"}, timeout=REJUDGE_WALL_S)
+        done = subprocess.run([str(PACK5[pack]["python"]), "-I", str(Path(policy) / REJUDGE.relative_to(POLICY))], input=json.dumps(request).encode(), capture_output=True, cwd=policy, env={**env, "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "VECLIB_MAXIMUM_THREADS": "1", "MUJOCO_LOG": "0"}, timeout=REJUDGE_WALL_S)
     except subprocess.TimeoutExpired:
         print(f"re-judge: the time limit stopped it, {out}", file=sys.stderr)
         return None

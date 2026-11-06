@@ -1,31 +1,61 @@
 {
- "verdict": "timed_out",
- "passed": false,
- "reason": "The robot reached 0 of 3 waypoints in 30 s and ran out of time. Its longest stall was 25.7 s.",
+ "verdict": "passed",
+ "passed": true,
+ "reason": "The robot reached all 5 waypoints in 29.0 s, and stayed within 0.30 m of the route.",
  "numbers": {
-  "waypoints_reached": 0,
-  "waypoints": 3,
-  "longest_stall_s": 25.7,
-  "deviation_max_m": 0.684,
-  "deviation_mean_m": 0.081,
-  "min_up_z": -0.025,
-  "min_clearance_m": 0.163,
-  "object_peak_N": 2343.7,
-  "object_contact_s": 24.66,
-  "foot_slip_mps": 0.026,
-  "body_on_ground_peak_N": 1583.5
+  "waypoints_reached": 5,
+  "waypoints": 5,
+  "time_s": 28.98,
+  "longest_stall_s": 3.4,
+  "deviation_max_m": 0.301,
+  "deviation_mean_m": 0.068,
+  "min_up_z": 0.99,
+  "min_clearance_m": 0.528,
+  "object_peak_N": 3630.2,
+  "object_contact_s": 9.54,
+  "foot_slip_mps": 0.264,
+  "body_on_ground_peak_N": 0.0
  },
- "events": [],
- "code": {
-  "file": "policy/packs/inspection/controller.py",
-  "line": 37,
-  "why": "RouteFollower picks every walking command here, and it cannot see objects.",
-  "traced": false
- },
- "label": "sim packs/inspection b1c89c64f172",
+ "events": [
+  {
+   "name": "waypoint 1",
+   "t": 4.78,
+   "value": 1
+  },
+  {
+   "name": "waypoint 2",
+   "t": 9.86,
+   "value": 2
+  },
+  {
+   "name": "waypoint 3",
+   "t": 14.96,
+   "value": 3
+  },
+  {
+   "name": "waypoint 4",
+   "t": 20.18,
+   "value": 4
+  },
+  {
+   "name": "waypoint 5",
+   "t": 28.98,
+   "value": 5
+  }
+ ],
+ "code": null,
+ "label": "sim packs/inspection 56be05d3c91e",
  "note": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.",
  "safe_hold": false,
- "record_sha256": "56a3096d3abc7f27f7fc98e6dcd19b8a2e6569f75b7cbb78322084b4f47d100e",
+ "record_sha256": "549283716e8ff5f22e3f407ec7046cb3d3256e431d81452c3e92c765b0e47599",
+ "code_sha256": {
+  "packs/inspection/judge.py": "41d49d845bd851178e72a6cb6612e601ac1993c02c80d063b87cfb8d5a8e4928",
+  "packs/inspection/sim.py": "3d5c44379011696c54bb5b8e448499cc0418d452d2d4409f6196d1f648d14e7e",
+  "packs/inspection/world.py": "c9fe30c7eed32da94d529cf60dc344a9d658ddff5e0460477d29a19e17afe353",
+  "packs/inspection/model.py": "6f10190053edc400c5a6b3fbfbf4f7aa72808a8da1e4d5352e1bd838fb22bc00",
+  "packs/inspection/plant.py": "2175c9bc85dd93e287992d31a9fcb1ef280d9b0c48e25c905a3adc853217ce8d",
+  "packs/inspection/controller.py": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38"
+ },
  "film": {
   "count": 24,
   "cols": 6,
@@ -33,8 +63,8 @@
   "h": 150
  },
  "seed": 3138,
- "wall_s": 25.69,
- "end_t": 30.0,
- "end_x": 2.48,
- "end_y": -0.684
+ "wall_s": 59.82,
+ "end_t": 31.14,
+ "end_x": 10.75,
+ "end_y": 4.021
 }

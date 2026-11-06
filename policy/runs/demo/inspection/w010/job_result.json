@@ -1,31 +1,26 @@
 {
  "verdict": "stuck",
  "passed": false,
- "reason": "The robot stopped making progress at 19.8 s, after 1 of 3 waypoints, near floor_grating.",
+ "reason": "The robot stopped making progress at 9.0 s, after 0 of 3 waypoints, near knee_height_pipe_on_saddles.",
  "numbers": {
-  "waypoints_reached": 1,
+  "waypoints_reached": 0,
   "waypoints": 3,
-  "stuck_t_s": 19.82,
-  "longest_stall_s": 10.2,
-  "deviation_max_m": 0.785,
-  "deviation_mean_m": 0.342,
-  "min_up_z": 0.879,
-  "min_clearance_m": 0.367,
-  "object_peak_N": 5835.4,
-  "object_contact_s": 16.82,
-  "foot_slip_mps": 0.206,
+  "stuck_t_s": 9.0,
+  "longest_stall_s": 21.0,
+  "deviation_max_m": 0.487,
+  "deviation_mean_m": 0.258,
+  "min_up_z": 0.969,
+  "min_clearance_m": 0.511,
+  "object_peak_N": 4607.3,
+  "object_contact_s": 24.32,
+  "foot_slip_mps": 0.158,
   "body_on_ground_peak_N": 0.0
  },
  "events": [
   {
-   "name": "waypoint 1",
-   "t": 5.8,
-   "value": 1
-  },
-  {
    "name": "stuck",
-   "t": 19.82,
-   "value": 19.82
+   "t": 9.0,
+   "value": 9.0
   }
  ],
  "code": {
@@ -34,10 +29,18 @@
   "why": "RouteFollower picks every walking command here, and it cannot see objects.",
   "traced": false
  },
- "label": "sim packs/inspection b1c89c64f172",
+ "label": "sim packs/inspection 56be05d3c91e",
  "note": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.",
  "safe_hold": false,
- "record_sha256": "930172444920316513ddc25bd1a5e0bf6b519c3dd628854da52f53ff69c7425f",
+ "record_sha256": "3ab4b92105fecf72bcd15648cf01d1533c50367beb0762f86eeff065b9e0fdc5",
+ "code_sha256": {
+  "packs/inspection/judge.py": "41d49d845bd851178e72a6cb6612e601ac1993c02c80d063b87cfb8d5a8e4928",
+  "packs/inspection/sim.py": "3d5c44379011696c54bb5b8e448499cc0418d452d2d4409f6196d1f648d14e7e",
+  "packs/inspection/world.py": "c9fe30c7eed32da94d529cf60dc344a9d658ddff5e0460477d29a19e17afe353",
+  "packs/inspection/model.py": "6f10190053edc400c5a6b3fbfbf4f7aa72808a8da1e4d5352e1bd838fb22bc00",
+  "packs/inspection/plant.py": "2175c9bc85dd93e287992d31a9fcb1ef280d9b0c48e25c905a3adc853217ce8d",
+  "packs/inspection/controller.py": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38"
+ },
  "film": {
   "count": 24,
   "cols": 6,
@@ -45,8 +48,8 @@
   "h": 150
  },
  "seed": 3110,
- "wall_s": 35.87,
+ "wall_s": 26.23,
  "end_t": 30.0,
- "end_x": 4.462,
- "end_y": 3.186
+ "end_x": 3.275,
+ "end_y": 0.232
 }

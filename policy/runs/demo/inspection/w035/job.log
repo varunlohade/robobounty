@@ -25,6 +25,6 @@ Warning: in BindingsAtPrim at line 671 of /Users/runner/work/OpenUSD/OpenUSD/pxr
 Warning: in BindingsAtPrim at line 671 of /Users/runner/work/OpenUSD/OpenUSD/pxr/usd/usdShade/materialBindingAPI.cpp -- Found material bindings on prim at path (/anymal/RH_FOOT/visuals/mesh_0) but MaterialBindingAPI is not applied on the prim
 Warning: in BindingsAtPrim at line 671 of /Users/runner/work/OpenUSD/OpenUSD/pxr/usd/usdShade/materialBindingAPI.cpp -- Found material bindings on prim at path (/anymal/RH_FOOT/visuals/mesh_0) but MaterialBindingAPI is not applied on the prim
 t 0 s, x 0.00, y 0.00
-t 10 s, x 2.86, y -0.00
-t 20 s, x 2.86, y -0.00
-verdict stuck: The robot stopped making progress at 3.9 s, after 0 of 3 waypoints, near medium_steel_floor_grating.
+t 10 s, x 5.03, y 2.07
+t 20 s, x 10.07, y 4.02
+verdict passed: The robot reached all 3 waypoints in 20.4 s, and stayed within 0.26 m of the route.

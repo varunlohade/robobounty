@@ -1,0 +1,55 @@
+{
+ "verdict": "stuck",
+ "passed": false,
+ "reason": "The robot stopped making progress at 3.5 s, after 0 of 3 waypoints, near medium_gate_valve_on_spool.",
+ "numbers": {
+  "waypoints_reached": 0,
+  "waypoints": 3,
+  "stuck_t_s": 3.5,
+  "longest_stall_s": 26.5,
+  "deviation_max_m": 0.165,
+  "deviation_mean_m": 0.084,
+  "min_up_z": 0.987,
+  "min_clearance_m": 0.521,
+  "object_peak_N": 11534.4,
+  "object_contact_s": 17.78,
+  "foot_slip_mps": 0.192,
+  "body_on_ground_peak_N": 0.0
+ },
+ "events": [
+  {
+   "name": "stuck",
+   "t": 3.5,
+   "value": 3.5
+  }
+ ],
+ "code": {
+  "file": "policy/packs/inspection/controller.py",
+  "line": 37,
+  "why": "RouteFollower picks every walking command here, and it cannot see objects.",
+  "traced": false
+ },
+ "label": "sim packs/inspection 56be05d3c91e",
+ "note": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.",
+ "safe_hold": false,
+ "record_sha256": "6ae3b527170da4f86f2e40ccc0c37fddd1fa286d40e1672811ca639ec870aa96",
+ "code_sha256": {
+  "packs/inspection/judge.py": "41d49d845bd851178e72a6cb6612e601ac1993c02c80d063b87cfb8d5a8e4928",
+  "packs/inspection/sim.py": "3d5c44379011696c54bb5b8e448499cc0418d452d2d4409f6196d1f648d14e7e",
+  "packs/inspection/world.py": "c9fe30c7eed32da94d529cf60dc344a9d658ddff5e0460477d29a19e17afe353",
+  "packs/inspection/model.py": "6f10190053edc400c5a6b3fbfbf4f7aa72808a8da1e4d5352e1bd838fb22bc00",
+  "packs/inspection/plant.py": "2175c9bc85dd93e287992d31a9fcb1ef280d9b0c48e25c905a3adc853217ce8d",
+  "packs/inspection/controller.py": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38"
+ },
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3133,
+ "wall_s": 61.28,
+ "end_t": 30.0,
+ "end_x": 2.682,
+ "end_y": -0.089
+}

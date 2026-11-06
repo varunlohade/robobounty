@@ -18,6 +18,8 @@ NAME, ROBOT, BACKEND = "inspection", "anymal_c", "newton"
 NOTE = "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated."
 catalog, physics_hash, validate = W.catalog, W.physics_hash, W.validate
 HERE = Path(__file__).resolve().parent
+CODE_ROOT = HERE  # The sandbox points HERE at the session's copy. These hashes name the frozen files.
+CODE_FILES = ("judge.py", "sim.py", "world.py", "model.py", "plant.py", "controller.py")
 NOTES = [
     "Axes: z up, metres. The robot starts at the origin and faces +x. The default route goes to (5, 0), then (5, 4), then (11, 4), inside a 3.4 m walkway. Put a thing on the route for it to matter.",
     "The route follower knows only the route and its pose. The walking policy is blind and reads only the robot's own state. Neither sees objects.",
@@ -109,10 +111,14 @@ def _events(judged):
     return sorted(rows, key=lambda e: e["t"])
 
 
+def code_hashes():
+    return {f"packs/inspection/{name}": hashlib.sha256((CODE_ROOT / name).read_bytes()).hexdigest() for name in CODE_FILES}
+
+
 def _finish(pack, rec, meta):
     judged = pack.judge(rec, meta["world"])
     digest = hashlib.sha256(rec["base_q"].tobytes()).hexdigest()
-    return {**pack_job.split_judged(judged), "events": _events(judged), "code": code_line(judged["verdict"]), "label": meta["label"], "note": NOTE, "safe_hold": False, "record_sha256": digest}, judged
+    return {**pack_job.split_judged(judged), "events": _events(judged), "code": code_line(judged["verdict"]), "label": meta["label"], "note": NOTE, "safe_hold": False, "record_sha256": digest, "code_sha256": code_hashes()}, judged
 
 
 def run(world, seed, out, progress):

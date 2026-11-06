@@ -93,6 +93,22 @@ def propose(row, result, folder, root):
             return {"status": "LedgerRefused", "error": str(e), "ledger_label": B.LEDGER_LABEL}
 
 
+STALE_WORDS = "A stored run no longer matches or no longer replays on the code here, so this proof says nothing about it. Nothing is held. The company must post again."
+
+
+def _stale_for_payout(folder, code_root):
+    """The last check before any payout: the bounty's own stored runs against the code on disk now. Anything that cannot be read counts as stale."""
+    try:
+        info = json.loads((folder / "pack.json").read_text())
+        hidden = json.loads((folder / "hidden.json").read_text())
+        plan = folder / "campaign" / "scenarios.json"
+        if hashlib.sha256(plan.read_bytes()).hexdigest() != hidden["plan_sha256"]:
+            return True
+        return X._is_stale(folder / "campaign", json.loads(plan.read_text())["worlds"], info["pack"], info["controller"]["sha256"], code_root)
+    except (OSError, ValueError, KeyError, TypeError):
+        return True
+
+
 def _frozen_problem(info, code_root):
     now = X.frozen_shas(info["pack"], code_root)
     changed = sorted(Path(k).name for k, v in info["frozen"].items() if now.get(k) != v)
@@ -186,6 +202,8 @@ def run(row, root=B.ROOT, code_root=X.POLICY):
         except (OSError, ValueError, KeyError, TypeError) as e:
             result = _fail("gate_crashed", f"The board stopped this fix with an error ({type(e).__name__}), so there is no verdict.", "gate")
         result = _could_not_run(result, sub) or result
+        if result["code"] == "accepted" and _stale_for_payout(folder, code_root):
+            result = _fail("campaign_stale", STALE_WORDS, "frozen")
         state = "awaiting_company" if result["code"] == "awaiting_company" else X.COULD_NOT_RUN if result["code"] == "could_not_run" else "done"
         payout = propose(row, result, folder, root) if result["code"] == "accepted" else None
         row = {**row, "state": state, "result": result, "payout": payout, "wall_s": round(time.time() - t0, 1)}
@@ -193,7 +211,7 @@ def run(row, root=B.ROOT, code_root=X.POLICY):
     return row
 
 
-def company_decide(bounty_id, n, approve, root=B.ROOT):
+def company_decide(bounty_id, n, approve, root=B.ROOT, code_root=X.POLICY):
     """The company reads the flagged lines. Approve proposes on the ledger; decline ends the fix. It cannot approve a fix that did not pass, because only awaiting_company rows reach this."""
     folder = X.folder_of(bounty_id, root)
     path = folder / "fixes" / str(n) / "fix.json"
@@ -202,7 +220,9 @@ def company_decide(bounty_id, n, approve, root=B.ROOT):
     row = json.loads(path.read_text())
     if row["state"] != "awaiting_company":
         raise B.BoardError("wrong_state", "This fix is not waiting for the company.")
-    if approve:
+    if approve and _stale_for_payout(folder, code_root):
+        row = {**row, "state": "done", "result": _fail("campaign_stale", STALE_WORDS, "frozen")}
+    elif approve:
         result = {**row["result"], "accepted": True, "code": "accepted_by_company", "stage": "done", "words": "It passed, and the company read and approved the flagged lines."}
         row = {**row, "state": "done", "result": result, "payout": propose(row, result, folder, root)}
     else:

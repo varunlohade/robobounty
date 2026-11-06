@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -93,6 +94,8 @@ def _hidden(folder):
 
 RUN_FILES = ("judge5.py", "sim5.py", "run_trial5.py")  # These decide a run's result by themselves, so they must match exactly. So must the controller.
 PHYSICS_CHECK_S = 120
+REPLAY_PROCS = 6
+STORED_RUN_FILES = ("actions.jsonl.gz", "result.json")  # What a replay reads. The bounty keeps its own copy, so a payout can replay the runs it rests on.
 PHYSICS_CHECK = """
 import json, sys
 sys.path.insert(0, sys.argv[1])
@@ -103,11 +106,15 @@ print("same" if all(C.physics_hash(W.validate(w["world"])) == w["physics"] for w
 
 def _is_stale(folder, worlds, pack, base_sha, code_root=POLICY):
     """A stored run from other code or other physics says nothing about the code frozen now. It covers every world the bounty uses, public and hidden. Anything missing counts as stale.
-    The files that build a world may gain new kinds of object, so those are judged by each world's compiled physics hash, not by their own bytes."""
-    if pack != "window":
-        return False
-    now = frozen_shas(pack, code_root)
-    checks = []
+    The files that build a world may gain new kinds of object, so those are judged by each world's compiled physics hash, and every stored action log must replay on the code here, since sim code in those files reaches no hash.
+    An inspection run has no action log, so its stored run must name the exact bytes of every frozen file."""
+    try:
+        now = frozen_shas(pack, code_root)
+    except OSError:
+        return True
+    if not worlds:
+        return True
+    checks, replays = [], []
     for w in worlds:
         if not w.get("hash"):
             return True
@@ -115,6 +122,12 @@ def _is_stale(folder, worlds, pack, base_sha, code_root=POLICY):
         if w["held_back"]:  # A held-back world has no stored run. The proof runs it on both sides.
             continue
         run = Path(F.latest_run5(folder, w["index"]))
+        if pack == "inspection":
+            job = _read(run / "job_result.json") if (run / "job_result.json").is_file() else {}
+            code = job.get("code_sha256") or {}
+            if any(code.get(name) != sha for name, sha in now.items()) or (job.get("controller_sha256") or code.get("packs/inspection/controller.py")) != base_sha:
+                return True
+            continue
         if not (run / "run" / "result.json").is_file():
             return True
         stored = _read(run / "run" / "result.json")
@@ -124,7 +137,10 @@ def _is_stale(folder, worlds, pack, base_sha, code_root=POLICY):
         job = _read(run / "job_result.json") if (run / "job_result.json").is_file() else {}
         if (job.get("controller_sha256") or code.get("controller5.py")) != base_sha:
             return True
-    return not _same_physics(checks, Path(code_root) / "highrise5")
+        replays.append((w, run, job))
+    if pack == "inspection":
+        return False
+    return not (_same_physics(checks, Path(code_root) / "highrise5") and _replays_same(replays, code_root))
 
 
 def _same_physics(worlds, code):
@@ -134,6 +150,16 @@ def _same_physics(worlds, code):
     except subprocess.TimeoutExpired:
         return False
     return done.returncode == 0 and done.stdout.strip() == "same"
+
+
+def _replays_same(replays, code_root):
+    """Each stored action log through the judge outside the sandbox, on the code on disk now. It must give the stored states, result and verdict. No reply counts as changed."""
+    def same(entry):
+        world, run, job = entry
+        judged = F.rejudge5("window", None, world["world"], world["seed"], run.resolve(), code_root)
+        return bool(judged) and judged.get("matches") is True and judged["verdict"] == job.get("verdict") and judged["passed"] == job.get("passed")
+    with ThreadPoolExecutor(REPLAY_PROCS) as pool:
+        return all(pool.map(same, replays))
 
 
 def _public_world(world, row, result):
@@ -150,7 +176,7 @@ def _export_public(pack, campaign, index, out):
     return done.returncode == 0
 
 
-def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DISPUTE_WINDOW, posted_by="company", root=B.ROOT, runs=SERVER_RUNS):
+def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DISPUTE_WINDOW, posted_by="company", root=B.ROOT, runs=SERVER_RUNS, code_root=POLICY):
     """Makes one fix bounty from one failure group. cap = pay, so one fix can win. Returns the public view."""
     title, company = B._text(title, "The title", 120), B._text(company, "The company", 80)
     pay, window = B._amount(pay, "The pay"), B._amount(window, "The dispute window", B.MAX_WINDOW_S)
@@ -175,8 +201,8 @@ def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DI
     session_copy = source.parent.parent / "code" / F.PACK5[pack]["file"].name
     base = session_copy if session_copy.is_file() else F.PACK5[pack]["file"]
     base_text = base.read_text()
-    if _is_stale(source, plan["worlds"], pack, hashlib.sha256(base_text.encode()).hexdigest()):
-        raise B.BoardError("campaign_stale", "A stored run no longer matches. The sim, the judge, this controller or a world's physics changed after it ran. Run those worlds again before you post it.")
+    if _is_stale(source, plan["worlds"], pack, hashlib.sha256(base_text.encode()).hexdigest(), code_root):
+        raise B.BoardError("campaign_stale", "A stored run no longer matches or no longer replays. The sim, the judge, this controller or a world's physics changed after it ran. Run those worlds again before you post it.")
 
     with B.locked(root / ".lock"):
         for p in root.glob("*/hidden.json"):
@@ -196,6 +222,10 @@ def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DI
                 if not w["held_back"] and stored.is_file():
                     (campaign / f"w{w['index']:03d}").mkdir()
                     shutil.copyfile(stored, campaign / f"w{w['index']:03d}" / "job_result.json")
+                    if pack == "window":
+                        (campaign / f"w{w['index']:03d}" / "run").mkdir()
+                        for name in STORED_RUN_FILES:
+                            shutil.copyfile(stored.parent / "run" / name, campaign / f"w{w['index']:03d}" / "run" / name)
             (tmp / F.PACK5[pack]["file"].name).write_text(base_text)
             public = []
             for n, w in enumerate(target):
@@ -208,7 +238,7 @@ def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DI
             with os.fdopen(fd, "w") as f:
                 json.dump(hidden, f)
             info = {"schema": SCHEMA, "kind": "fix_failure", "id": bounty_id, "title": title, "company": company, "pack": pack, "robot": ROBOT_NAME[pack], "group": group, "posted_by": posted_by, "posted_at": time.time(),
-                    "controller": {"file": base.name, "sha256": hashlib.sha256(base_text.encode()).hexdigest()}, "frozen": frozen_shas(pack), "public_worlds": public,
+                    "controller": {"file": base.name, "sha256": hashlib.sha256(base_text.encode()).hexdigest()}, "frozen": frozen_shas(pack, code_root), "public_worlds": public,
                     "hidden_counts": {"held_back": len(held_back), "passed_before": len(passed), "other_failed": len(other)}, "pay": pay, "cap": pay, "window_s": window, "scope": SCOPE[pack], "replay_rejudge": True}
             B.write_json(tmp / "pack.json", info)
             spec_hash = "0x" + G.sha256_hex(G.canonical(info))

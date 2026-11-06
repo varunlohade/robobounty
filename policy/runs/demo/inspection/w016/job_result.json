@@ -1,26 +1,26 @@
 {
- "verdict": "stuck",
+ "verdict": "fell",
  "passed": false,
- "reason": "The robot stopped making progress at 8.9 s, after 0 of 3 waypoints, near knee_height_pipe_on_saddles.",
+ "reason": "The robot fell at 18.6 s, at x 1.2 m, y 1.1 m, after 0 of 3 waypoints, near steel_crossover_typical.",
  "numbers": {
   "waypoints_reached": 0,
   "waypoints": 3,
-  "stuck_t_s": 8.92,
-  "longest_stall_s": 21.1,
-  "deviation_max_m": 0.611,
-  "deviation_mean_m": 0.363,
-  "min_up_z": 0.914,
-  "min_clearance_m": 0.511,
-  "object_peak_N": 5430.9,
-  "object_contact_s": 21.62,
-  "foot_slip_mps": 0.179,
-  "body_on_ground_peak_N": 0.0
+  "fell_t_s": 18.64,
+  "longest_stall_s": 15.4,
+  "deviation_max_m": 1.05,
+  "deviation_mean_m": 0.692,
+  "min_up_z": 0.719,
+  "min_clearance_m": 0.23,
+  "object_peak_N": 3379.9,
+  "object_contact_s": 8.64,
+  "foot_slip_mps": 0.154,
+  "body_on_ground_peak_N": 5881.4
  },
  "events": [
   {
-   "name": "stuck",
-   "t": 8.92,
-   "value": 8.92
+   "name": "fell",
+   "t": 18.64,
+   "value": 18.64
   }
  ],
  "code": {
@@ -29,10 +29,18 @@
   "why": "RouteFollower picks every walking command here, and it cannot see objects.",
   "traced": false
  },
- "label": "sim packs/inspection b1c89c64f172",
+ "label": "sim packs/inspection 56be05d3c91e",
  "note": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.",
  "safe_hold": false,
- "record_sha256": "224193535985a44b04dc50919d81f9446e32814f759083df203ba136896e3857",
+ "record_sha256": "71a09926d175f12e68690b06b54adfbbf6425efe6673c77c644d69e601504f24",
+ "code_sha256": {
+  "packs/inspection/judge.py": "41d49d845bd851178e72a6cb6612e601ac1993c02c80d063b87cfb8d5a8e4928",
+  "packs/inspection/sim.py": "3d5c44379011696c54bb5b8e448499cc0418d452d2d4409f6196d1f648d14e7e",
+  "packs/inspection/world.py": "c9fe30c7eed32da94d529cf60dc344a9d658ddff5e0460477d29a19e17afe353",
+  "packs/inspection/model.py": "6f10190053edc400c5a6b3fbfbf4f7aa72808a8da1e4d5352e1bd838fb22bc00",
+  "packs/inspection/plant.py": "2175c9bc85dd93e287992d31a9fcb1ef280d9b0c48e25c905a3adc853217ce8d",
+  "packs/inspection/controller.py": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38"
+ },
  "film": {
   "count": 24,
   "cols": 6,
@@ -40,8 +48,8 @@
   "h": 150
  },
  "seed": 3116,
- "wall_s": 29.18,
+ "wall_s": 25.02,
  "end_t": 30.0,
- "end_x": 3.274,
- "end_y": 0.398
+ "end_x": 1.034,
+ "end_y": 1.042
 }

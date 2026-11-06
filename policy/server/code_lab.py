@@ -8,6 +8,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -52,7 +53,7 @@ def reply(session):
 def check(pack, source, folder):
     """Reasons a source may not run. The check is fix.py's, in its own process, so the server's imports stay its own."""
     folder.mkdir(parents=True, exist_ok=True)
-    path = folder / "checking.py"
+    path = folder / f"checking_{threading.get_ident()}.py"  # The editor and a run can check at once.
     path.write_text(source)
     done = subprocess.run([str(PYTHON), str(FIX), "check5", pack, str(path)], capture_output=True, text=True)
     path.unlink()
