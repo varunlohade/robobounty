@@ -1,6 +1,6 @@
 """Real checks of the fix bounty: check_board_fix.py t1|t2|t3|t8|t6 [--campaign SESSION/CID] [--keep]. Exit 0 only if every case behaves.
 
-Each section uses its own new folder under policy/runs/board/, named check_fix_<section>_<time>. t1, t3 and t6 start board_server.py on port 5298 and stop it at the end. Results are simulated.
+Each section uses its own new folder under policy/runs/board/, named check_fix_<section>_<time>. t1, t3, t6 and t8 start board_server.py and stop it at the end. It takes a free port, or CHECK_BOARD_PORT, and a port already in use stops the check. Results are simulated.
 """
 import argparse
 import ast
@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -28,7 +29,16 @@ import check_auth_helper as H
 import budget
 
 F = X.F
-PORT = os.environ.get("CHECK_BOARD_PORT", "5298")
+
+
+def own_port():
+    """Port 5298 often holds the owner's live board. A check must never send its POSTs to a server it did not start."""
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", int(os.environ.get("CHECK_BOARD_PORT", 0))))
+        return str(s.getsockname()[1])
+
+
+PORT = own_port()
 BASE = f"http://127.0.0.1:{PORT}"
 ORIGIN = "http://localhost:5199"
 DEFAULT_CAMPAIGN = "5a8d63e3648b469a8142af56c0824119/c1"
