@@ -28,14 +28,14 @@ const ZOOM_MS = 950;
 const ASPECT_MAX = 1.25;
 const OUTLINE_MARGIN = 0.14;
 
-const INK = { text: '#ECEEF1', text2: '#A3A9B3', muted: '#737A85', faint: '#4B515B', line: '#2A2F37', red: '#E5534B', redText: '#F27B73', amberText: '#E3B04F', greenText: '#5CC186' };
+const INK = { text: '#0B0B0C', text2: '#4A4C50', muted: '#63656A', faint: '#B4B6BB', line: '#E7E7EA', red: '#CF3A2F', redText: '#B42A21', amberText: '#855A00', greenText: '#17774A' };
 const MARK_FILL: Record<string, [string, string]> = { wet_patch: ['rgba(90,170,235,.38)', '#6FB7EE'], dirt_patch: ['rgba(176,140,90,.42)', '#C39C66'] };
-const MARK_SOLID: [string, string] = ['rgba(236,238,241,.26)', '#C9CDD3'];
+const MARK_SOLID: [string, string] = ['rgba(11,11,12,.12)', '#8D8F94'];
 const MARK_MIN_PX = 2;
 const FILM_MS = 250; // Each frame of a run's loop.
 const FILM_HOLD = 6; // The last frame waits this many steps, so the end of the run reads before the loop restarts.
 const FILM_STAGGER_MS = 137; // Squares do not step on the same beat.
-const SCRIM = 'rgba(10,12,15,.52)'; // A robot under the words or the map still shows.
+const SCRIM = 'rgba(255,255,255,.84)'; // A robot under the words or the map still shows.
 const INSET_W = 0.34, INSET_H = 0.4;
 const VALUE_ROW = 14;
 const VALUE_ROWS_MAX = 2;
@@ -178,7 +178,7 @@ class Square {
     c.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
     const red = row.status === 'failed' || row.status === 'stuck';
     const amber = row.status === 'held' && !row.held_back;
-    c.fillStyle = red ? '#2A1416' : amber ? '#231C10' : row.status === 'queued' || row.held_back ? '#0E1013' : '#14171B';
+    c.fillStyle = red ? '#FCEDEB' : amber ? '#FBF3E2' : row.status === 'queued' || row.held_back ? '#F7F7F8' : '#FFFFFF';
     c.fillRect(0, 0, w, h);
     if (row.held_back) this.hatch();
 
@@ -289,7 +289,7 @@ class Square {
 
   private hatch() {
     const { c, w, h } = this;
-    c.strokeStyle = 'rgba(255,255,255,.035)';
+    c.strokeStyle = 'rgba(11,11,12,.05)';
     c.lineWidth = 1;
     c.beginPath();
     for (let i = -h; i < w; i += 7) { c.moveTo(i, h); c.lineTo(i + h, 0); }
@@ -322,7 +322,7 @@ class Square {
     c.rect(left, top - 2, w, bottom - top + 4);
     c.clip();
     c.lineWidth = 1;
-    c.strokeStyle = dim ? INK.faint : red ? 'rgba(242,123,115,.45)' : INK.muted;
+    c.strokeStyle = dim ? INK.faint : red ? 'rgba(207,58,47,.45)' : INK.faint;
     c.lineJoin = 'round';
     const ink = c.strokeStyle;
     for (const m of shapes) {
@@ -361,7 +361,7 @@ class Square {
       const dx = px(rx), dy = py(ry);
       if (row.status === 'running') {
         const k = (now % 1400) / 1400;
-        c.strokeStyle = `rgba(236,238,241,${0.5 * (1 - k)})`;
+        c.strokeStyle = `rgba(11,11,12,${0.4 * (1 - k)})`;
         c.lineWidth = 1;
         c.beginPath(); c.arc(dx, dy, 3 + 6 * k, 0, 7); c.stroke();
       }

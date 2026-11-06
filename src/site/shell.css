@@ -1,23 +1,24 @@
-/* Tokens from design/site2/claude/site.css, with text raised for contrast. Prefixed, so a page's own stylesheet cannot clash. */
+/* The sidebar, page head and status line. Colours come from tokens.css. */
+@import "./tokens.css";
 @font-face{font-family:Inter;src:url(../lab/fonts/inter-latin-wght-normal.woff2) format("woff2");font-weight:100 900;font-display:swap}
 @font-face{font-family:"JetBrains Mono";src:url(../lab/fonts/jetbrains-mono-latin-wght-normal.woff2) format("woff2");font-weight:100 800;font-display:swap}
-html,body{height:100%;margin:0;background:#0B0C0E;overflow:hidden}
-.sh-app{--sh-line:rgba(255,255,255,.08);--sh-t1:#ECEEF1;--sh-t2:#B6BCC5;--sh-raised:#16191E;--sh-hover:#1E2228;--sh-ease:cubic-bezier(.23,1,.32,1);
+html,body{height:100%;margin:0;overflow:hidden}
+.sh-app{--sh-line:var(--line);--sh-t1:var(--t1);--sh-t2:var(--t2);--sh-raised:var(--raised);--sh-hover:var(--hover);--sh-ease:cubic-bezier(.23,1,.32,1);
   display:grid;grid-template-columns:216px minmax(0,1fr);grid-template-rows:minmax(0,1fr) 28px;height:100vh;width:100%;
-  font:400 14px/20px Inter,system-ui,sans-serif;color:var(--sh-t1);font-feature-settings:"tnum","cv11";font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;background:#0B0C0E}
+  font:400 14px/20px Inter,system-ui,sans-serif;color:var(--sh-t1);font-feature-settings:"tnum","cv11";font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;background:var(--app)}
 .sh-app *{box-sizing:border-box}
 .sh-nav{display:flex;flex-direction:column;gap:2px;padding:12px 8px 0;border-right:1px solid var(--sh-line);min-height:0}
 .sh-brand{display:flex;align-items:center;gap:9px;height:32px;padding:0 8px;margin-bottom:12px;font-size:15px;font-weight:500;letter-spacing:-.01em;color:var(--sh-t1);text-decoration:none}
 .sh-item{display:flex;align-items:center;gap:10px;height:34px;padding:0 8px;border-radius:6px;color:var(--sh-t2);text-decoration:none;transition:background-color 120ms var(--sh-ease),color 120ms var(--sh-ease)}
 .sh-item:hover{background:var(--sh-raised);color:var(--sh-t1)}
 .sh-item[aria-current]{background:var(--sh-hover);color:var(--sh-t1)}
-.sh-item:focus-visible,.sh-out:focus-visible,.sh-brand:focus-visible{outline:2px solid rgba(62,123,250,.6);outline-offset:1px}
+.sh-item:focus-visible,.sh-out:focus-visible,.sh-brand:focus-visible{outline:2px solid var(--ring);outline-offset:1px}
 .sh-who{margin:auto -8px 0;display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 12px 8px 16px;border-top:1px solid var(--sh-line);line-height:18px}
 .sh-who-name{min-width:0;flex:1}
 .sh-who-name span{display:block;font-size:13px}
 .sh-who-name small{display:block;font-size:12px;line-height:16px;color:var(--sh-t2)}
 .sh-mono{font-family:"JetBrains Mono",ui-monospace,monospace}
-.sh-ok{color:#5CC186;flex:none}
+.sh-ok{color:var(--green-t);flex:none}
 .sh-out{flex:none;width:28px;height:28px;display:grid;place-items:center;padding:0;border:0;background:none;border-radius:6px;color:var(--sh-t2);cursor:pointer;transition:background-color 120ms var(--sh-ease),color 120ms var(--sh-ease),transform 160ms var(--sh-ease)}
 .sh-out:hover{background:var(--sh-raised);color:var(--sh-t1)}
 .sh-out:active{transform:scale(.97)}
@@ -33,11 +34,8 @@ html,body{height:100%;margin:0;background:#0B0C0E;overflow:hidden}
 .sh-status-r{margin-left:auto;display:flex;gap:20px;flex:none}
 @media (prefers-reduced-motion:reduce){.sh-app *{transition-duration:1ms!important;animation-duration:1ms!important}}
 
-/* The light pages: Overview, Failures, Settings. */
-html:has(.sh-light),body:has(.sh-light){background:#fff}
-.sh-app.sh-light{--sh-line:#E7E7EA;--sh-t1:#0B0B0C;--sh-t2:#63656A;--sh-raised:#F7F7F8;--sh-hover:#F2F2F3;
-  --line:#E7E7EA;--line2:#D4D4D8;--t1:#0B0B0C;--t2:#63656A;--t3:#63656A;--raised:#F7F7F8;--hover:#F2F2F3;--ring:rgba(11,11,12,.45);
-  grid-template-columns:224px minmax(0,1fr);background:#fff;color:var(--sh-t1)}
+/* Every page. */
+.sh-app.sh-light{grid-template-columns:224px minmax(0,1fr)}
 .sh-light .sh-nav{padding:20px 12px 0}
 .sh-light .sh-brand{font-size:17px;font-weight:600;letter-spacing:-.02em;padding:0 10px;margin-bottom:18px}
 .sh-light .sh-item{padding:0 10px}
@@ -60,3 +58,19 @@ html:has(.sh-light),body:has(.sh-light){background:#fff}
   .sh-light .sh-head{min-height:60px;padding:0 16px}
   .sh-light .sh-status{flex:none;height:28px}
 }
+
+/* The simulator's sidebar: the same one, and it folds to icons. Width snaps, so no frame shows the page half laid out. */
+.sh-rail{width:224px;position:relative;background:var(--app)}
+.sh-fold{position:absolute;top:22px;right:12px;width:28px;height:28px;display:grid;place-items:center;padding:0;border:0;background:none;border-radius:6px;color:var(--sh-t2);cursor:pointer;transition:background-color 120ms var(--sh-ease),color 120ms var(--sh-ease)}
+.sh-fold:hover{background:var(--sh-raised);color:var(--sh-t1)}
+.sh-fold:focus-visible{outline:2px solid var(--ring);outline-offset:1px}
+.sh-badge{display:none;width:28px;height:28px;flex:none;place-items:center;border-radius:50%;background:var(--sh-hover);font-size:13px;font-weight:550;color:var(--sh-t1)}
+.sh-light .sh-rail.closed{width:56px;padding:20px 8px 0}
+.sh-rail.closed .sh-brand{width:40px;padding:0;justify-content:center;font-size:0;gap:0;margin-bottom:6px}
+.sh-rail.closed .sh-fold{position:static;width:40px;height:34px;margin-bottom:10px}
+.sh-rail.closed .sh-item{width:40px;padding:0;justify-content:center}
+.sh-rail.closed .sh-item span{display:none}
+.sh-light .sh-rail.closed .sh-who{flex-direction:column;gap:6px;margin:auto -8px 0;padding:10px 0}
+.sh-rail.closed .sh-who-name{display:none}
+.sh-rail.closed .sh-badge{display:grid}
+.sh-who-name button{display:block;padding:0;margin-top:2px;border:0;background:none;font-size:12px;line-height:16px;text-align:left;color:var(--sh-t1);text-decoration:underline;cursor:pointer}

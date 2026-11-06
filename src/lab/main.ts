@@ -1,5 +1,7 @@
 import { el } from '../app/dom.ts';
 import { ENGINEER_HOME, loginHref, me } from '../site/auth.ts';
+import { mountRail } from '../site/shell.ts';
+import { icon } from '../site/icons.ts';
 import { LiveBackend, SERVER, health, type ServerEvent } from '../app/chat/live.ts';
 import { Replay, loadMujoco } from '../app/replay.ts';
 import { isV5, loadTrial, loadTrialFrom, type Trial } from '../app/trial.ts';
@@ -14,7 +16,6 @@ import { PosesView, loadPoses, posesPage, previewReplay, type PoseReplay } from 
 // Signed-out visitors go to login and come back here. With no site server the lab still opens, because nobody can sign in then.
 void me().then(m => { if (!m.signedIn && !m.offline) location.replace(loginHref()); else if (m.role === 'engineer') location.replace(ENGINEER_HOME); });
 
-const NS = 'http://www.w3.org/2000/svg';
 const HEALTH_RETRY_MS = 2_000;
 const TRIAL_TRIES = 3;
 const TRIAL_RETRY_MS = 3_000;
@@ -28,44 +29,12 @@ function chosenPack(): string | null {
 function choosePack(pack: string) {
   try { sessionStorage.setItem(PACK_KEY, pack); } catch { /* no storage: the page keeps the window robot */ }
 }
-// Lucide 0.400 outlines: panel-left, layout-grid, settings.
-const ACTIVITY = [
-  ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M9 3v18'],
-  ['M4 3h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z', 'M15 3h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z', 'M15 14h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z', 'M4 14h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z'],
-  ['M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z', 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z'],
-];
-
-function outline(paths: string[]): SVGSVGElement {
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  for (const d of paths) {
-    const path = document.createElementNS(NS, 'path');
-    path.setAttribute('d', d);
-    svg.append(path);
-  }
-  return svg;
-}
-
 function titleBar(name: HTMLElement): HTMLElement {
   const bar = el('header', 'lab-title');
-  const lights = el('div', 'lab-lights');
-  lights.setAttribute('aria-hidden', 'true');
-  lights.append(el('i'), el('i'), el('i'));
-  const home = el('a', '', 'Home');
-  home.href = 'home.html';
-  home.style.cssText = 'margin-left:auto;font-size:12px;color:inherit;text-decoration:none';
-  bar.append(lights, name, home);
-  return bar;
-}
-
-function activityBar(): HTMLElement {
-  const bar = el('nav', 'lab-activity');
-  bar.setAttribute('aria-hidden', 'true');
-  ACTIVITY.forEach((paths, i) => {
-    const item = el('div', i === 0 ? 'lab-act on' : 'lab-act');
-    item.append(outline(paths));
-    bar.append(item);
-  });
+  const way = el('a', 'lab-way');
+  way.href = 'simulation.html';
+  way.append(icon('back'), 'Simulation');
+  bar.append(way, name);
   return bar;
 }
 
@@ -87,12 +56,12 @@ function shell(root: HTMLElement, chat: HTMLElement) {
   const main = el('main', 'lab-main');
   main.append(tabs);
   const body = el('div', 'lab-body');
-  body.append(activityBar(), chat, main);
+  body.append(chat, main);
   const statusRight = el('div', 'lab-status-end');
   const status = el('footer', 'lab-status');
   const statusNote = el('span', 'lab-status-note', WINDOW_NOTE);
   status.append(statusNote, statusRight);
-  root.append(titleBar(name), body, status);
+  root.append(mountRail(root), titleBar(name), body, status);
   return { main, statusRight, setName, tab, gridTab, statusNote, tabs };
 }
 

@@ -1,9 +1,9 @@
-/* Overview, Failures and Settings. These pages are light, on .sh-light from shell.css. */
-.ov{padding:0 32px 32px;--pass:#1F8A57;--fail:#CF3A2F;--hold:#D39A2A}
+/* Overview, Failures and Settings. */
+.ov{padding:0 32px 32px}
 .ov-pill{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 18px;border-radius:19px;background:#0B0B0C;color:#fff;font-weight:550;white-space:nowrap;transition:transform 160ms var(--enter),background-color 120ms var(--enter)}
 .ov-pill:hover{background:#2A2A2D}.ov-pill:active{transform:scale(.97)}
 .ov-pill.big{height:44px;border-radius:22px;padding:0 22px}
-.ov-pill[disabled]{background:#EFEFF0;color:#76787D;cursor:default;transform:none}
+.ov-pill[disabled]{background:#EFEFF0;color:#63656A;cursor:default;transform:none}
 .ov-btn{display:inline-flex;align-items:center;height:30px;padding:0 12px;border:1px solid #D4D4D8;border-radius:15px;font-size:13px;font-weight:500;white-space:nowrap;background:#fff;transition:background-color 120ms var(--enter),transform 160ms var(--enter)}
 .ov-btn:hover{background:#F2F2F3}.ov-btn:active{transform:scale(.97)}
 .ov-stats{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:30px}
@@ -24,7 +24,7 @@ a.ov-st:hover{background:#F7F7F8}
 .ov td.num0,.ov td.sm{color:var(--t2);font-size:13px}
 .ov tr.go{cursor:pointer;transition:background-color 120ms var(--enter)}.ov tr.go:hover{background:#F7F7F8}
 .ov-bar{display:flex;gap:2px;height:8px;min-width:0}.ov-bar u{display:block;border-radius:2px;min-width:2px}
-.ov-bar .pass{background:var(--pass)}.ov-bar .fail{background:var(--fail)}.ov-bar .hold{background:var(--hold)}
+.ov-bar .pass{background:var(--pass)}.ov-bar .fail{background:var(--red)}.ov-bar .hold{background:var(--hold)}
 .ov-lg{font-size:12px;line-height:16px;color:var(--t2);margin-top:4px}
 .ov-out{width:38%}
 .ov-f{display:flex;align-items:center;gap:12px;min-height:64px;border-bottom:1px solid var(--line);cursor:pointer}

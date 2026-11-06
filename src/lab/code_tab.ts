@@ -23,23 +23,23 @@ const theme = EditorView.theme({
   '.cm-cursor': { borderLeftColor: 'var(--lab-text)' },
   '.cm-gutters': { backgroundColor: 'var(--lab-app)', color: 'var(--lab-muted)', border: '0' },
   '.cm-lineNumbers .cm-gutterElement': { padding: '0 12px 0 16px', minWidth: '44px' },
-  '.cm-activeLine': { backgroundColor: 'rgba(255, 255, 255, .03)' },
+  '.cm-activeLine': { backgroundColor: 'rgba(11, 11, 12, .03)' },
   '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--lab-text-2)' },
   '&.cm-focused': { outline: 'none' },
-  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: 'rgba(62, 123, 250, .28)' },
-  '.cm-matchingBracket': { backgroundColor: 'rgba(255, 255, 255, .1)', color: 'inherit' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: 'rgba(11, 11, 12, .12)' },
+  '.cm-matchingBracket': { backgroundColor: 'rgba(11, 11, 12, .1)', color: 'inherit' },
 }, { dark: true });
 
 const highlight = HighlightStyle.define([
-  { tag: [t.keyword, t.operatorKeyword, t.controlKeyword, t.definitionKeyword, t.moduleKeyword], color: '#8FB4FC' },
-  { tag: [t.string, t.special(t.string)], color: '#5CC186' },
+  { tag: [t.keyword, t.operatorKeyword, t.controlKeyword, t.definitionKeyword, t.moduleKeyword], color: '#1F4FBF' },
+  { tag: [t.string, t.special(t.string)], color: '#17774A' },
   { tag: [t.comment, t.lineComment, t.blockComment], color: 'var(--lab-muted)' },
-  { tag: [t.number, t.bool, t.null], color: '#E3B04F' },
-  { tag: [t.function(t.variableName), t.function(t.propertyName), t.definition(t.function(t.variableName))], color: '#ECEEF1', fontWeight: '500' },
-  { tag: [t.className, t.definition(t.className)], color: '#ECEEF1', fontWeight: '500' },
-  { tag: [t.propertyName, t.attributeName], color: '#A3A9B3' },
-  { tag: [t.self], color: '#A3A9B3' },
-  { tag: [t.operator, t.punctuation, t.bracket], color: '#A3A9B3' },
+  { tag: [t.number, t.bool, t.null], color: '#855A00' },
+  { tag: [t.function(t.variableName), t.function(t.propertyName), t.definition(t.function(t.variableName))], color: '#0B0B0C', fontWeight: '500' },
+  { tag: [t.className, t.definition(t.className)], color: '#0B0B0C', fontWeight: '500' },
+  { tag: [t.propertyName, t.attributeName], color: '#63656A' },
+  { tag: [t.self], color: '#63656A' },
+  { tag: [t.operator, t.punctuation, t.bracket], color: '#63656A' },
 ]);
 
 // The marked lines: the line the run points at, and the lines a refusal names.

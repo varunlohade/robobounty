@@ -1,0 +1,17 @@
+/* The one set of colours for every signed-in page and the simulator. Values from the company Overview. --red and friends are status colours: text uses the -t value, which clears 4.5:1 on white. */
+:root{
+  --app:#fff;--panel:#fff;--raised:#F7F7F8;--hover:#F2F2F3;--active:#E7E7EA;
+  --line:#E7E7EA;--line2:#D4D4D8;
+  --t1:#0B0B0C;--t2:#63656A;--t3:#63656A;--t4:#6E7075;
+  --accent:#0B0B0C;--accent-h:#2A2A2D;--accent-p:#000;--accent-t:#0B0B0C;--ring:rgba(11,11,12,.45);
+  --red:#CF3A2F;--red-t:#B42A21;--red-tint:#FCEDEB;
+  --amber:#D39A2A;--amber-t:#855A00;--amber-tint:#FBF3E2;
+  --green:#1F8A57;--green-t:#17774A;--green-tint:#E9F5EF;
+  --pass:var(--green);--hold:var(--amber);
+  --hatch:repeating-linear-gradient(135deg,#C9CACE 0 1.5px,#F2F2F3 1.5px 4px);
+  --tag:rgba(255,255,255,.92);
+  --float:0 1px 2px rgba(11,11,12,.06),0 8px 24px rgba(11,11,12,.08);
+  --gutter:32px;
+  --enter:cubic-bezier(.23,1,.32,1);--move:cubic-bezier(.77,0,.175,1);--sheet:cubic-bezier(.32,.72,0,1);
+}
+html,body{background:var(--app)}

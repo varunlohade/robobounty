@@ -3,7 +3,7 @@ import { icon } from './icons.ts';
 import { h, link, resultWords, serverDown, type Tally } from './ui.ts';
 import { ago, askAi, board, byNewest, campaigns, failKinds, OPEN_SCOPE, openRuns, pickRobot, postBounty, postRef, robotLink, rowGo, type Board, type Campaign } from './overview_data.ts';
 
-const { main, actions, who } = mountShell({ page: 'home', title: 'Overview', subtitle: 'Simulated', light: true });
+const { main, actions, who } = mountShell({ page: 'home', title: 'Overview', subtitle: 'Simulated' });
 const page = h('div', 'scroll ov');
 main.append(page);
 

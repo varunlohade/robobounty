@@ -3,7 +3,7 @@ import { mountShell } from './shell.ts';
 import { h, serverDown } from './ui.ts';
 import { askAi, board, campaigns, OPEN_SCOPE, openRuns, postBounty, postRef, rowGo } from './overview_data.ts';
 
-const { main, who } = mountShell({ page: 'failures', title: 'Failures', subtitle: 'Simulated', light: true });
+const { main, who } = mountShell({ page: 'failures', title: 'Failures', subtitle: 'Simulated' });
 const page = h('div', 'scroll ov');
 main.append(page);
 

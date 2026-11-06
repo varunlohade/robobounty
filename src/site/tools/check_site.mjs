@@ -195,7 +195,7 @@ for (const pack of ['inspection', 'window']) {
   await until(`location.pathname === '/lab.html' && !!document.querySelector('.lab-title a')`, 'the lab page', 60).catch(() => null);
   say((await ev(`location.pathname`)) === '/lab.html', `Open Simulation reaches lab.html for ${pack}`);
   say((await ev(`sessionStorage.getItem('crashlab-pack')`)) === pack, `lab.html has ${pack} preselected`);
-  say(await ev(`[...document.querySelectorAll('.lab-title a')].some(a => a.getAttribute('href') === 'home.html')`), 'lab has a way home');
+  say(await ev(`[...document.querySelectorAll('.sh-nav a')].some(a => a.getAttribute('href') === 'home.html')`), 'lab has a way home');
 }
 await go('home.html', 400);
 

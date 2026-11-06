@@ -190,11 +190,11 @@ export class Testing {
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', `${s.label} from ${num(lo)} to ${withUnit(hi, s.unit)}, each run marked by its result.`);
     const add = (tag: string, attrs: Record<string, string | number>, text?: string) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v)); if (text) n.textContent = text; svg.append(n); };
-    const ink: Record<string, string> = { passed: '#5CC186', held: '#E3B04F', failed: '#F27B73', stuck: '#F27B73', running: '#ECEEF1', queued: '#4B515B' };
-    add('line', { x1: PAD, y1: AXIS, x2: W - PAD, y2: AXIS, stroke: 'rgba(255,255,255,.18)', 'stroke-width': 1 });
+    const ink: Record<string, string> = { passed: '#1F8A57', held: '#D39A2A', failed: '#CF3A2F', stuck: '#CF3A2F', running: '#0B0B0C', queued: '#B4B6BB' };
+    add('line', { x1: PAD, y1: AXIS, x2: W - PAD, y2: AXIS, stroke: '#D4D4D8', 'stroke-width': 1 });
     if (s.pass_value !== null && s.fail_value !== null) {
       const a = x(s.pass_value), b = x(s.fail_value);
-      add('rect', { x: Math.min(a, b) - 1, y: AXIS - 13, width: Math.max(2, Math.abs(b - a) + 2), height: 15, fill: 'rgba(62,123,250,.28)' });
+      add('rect', { x: Math.min(a, b) - 1, y: AXIS - 13, width: Math.max(2, Math.abs(b - a) + 2), height: 15, fill: 'rgba(11,11,12,.08)' });
     }
     const stack = new Map<number, number>();
     for (const r of s.runs) {
@@ -205,8 +205,8 @@ export class Testing {
         add('circle', { cx: px, cy: AXIS - 17 - n * 5, r: 2, fill: ink[r.status] ?? ink.queued });
       } else add('line', { x1: px, y1: AXIS - 8, x2: px, y2: AXIS + 3, stroke: ink[r.status] ?? ink.queued, 'stroke-width': 2 });
     }
-    add('text', { x: PAD, y: H - 3, fill: '#A3A9B3', 'font-size': 11 }, withUnit(lo, s.unit));
-    add('text', { x: W - PAD, y: H - 3, fill: '#A3A9B3', 'font-size': 11, 'text-anchor': 'end' }, withUnit(hi, s.unit));
+    add('text', { x: PAD, y: H - 3, fill: '#63656A', 'font-size': 11 }, withUnit(lo, s.unit));
+    add('text', { x: W - PAD, y: H - 3, fill: '#63656A', 'font-size': 11, 'text-anchor': 'end' }, withUnit(hi, s.unit));
     return svg as unknown as HTMLElement;
   }
 

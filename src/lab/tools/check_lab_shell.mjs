@@ -56,12 +56,12 @@ const rect = sel => js(`(() => { const e = document.querySelector('${sel}'); if 
 const near = (a, b) => Math.abs(a - b) <= 1;
 
 check('page ready, no error panel', ready && !(await js(`!!document.querySelector('.sim-error')`)));
-for (const [sel, side, want] of [['.lab-title', 'h', 36], ['.lab-activity', 'w', 44], ['.chat', 'w', 380], ['.lab-tabs', 'h', 36], ['.player', 'h', 40], ['.lab-status', 'h', 24]]) {
+for (const [sel, side, want] of [['.lab-title', 'h', 36], ['.sh-rail', 'w', 56], ['.chat', 'w', 380], ['.lab-tabs', 'h', 36], ['.player', 'h', 40], ['.lab-status', 'h', 24]]) {
   const r = await rect(sel);
   check(`${sel} ${side} ${want}`, !!r && near(r[side], want), JSON.stringify(r));
 }
 const chat = await rect('.chat'), main = await rect('.lab-main');
-check('chat left of main', chat.x + chat.w <= main.x + 1 && near(chat.x, 44), `chat x ${chat.x}`);
+check('chat left of main', chat.x + chat.w <= main.x + 1 && near(chat.x, 56), `chat x ${chat.x}`);
 const view = await rect('.viewport'), canvas = await rect('.viewport canvas'), tabs = await rect('.lab-tabs'), player = await rect('.player');
 check('viewport fills between tab and player', near(view.y, tabs.y + tabs.h) && near(view.y + view.h, player.y) && near(view.w, main.w), JSON.stringify(view));
 check('canvas fills viewport', ['x', 'y', 'w', 'h'].every(k => near(canvas[k], view[k])), JSON.stringify(canvas));

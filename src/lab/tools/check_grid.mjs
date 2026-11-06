@@ -147,7 +147,7 @@ try {
     const b = document.querySelector('.sq[data-status=stuck]'); const v = b.querySelector('canvas'); const d = v.getContext('2d').getImageData(4, Math.floor(v.height / 2), 1, 1).data;
     return { border: getComputedStyle(b).borderTopColor, fill: [...d].slice(0, 3), index: b.dataset.index, label: b.getAttribute('aria-label') };
   })()`);
-  check('a stuck world goes red', red.border === 'rgb(229, 83, 75)' && red.fill[0] > red.fill[1] * 1.5, JSON.stringify(red));
+  check('a stuck world goes red', red.border === 'rgb(207, 58, 47)' && red.fill[0] > red.fill[1] + 8, JSON.stringify(red));
   check('the counts say so', Number(await c.js(`document.querySelector('.grid-count[data-status=stuck] b').textContent`)) >= 1);
   await shot('grid-stuck.png');
 

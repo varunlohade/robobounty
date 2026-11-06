@@ -158,11 +158,11 @@ function axis(word: string, bound: string, lo: number, hi: number): HTMLElement 
     for (const [k, v] of Object.entries({ x1, y1, x2, y2, stroke, 'stroke-width': width })) l.setAttribute(k, String(v));
     svg.append(l);
   };
-  line(0, 20, 300, 20, 'rgba(255,255,255,.14)', 1);
+  line(0, 20, 300, 20, '#D4D4D8', 1);
   for (const w of rows) {
     const x = ((w.bounds![bound]! - lo) / (hi - lo)) * 300;
-    if (w.outcome === 'fail') line(x, 4, x, 20, '#E5534B');
-    else line(x, 12, x, 20, w.outcome === 'pass' ? '#C9CED6' : '#979EA9');
+    if (w.outcome === 'fail') line(x, 4, x, 20, '#CF3A2F');
+    else line(x, 12, x, 20, w.outcome === 'pass' ? '#1F8A57' : '#D39A2A');
   }
   return h('div', '', h('div', 'top', h('span', '', word), h('span', '', `${lo} to ${hi}`)), svg);
 }

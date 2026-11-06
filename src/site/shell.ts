@@ -8,6 +8,7 @@ import { signOut, whoIs, type Who } from './session.ts';
 
 export type PageName = 'home' | 'simulation' | 'failures' | 'bounties' | 'data' | 'settings' | 'providers';
 const MARK = '<svg viewBox="0 0 28 28" width="22" height="22" aria-hidden="true"><g fill="currentColor"><path d="M3 20.2A11 11 0 0 1 18.6 4.6z"/><path d="M25 7.8A11 11 0 0 1 9.4 23.4z"/></g></svg>';
+const RAIL_KEY = 'crashlab-rail';
 export const SIM_NOTE = 'Simulated. Hand-built physics, not checked against real hardware.';
 
 const NAV: { page: PageName; label: string; href: string; icon: IconName }[] = [
@@ -25,7 +26,6 @@ export interface ShellOptions {
   subtitle?: string;
   status?: string;
   statusRight?: string[];
-  light?: boolean;
 }
 
 export interface Shell {
@@ -58,13 +58,16 @@ function payoutButton(who: Who) {
 
 function whoRow(box: HTMLElement, who: Who) {
   const name = make('div', 'sh-who-name');
+  const label = who.kind === 'guest' ? who.verificationLabel : who.label;
+  const badge = make('span', 'sh-badge', label.trim().charAt(0).toUpperCase());
+  badge.title = who.kind === 'guest' ? label : `${label}, ${who.verificationLabel}`;
   box.dataset.who = who.kind;
   box.dataset.level = who.verification;
   const words = who.kind === 'guest' ? who.verificationLabel : who.label;
   name.append(make('span', '', words));
   if (who.kind !== 'guest') name.append(make('small', '', who.verificationLabel));
   if (who.kind === 'engineer') name.append(make('small', '', who.screened ? 'Screened. A quiz, not proof of skill.' : 'Not screened yet'), payoutButton(who));
-  box.replaceChildren(name);
+  box.replaceChildren(badge, name);
   const out = make('button', 'sh-out');
   out.setAttribute('aria-label', 'Sign out');
   out.title = 'Sign out';
@@ -73,10 +76,7 @@ function whoRow(box: HTMLElement, who: Who) {
   box.append(out);
 }
 
-export function mountShell(opts: ShellOptions): Shell {
-  const root = document.getElementById('site') ?? document.body.appendChild(make('div', ''));
-  root.classList.add('sh-app');
-  root.classList.toggle('sh-light', opts.light === true);
+function sidebar(page: PageName) {
   const nav = make('nav', 'sh-nav');
   nav.setAttribute('aria-label', 'Main');
   const brand = make('a', 'sh-brand', 'CrashLab') as HTMLAnchorElement;
@@ -89,11 +89,50 @@ export function mountShell(opts: ShellOptions): Shell {
     a.append(icon(item.icon, 16), make('span', '', item.label));
     a.hidden = item.page !== 'bounties'; // Shown once the server names the role, so an engineer never sees them flash.
     a.dataset.page = item.page;
-    if (item.page === opts.page) a.setAttribute('aria-current', 'page');
+    if (item.page === page) a.setAttribute('aria-current', 'page');
     nav.append(a);
   }
   const whoBox = make('div', 'sh-who');
   nav.append(whoBox);
+  return { nav, brand, whoBox };
+}
+
+// The simulator's copy of the sidebar. It folds to icons so the simulation keeps its room, and remembers. The lab does its own redirects.
+export function mountRail(root: HTMLElement): HTMLElement {
+  root.classList.add('sh-app', 'sh-light');
+  const { nav, brand, whoBox } = sidebar('simulation');
+  nav.classList.add('sh-rail');
+  for (const a of nav.querySelectorAll<HTMLAnchorElement>('a.sh-item')) a.title = a.textContent ?? '';
+  const fold = make('button', 'sh-fold') as HTMLButtonElement;
+  fold.type = 'button';
+  fold.append(icon('panel', 16));
+  const paint = (closed: boolean) => {
+    nav.classList.toggle('closed', closed);
+    fold.setAttribute('aria-label', closed ? 'Open the sidebar' : 'Fold the sidebar to icons');
+    fold.title = fold.getAttribute('aria-label') ?? '';
+    fold.setAttribute('aria-expanded', String(!closed));
+  };
+  let closed = true;
+  try { closed = localStorage.getItem(RAIL_KEY) !== 'open'; } catch { /* no storage: folded */ }
+  paint(closed);
+  fold.addEventListener('click', () => {
+    closed = !closed;
+    paint(closed);
+    try { localStorage.setItem(RAIL_KEY, closed ? 'closed' : 'open'); } catch { /* no storage: this page only */ }
+  });
+  brand.after(fold);
+  void whoIs().then(w => {
+    if (w.kind === 'none') { for (const a of nav.querySelectorAll<HTMLElement>('a.sh-item')) a.hidden = false; return; }
+    whoRow(whoBox, w);
+    for (const a of nav.querySelectorAll<HTMLElement>('a.sh-item')) a.hidden = w.kind === 'engineer' && a.dataset.page !== 'bounties';
+  });
+  return nav;
+}
+
+export function mountShell(opts: ShellOptions): Shell {
+  const root = document.getElementById('site') ?? document.body.appendChild(make('div', ''));
+  root.classList.add('sh-app', 'sh-light');
+  const { nav, whoBox } = sidebar(opts.page);
 
   const column = make('div', 'sh-column');
   const head = make('header', 'sh-head');
