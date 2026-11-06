@@ -47,7 +47,7 @@ async function flow(mode) {
   const rect = sel => c.js(`(() => { const n = ${sel}; n.scrollIntoView({ block: 'nearest' }); const r = n.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   const clickOn = async sel => { const b = await rect(`document.querySelector(${JSON.stringify(sel)})`); await c.click(b.x, b.y); };
   const clickText = async (label, within = 'body') => {
-    const find = `[...document.querySelector(${JSON.stringify(within)}).querySelectorAll('button, a')].find(n => n.textContent.trim().startsWith(${JSON.stringify(label)}))`;
+    const find = `[...(document.querySelector(${JSON.stringify(within)})?.querySelectorAll('button, a') ?? [])].find(n => n.textContent.trim().startsWith(${JSON.stringify(label)}))`;
     await c.until(`!!${find}`, `the control "${label}"`, 30);
     const b = await rect(find);
     await c.click(b.x, b.y);
@@ -151,6 +151,7 @@ async function flow(mode) {
     }, 1000);
     const redSquare = async word => c.js(`document.querySelector('.sq[data-status=failed][aria-label*="${word}."]')?.dataset.index ?? null`);
     const slip = await redSquare('Slipped');
+    const coverage = await redSquare('Low coverage');
     check(`${mode}: a red Slipped square exists`, slip !== null);
     const replayOk = `document.querySelector('.grid-replay .viewport')?.dataset.ready === 'true' && Number(document.querySelector('.grid-replay .viewport').dataset.frame) > 0`;
     await step('red-square-detail-replay', async () => {
@@ -176,7 +177,6 @@ async function flow(mode) {
     }, 1000);
 
     if (live) {
-      const coverage = await redSquare('Low coverage');
       await step('edit', async () => {
         await clickOn('.lab-tab-grid');
         await c.until(`!!document.querySelector('.grid-page')`, 'the grid again', 10);
@@ -193,8 +193,7 @@ async function flow(mode) {
       await step('re-run-square-has-picture', async () => {
         await clickOn('.lab-tab-grid');
         await c.until(`document.querySelector('.sq[data-index="${coverage}"]')?.dataset.picture === 'film'`, 'the re-run square film', 30);
-        const url = await c.js(`performance.getEntriesByType('resource').map(e => e.name).filter(n => n.includes('film.jpg?run=r')).pop() ?? ''`);
-        check(`${mode}: the square draws the re-run's own film`, url.includes(`worlds/${coverage}/film.jpg?run=r`), url);
+        await c.until(`__lab.grid().squares.get(${Number(coverage)}).film?.run?.startsWith('r')`, "the re-run's own film", 30);
         await clickOn(`.sq[data-index="${coverage}"]`);
         await c.until(`document.querySelector('.grid-rail')?.innerText.includes('Before and after')`, 'before and after note', 30);
         check(`${mode}: the note says before and after`, /Before: .* After: /s.test(await c.js(`document.querySelector('.grid-rail').innerText`)));
@@ -227,6 +226,7 @@ async function flow(mode) {
     }, 800);
 
     let ref = '';
+    let paid = false;
     await step('post-a-bounty-link', async () => {
       ref = new URL(await c.js(`document.querySelector('.code-fix-bounty').href`)).searchParams.get('post');
       await clickOn('.code-fix-bounty');
@@ -260,26 +260,47 @@ async function flow(mode) {
     await step('hidden-world-proof', async () => {
       await c.until(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.trim() === 'Finalize') || /Refused|Not fixed|Worse on hidden|Overfit|Limit hit|Replay differs|Stopped/.test(document.querySelector('.detail').innerText.split('Submission')[1] ?? '')`, 'the proof', PROOF_S);
       const detail = await c.js(`document.querySelector('.detail').innerText`);
-      check(`${mode}: the proof passes on hidden worlds`, /The fix holds on the hidden worlds/.test(detail), detail.slice(0, 200));
+      paid = /The fix holds on the hidden worlds/.test(detail);
+      // The stored batch's worlds are fixed, so this fix must pay there. A live list can differ, and then the fix may really fail, so the check asks that nothing is held.
+      if (live && !paid) check(`${mode}: a fix that fails holds no pay, with a plain reason`, /The failing worlds still fail/.test(detail) && /Nothing held/.test(detail), detail.slice(0, 200));
+      else check(`${mode}: the proof passes on hidden worlds`, paid, detail.slice(0, 200));
       check(`${mode}: the page names only counts for hidden worlds`, /stay hidden/.test(detail));
       await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
     }, 800);
-    await step('dispute-window', async () => {
-      await c.until(`[...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Reject in the window')?.disabled === false`, 'the open window', 10).catch(() => {});
-      await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
-    }, 300);
-    await step('finalize', async () => {
-      await c.until(`[...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Finalize')?.disabled === false`, 'the end of the window', 300);
-      await clickText('Finalize', '.detail');
-      await c.until(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.trim() === 'Claim')`, 'finalized', 30);
-      await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
-    });
-    await step('claim', async () => {
-      await c.js(`(() => { const who = document.querySelector('.detail .acts input'); who.value = 'ana'; [...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Claim').click(); })()`);
-      await c.until(`document.querySelector('.detail').innerText.includes('claimed')`, 'the claim', 30);
-      check(`${mode}: pay is in test units, with the ledger label`, /test units/.test(await c.js(`document.querySelector('.detail').innerText`)) && /Local ledger\. Not on chain\./.test(await text()));
-      await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
-    });
+    if (paid) {
+      await step('dispute-window', async () => {
+        await c.until(`[...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Reject in the window')?.disabled === false`, 'the open window', 10).catch(() => {});
+        await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
+      }, 300);
+      await step('finalize', async () => {
+        await c.until(`[...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Finalize')?.disabled === false`, 'the end of the window', 300);
+        await clickText('Finalize', '.detail');
+        await c.until(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.trim() === 'Claim')`, 'finalized', 30);
+        await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
+      });
+      await step('claim-secret-lost', async () => {
+        const key = await c.js(`Object.keys(sessionStorage).find(k => k.startsWith('crashlab-claim-fix-'))`);
+        check(`${mode}: submit keeps the claim secret in this tab`, Boolean(key), key);
+        const secret = await c.js(`sessionStorage.getItem(${JSON.stringify(key)})`);
+        await c.js(`sessionStorage.removeItem(${JSON.stringify(key)})`);
+        await go('bounties.html');
+        await c.until(`document.querySelector('.detail')?.innerText.includes('claim secret is lost')`, 'the plain message', 30);
+        await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
+        await wait(300);
+        await c.shot(join(OUT, 'claim-secret-lost.png'));
+        await c.js(`sessionStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(secret)})`);
+        await go('bounties.html');
+        await c.until(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.trim() === 'Claim')`, 'Claim after a reload', 30);
+        check(`${mode}: a reload keeps the claim`, true);
+        check(`${mode}: the World ID label stays`, (await text()).includes('World ID is not connected'));
+      });
+      await step('claim', async () => {
+        await c.js(`(() => { const who = document.querySelector('.detail .acts input'); who.value = 'ana'; [...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Claim').click(); })()`);
+        await c.until(`document.querySelector('.detail').innerText.includes('claimed')`, 'the claim', 30);
+        check(`${mode}: pay is in test units, with the ledger label`, /test units/.test(await c.js(`document.querySelector('.detail').innerText`)) && /Local ledger\. Not on chain\./.test(await text()));
+        await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
+      });
+    }
     await step('data-shows-runs', async () => {
       await clickOn('nav a.sh-item[href="data.html"]');
       await c.until(`location.pathname === '/data.html' && !!document.querySelector('.campaigns')?.children.length`, 'the data page', 30);

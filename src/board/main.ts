@@ -1,7 +1,7 @@
 // The bounty board in the site's style: side bar, bounty list, one bounty. Real data only. All text goes in through textContent.
 import { mountShell, SIM_NOTE } from '../site/shell.ts';
 import './board.css';
-import { api, ApiError, type Bounty, type Fix, type Sub, type Budget, type Fixable, type FixResult } from './api.ts';
+import { api, ApiError, fixSecret, type Bounty, type Fix, type Sub, type Budget, type Fixable, type FixResult } from './api.ts';
 import { icon, type IconName } from './icons.ts';
 
 const LEDGER = 'Local ledger. Not on chain.';
@@ -302,7 +302,9 @@ function payout(b: Bounty, f: Fix): HTMLElement[] {
     const who = h('input') as HTMLInputElement;
     who.placeholder = 'Name to claim with';
     who.setAttribute('aria-label', 'Name to claim with');
-    acts.append(who, button('pri', 'Claim', 'check', act(() => api.step(b.id, f.n, 'claim', who.value))), h('span', 'sp'), h('span', 't3 small', 'The tester id comes from the name. It is not a wallet.'));
+    const secret = fixSecret(b.id, f.n);
+    if (secret) acts.append(who, button('pri', 'Claim', 'check', act(() => api.claim(b.id, f.n, who.value, secret))), h('span', 'sp'), h('span', 't3 small', 'The tester id comes from the name. It is not a wallet.'));
+    else acts.append(h('span', 't2', 'The claim secret is lost, so this tab cannot claim. Submit shows it once and only the tab that submitted keeps it.'));
   } else acts.append(h('span', 't2', p.status === 'Claimed' ? `${f.tester} claimed ${p.amount} test units.` : `${p.status}.`));
   out.push(acts);
   return out;
