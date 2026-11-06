@@ -6,6 +6,7 @@ All data goes in a new folder under policy/runs/board/, named check_<time>.
 import argparse
 import json
 import stat
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -20,6 +21,8 @@ import gate as G
 W = G.W
 SALT = "ab" * 32
 FIXTURES = HERE / "fixtures"
+BASE = "http://127.0.0.1:5298"
+PAGE = "http://localhost:5299"
 results = []
 
 
@@ -104,16 +107,148 @@ def gate_flow(root):
         check("same world again: duplicate, no second payout", again["result"]["code"] == "duplicate" and again["payout"] is None and B.get(wide["id"], root)["available"] == 90, f"code={again['result']['code']} runs={again['result']['runs']}")
 
 
+def curl(method, path, body=None, origin=PAGE, host=None, ctype="application/json"):
+    argv = ["curl", "-s", "-m", "20", "-X", method, "-w", "\n%{http_code}", f"{BASE}{path}"]
+    if origin:
+        argv += ["-H", f"Origin: {origin}"]
+    if host:
+        argv += ["-H", f"Host: {host}"]
+    data = None
+    if body is not None:
+        data = body if isinstance(body, str) else json.dumps(body)
+        argv += ["-H", f"Content-Type: {ctype}", "--data-binary", "@-"]
+    out = subprocess.run(argv, input=data, capture_output=True, text=True, timeout=30).stdout
+    text, _, status = out.rpartition("\n")
+    try:
+        return int(status), json.loads(text)
+    except ValueError:
+        return int(status or 0), text
+
+
+def wait_done(bounty, n, most_s=180):
+    end = time.time() + most_s
+    while time.time() < end:
+        _, row = curl("GET", f"/api/bounties/{bounty}/submissions/{n}")
+        if row["state"] == "done":
+            return row
+        time.sleep(0.5)
+    raise SystemExit(f"submission {n} on bounty {bounty} did not finish")
+
+
+def start_server(root):
+    p = subprocess.Popen([sys.executable, str(HERE / "board_server.py"), "--root", str(root)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for _ in range(100):
+        time.sleep(0.2)
+        if curl("GET", "/api/health")[0] == 200:
+            return p
+    p.terminate()
+    raise SystemExit("the board server did not start")
+
+
+def server_flow(root):
+    root.mkdir(parents=True)
+    meta = json.loads((FIXTURES / "meta.json").read_text())
+    world = (FIXTURES / "failing.json").read_text()
+    seed = meta["failing_seed"]
+    server = start_server(root)
+    try:
+        for name, kw in (("no Origin", {"origin": None}), ("other origin", {"origin": "http://evil.example"}), ("main app origin", {"origin": "http://localhost:5199"}), ("other Host", {"host": "evil.example:5298"})):
+            status, out = curl("GET", "/api/bounties", **kw)
+            check(f"refuses {name}", status == 403 and out["error"] == "origin_refused", f"{status}")
+        status, out = curl("POST", "/api/bounties", {"title": "x", "company": "y", "scenarios": [], "cap": 10, "per_failure": 5, "limits": {}}, origin=None)
+        check("refuses a post with no Origin", status == 403, f"{status}")
+        check("still no bounty after refused posts", curl("GET", "/api/bounties")[1]["bounties"] == [])
+
+        status, narrow = curl("POST", "/api/bounties", {"title": "Dry glass only", "company": "Sample company", "scenarios": ["Dry day"], "cap": 100, "per_failure": 10, "limits": {"wetness": [0, 0.5]}})
+        check("post bounty", status == 201 and narrow["status"] == "open", f"{status}")
+        status, wide = curl("POST", "/api/bounties", {"title": "Wind up to 25", "company": "Sample company", "scenarios": [], "cap": 20, "per_failure": 10, "limits": {"wind_ms": [0, 25]}})
+        check("post second bounty", status == 201 and wide["id"] == narrow["id"] + 1, f"{status}")
+        status, out = curl("POST", "/api/bounties", {"title": "x", "company": "y", "scenarios": [], "cap": 10, "per_failure": 5, "limits": {"wind_ms": [0, 30]}})
+        check("refuses a limit outside the schema", status == 400 and out["error"] == "bad_spec", f"{status} {out['reason']}")
+        status, out = curl("POST", "/api/bounties", {"title": "x", "company": "y", "scenarios": [], "cap": 10, "per_failure": 5, "limits": {}, "robot": "my robot"})
+        check("refuses a chosen robot", status == 400 and out["error"] == "bad_fields", f"{status}")
+        status, out = curl("GET", "/api/bounties")
+        check("list shows both open, with both labels", len(out["bounties"]) == 2 and all(b["status"] == "open" for b in out["bounties"]) and out["ledger_label"] == "Local ledger. Not on chain." and out["world_id_label"] == "World ID is not connected", f"{out['ledger_label']} {out['world_id_label']}")
+        salts = [(root / str(i) / "salt.hex").read_text() for i in (narrow["id"], wide["id"])]
+        check("no reply holds a salt", not any(s in json.dumps(out) for s in salts))
+
+        submit = f"/api/bounties/{narrow['id']}/submit"
+        for name, body, want, ctype in (("world over 16 KB", {"tester": "t", "seed": 1, "world": " " * (16 * 1024 + 1)}, 413, "application/json"), ("body over the limit", {"tester": "t", "seed": 1, "world": " " * (60 * 1024)}, 413, "application/json"),
+                                        ("not JSON", "{not json", 400, "application/json"), ("plain text type", {"tester": "t", "seed": 1, "world": world}, 415, "text/plain"), ("seed as text", {"tester": "t", "seed": "--out", "world": world}, 400, "application/json"),
+                                        ("bad name", {"tester": "../x", "seed": 1, "world": world}, 400, "application/json"), ("extra field", {"tester": "t", "seed": 1, "world": world, "x": 1}, 400, "application/json")):
+            status, _ = curl("POST", submit, body, ctype=ctype)
+            check(f"refuses {name}", status == want, f"{status}")
+        check("refused submits use no place", curl("GET", f"/api/bounties/{narrow['id']}/submissions")[1]["submissions"] == [])
+        status, out = curl("POST", "/api/bounties/99/submit", {"tester": "t", "seed": 1, "world": world})
+        check("unknown bounty", status == 404, f"{status}")
+
+        status, out = curl("POST", f"/api/bounties/{wide['id']}/submit", {"tester": "Ana", "seed": seed, "world": world})
+        check("submit is queued", status == 202 and out["world_id_label"] == "World ID is not connected", f"{status} {out.get('used')} of {out.get('of')}")
+        row = wait_done(wide["id"], out["n"])
+        check("failing fixture accepted over HTTP, ledger Pending", row["result"]["code"] == "accepted" and row["result"]["runs"] == 10 and row["payout"]["status"] == "Pending", f"{row['result']['reason']} {row['wall_s']}s")
+        status, money = curl("GET", f"/api/bounties/{wide['id']}")
+        check("bounty shows the held amount", money["available"] == 10 and money["status"] == "open", f"available={money['available']}")
+
+        for i in range(5):
+            status, out = curl("POST", submit, {"tester": "Cap Check", "seed": seed + i, "world": world})
+            if status != 202:
+                check(f"cap submit {i + 1} queued", False, f"{status} {out}")
+                continue
+            row = wait_done(narrow["id"], out["n"], 60)
+            check(f"submit {i + 1} of 5: outside_limits, 0 runs", row["result"]["code"] == "outside_limits" and row["result"]["runs"] == 0, f"{status}")
+        status, out = curl("POST", submit, {"tester": " cap   CHECK ", "seed": seed + 9, "world": world})
+        check("6th submit returns 429, labelled", status == 429 and out["error"] == "tester_cap" and out["world_id_label"] == "World ID is not connected", f"{status} {out['reason']}")
+        status, out = curl("POST", submit, {"tester": "Other name", "seed": seed, "world": world})
+        check("a new name gets past the cap, as the label says", status == 202, f"{status}")
+        wait_done(narrow["id"], out["n"], 60)
+
+        codes = []
+        placed = []
+        for i in range(8):
+            status, out = curl("POST", submit, {"tester": f"queue {i}", "seed": seed, "world": world})
+            codes.append(status)
+            if status == 202:
+                placed.append(out["n"])
+        check("queue cap: one running and 4 waiting at most, the rest get 503", codes.count(503) >= 1 and set(codes) == {202, 503} and 4 <= len(placed) <= 5, f"{codes}")
+        rows = [wait_done(narrow["id"], n, 120) for n in placed]
+        spans = sorted((r["started_at"], r["started_at"] + r["wall_s"]) for r in rows)
+        check("one gate at a time", all(a[1] <= b[0] + 0.15 for a, b in zip(spans, spans[1:])), f"{len(spans)} gates in {spans[-1][1] - spans[0][0]:.1f}s")
+        status, out = curl("POST", submit, {"tester": f"queue {codes.index(503)}", "seed": seed, "world": world})
+        check("a 503 did not use a place", status == 202 and out["used"] == 1, f"{status}")
+        wait_done(narrow["id"], out["n"], 60)
+
+        status, third = curl("POST", "/api/bounties", {"title": "Stop test", "company": "Sample company", "scenarios": [], "cap": 10, "per_failure": 10, "limits": {}})
+        status, out = curl("POST", f"/api/bounties/{third['id']}/submit", {"tester": "Stop", "seed": seed, "world": world})
+        time.sleep(3)
+        running = curl("GET", f"/api/bounties/{third['id']}/submissions/{out['n']}")[1]["state"]
+        server.terminate()
+        server.wait(10)
+        time.sleep(1)
+        left = subprocess.run(["pgrep", "-f", str(root)], capture_output=True, text=True).stdout.split()
+        check("stopping the server stops the running gate", running == "running" and not left, f"state was {running}, left={left}")
+        server = start_server(root)
+        row = curl("GET", f"/api/bounties/{third['id']}/submissions/{out['n']}")[1]
+        check("after a restart that run shows interrupted", row["state"] == "interrupted", row["state"])
+    finally:
+        server.terminate()
+        server.wait(10)
+    code = subprocess.run(["curl", "-s", "-m", "2", "-o", "/dev/null", f"{BASE}/api/health"]).returncode
+    check("server stopped, port closed", code != 0, f"curl exit {code}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fast", action="store_true")
     ap.add_argument("--gate", action="store_true")
+    ap.add_argument("--server", action="store_true")
     a = ap.parse_args()
     root = G.POLICY / "runs" / "board" / f"check_{time.strftime('%Y%m%d_%H%M%S')}"
     if a.fast:
         fast(root)
     if a.gate:
         gate_flow(root)
+    if a.server:
+        server_flow(root)
     print(f"{sum(results)}/{len(results)} passed; output {root}")
     sys.exit(0 if results and all(results) else 1)
 

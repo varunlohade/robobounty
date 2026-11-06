@@ -157,6 +157,24 @@ def _rows(folder):
     return [json.loads((p / "submission.json").read_text()) for p in sorted((folder / "submissions").iterdir(), key=lambda p: int(p.name))]
 
 
+def _used(rows, key):
+    return sum(r["tester"] == key and r["state"] != "interrupted" for r in rows)
+
+
+def _cap_error(key, used):
+    return BoardError("tester_cap", f"{key} already used {used} of {MAX_PER_TESTER} submissions for this bounty. {WORLD_ID_LABEL}, so this cap counts names and not people.")
+
+
+def require_room(bounty_id, tester, root=ROOT):
+    """Tells a tester at the cap so, before any other refusal. reserve() still decides, in its own lock."""
+    folder = _folder(bounty_id, root)
+    key = tester_key(tester)
+    with locked(folder / ".lock"):
+        used = _used(_rows(folder), key)
+    if used >= MAX_PER_TESTER:
+        raise _cap_error(key, used)
+
+
 def reserve(bounty_id, tester, seed, root=ROOT):
     """Counts a new submission against the tester's cap, in the same lock, so two requests cannot both take the last place."""
     folder = _folder(bounty_id, root)
@@ -165,9 +183,9 @@ def reserve(bounty_id, tester, seed, root=ROOT):
         raise BoardError("bad_seed", "The seed must be a whole number from 0 to 2147483647.")
     with locked(folder / ".lock"):
         rows = _rows(folder)
-        used = sum(r["tester"] == key and r["state"] != "interrupted" for r in rows)
+        used = _used(rows, key)
         if used >= MAX_PER_TESTER:
-            raise BoardError("tester_cap", f"{key} already used {used} of {MAX_PER_TESTER} submissions for this bounty. {WORLD_ID_LABEL}, so this cap counts names and not people.")
+            raise _cap_error(key, used)
         n = 1 + max((r["n"] for r in rows), default=0)
         row = {"n": n, "bounty_id": bounty_id, "tester": key, "seed": seed, "used_before": used, "state": "queued", "submitted_at": time.time(), "result": None, "payout": None}
         (folder / "submissions" / str(n)).mkdir()
@@ -185,6 +203,10 @@ def get_submission(bounty_id, n, root=ROOT):
     if not path.is_file():
         raise BoardError("unknown_submission", "There is no submission with this number.")
     return json.loads(path.read_text())
+
+
+def list_submissions(bounty_id, root=ROOT):
+    return _rows(_folder(bounty_id, root))
 
 
 def mark_interrupted(root=ROOT):
