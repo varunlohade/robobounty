@@ -235,6 +235,7 @@ function flow(b: Bounty, f: Fix | undefined) {
 }
 
 function fixTag(f: Fix) {
+  if (f.state === 'could_not_run') return tag('quiet', 'slash', 'Could not run');
   if (!f.result) return f.state === 'interrupted' ? tag('quiet', 'slash', 'Interrupted') : f.state === 'running' ? tag('live', 'loader', 'Checking', true) : tag('quiet', 'clock', 'Waiting');
   const c = f.result.code;
   if (c === 'accepted' || c === 'accepted_by_company') return tag('ok', 'ok', 'Accepted');
@@ -242,7 +243,7 @@ function fixTag(f: Fix) {
   return tag('bad', 'bad', ({ refused_source: 'Refused', judge_changed: 'Judge changed', worse_on_hidden: 'Worse on hidden', overfit: 'Overfit', target_not_fixed: 'Not fixed', limit_hit: 'Limit hit', replay_mismatch: 'Replay differs', declined_by_company: 'Declined' } as Record<string, string>)[c] ?? cap1(words(c)));
 }
 
-const HEADLINE: Record<string, string> = { accepted: 'The fix holds on the hidden worlds', accepted_by_company: 'The fix holds, and the company approved it', awaiting_company: 'It passes, and a safety line needs the company', refused_source: 'The code rules refused this source', judge_changed: 'The judge changed, so no run counts', worse_on_hidden: 'It made hidden worlds worse', overfit: 'It does not carry over to hidden worlds', target_not_fixed: 'The failing worlds still fail', limit_hit: 'The sandbox stopped a run', replay_mismatch: 'A run did not replay to its result', declined_by_company: 'The company declined it', no_change: 'The source has no change', gate_crashed: 'The gate stopped with an error' };
+const HEADLINE: Record<string, string> = { could_not_run: 'The check could not run', accepted: 'The fix holds on the hidden worlds', accepted_by_company: 'The fix holds, and the company approved it', awaiting_company: 'It passes, and a safety line needs the company', refused_source: 'The code rules refused this source', judge_changed: 'The judge changed, so no run counts', worse_on_hidden: 'It made hidden worlds worse', overfit: 'It does not carry over to hidden worlds', target_not_fixed: 'The failing worlds still fail', limit_hit: 'The sandbox stopped a run', replay_mismatch: 'A run did not replay to its result', declined_by_company: 'The company declined it', no_change: 'The source has no change', gate_crashed: 'The gate stopped with an error' };
 
 function line(state: 'ok' | 'bad' | 'skip' | 'warn', label: string, value: string) {
   const mark = h('span', state, icon(state === 'ok' ? 'check' : state === 'bad' ? 'x' : state === 'warn' ? 'warn' : 'slash'));

@@ -485,6 +485,48 @@ def compile(world):
     check("a compile error counts as changed", stale(worlds, broken))
 
 
+def could_not_run(root):
+    """A real broken sandbox: a worker that dies on import, as a missing module does. The proof's report is stubbed, since that is not what this tests."""
+    import gzip
+    with gzip.open(X.POLICY / "runs" / "demo" / "window" / "scenarios.json.gz", "rt") as f:
+        world = next(w for w in json.load(f)["worlds"] if not w["held_back"])
+    entry = {k: world[k] for k in ("index", "name", "world", "seed")}
+    broken = root / "broken_worker.py"
+    broken.write_text("import generate_object\n")
+    real_worker = F.WORKER5
+    probe = root / "canary"
+    check("the sandbox check passes when the sandbox works", F.sandbox_works5("window", entry, probe / "good"))
+    F.WORKER5 = broken
+    try:
+        check("the sandbox check fails on a real import crash in the sandbox", not F.sandbox_works5("window", entry, probe / "bad"))
+    finally:
+        F.WORKER5 = real_worker
+
+    made = root / "cnr"
+    runs = root / "cnr_runs"
+    small_campaign(runs, [("t", {}, 1, FAKE)], [("h", {}, 2, FAKE)], [("p", {}, 3, FAKE_PASS)])
+    info = X.post(SESSION, "c1", "timed_out", "Crash check", "Check company", 40, root=made, runs=runs)
+    bid = info["id"]
+    crashed = {**FG._fail("target_not_fixed", "1 of 1 failing worlds still fail.", "sim"), "target": [{"index": 0, "name": "w", "old": "timed_out", "new": "controller_crashed", "passed": False, "safe_hold": False, "reason": "x"}], "sets": {"held_back": {"n": 15, "better": 0, "worse": 15, "same": 0, "passed_before": 0, "passed_after": 0, "limits_hit": 0, "replay_mismatch": 0}}}
+    real_run, real_works = FG._run, FG._sandbox_works
+    FG._run = lambda *a: crashed
+    source = INSPECTION + "\n# a fix\n"
+    try:
+        FG._sandbox_works = lambda *a: False
+        row = FG.run(X.reserve(bid, "ana", source, made, secret="s"), made)
+        check("a sandbox crash reads as could not run, not as a verdict", row["state"] == "could_not_run" and row["result"]["code"] == "could_not_run" and "could not run" in row["result"]["words"], row["result"]["code"])
+        check("it shows no worse count", row["result"]["sets"] is None and row["result"]["target"] == [])
+        check("it holds no pay", row["payout"] is None and B._ledger(X.folder_of(bid, made)).bounty["available"] == 40)
+        again = X.reserve(bid, "ana", source, made, secret="s2")
+        check("it does not use a submission, and the same source can go again", again["used_before"] == 0, again["used_before"])
+        FG._sandbox_works = lambda *a: True
+        row = FG.run(again, made)
+        check("a crash from the source itself stays a charged result", row["state"] == "done" and row["result"]["code"] == "target_not_fixed", row["result"]["code"])
+        check("that one does use a submission", X.reserve(bid, "ana", source + "# other\n", made, secret="s3")["used_before"] == 1)
+    finally:
+        FG._run, FG._sandbox_works = real_run, real_works
+
+
 def main():
     global ARGS
     ap = argparse.ArgumentParser()
@@ -495,6 +537,7 @@ def main():
     f1()
     f2()
     stale_rule(root)
+    could_not_run(root)
     f3_and_secret(root)
     if not ARGS.fast:
         full(root)

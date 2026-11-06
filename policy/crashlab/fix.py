@@ -618,6 +618,11 @@ def sandbox_run5(pack, controller, request, own_group=False):
     return result
 
 
+def sandbox_works5(pack, world, out):
+    """The frozen controller on one world in the sandbox. It always runs, so a crash here means the sandbox or the code around it broke, and says nothing about a submitted source."""
+    return trial5(pack, PACK5[pack]["file"], world, Path(out), False)["verdict"] != "controller_crashed"
+
+
 def film5(pack, world, out):
     """The square's picture for a sandbox run. It is drawn outside the sandbox, from recorded numbers, after the sandbox process has ended.
     A window run must replay through sim5 with no controller loaded first, so a controller cannot forge what is drawn. No picture never changes a result."""
@@ -951,6 +956,10 @@ def main():
     w.add_argument("pack", choices=sorted(PACK5))
     w.add_argument("controller")
     w.add_argument("request")
+    n = sub.add_parser("canary5")
+    n.add_argument("pack", choices=sorted(PACK5))
+    n.add_argument("world_file")
+    n.add_argument("out")
     k = sub.add_parser("check5")
     k.add_argument("pack", choices=sorted(PACK5))
     k.add_argument("file")
@@ -972,6 +981,8 @@ def main():
         sandbox_run5(a.pack, a.controller, a.request)
         film5(a.pack, req["world"], req["out"])
         return 0
+    if a.cmd == "canary5":
+        return 0 if sandbox_works5(a.pack, json.loads(Path(a.world_file).read_text()), a.out) else 1
     if a.cmd == "check5":
         print(json.dumps({"reasons": validate5(a.pack, Path(a.file).read_text())}))
         return 0

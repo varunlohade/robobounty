@@ -145,6 +145,18 @@ def report_run(session, cid, run, scope, rows, source_sha):
     session.say(f"Run {run}, {len(rows)} worlds: {count['better']} better, {count['worse']} worse, {count['same']} same. Simulated.")
 
 
+def check_could_run(session, folder, worlds):
+    """A crashed run may be the code under test or the sandbox itself. The frozen controller on one world tells them apart. False means the chat already said so."""
+    world = worlds[0]
+    probe = folder / "canary"
+    probe.mkdir(exist_ok=True)
+    (probe / "world.json").write_text(json.dumps({k: world[k] for k in ("index", "name", "world", "seed")}))
+    if subprocess.run([str(PYTHON), str(FIX), "canary5", session.pack, str(probe / "world.json"), str(probe / "out")], capture_output=True, timeout=CANARY_WALL_S).returncode == 0:
+        return True
+    session.say("The check could not run. The sandbox failed on the unchanged controller too, so this says nothing about your code. Nothing changed, and these results do not count.", fail=True)
+    return False
+
+
 def run_worlds(session, cid, indexes, scope):
     """Re-runs worlds with the session copy, under the same loop as a campaign. Held-back worlds stay out: they are kept to test a fix."""
     folder = session.dir / "campaigns" / cid
@@ -185,6 +197,11 @@ def run_worlds(session, cid, indexes, scope):
     finally:
         T.slots.give(T.max_procs)
         T.lock.release()
+    if any(r.get("verdict") == "controller_crashed" for r in grid["rows"]) and not check_could_run(session, folder, worlds):
+        session.working()
+        write_grid(folder, base)
+        session.set_grid(base)
+        return
     index = read_index(folder)
     for w in worlds:
         index[str(w["index"])] = f"code_runs/{run}"
@@ -234,6 +251,8 @@ def run_fix(session, cid, group):
     if code != 0 or not report:
         session.say(f"The fix test stopped with an error (exit {code}), so no fix was tested and nothing changed.", fail=True)
         return
+    if any(p["new"]["verdict"] == "controller_crashed" for p in report.get("pairs") or []) and not check_could_run(session, folder, pack_campaign.read_json(folder / "scenarios.json")["worlds"]):
+        return
     session.tool("code_fix", report["status"], [json.dumps({"group": group, "llm": report["llm"], "sets": report["sets"]})])
     session.emit(type="code_fix", fix=fid, campaign=cid, group=group, **{k: report.get(k) for k in ("status", "words", "diff", "flags", "sets", "pairs", "validation", "limits", "held_back_worlds_shown_to_llm", "proof_wall_s")}, llm_note=(report["llm"] or {}).get("note"), base_sha=report["base_sha256"])
 
@@ -281,6 +300,7 @@ def decide_fix(session, cid, fid, accept):
 RERUN_PYTHON = pack_job.POLICY / "rerun_lab" / ".venv" / "bin" / "python"
 RERUN_EXPORT = pack_job.POLICY / "rerun_lab" / "export_rrd.py"
 RERUN_WALL_S = 300
+CANARY_WALL_S = 900
 
 
 def rerun_source(session, folder, index, detail):

@@ -151,6 +151,26 @@ def _run(row, root, code_root, folder, sub, t0):
     return decide(report, out, hashlib.sha256(source.read_bytes()).hexdigest())
 
 
+COULD_NOT_RUN = "The check could not run. The sandbox failed on the unchanged controller too, so this says nothing about your fix. No verdict, no pay, and it did not use one of your submissions. Send it again later."
+
+
+def _sandbox_works(info, folder):
+    first = info["public_worlds"][0]
+    return X.F.sandbox_works5(info["pack"], {k: first[k] for k in ("index", "name", "world", "seed")}, folder / "canary")
+
+
+def _could_not_run(result, sub):
+    """A crash can come from the source or from the board. The frozen controller on one world tells them apart. Only a board failure comes here free."""
+    if result["code"] != "gate_crashed" and not any(t["new"] == "controller_crashed" for t in result.get("target") or []):
+        return None
+    info = json.loads((sub.parent.parent / "pack.json").read_text())
+    try:
+        works = _sandbox_works(info, sub / "gate")
+    except (OSError, ValueError, KeyError, TypeError):
+        works = False
+    return None if works else _fail("could_not_run", COULD_NOT_RUN, "gate")
+
+
 def run(row, root=B.ROOT, code_root=X.POLICY):
     """Runs one reserved fix. The gate lock keeps one gate at a time, with the world gate too."""
     root = Path(root).resolve()  # the sandbox and fix.py run in other folders
@@ -165,7 +185,8 @@ def run(row, root=B.ROOT, code_root=X.POLICY):
             result = _run(row, root, code_root, folder, sub, t0)
         except (OSError, ValueError, KeyError, TypeError) as e:
             result = _fail("gate_crashed", f"The board stopped this fix with an error ({type(e).__name__}), so there is no verdict.", "gate")
-        state = "awaiting_company" if result["code"] == "awaiting_company" else "done"
+        result = _could_not_run(result, sub) or result
+        state = "awaiting_company" if result["code"] == "awaiting_company" else X.COULD_NOT_RUN if result["code"] == "could_not_run" else "done"
         payout = propose(row, result, folder, root) if result["code"] == "accepted" else None
         row = {**row, "state": state, "result": result, "payout": payout, "wall_s": round(time.time() - t0, 1)}
         X.save_fix(row, root)

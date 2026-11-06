@@ -271,6 +271,8 @@ def list_views(root=B.ROOT):
     return [view(i, root) for i in sorted(int(p.name) for p in root.iterdir() if p.name.isdigit() and (p / "pack.json").is_file())]
 
 
+COULD_NOT_RUN = "could_not_run"
+FREE_STATES = ("interrupted", COULD_NOT_RUN)  # The board failed, not the tester, so these cost no submission.
 FIX_KEYS = ("n", "bounty_id", "tester", "source_sha256", "state", "submitted_at", "result", "payout", "wall_s", "used_before")
 
 
@@ -309,10 +311,10 @@ def reserve(bounty_id, tester, source, root=B.ROOT, secret=None):
         book = B._ledger(folder)
         if book.bounty["available"] < book.bounty["per_failure"]:
             raise B.BoardError("cap_reached", "A fix already holds this bounty's pay. If it gets rejected, the bounty opens again.")
-        used = sum(r["tester"] == key and r["state"] != "interrupted" for r in rows)
+        used = sum(r["tester"] == key and r["state"] not in FREE_STATES for r in rows)
         if used >= B.MAX_PER_TESTER:
             raise B.BoardError("tester_cap", f"{key} already used {used} of {B.MAX_PER_TESTER} submissions for this bounty. {B.WORLD_ID_LABEL}, so this cap counts names and not people.")
-        if any(r["source_sha256"] == sha and r["state"] != "interrupted" for r in rows):
+        if any(r["source_sha256"] == sha and r["state"] not in FREE_STATES for r in rows):
             raise B.BoardError("same_source", "This exact source was already submitted to this bounty, so it gets no new run.")
         n = 1 + max((r["n"] for r in rows), default=0)
         row = {"n": n, "bounty_id": bounty_id, "tester": key, "source_sha256": sha, "state": "queued", "submitted_at": time.time(), "result": None, "payout": None, "used_before": used, "claim_sha256": B.claim_hash(secret) if secret else None}
