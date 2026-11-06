@@ -189,6 +189,15 @@ export class LiveBackend implements ChatBackend {
     if (!res.ok) this.push({ type: 'text', fail: true, text: res.status === 409 ? 'That step is no longer open, or I am still working.' : `The run server refused that: HTTP ${res.status}.` });
   }
 
+  /** The AI that answers this chat from the next message on. False when the server refused the change. */
+  async chooseRoute(route: string): Promise<boolean> {
+    try {
+      return (await post(`/api/sessions/${this.id}/action`, { action: 'llm_route', value: route })).ok;
+    } catch {
+      return false;
+    }
+  }
+
   /** Returns a problem to show, or null when the gate started. The world text is posted as data and shown back nowhere. */
   async submit(world: string, seed: string): Promise<string | null> {
     const res = await post(`/api/sessions/${this.id}/submit`, { world, seed });

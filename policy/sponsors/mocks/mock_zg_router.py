@@ -32,6 +32,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, {"error": "not_found"})
         if self.headers.get("Authorization") != f"Bearer {KEY}":
             return self.send(401, {"error": {"code": "invalid_api_key"}})
+        if body.get("model", "").startswith("mock-fast"):  # The fast route: a private header or a TEE request here is a bug.
+            if self.headers.get("X-0G-Provider-Trust-Mode") or "verify_tee" in body:
+                return self.send(400, {"error": {"code": "mock_fast_wants_no_private_header"}})
+            if body["model"] == "mock-fast-503":
+                return self.send(503, {"error": {"code": "no_provider"}})
+            return self.send(200, {"id": "chat-fast", "choices": [{"message": {"role": "assistant", "content": '{"calls": [], "say": "mock"}'}}], "x_0g_trace": {"request_id": uuid.uuid4().hex, "provider": "0x" + "00" * 20}})
         if self.headers.get("X-0G-Provider-Trust-Mode") != "private" or body.get("verify_tee") is not True or body.get("response_format") != {"type": "json_object"}:
             return self.send(400, {"error": {"code": "mock_wants_private_verify_tee_and_json_mode"}})
         model = body.get("model", "")

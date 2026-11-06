@@ -85,7 +85,7 @@ The full list with licenses is in `docs/THIRD-PARTY.md`. `AI-USE.md` lists who w
 | Contract | Written and tested on a local test EVM only. Not deployed anywhere |
 | World ID | Set up on staging. A real scan is untested |
 | Arc | Not deployed |
-| 0G | Not connected |
+| 0G | The chat's AI can run on the real 0G Router. Evidence upload has run on mocks only |
 | Window robot | Fictional. Our scripted Python controller |
 | Inspection robot | ANYmal C model and upstream's walking policy, in hand-built worlds. Not checked against a real robot |
 | Hull robot | A separate pack on a flat plate. Not in the app. The film is a concept |
@@ -98,7 +98,7 @@ World ID: a real scan with World App passed on production on 7 Nov 2026, using t
 
 **Arc.** Not deployed. `policy/bounty/arc_mirror.py` can deploy and pay on Arc testnet once the owner makes wallets. It has run on local anvil only.
 
-**0G.** Not connected. The AI backend and the evidence upload are in the code, off by default, and have run on local mocks only.
+**0G.** The simulator chat can use the real 0G Router, and the user picks the route. The private route is sealed, and our own code checks the provider's signature on each reply. That check does not show that the signature covers the prompt. The fast route is not private and not verified. Fixes and generated models use Claude. The evidence upload has run on local mocks only.
 
 **Local chain.** `contracts/src/FailureBounty.sol` has 41 passing tests under `forge test`. `policy/bounty/anvil_mirror.py` mirrors one accepted fix on a local anvil chain with public dev accounts and a test token. No human or outside firm has audited the contract.
 

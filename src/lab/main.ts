@@ -145,6 +145,7 @@ async function live(root: HTMLElement) {
       case 'view': applyView(e); break;
       case 'camera': if (e.box) current()?.frameOn(e.box); else current()?.backToRobot(); break;
       case 'trial': await showTrial(e.tid); break;
+      case 'llm_route': routeLine = `LLM: ${e.label}`; llmLine.textContent = routeLine; chat.llmRoute(e); break;
       case 'llm_count': aiLine.textContent = `AI calls ${e.used} of ${e.cap}`; break;
       case 'sim': simLine.textContent = e.label ? String(e.label) : `Sim ${e.sha ? String(e.sha).slice(0, 8) : 'unknown'}${e.sha && e.sha !== e.now ? `, now ${String(e.now).slice(0, 8)}: this run is from older code` : ''}`; break;
       case 'idle':
@@ -168,6 +169,7 @@ async function live(root: HTMLElement) {
   });
   const simLine = el('span');
   const llmLine = el('span');
+  let routeLine = '';
   const aiLine = el('span');
   statusRight.append(llmLine, aiLine, simLine);
 
@@ -418,7 +420,7 @@ async function live(root: HTMLElement) {
   for (let told = false; ;) {
     try {
       const info = await health();
-      llmLine.textContent = `LLM: ${info.llm}`;
+      llmLine.textContent = routeLine || `LLM: ${info.llm}`;
       root.dataset.server = 'up';
       break;
     } catch {

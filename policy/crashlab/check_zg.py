@@ -133,6 +133,29 @@ def ai_checks_on(router, port):
     done = subprocess.run([PY, str(POLICY / "server" / "plan_job.py"), "agent"], input=json.dumps({"text": "x", "round": 1, "prompt": "p", "schema": {"type": "object"}, "model": "opus"}).encode(), capture_output=True, env=env_off)
     check("with 0G off, the reply holds no row", done.returncode != 0 or "llm_calls" not in json.loads(done.stdout))
 
+    print("-- the chat's three routes, as child processes")
+
+    def routed(route, **extra):
+        request = {"text": "x", "round": 1, "prompt": "p", "schema": {"type": "object"}, "model": "claude-opus-5-5", "llm_route": route}
+        done = subprocess.run([PY, str(POLICY / "server" / "plan_job.py"), "agent"], input=json.dumps(request).encode(), capture_output=True, env={**env, "ZG_FAST_MODEL": "mock-fast", **extra})
+        reply = json.loads(done.stdout)
+        return reply, reply["llm_calls"][-1]
+    reply, row = routed("fast")
+    check("fast: no private header, no signature check, and the line says so", reply["ok"] and row["private"] is False and "own_check" not in row and "tee_verified" not in row and row["line"].startswith("0G Fast:") and "Not private and not verified" in row["line"], row["line"])
+    check("fast: no word claims a TEE or a good check", "TEE" not in row["line"] and "ourselves" not in row["line"])
+    reply, row = routed("fast", ZG_FAST_MODEL="mock-fast-503")
+    check("fast: a failure says no word about a private provider", not reply["ok"] and "private" not in row["say"].lower() and row["say"].startswith("0G Fast did not answer"), row["say"])
+    reply, row = routed("private")
+    check("private: the signature check still runs", reply["ok"] and row["private"] is True and row["own_check"] is True and row["line"].startswith("0G Private:") and "ourselves" in row["line"], row["line"])
+    reply, row = routed("private", ZG_MODEL="mock-sig-bad")
+    check("private: a bad signature still throws the answer away", not reply["ok"] and row["error"] == "tee_check_failed", row.get("error"))
+    with tempfile.TemporaryDirectory() as fake:
+        script = Path(fake) / "claude"
+        script.write_text(f'#!/bin/sh\necho "$*" > {fake}/args\necho \'{{"structured_output": {{"calls": [], "say": "c"}}}}\'\n')  # Spends nothing.
+        script.chmod(0o755)
+        reply, row = routed("claude", PATH=f"{fake}:/usr/bin:/bin:/usr/sbin:/sbin")
+        check("claude: 0G gets no call, and the row names Claude and the pinned model", reply["ok"] and row["backend"] == "claude" and row["model"] == "claude-opus-5-5" and "--model claude-opus-5-5" in (Path(fake) / "args").read_text() and "request_id" not in row and row["line"].startswith("Claude:"), row["line"])
+
     print("-- the scenario agent, as a child process")
     with tempfile.TemporaryDirectory() as out:
         request = {"pack": "window", "world": json.loads((POLICY / "highrise" / "worlds" / "nominal.json").read_text()), "words": ["wind"], "out": out, "limit": 4, "limits": None}
@@ -144,7 +167,7 @@ def ai_checks_on(router, port):
     import server
     with tempfile.TemporaryDirectory() as folder:
         said, tools = [], []
-        session = types.SimpleNamespace(dir=Path(folder), tool=lambda *a: tools.append(a), say=lambda text, fail=False: said.append((text, fail)))
+        session = types.SimpleNamespace(llm_route=None, dir=Path(folder), tool=lambda *a: tools.append(a), say=lambda text, fail=False: said.append((text, fail)))
         real_job = server.job
         rows = [{"backend": "0g", "request_id": "abc", "line": "0G: request abc", "say": "0G did not answer this: it did not answer in time."}]
         server.job = lambda *_: {"ok": False, "rejection": "llm_zg_timeout", "llm_calls": rows}
@@ -161,6 +184,36 @@ def ai_checks_on(router, port):
             check("with 0G off, no Details row and no line", not tools and not said)
         finally:
             server.job = real_job
+
+    print("-- the picker's server action")
+    saved_env, real_runs = dict(os.environ), server.RUNS
+    os.environ.update(ZG_API_KEY=KEY, ZG_FAST_MODEL="mock-fast", ZG_MODEL="mock-good")
+    try:
+        with tempfile.TemporaryDirectory() as folder:
+            server.RUNS = Path(folder)
+            s = server.Session()
+            s.pack, s.llm_route = "inspection", server.default_llm_route()
+            check("a new chat starts on 0G Private", s.llm_route == "private")
+            check("a free model name is refused", s.choose_llm_route("gpt-4.1-nano") == (400, {"error": "unknown_route"}) and s.choose_llm_route(["fast"])[0] == 400 and s.llm_route == "private")
+            s.busy = True
+            check("no change while busy", s.choose_llm_route("claude")[0] == 409 and s.llm_route == "private")
+            s.busy = False
+            check("an allowed route changes between messages", s.choose_llm_route("claude")[0] == 200 and s.llm_route == "claude")
+            shown = [e for e in s.events if e["type"] == "llm_route"][-1]
+            check("the label event names the route", shown["route"] == "claude" and shown["label"] == "Claude", shown["label"])
+            restored = server.Session.load(s.id)
+            check("a chat restored from disk keeps its choice", restored.llm_route == "claude")
+            check("the fast label never says private without not", server.llm_route_label("fast") == "0G Fast, mock-fast. Not private, not verified", server.llm_route_label("fast"))
+            check("a fallback label names Claude", server.llm_route_label("fast", {"fell_back": True}) == "Claude, because 0G Fast failed")
+            os.environ.pop("ZG_API_KEY")
+            check("with no key, the 0G routes are shut and a new chat starts on Claude", server.default_llm_route() == "claude" and s.choose_llm_route("fast")[0] == 409)
+            server.RECORDED = "stored"
+            check("a stored run has no route, so no picker", server.default_llm_route() is None)
+            server.RECORDED = None
+    finally:
+        server.RUNS = real_runs
+        os.environ.clear()
+        os.environ.update(saved_env)
 
 
 def make_campaign(runs, session, cid):

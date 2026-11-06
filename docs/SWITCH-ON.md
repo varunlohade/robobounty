@@ -2,7 +2,7 @@
 
 Arc and 0G stay off until you set their values. With nothing set, the app runs as it does now, and the labels stay "Local ledger. Not on chain."
 
-**Tested only on local mocks and anvil.** No real Arc or 0G service has received a call from this code. See "What is only mocked".
+**Arc and 0G Storage are tested only on local mocks and anvil.** The 0G AI is tested on the real 0G Router. See "What is only mocked".
 
 Testnet only, and new wallets only. Never use a wallet that holds real money. Never paste a private key anywhere.
 
@@ -59,6 +59,14 @@ Ask at the Arc booth: "We wrote and tested the contract in Foundry. Does it qual
 
 ## 0G Private Computer: the AI
 
+Tested on the real 0G Router on 7 Nov 2026. A small select beside the robot name chooses who answers each chat, and you can change it between messages:
+
+- **0G Private** (`ZG_MODEL`, tested with `glm-5.3`) is the default. It is sealed, and our own check of the TEE signature passes. A message takes about 50 to 100 s.
+- **0G Fast** (`ZG_FAST_MODEL`, now `gpt-4.1-nano`) answers in about 3 s a call. It is not private and not verified. It sends no private header, and we check no signature. It often gets things wrong: it refused "add snow" five times out of five.
+- **Claude** uses the `claude` CLI, pinned to `claude-opus-5-5`.
+
+A route shows only when its values are set. A recorded run shows no select. The status bar and the Details row name the route that answered.
+
 **1.** Ask the 0G booth how to claim team credits. The method is unknown.
 
 **2.** Sign in at https://pc.0g.ai. Add funds only if the credits do not cover the demo. That costs money, so you decide.
@@ -72,13 +80,14 @@ Ask at the Arc booth: "We wrote and tested the contract in Foundry. Does it qual
     CRASHLAB_LLM=0g
     ZG_API_KEY=
     ZG_MODEL=
+    ZG_FAST_MODEL=
 
 **6.** Install the SDK, so we can check signatures ourselves. Then restart the app with the values loaded:
 
     npm --prefix policy/sponsors/zg ci --ignore-scripts
     set -a; . ./.env; set +a; npm run demo
 
-The scenario agent and the engine agent now use 0G. Fixes and generated models still use Claude, because they need file and image tools.
+The scenario agent and the engine agent now use the chosen route. Fixes and generated models still use Claude, because they need file and image tools.
 
 Each call adds a row to `llm_calls.jsonl` in the run folder, with its request ID and receipt. The chat's Details row shows the same. The line says only what came back:
 
@@ -134,7 +143,5 @@ Held-back worlds and a bounty's hidden worlds stay out of every bundle. Post a b
 | Chain | Standard anvil with chain id 5042002 | Arc's EVM, gas in USDC, the 20 Gwei floor, the RPC |
 | USDC | `MockUSDC` at Arc's address | Arc's USDC and its blocklist |
 | Faucet, explorer links | Not called | Faucet limits, the links opening |
-| 0G Router | Local mock | Its replies, JSON mode on your model, its error shapes |
-| `processResponse` | Mock SDK | The real SDK call, and how long it takes |
 | 0G Storage | Mock SDK and a local folder | Upload, fees, indexer delay, the real Merkle root |
 | Contract, budget, gate, keystores, ethers opening a cast keystore | Real | |

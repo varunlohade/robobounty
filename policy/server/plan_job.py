@@ -167,6 +167,8 @@ def propose(req):
 def main():
     req = json.load(sys.stdin)
     with contextlib.redirect_stdout(sys.stderr):
+        if req.get("llm_route"):
+            llm.use_route(req["llm_route"])
         if os.environ.get("CRASHLAB_RECORDED_REPLIES"):
             llm.BACKENDS["recorded"] = _recorded
             os.environ["CRASHLAB_LLM"] = "recorded"

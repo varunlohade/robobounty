@@ -404,6 +404,30 @@ def run_one(name, argv, stdout_file, paths=()):
         SLOTS.give(1)
 
 
+# What the chat's picker may choose. The client sends only a key from here, never a model name.
+LLM_ROUTES = {"fast": "0G Fast", "private": "0G Private", "claude": "Claude"}
+LLM_ROUTE_NEEDS = {"fast": ("ZG_API_KEY", "ZG_FAST_MODEL"), "private": ("ZG_API_KEY", "ZG_MODEL"), "claude": ()}
+
+
+def llm_route_open(route):
+    return all(os.environ.get(k) for k in LLM_ROUTE_NEEDS[route])
+
+
+def default_llm_route():
+    """A new chat starts on the first route this server can use. A stored run has no route, so the page shows no picker.
+    0G Private comes first: in the real agent on 2026-11-07, both fast models refused or failed "add snow", so 0G Fast is a choice and not the default."""
+    return None if RECORDED else next(r for r in ("private", "fast", "claude") if llm_route_open(r))
+
+
+def llm_route_label(route, last=None):
+    name = LLM_ROUTES[route]
+    if last and last.get("fell_back"):
+        return f"Claude, because {name} failed"
+    if last and last.get("error"):
+        return f"{name} failed"
+    return {"fast": f"{name}, {os.environ.get('ZG_FAST_MODEL')}. Not private, not verified", "private": f"{name}, {os.environ.get('ZG_MODEL')}", "claude": name}[route]
+
+
 def llm_label():
     if BATCH:
         return f"{recorded_batch.LABEL}, no AI and no sim"
@@ -613,6 +637,7 @@ class Session:
         self.tester = "0x" + hashlib.sha256(self.id.encode()).hexdigest()[:40]
         self.v5, self.h5 = False, None  # A lab session keeps one v5 world and sends every message to agent5. The app's session stays on the old path.
         self.pack = None  # window or inspection. None is the old app path.
+        self.llm_route = None  # The chat picker's choice, a key of LLM_ROUTES. None uses the server's environment: the old app path and stored runs.
         self.chat_pack, self.pack_runs = [], {}
         self.pending_campaign, self.pending_base, self.campaign_n, self.grid, self.grid_n, self.live_campaign = None, None, 0, None, 0, None
         self.export_lock = threading.Lock()
@@ -631,7 +656,7 @@ class Session:
 
     def save(self):
         kept = {"good": self.good, "good_events": self.good_events, "look": self.look, "exports": {k: str(v) for k, v in self.exports.items()}, "llm_used": self.llm_used, "round": self.round,
-                "v5": self.v5, "chat5": self.h5.chat if self.h5 else [], "pack": self.pack, "chat_pack": self.chat_pack, "pack_runs": self.pack_runs, "pending_campaign": self.pending_campaign, "pending_base": self.pending_base, "campaign_n": self.campaign_n}
+                "v5": self.v5, "chat5": self.h5.chat if self.h5 else [], "pack": self.pack, "chat_pack": self.chat_pack, "pack_runs": self.pack_runs, "pending_campaign": self.pending_campaign, "pending_base": self.pending_base, "campaign_n": self.campaign_n, "llm_route": self.llm_route}
         tmp = self.dir / "session.json.tmp"
         tmp.write_text(json.dumps(kept))
         tmp.replace(self.dir / "session.json")
@@ -676,6 +701,10 @@ class Session:
             s.history5().chat = kept.get("chat5", [])
         s.look, s.llm_used, s.round = kept["look"], kept["llm_used"], kept["round"]
         s.pack, s.chat_pack, s.pack_runs, s.pending_campaign, s.pending_base, s.campaign_n = kept.get("pack"), kept.get("chat_pack", []), kept.get("pack_runs", {}), kept.get("pending_campaign"), kept.get("pending_base"), kept.get("campaign_n", 0)
+        if s.pack and not RECORDED:
+            stored = kept.get("llm_route")
+            s.llm_route = stored if stored in LLM_ROUTES and llm_route_open(stored) else default_llm_route()
+            s.emit_llm_route()
         s.restore_grid()
         s.exports = {k: Path(v) for k, v in kept["exports"].items()}
         after = s.events[s.good_events:]
@@ -843,7 +872,25 @@ class Session:
             self.routing = False
         return reply
 
+    def emit_llm_route(self, last=None):
+        self.emit(type="llm_route", route=self.llm_route, label=llm_route_label(self.llm_route, last), routes=[{"id": k, "label": v, "open": llm_route_open(k)} for k, v in LLM_ROUTES.items()])
+
+    def choose_llm_route(self, value):
+        if self.llm_route is None or not isinstance(value, str) or value not in LLM_ROUTES:
+            return 400, {"error": "unknown_route"}
+        if not llm_route_open(value):
+            return 409, {"error": "route_off"}
+        with self.lock:
+            if self.busy:
+                return 409, {"error": "busy"}
+            self.llm_route = value
+        self.save()
+        self.emit_llm_route()
+        return 200, {"ok": True}
+
     def action(self, name, value):
+        if name == "llm_route":
+            return self.choose_llm_route(value)
         if name == "focus" and self.v5 and isinstance(value, str):
             return self.focus5(value)
         if name == "list_scenarios" and self.pack and (value is None or isinstance(value, str)):
@@ -1181,8 +1228,8 @@ class Session:
         return 200, {"ok": True}
 
     def ai_job(self, request, command):
-        """One plan_job.py run. With 0G on, it saves each call's request id and receipt in the run folder, shows them in a Details row, and says plainly when 0G failed."""
-        reply = job(HERE / "plan_job.py", request, command)
+        """One plan_job.py run, on this chat's route. With 0G on, it saves each call's request id and receipt in the run folder, shows them in a Details row, and says plainly when 0G failed."""
+        reply = job(HERE / "plan_job.py", {**request, "llm_route": self.llm_route}, command)
         rows = reply.pop("llm_calls", None) if isinstance(reply, dict) else None
         if rows:
             with open(self.dir / "llm_calls.jsonl", "a") as f:
@@ -1191,6 +1238,8 @@ class Session:
             for row in rows:
                 if row.get("say"):
                     self.say(row["say"], fail=not row.get("fell_back"))
+            if self.llm_route:
+                self.emit_llm_route(rows[-1])
         return reply
 
     def complete5(self, text):
@@ -2266,8 +2315,11 @@ class Handler(BaseHTTPRequestHandler):
                 s = Session()
                 s.pack = "window" if body.get("engine") == "v5" and pack is None else pack
                 s.v5 = s.pack == "window"
+                s.llm_route = default_llm_route() if s.pack else None
                 s.save()
                 SESSIONS[s.id] = s
+            if s.llm_route:
+                s.emit_llm_route()
             if BATCH and s.pack:
                 s.start(recorded_batch.open_session, s, BATCH)
             elif s.pack == "inspection":

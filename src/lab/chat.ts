@@ -40,6 +40,8 @@ export class LabChat {
   private menu = el('div', 'chat-menu');
   private test = el('button', 'chat-test', 'List test scenarios');
   private robotName = el('span', 'chat-robot');
+  private route = el('select', 'chat-route');
+  private routeNow = '';
   /** The user chose a robot from the + menu. */
   onPick: (pack: string) => void = () => {};
   private runCards: HTMLElement[] = [];
@@ -73,7 +75,12 @@ export class LabChat {
     plus.addEventListener('click', e => { e.stopPropagation(); void this.toggleMenu(); });
     const left = el('div', 'chat-foot-left');
     this.robotName.textContent = FALLBACK_NAME[pack] ?? pack;
-    left.append(plus, this.robotName);
+    // The server's llm_route event shows it. A recorded run sends none, so it stays hidden.
+    this.route.hidden = true;
+    this.route.setAttribute('aria-label', 'AI that answers this chat');
+    this.route.title = 'AI that answers this chat';
+    this.route.addEventListener('change', () => void this.chooseRoute());
+    left.append(plus, this.robotName, this.route);
     foot.append(left, this.send);
     this.menu.hidden = true;
     this.menu.setAttribute('role', 'menu');
@@ -130,6 +137,27 @@ export class LabChat {
     this.menu.replaceChildren(...rows);
     const named = list.packs.find(p => p.name === this.pack);
     if (named) this.robotName.textContent = named.label;
+  }
+
+  /** The route the server now has for this chat. */
+  llmRoute(e: ServerEvent) {
+    this.route.replaceChildren(...(e.routes as { id: string; label: string; open: boolean }[]).map(r => {
+      const option = el('option', '', r.label);
+      option.value = r.id;
+      option.disabled = !r.open;
+      return option;
+    }));
+    this.route.value = this.routeNow = e.route;
+    this.route.hidden = false;
+  }
+
+  private async chooseRoute() {
+    this.route.disabled = true;
+    const done = await this.backend.chooseRoute(this.route.value);
+    this.route.disabled = this.busy;
+    if (done) return;
+    this.route.value = this.routeNow;
+    this.note('The AI did not change. Wait for the last step to finish, then try again.', true);
   }
 
   /** The agent's list of test scenarios, with the button that runs it. */
@@ -199,6 +227,7 @@ export class LabChat {
   private setBusy(on: boolean) {
     this.busy = on;
     this.send.disabled = on;
+    this.route.disabled = on;
     this.test.hidden = on || !this.hasWorld;
   }
 

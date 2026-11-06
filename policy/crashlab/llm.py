@@ -5,6 +5,7 @@ It starts from a small environment, so an API key in the parent shell cannot tur
 Backend B runs on the 0G Router in private trust mode: CRASHLAB_LLM=0g, ZG_API_KEY, ZG_MODEL. A failed 0G call fails the step. With ZG_FALLBACK_CLAUDE=1, Claude answers instead, and the chat says so.
 Each 0G call leaves one row in CALLS. plan_job.py hands the rows to the server, which saves them in the run folder and shows them in the chat's Details row.
 Add a backend by adding a function to BACKENDS. CRASHLAB_LLM picks one, CRASHLAB_LLM_MODEL picks its model.
+The chat's picker chooses a route for one child process: use_route. 0G Fast is not private: it sends no private header, and its line says it is not verified.
 """
 import hashlib
 import json
@@ -35,11 +36,13 @@ ZG_ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}")
 ZG_CHAT_ID = re.compile(r"[A-Za-z0-9_.:-]{1,200}")
 ZG_LOCAL = re.compile(r"http://127\.0\.0\.1(:[0-9]+)?(/.*)?")
 ZG_HTTP_CODES = {401: "bad_key", 402: "no_balance", 403: "bad_key", 429: "rate_limited", 503: "no_private_provider"}
-ZG_WORDS = {"no_key": "ZG_API_KEY or ZG_MODEL is not set", "bad_key": "it refused the API key", "no_balance": "the 0G account has no balance left", "rate_limited": "it is rate limiting us", "no_private_provider": "no private provider serves this model now",
+ZG_WORDS = {"no_key": "the 0G key or model is not set", "bad_key": "it refused the API key", "no_balance": "the 0G account has no balance left", "rate_limited": "it is rate limiting us", "no_private_provider": "no private provider serves this model now",
             "timeout": "it did not answer in time", "router_not_https": "ZG_ROUTER_URL is not HTTPS", "tee_check_failed": "the TEE signature check failed, so the answer was thrown away", "not_json": "its answer was not JSON", "no_structured_output": "its answer had no usable JSON",
             "backend_failed": "the call failed"}
 ZG_CHECK_KEPT = ("HOME", "PATH", "LANG", "TMPDIR", "ZG_RPC_URL", "ZG_SDK_MODULE", "ZG_ETHERS_MODULE")
+CLAUDE_MODEL = "claude-opus-5-5"
 CALLS = []
+zg_name, zg_private = "0G", True  # use_route changes these, only in a child that serves one request.
 
 
 class LLMError(Exception):
@@ -89,13 +92,14 @@ def _zg_post(body, timeout):
         def redirect_request(self, *_):
             return None
     request = urllib.request.Request(router.rstrip("/") + "/chat/completions", data=json.dumps(body).encode(), method="POST", headers={
-        "Authorization": f"Bearer {os.environ['ZG_API_KEY']}", "Content-Type": "application/json", "X-0G-Provider-Trust-Mode": "private", "User-Agent": "crashlab"})
+        "Authorization": f"Bearer {os.environ['ZG_API_KEY']}", "Content-Type": "application/json", "User-Agent": "crashlab", **({"X-0G-Provider-Trust-Mode": "private"} if zg_private else {})})
     try:
         with urllib.request.build_opener(NoRedirect, urllib.request.ProxyHandler({})).open(request, timeout=timeout) as reply:
             data = reply.read(MAX_OUTPUT_BYTES + 1)
             chat_header = reply.headers.get("ZG-Res-Key")
     except urllib.error.HTTPError as e:
-        raise LLMError(ZG_HTTP_CODES.get(e.code, "backend_failed")) from None
+        code = ZG_HTTP_CODES.get(e.code, "backend_failed")
+        raise LLMError(code if zg_private or code != "no_private_provider" else "backend_failed") from None
     except (urllib.error.URLError, TimeoutError, OSError):
         raise LLMError("timeout") from None
     if len(data) > MAX_OUTPUT_BYTES:
@@ -130,15 +134,17 @@ def _zerog(prompt, schema, timeout):
     if not (os.environ.get("ZG_API_KEY") and os.environ.get("ZG_MODEL")):
         raise LLMError("no_key")
     system = f"{SYSTEM} Reply with one JSON object only, matching this JSON schema: {json.dumps(schema)}"
-    data, chat_header = _zg_post({"model": os.environ["ZG_MODEL"], "verify_tee": True, "max_tokens": ZG_MAX_TOKENS, "response_format": {"type": "json_object"},
+    data, chat_header = _zg_post({"model": os.environ["ZG_MODEL"], **({"verify_tee": True} if zg_private else {}), "max_tokens": ZG_MAX_TOKENS, "response_format": {"type": "json_object"},
                                   "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}]}, timeout)
     reply = _strict_object(data)
     trace = reply.get("x_0g_trace") if isinstance(reply.get("x_0g_trace"), dict) else {}
     chat_id = chat_header or reply.get("id")
-    row = {"request_id": trace.get("request_id"), "provider": trace.get("provider"), "chat_id": chat_id, "tee_verified": trace.get("tee_verified"), "own_check": _zg_own_check(trace.get("provider"), chat_id), "billing": trace.get("billing")}
-    CALLS[-1].update(row)
-    if row["own_check"] is False or row["tee_verified"] is False:
-        raise LLMError("tee_check_failed")
+    CALLS[-1].update(request_id=trace.get("request_id"), provider=trace.get("provider"), billing=trace.get("billing"), private=zg_private)
+    if zg_private:
+        row = {"chat_id": chat_id, "tee_verified": trace.get("tee_verified"), "own_check": _zg_own_check(trace.get("provider"), chat_id)}
+        CALLS[-1].update(row)
+        if row["own_check"] is False or row["tee_verified"] is False:
+            raise LLMError("tee_check_failed")
     try:
         text = reply["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError):
@@ -156,6 +162,34 @@ def use_model(model):
     os.environ["CRASHLAB_LLM_MODEL"] = model
 
 
+def use_route(route):
+    """The chat picker's choice, one of fast, private or claude. This changes the environment of this process, so only a child that serves one request calls it."""
+    global zg_name, zg_private
+    BACKENDS["claude"] = _complete_claude
+    if route == "claude":
+        os.environ.update(CRASHLAB_LLM="claude", CRASHLAB_LLM_MODEL=CLAUDE_MODEL)
+        return
+    os.environ["CRASHLAB_LLM"] = "0g"
+    zg_name, zg_private = {"fast": ("0G Fast", False), "private": ("0G Private", True)}[route]
+    if route == "fast":
+        os.environ["ZG_MODEL"] = os.environ.get("ZG_FAST_MODEL", "")
+
+
+def _complete_claude(prompt, schema):
+    """Claude as a route the chat chose, with one row, so the Details row names it."""
+    started = time.time()
+    model = os.environ.get("CRASHLAB_LLM_MODEL", CLAUDE_MODEL)
+    row = {"backend": "claude", "model": model, "at": started, "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest()}
+    CALLS.append(row)
+    try:
+        answer = _claude(prompt, schema)
+    except LLMError as e:
+        row.update(error=str(e), seconds=round(time.time() - started, 1), line=f"Claude: model {model}, failed.")
+        raise
+    row.update(seconds=round(time.time() - started, 1), line=f"Claude: model {model}, {round(time.time() - started, 1)} s.")
+    return answer
+
+
 def _complete_0g(prompt, schema):
     """One 0G call and its row. The row's line and say are what the chat shows."""
     global TIMEOUT_S
@@ -169,14 +203,14 @@ def _complete_0g(prompt, schema):
         row.update(error=code, seconds=round(time.time() - started, 1))
         reason = ZG_WORDS.get(code, ZG_WORDS["backend_failed"])
         if os.environ.get("ZG_FALLBACK_CLAUDE") != "1":
-            row.update(line=f"0G: request {row.get('request_id') or 'none'}, failed: {reason}.", say=f"0G did not answer this: {reason}.")
+            row.update(line=f"{zg_name}: request {row.get('request_id') or 'none'}, failed: {reason}.", say=f"{zg_name} did not answer this: {reason}.")
             raise LLMError(f"zg_{code}") from None
         TIMEOUT_S = max(30, int(TIMEOUT_S - (time.time() - started)))  # Claude gets what is left, so the whole call still fits the stage's deadline.
         answer = _claude(prompt, schema)
-        row.update(fell_back=True, line=f"0G: request {row.get('request_id') or 'none'}, failed: {reason}. Claude answered instead.", say=f"0G did not answer this: {reason}. Claude answered instead.")
+        row.update(fell_back=True, line=f"{zg_name}: request {row.get('request_id') or 'none'}, failed: {reason}. Claude answered instead.", say=f"{zg_name} did not answer this: {reason}. Claude answered instead.")
         return answer
     row["seconds"] = round(time.time() - started, 1)
-    row["line"] = f"0G: request {row.get('request_id') or 'none'}, model {row['model']}, {row['seconds']} s. {verification_words(row)}"
+    row["line"] = f"{zg_name}: request {row.get('request_id') or 'none'}, model {row['model']}, {row['seconds']} s. {verification_words(row) if zg_private else 'Not private and not verified.'}"
     return answer
 
 
