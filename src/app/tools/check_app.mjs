@@ -6,12 +6,13 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const BASE = 'http://localhost:5199';
+const BASE = `http://localhost:${process.env.CRASHLAB_APP_PORT ?? 5199}`;
+const SERVER_PORT = process.env.CRASHLAB_SERVER_PORT ?? '5198';
 const OUT = resolve(process.argv[2] ?? '/tmp/crashlab-app-check');
 const ROOT = resolve(import.meta.dirname, '../../..');
 mkdirSync(OUT, { recursive: true });
 const profile = mkdtempSync(join(tmpdir(), 'crashlab-chrome-'));
-const PORT = 9333;
+const PORT = Number(process.env.CRASHLAB_CHROME_PORT ?? 9333);
 const chrome = spawn(CHROME, [
   '--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--window-size=1440,900',
   '--force-device-scale-factor=1', '--hide-scrollbars', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--mute-audio', 'about:blank',
@@ -212,7 +213,7 @@ await shot('worlds-default.png');
 // Recorded run: the finished campaign from one file, with no run server, no AI and no simulation.
 const serverCalls = [];
 await send('Network.enable');
-ws.addEventListener('message', m => { const msg = JSON.parse(m.data); if (msg.method === 'Network.requestWillBeSent' && msg.params.request.url.includes(':5198')) serverCalls.push(msg.params.request.url); });
+ws.addEventListener('message', m => { const msg = JSON.parse(m.data); if (msg.method === 'Network.requestWillBeSent' && msg.params.request.url.includes(`:${SERVER_PORT}`)) serverCalls.push(msg.params.request.url); });
 const started = Date.now();
 await send('Page.navigate', { url: `${BASE}/app.html?recorded=1` });
 await wait(100);

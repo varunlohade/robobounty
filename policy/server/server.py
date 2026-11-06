@@ -36,7 +36,7 @@ CRASHLAB = POLICY / "crashlab"
 RUNS = POLICY / "runs" / "server"
 PYTHON = str(POLICY / ".venv" / "bin" / "python")
 HOST = "127.0.0.1"
-APP_ORIGINS = {"http://localhost:5199", "http://127.0.0.1:5199"}
+APP_ORIGINS = {"http://localhost:5199", "http://127.0.0.1:5199"}  # --app-port replaces the port
 MAX_PROCS = 4
 MAX_BODY_BYTES = 8192
 MAX_SESSIONS = 32
@@ -997,15 +997,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global RECORDED
+    global RECORDED, APP_ORIGINS
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=5198)
+    ap.add_argument("--app-port", type=int, default=5199)
     ap.add_argument("--recorded", help="folder of stored LLM replies. For offline checks only, and the status line says so.")
     ap.add_argument("--llm-session-cap", type=int, default=MAX_LLM_PER_SESSION)
     ap.add_argument("--llm-hour-cap", type=int, default=MAX_LLM_PER_HOUR)
     a = ap.parse_args()
     LLM_LIMIT.session_cap, LLM_LIMIT.hour_cap = a.llm_session_cap, a.llm_hour_cap
     RECORDED = str(Path(a.recorded).resolve()) if a.recorded else None
+    APP_ORIGINS = {f"http://localhost:{a.app_port}", f"http://127.0.0.1:{a.app_port}"}
     RUNS.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer((HOST, a.port), Handler)
     server.daemon_threads = True

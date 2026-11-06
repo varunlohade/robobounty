@@ -1,7 +1,7 @@
 // The chat backend for the local run server. DEMO SHORTCUT: an embedded runtime can replace this transport.
 import type { ChatAction, ChatBackend, ChatEvent } from './backend.ts';
 
-export const SERVER = 'http://127.0.0.1:5198';
+export const SERVER = (import.meta as unknown as { env?: { VITE_CRASHLAB_SERVER?: string } }).env?.VITE_CRASHLAB_SERVER ?? 'http://127.0.0.1:5198';
 const STORE_KEY = 'crashlab-session';
 
 function remembered(): string | null {
