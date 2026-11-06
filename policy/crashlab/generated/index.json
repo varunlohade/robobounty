@@ -10,6 +10,28 @@
    0.667267
   ]
  },
+ "barnacle covered steel panel": {
+  "check": "good:quality",
+  "description": "a barnacle covered steel panel",
+  "hulls": 16,
+  "sha256": "01b9664fe14e4ee2200100d410d4ebf31e8a0e9afefbd8659829c178688f326d",
+  "unit_size": [
+   1.0,
+   0.122989,
+   0.771887
+  ]
+ },
+ "cable tray": {
+  "check": "good:quality",
+  "description": "a cable tray",
+  "hulls": 16,
+  "sha256": "0b59246491a1caa07d0dff6ee945ada23b5f5c763e1723996a132e9eb372713b",
+  "unit_size": [
+   0.17129,
+   1.0,
+   0.063826
+  ]
+ },
  "rooftop ac unit": {
   "check": "good:quality",
   "description": "a rooftop AC unit",
