@@ -18,6 +18,7 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
       uRobot: { value: new THREE.Vector4(0, 0, 1, 0) }, uRobotNear: { value: 1 }, uFilmTop: { value: 1 }, uFogK: { value: 1 },
       // The look. As built, these change nothing.
       uBody: { value: new THREE.Color(0, 0, 0) }, uBodyLight: { value: new THREE.Color(1, 1, 1) }, uBodyAmt: { value: 0 }, uReflKeep: { value: 1 }, uFilmKeep: { value: 1 },
+      uSnow: { value: 0 }, uRain: { value: 0 }, uTime: { value: 0 }, uDropBack: { value: 0 }, uDustFilm: { value: 0 },
       uTint: { value: new THREE.Color(1, 1, 1) }, uTintGlow: { value: new THREE.Color(0, 0, 0) }, uFrit: { value: new THREE.Color(0.01, 0.011, 0.012) }, uRooms: { value: 0 },
     },
     vertexShader: `varying vec3 vW; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
@@ -25,7 +26,7 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
       varying vec3 vW;
       uniform sampler2D uReflect, uDirtA, uDirtB, uDrops;
       uniform mat4 uTexMat;
-      uniform float uHasReflect, uDirtMix, uFilm, uWet, uRobotNear, uBodyAmt, uReflKeep, uFilmKeep, uRooms;
+      uniform float uHasReflect, uDirtMix, uFilm, uWet, uRobotNear, uBodyAmt, uReflKeep, uFilmKeep, uRooms, uSnow, uRain, uTime, uDropBack, uDustFilm;
       uniform vec3 uEnvFlat, uBody, uBodyLight, uTint, uTintGlow, uFrit;
       uniform vec4 uDirtRect, uGrid, uRobot;
       uniform vec2 uDirtSize, uClean;
@@ -55,16 +56,26 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
         vec4 wide = texture2D(uNoise, p * vec2(0.13, 0.05) + rnd3);
         vec2 tilt = (vec2(rnd2, rnd3) - 0.5) * 0.008 + (vec2(wide.a, texture2D(uNoise, p * vec2(0.09, 0.04) + rnd2).a) - 0.5) * 0.012;
 
-        // Water on the glass, as much as this world's wetness says. Each drop bends the reflection through itself.
-        vec4 dropT = texture2D(uDrops, p / 2.0 + vec2(rnd3 * 0.4, rnd * 0.4));
-        float dropOn = dropT.b * step(dropT.a, uWet * 0.55) * smoothstep(0.03, 0.006, length(fwidth(p / 2.0)));
-        vec2 dropN = (dropT.rg - 0.5) * 2.0 * dropOn;
-
         // Recorded dirt: relative to the run's mean start level. Outside the padded grid there is no record, so the wall keeps the start film.
         vec2 du = (p - uDirtRect.xy) / uDirtRect.zw;
         float level = 1.0;
         if (du.x > 0.0 && du.x < 1.0 && du.y > 0.0 && du.y < 1.0) level = mix(bicubic(uDirtA, du), bicubic(uDirtB, du), uDirtMix) * 3.0;
         float mask = smoothstep(uClean.x, uClean.y, level);
+
+        // Water on the glass, as much as this world's wetness says. Each drop bends the reflection through itself.
+        // Picture only: drops go where the recording shows the robot cleaned. The sim's wetness stays constant, so grip does not change after a pass. In rain a few come back.
+        vec4 dropT = texture2D(uDrops, p / 2.0 + vec2(rnd3 * 0.4, rnd * 0.4));
+        float dropKept = step(dropT.a, uWet * 0.55 * mix(uDropBack, 1.0, mask));
+        float dropOn = dropT.b * dropKept * smoothstep(0.03, 0.006, length(fwidth(p / 2.0)));
+        vec2 dropN = (dropT.rg - 0.5) * 2.0 * dropOn;
+        // Rain also runs down the glass in thin lines. Scenery.
+        if (uRain > 0.5) {
+          float rx = p.x * 19.0, lane = floor(rx), rr = hash12(vec2(lane, 3.0));
+          float ry = fract(p.y * 0.3 + uTime * (0.22 + 0.5 * rr) + rr * 7.0);
+          float run = step(0.62, rr) * (1.0 - abs(fract(rx) * 2.0 - 1.0)) * smoothstep(0.0, 0.03, ry) * smoothstep(0.55, 0.1, ry) * mix(uDropBack, 1.0, mask);
+          dropOn = max(dropOn, run);
+          dropN += vec2((fract(rx) - 0.5) * 2.0, 0.2) * run;
+        }
         float grimeAmt = 0.3 + 0.34 * smoothstep(0.34, 0.68, tile.r) + 0.42 * tile.g + 0.12 * smoothstep(0.48, 0.66, tile.b);
         // Run-off below each transom, in streaks.
         float below = fract(gr.y);
@@ -115,9 +126,17 @@ export function glassMaterial(noise: { value: THREE.Texture | null }, drops: { v
         // The film: a thin warm-grey mineral layer lit by the overcast.
         vec3 tint = mix(vec3(0.24, 0.235, 0.22), vec3(0.17, 0.17, 0.165), smoothstep(0.3, 0.7, tile.r));
         vec3 filmCol = tint * uEnvFlat * 1.55 * (0.92 + 0.18 * tile.g);
+        filmCol = mix(filmCol, vec3(0.62, 0.44, 0.25) * uEnvFlat * 1.55, uDustFilm);
         // Water cuts through the film where it sits, and a drop's lower lip catches the sky.
         vec3 col = mix(glass * mix(1.0, occl, 0.75), filmCol * occl, film * (1.0 - 0.8 * dropOn));
         col += dropOn * uEnvFlat * 0.5 * smoothstep(0.1, 0.9, dropN.y) * occl;
+        // Snow settled on each joint's top edge and creeping in from the pane edges. Scenery. A cleaned lane stays bare.
+        if (uSnow > 0.0) {
+          float above = fract(gr.y) * uGrid.w;
+          float bank = 1.0 - smoothstep(0.75, 1.0, above / (uSnow * (0.1 + 0.4 * tile.r * tile.r + 0.2 * wide.a)));
+          float frost = smoothstep(0.16, 0.03, bar.x + 0.14 * tile.g) * smoothstep(0.42, 0.62, tile.r) * uSnow;
+          col = mix(col, uEnvFlat * vec3(2.2, 2.25, 2.35) * occl, clamp(max(bank, frost * 0.7), 0.0, 1.0) * mix(0.1, 1.0, mask));
+        }
         col = mix(col, uHaze, clamp(airAmount(vW, cameraPosition), 0.0, 1.0));
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>

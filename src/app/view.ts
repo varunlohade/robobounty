@@ -6,9 +6,10 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { HAZE, SKY_URL, bakeDrops, bakeGrime, skyDome } from '../view/real/air.ts';
 import { cityGeometry, cityMaterial } from '../view/real/city.ts';
 import { barGeometry, brushedTextures, glassMaterial, type FacadeGrid } from '../view/real/facade.ts';
-import { CITIES, FOG_THICKNESS, TIMES, luminance, parseLook, tintOf, type Look } from '../view/real/look.ts';
+import { AIR, CITIES, FOG_THICKNESS, TIMES, luminance, parseLook, tintOf, type Look } from '../view/real/look.ts';
 import { compositeMaterial } from '../view/real/post.ts';
 import { buildRobot } from '../view/real/robot.ts';
+import { Weather } from '../view/real/weather.ts';
 import type { Replay } from './replay.ts';
 import type { Trial } from './trial.ts';
 
@@ -78,6 +79,7 @@ export class SimView {
   private dirty = true; private stopped = false; private shadowsDirty = true;
   private observer: ResizeObserver;
   private seed = 0; private lastTick = 0; private slow = 0; private frames = 0;
+  private weather: Weather; private air = { rain: false, snow: false, dust: false };
 
   constructor(private host: HTMLElement, private replay: Replay, private trial: Trial) {
     const built = performance.now();
@@ -168,6 +170,10 @@ export class SimView {
 
     this.buildGeoms(geomId);
 
+    this.weather = new Weather(noise);
+    this.scene.add(this.weather.group);
+    this.disposers.push(() => this.weather.dispose());
+
     this.robot = buildRobot(this.renderer);
     this.scene.add(this.robot.root, this.robot.tether);
     this.disposers.push(() => this.robot.dispose());
@@ -252,6 +258,7 @@ export class SimView {
       if (this.stopped) return;
       this.controls.update();
       this.stepCamera(now);
+      this.stepWeather(now);
       if (this.dirty && host.clientWidth > 0) { this.dirty = false; this.renderFrame(); this.watchSpeed(now); }
       this.lastTick = now;
       requestAnimationFrame(loop);
@@ -295,12 +302,21 @@ export class SimView {
     const glass = this.glass.uniforms, sky = (this.dome.material as THREE.ShaderMaterial).uniforms, c = this.city.uniforms;
 
     this.haze.copy(time.haze).multiply(city.haze);
+    const air = { rain: look.rain === true, snow: look.snow === true, dust: look.dust_air === true };
+    this.air = air;
+    const active = [air.rain && AIR.rain, air.snow && AIR.snow, air.dust && AIR.dust].filter(a => !!a);
+    for (const a of active) this.haze.multiply(a.haze);
     this.renderer.setClearColor(this.haze);
     glass.uEnvFlat.value.copy(time.flat);
-    glass.uFogK.value = c.uFogK.value = FOG_THICKNESS[fog];
-    sky.uSkyMix.value = time.skyMix; sky.uSkyLow.value.copy(time.skyLow); sky.uSkyHigh.value.copy(time.skyHigh); sky.uSkyFog.value = fog * 0.3;
+    glass.uFogK.value = c.uFogK.value = Math.max(FOG_THICKNESS[fog], ...active.map(a => a.fog));
+    sky.uSkyMix.value = time.skyMix; sky.uSkyLow.value.copy(time.skyLow); sky.uSkyHigh.value.copy(time.skyHigh); sky.uSkyFog.value = Math.max(fog * 0.3, ...active.map(a => a.skyFog));
     c.uDay.value = time.day; c.uLights.value = time.lights; c.uCityTint.value.copy(city.tint); c.uGround.value.copy(city.ground); c.uLift.value = city.lift; c.uShore.value = city.shore;
-    this.sun.color.copy(time.sun); this.sun.intensity = time.sunLevel;
+    for (const a of active) { c.uCityTint.value.multiply(a.city); c.uGround.value.multiply(a.ground); }
+    this.sun.color.copy(time.sun); this.sun.intensity = time.sunLevel * active.reduce((k, a) => k * a.sun, 1);
+    glass.uRain.value = air.rain ? 1 : 0;
+    glass.uDustFilm.value = air.dust ? 0.85 : 0;
+    this.syncAirOverTime();
+    this.weather.setAir(air, Math.min(1.3, 0.25 + luminance(this.haze) * 1.6));
     this.envStrength = time.env;
     glass.uRooms.value = time.rooms;
 
@@ -343,8 +359,17 @@ export class SimView {
       this.metalMat.color.setRGB(0.72, 0.735, 0.75);
       this.metalMat.metalness = 1; this.metalMat.roughness = 0.75;
     }
+    // Snow lies on the frames, the ledge and whatever else the record has out in the air.
+    if (air.snow) { this.metalMat.color.lerp(new THREE.Color(1.5, 1.52, 1.58), 0.8); this.metalMat.metalness = 0.1; this.metalMat.roughness = 0.9; }
+    for (const { mesh } of this.drawn) {
+      const m = mesh.material as THREE.MeshStandardMaterial;
+      if (m === this.towerMat) continue;
+      m.userData.built ??= m.color.clone();
+      m.color.copy(m.userData.built);
+      if (air.snow) m.color.lerp(new THREE.Color(1.4, 1.42, 1.48), 0.85);
+    }
 
-    const envKey = `${look.time ?? 'noon'}|${fog}|${look.city ?? 'default'}`;
+    const envKey = `${look.time ?? 'noon'}|${fog}|${look.city ?? 'default'}|${air.rain}|${air.snow}|${air.dust}`;
     if (envKey !== this.envKey) { this.envKey = envKey; this.buildEnv(); }
     else this.scene.environmentIntensity = this.envStrength;
     this.host.dataset.look = JSON.stringify(look);
@@ -546,6 +571,25 @@ export class SimView {
     }
   }
 
+  // The wind at this frame comes from the run's record. A world with no run yet has only its steady value. The direction is the world's.
+  private stepWeather(now: number) {
+    if (!this.lastTick) return;
+    const dt = Math.min(0.25, (now - this.lastTick) / 1000);
+    const { wind, world } = this.trial;
+    const row = Math.max(0, this.replay.frame - 1);
+    const speed = wind.length ? wind[Math.min(row, wind.length - 1)] : Number(world?.steady_wind_ms ?? 0);
+    this.glass.uniforms.uTime.value = now / 1000;
+    if (this.weather.step(dt, speed, Number(world?.wind_dir_deg ?? 0), this.camera, now / 1000, (2 * Math.tan((this.camera.fov * Math.PI) / 360)) / Math.max(1, this.host.clientHeight))) this.dirty = true;
+    this.host.dataset.weather = JSON.stringify({ ms: this.weather.speed, dir: this.weather.dirDeg, travel: Number(this.weather.travel.toFixed(4)), at: Number(now.toFixed(2)), streaks: this.weather.streaks });
+  }
+
+  // Snow builds up and drops come back on cleaned glass over the run's recorded time. Picture only.
+  private syncAirOverTime() {
+    const progress = this.replay.frame / Math.max(1, this.trial.manifest.frames - 1);
+    this.glass.uniforms.uSnow.value = this.air.snow ? 0.55 + 0.45 * progress : 0;
+    this.glass.uniforms.uDropBack.value = this.air.rain ? 0.35 * progress : 0;
+  }
+
   // The camera glides after the robot so it stays in frame while the wall moves past. A viewer's orbit stays as an offset.
   private stepCamera(now: number) {
     if (!this.followed) return;
@@ -637,6 +681,7 @@ export class SimView {
 
     if (this.path) (this.path.geometry as LineGeometry).instanceCount = Math.max(0, this.replay.frame - this.pathStart);
     this.syncDirt();
+    this.syncAirOverTime();
     this.dirty = true;
   }
 

@@ -1,7 +1,8 @@
 // Drives lab.html end to end: a brief, one run, a follow-up, a second run of the same world.
 // node src/lab/tools/check_lab.mjs [--recorded DIR] [--out DIR] [--brief text] [--change text]
-// Needs vite on port 5199. It starts its own run server on port 5198 and stops it. With no --recorded it makes 2 real LLM calls.
+// Needs vite on port 5199. It starts its own run server on a free port, so one already open stays untouched and stops it. With no --recorded it makes 2 real LLM calls.
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -12,13 +13,14 @@ const OUT = resolve(arg('out', join(ROOT, 'design/shell')));
 const RECORDED = arg('recorded', null);
 const BRIEF = arg('brief', 'Window robot for towers in Dubai. High floor.');
 const CHANGE = arg('change', 'Make the wind stronger and wet the glass.');
-const SERVER = 'http://127.0.0.1:5198';
+const SERVER_PORT = await new Promise(r => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => r(port)); }); });
+const SERVER = `http://127.0.0.1:${SERVER_PORT}`;
 const ORIGIN = 'http://localhost:5199';
 const PORT = 9650 + Math.floor(Math.random() * 100);
 const profile = mkdtempSync(join(tmpdir(), 'crashlab-lab-live-'));
 mkdirSync(OUT, { recursive: true });
 
-const server = spawn(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/server.py'), ...(RECORDED ? ['--recorded', resolve(RECORDED)] : [])],
+const server = spawn(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/server.py'), '--port', String(SERVER_PORT), ...(RECORDED ? ['--recorded', resolve(RECORDED)] : [])],
   { stdio: 'inherit', env: { ...process.env, CRASHLAB_LLM_MODEL: 'claude-opus-5-5' } });
 const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--window-size=1440,900',
   '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
@@ -72,7 +74,7 @@ try {
   await send('Runtime.enable'); await send('Page.enable'); await send('Log.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await wait(1000);
-  await send('Page.navigate', { url: `${ORIGIN}/lab.html` });
+  await send('Page.navigate', { url: `${ORIGIN}/lab.html?server=${SERVER_PORT}` });
   await until(`document.getElementById('lab')?.dataset.server === 'up'`, 'server up', 30);
 
   // 1. Empty start.
@@ -148,10 +150,10 @@ try {
   check('world_2 differs from world_1', moved.length > 0);
   check('world_2 differs only in the cited fields', moved.every(k => cited.includes(k)), moved.filter(k => !cited.includes(k)).join(','));
   check('the run seed stays', r1.seed === r2.seed, `${r1.seed} and ${r2.seed}`);
-  const said = log.filter(e => e.type === 'text' && !e.fail).map(e => e.text).filter(t => / to .*\d/.test(t)).pop() ?? '';
+  const said = log.filter(e => e.type === 'text' && !e.fail).map(e => e.text).filter(t => / \u2192 .*\d/.test(t)).pop() ?? '';
   console.log('said:', said);
   const shown = v => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(1) : String(Number(v.toPrecision(3))));
-  check('chat says each moved value in plain numbers', moved.length > 0 && moved.every(k => said.includes(`${shown(w1[k])} to ${shown(w2[k])}`)), said);
+  check('chat says each moved value in plain numbers', moved.length > 0 && moved.every(k => said.includes(`${shown(w1[k])} \u2192 ${shown(w2[k])}`)), said);
   check('chat shows those numbers', (await chatText()).includes(said) && said.length > 0);
   const f1 = await frame();
   await wait(1500);
@@ -177,6 +179,33 @@ try {
   const state = await (await get('state')).json();
   const after = await events();
   check('confirming ends there', state.phase === 'review_scene' && !state.busy && !after.some(e => e.title === 'scenario_agent') && after.filter(e => e.type === 'llm_count').length === count, JSON.stringify(state));
+
+  // 5. A held run explains itself, from the run's own numbers. A new chat with the very windy answer.
+  await send('Page.navigate', { url: 'about:blank' });
+  await wait(300);
+  await send('Page.navigate', { url: `${ORIGIN}/lab.html?server=${SERVER_PORT}` });
+  await until(`document.getElementById('lab')?.dataset.server === 'up'`, 'server up', 30);
+  await js(`sessionStorage.removeItem('crashlab-session')`);
+  await send('Page.navigate', { url: `${ORIGIN}/lab.html?server=${SERVER_PORT}` });
+  await until(`document.getElementById('lab')?.dataset.server === 'up' && !!sessionStorage.getItem('crashlab-session')`, 'fresh session', 30);
+  n = await idle();
+  await type(BRIEF);
+  await idleAfter(n, 90);
+  for (let q = 0; await js(`[...document.querySelectorAll('.chat-option')].some(b => !b.disabled)`); q++) {
+    n = await idle();
+    await js(`[...document.querySelectorAll('.chat-card')].pop().querySelectorAll('.chat-option')[${q === 0 ? 2 : 0}].click()`);
+    await idleAfter(n, 90);
+  }
+  await until(playing('normal-1'), 'held run plays', 60);
+  const heldSid = await js(`sessionStorage.getItem('crashlab-session')`);
+  const heldFile = name => fetch(`${SERVER}/api/sessions/${heldSid}/trials/normal-1/${name}`, { headers: { Origin: ORIGIN } }).then(r => r.json());
+  const heldResult = await heldFile('result.json'), heldWind = await heldFile('wind.json');
+  const peak = Math.max(...heldWind).toFixed(1), held = await chatText();
+  check('the run held for wind', heldResult.outcome === 'wind_hold', heldResult.outcome);
+  check('the chat gives the plain cause with recorded numbers', new RegExp(`The robot paused for (all|most|part) of the run, because wind of ${peak} m/s is above its 10 m/s limit\\.`).test(held) && held.includes(`averaged ${heldResult.hold_mean_wind_ms.toFixed(1)} m/s`), held.split('\n').find(l => l.includes('paused')));
+  check('the chat gives the cleaned share', held.includes(`It cleaned ${(heldResult.coverage * 100).toFixed(1)}%.`));
+  check('the old words are gone', !/stopped and held on|wind hold/i.test(held));
+  await shot('lab-held.png');
   check('no console errors', problems.length === 0, [...new Set(problems)].slice(0, 8).join('\n'));
 } catch (err) {
   check('the flow finished', false, String(err));

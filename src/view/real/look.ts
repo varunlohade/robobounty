@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { HAZE } from './air.ts';
 
 // The look: scenery only. It feeds nothing to physics. The run server validates it first, and this file checks it again, so only these typed values reach a shader.
-export interface Look { building?: string; glass_tint?: string; frames?: string; time?: 'noon' | 'dusk' | 'night'; fog?: number; city?: 'default' | 'dubai' | 'generic_desert' | 'generic_coast'; rain?: boolean; dust_air?: boolean }
+export interface Look { building?: string; glass_tint?: string; frames?: string; time?: 'noon' | 'dusk' | 'night'; fog?: number; city?: 'default' | 'dubai' | 'generic_desert' | 'generic_coast'; rain?: boolean; snow?: boolean; dust_air?: boolean }
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -15,6 +15,7 @@ export function parseLook(raw: unknown): Look {
   if (r.fog === 0 || r.fog === 1 || r.fog === 2 || r.fog === 3) out.fog = r.fog;
   if (r.city === 'default' || r.city === 'dubai' || r.city === 'generic_desert' || r.city === 'generic_coast') out.city = r.city;
   if (typeof r.rain === 'boolean') out.rain = r.rain;
+  if (typeof r.snow === 'boolean') out.snow = r.snow;
   if (typeof r.dust_air === 'boolean') out.dust_air = r.dust_air;
   return out;
 }
@@ -32,6 +33,12 @@ export const CITIES = {
   generic_coast: { tint: rgb(1.05, 1.05, 1.08), ground: rgb(1, 1, 1), haze: rgb(0.84, 0.98, 1.14), lift: 0.8, shore: -760 },
 };
 export const FOG_THICKNESS = [1, 3.5, 9, 24];
+// What the air does to the picture. Each multiplies the time of day, so a night stays dark. Scenery only.
+export const AIR = {
+  rain: { haze: rgb(0.62, 0.66, 0.72), fog: 4, skyFog: 0.75, sun: 0.4, city: rgb(0.8, 0.82, 0.85), ground: rgb(0.8, 0.82, 0.85) },
+  snow: { haze: rgb(1.55, 1.6, 1.7), fog: 5, skyFog: 0.8, sun: 0.65, city: rgb(1.5, 1.55, 1.62), ground: rgb(4.5, 4.6, 4.8) },
+  dust: { haze: rgb(1.55, 1.02, 0.56), fog: 8, skyFog: 0.92, sun: 0.5, city: rgb(1.12, 0.95, 0.72), ground: rgb(1.5, 1.15, 0.75) },
+};
 
 // A tint keeps its hue at any brightness, so a dark colour still reads as that colour on the glass.
 export function tintOf(hex: string): THREE.Color {

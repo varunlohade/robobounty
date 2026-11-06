@@ -178,5 +178,60 @@
  },
  "make the robot dance": {
   "calls": []
+ },
+ "make the weather dusty": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "make the weather dusty",
+    "args": {
+     "dust_air": true
+    }
+   }
+  ]
+ },
+ "make it rain": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "make it rain",
+    "args": {
+     "rain": true
+    }
+   }
+  ]
+ },
+ "make it snow": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "make it snow",
+    "args": {
+     "snow": true
+    }
+   }
+  ]
+ },
+ "no rain": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "no rain",
+    "args": {
+     "rain": false
+    }
+   }
+  ]
+ },
+ "no snow": {
+  "calls": [
+   {
+    "tool": "set_look",
+    "words": "no snow",
+    "args": {
+     "snow": false
+    }
+   }
+  ]
  }
 }

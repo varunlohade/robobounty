@@ -8,7 +8,17 @@ import re
 COLOUR_FIELDS = ("building", "glass_tint", "frames")
 TIMES = ("noon", "dusk", "night")
 CITIES = ("default", "dubai", "generic_desert", "generic_coast")
-FIELDS = (*COLOUR_FIELDS, "time", "fog", "city", "rain", "dust_air")
+FIELDS = (*COLOUR_FIELDS, "time", "fog", "city", "rain", "snow", "dust_air")
+WEATHER_FIELDS = ("rain", "snow", "dust_air")
+# One word changes both sides. A weather look also sets these world fields, the parts that have a model. The rest of the weather is scenery, and the chat says so.
+# Each value is exact, as a min and a max for the plan validator. They are chosen inside the world limits and the brief's guide: heavy dust, fully wet glass, freezing air.
+WEATHER_PHYSICS = {"rain": {"wetness": 0.9}, "snow": {"temperature_c": -5.0, "wetness": 0.6}, "dust_air": {"dust_gm2": 25.0}}
+_WEATHER_NAMES = {"rain": "Rain", "snow": "Snow", "dust_air": "Dust"}
+_WEATHER_WORDS = {
+    "rain": ("Modelled: wet glass. Rain on screen is scenery.", "Rain is off. The wet glass goes back to its value before the rain."),
+    "snow": ("Modelled: cold air, wet glass. Snow on screen is scenery. Snow and ice have no physics here.", "Snow is off. The air and the glass go back to their values before the snow."),
+    "dust_air": ("Modelled: dust on the glass. Blowing dust on screen is scenery. Dust and sand in the air have no physics here.", "Dust is off. The glass goes back to its value before the dust."),
+}
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 # The fields back to how the scene was built: "default" for a colour, "clear" also for the glass.
 _RESET = {"building": {"default"}, "frames": {"default"}, "glass_tint": {"default", "clear"}}
@@ -48,16 +58,23 @@ def validate(args):
             patch[key] = v
         elif key == "fog" and type(v) is int and 0 <= v <= 3:
             patch[key] = v
-        elif key in ("rain", "dust_air") and type(v) is bool:
+        elif key in WEATHER_FIELDS and type(v) is bool:
             patch[key] = v
         else:
             raise LookError("bad_value")
     return patch
 
 
+def one_weather(patch):
+    """A new weather replaces the old one, unless the same message asks for both."""
+    if any(patch.get(k) for k in WEATHER_FIELDS):
+        return {**{k: False for k in WEATHER_FIELDS}, **patch}
+    return patch
+
+
 def merged(look, patch):
     out = {**look, **patch}
-    return {k: v for k, v in out.items() if v is not None}
+    return {k: v for k, v in out.items() if v is not None and v is not False}
 
 
 def colour_name(hex_value):
@@ -94,11 +111,12 @@ def words(patch, before, has_world):
         lines.append("Fog is off." if patch["fog"] == 0 else f"Fog is now level {patch['fog']} of 3.")
     if "city" in patch:
         lines.append(_CITY_WORDS[patch["city"]])
-    # The view does not draw these two yet, so the chat does not claim it does.
-    if "rain" in patch:
-        lines.append("Rain is saved with this look. The view does not draw it yet." if patch["rain"] else "Rain is off.")
-    if "dust_air" in patch:
-        lines.append("Dust in the air is saved with this look. The view does not draw it yet." if patch["dust_air"] else "Dust in the air is off.")
+    asked_on = any(patch.get(k) for k in WEATHER_FIELDS)
+    for key in WEATHER_FIELDS:
+        if key in patch and patch[key] != bool(before.get(key)):
+            lines.append(_WEATHER_WORDS[key][0 if patch[key] else 1])
+        elif key in patch and (patch[key] or not asked_on):
+            lines.append(f"{_WEATHER_NAMES[key]} is already {'on' if patch[key] else 'off'}.")
     return lines
 
 
@@ -109,7 +127,7 @@ _GLASS = r"(?:glass|windows?|panes?)"
 _FRAMES = r"(?:frames?|mullions?)"
 _VERB = r"(?:make|turn|paint|set|change|colou?r)"
 _BLOCK = re.compile(r"^\s*(?:what|why|how|which|is|are|does|did|if|when|whether)\b|\b(?:not|don'?t|never|without)\b", re.I)
-_FILLER = set("a an the it to be is please can could would you i we want like let us me now make turn paint set change colour color give some with have in at of look city scene sky all so".split())
+_FILLER = set("a an the it to be is please can could would you i we want like let us me now make turn paint set change colour color give some with have in at of look city scene sky all so weather".split())
 
 
 def _colour_rules(field, subject):
@@ -126,7 +144,9 @@ _RULES = (
     (r"\bfog\s+(?:level\s+|to\s+)?([0-3])\b", "fog"), (r"\b(?:foggy|fog)\b(?!\s+\d)", ("fog", 2)),
     (r"\bin\s+dubai\b|\bdubai\b", ("city", "dubai")), (r"\bdesert\s+city\b|\bgeneric\s+desert\b", ("city", "generic_desert")), (r"\bcoast(?:al)?\s+city\b|\bgeneric\s+coast\b", ("city", "generic_coast")), (r"\bdefault\s+city\b", ("city", "default")),
     (r"\bno\s+rain\b|\bstop\s+the\s+rain\b", ("rain", False)), (r"\b(?:make\s+it\s+rain|rainy|raining|rain)\b", ("rain", True)),
-    (r"\bno\s+dust\s+in\s+the\s+air\b", ("dust_air", False)), (r"\bdust\s+in\s+the\s+air\b|\bdusty\s+air\b|\bairborne\s+dust\b", ("dust_air", True)),
+    (r"\bno\s+snow\b|\bstop\s+the\s+snow\b", ("snow", False)), (r"\b(?:make\s+it\s+snow|snowy|snowing|snow)\b", ("snow", True)),
+    (r"\bno\s+dust\s+in\s+the\s+air\b|\bno\s+dust\b", ("dust_air", False)),
+    (r"\bdust\s+in\s+the\s+air\b|\bairborne\s+dust\b|\bdust\s?storm\b|\bsand\s?storm\b|\bdusty\b(?!\s+(?:glass|windows?|panes?))", ("dust_air", True)),
 )
 
 

@@ -1,13 +1,17 @@
-"""Checks the look's validator, the simple parser and the code check on AI replies. It needs no AI.
+"""Checks the look's validator, the simple parser and the code check on AI replies. It needs no AI. It also runs the real sim through the real server, on a free port, for the weather words.
 
 policy/.venv/bin/python policy/server/check_look.py
-With --live MODEL it also scores that model's tool choices on the 30 phrases below. That makes 30 real AI calls.
+With --live MODEL it also scores that model's tool choices on the 33 phrases below. That makes 33 real AI calls.
 """
 import argparse
+import contextlib
 import json
 import os
+import socket
 import subprocess
 import sys
+import time
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -50,6 +54,9 @@ PHRASES = (
     ("put it on a coast", {"city": "generic_coast"}, False, False),
     ("make it rain", {"rain": True}, False, False),
     ("dust hanging in the air", {"dust_air": True}, False, False),
+    ("make the weather dusty", {"dust_air": True}, False, False),
+    ("make it snow", {"snow": True}, False, False),
+    ("rainy weather please", {"rain": True}, False, False),
     ("black building at night with blue glass", {"building": "black", "time": "night", "glass_tint": "blue"}, False, False),
     ("make the building black and the wind stronger", {"building": "black"}, True, False),
     ("Window robot for towers in Dubai. High floor.", {"city": "dubai"}, True, False),
@@ -87,7 +94,7 @@ def right(routed, want_look, want_planner, want_cannot):
 def offline():
     # Validator: typed values only.
     for bad in ({"building": "black"}, {"building": "#12345"}, {"building": "#12345g"}, {"building": "#123456; background:url(x)"}, {"building": 5}, {"frames": "url(x)"},
-                {"time": "vec3(1.0)"}, {"time": ["noon"]}, {"fog": 4}, {"fog": -1}, {"fog": 1.5}, {"fog": True}, {"city": "paris"}, {"city": "dubai\n"}, {"rain": "yes"}, {"rain": 1},
+                {"time": "vec3(1.0)"}, {"time": ["noon"]}, {"fog": 4}, {"fog": -1}, {"fog": 1.5}, {"fog": True}, {"city": "paris"}, {"city": "dubai\n"}, {"rain": "yes"}, {"rain": 1}, {"snow": "yes"}, {"dust_air": 1},
                 {"shader": "void main(){}"}, {"css": "x"}, "text"):
         try:
             look.validate(bad)
@@ -123,6 +130,10 @@ def offline():
         ("make it rain", {"rain": True}, ""),
         ("no rain", {"rain": False}, ""),
         ("dust in the air", {"dust_air": True}, ""),
+        ("make the weather dusty", {"dust_air": True}, ""),
+        ("make it snow", {"snow": True}, ""),
+        ("no snow", {"snow": False}, ""),
+        ("dusty glass", {}, "dusty glass"),
         ("make the building black and the wind stronger", {"building": C["black"]}, "the wind stronger"),
         ("Window robot for towers in Dubai. High floor.", {"city": "dubai"}, "Window robot for towers. High floor"),
         ("make the building purplish", {}, "make the building purplish"),
@@ -153,7 +164,104 @@ def offline():
     r = engine.check_reply({"calls": [call("set_look", "wind stronger", building="#000000"), {"tool": "set_physics", "words": "wet the glass"}]}, "wind stronger and wet the glass")
     check("one reply can call several tools", r.tools == ["set_look", "set_physics"] and r.planner_words == "wet the glass")
     check("the reply schema lists the registry", set(engine.reply_schema()["properties"]["calls"]["items"]["properties"]["tool"]["enum"]) == set(engine.TOOLS))
-    check("30 phrases", len(PHRASES) == 30 and len(cases) == 30)
+    check("33 phrases and 34 parser cases", len(PHRASES) == 33 and len(cases) == 34)
+
+    # The chat says which part is modelled and which is scenery.
+    said = {k: " ".join(look.words(look.one_weather({k: True}), {}, True)) for k in look.WEATHER_FIELDS}
+    check("snow says what is scenery", "Modelled: cold air, wet glass. Snow on screen is scenery." in said["snow"], said["snow"])
+    check("rain says what is scenery", "Modelled: wet glass. Rain on screen is scenery." in said["rain"], said["rain"])
+    check("dust says what is scenery", "Modelled: dust on the glass. Blowing dust on screen is scenery." in said["dust_air"], said["dust_air"])
+    check("the old reply is gone", not any("does not draw" in v for v in said.values()))
+    check("a plain colour moves no physics", not set(look.validate({"building": "#0a0a0a"})) & set(look.WEATHER_PHYSICS))
+
+
+class Server:
+    """The real run server on a free port, with stored AI replies. It never touches a server already open."""
+
+    def __enter__(self):
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            self.port = s.getsockname()[1]
+        self.p = subprocess.Popen([str(HERE.parent / ".venv/bin/python"), str(HERE / "server.py"), "--port", str(self.port), "--recorded", str(HERE / "fixtures_lab")], stdout=subprocess.DEVNULL)
+        for _ in range(100):
+            with contextlib.suppress(OSError):
+                self.call("GET", "/api/health")
+                return self
+            time.sleep(0.1)
+        raise RuntimeError("server did not start")
+
+    def __exit__(self, *_):
+        self.p.terminate()
+        self.p.wait()
+
+    def call(self, method, path, body=None):
+        req = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}", method=method, data=json.dumps(body).encode() if body is not None else None,
+                                     headers={"Origin": "http://localhost:5199", "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=120) as res:
+            return json.load(res)
+
+
+class Chat:
+    def __init__(self, server):
+        self.server = server
+        self.base = f"/api/sessions/{server.call('POST', '/api/sessions', {})['id']}"
+
+    def settle(self):
+        for _ in range(400):
+            time.sleep(0.25)
+            state = self.server.call("GET", f"{self.base}/state")
+            if not state["busy"] and not state.get("routing"):
+                return state
+        raise RuntimeError("session stuck")
+
+    def say(self, text):
+        self.server.call("POST", f"{self.base}/message", {"text": text})
+        return self.settle()
+
+    def brief(self):
+        state = self.say("Window robot for towers in Dubai. High floor.")
+        while state["phase"] == "asking":
+            self.server.call("POST", f"{self.base}/action", {"action": "answer", "value": 0})
+            state = self.settle()
+
+    def trial(self, tid, name):
+        return self.server.call("GET", f"{self.base}/trials/{tid}/{name}")
+
+
+def both_sides():
+    """One word changes the picture and the physics. It needs no AI: the replies are stored, and the sims are real."""
+    with Server() as server:
+        plain = Chat(server)
+        plain.brief()
+        sha = plain.trial("normal-1", "result.json")["final_state_sha256"]
+        world = plain.trial("normal-1", "world.json")
+        # A plain colour: no new run, and a run under that colour ends in the same state.
+        plain.say("make the building black")
+        check("a plain colour starts no run", plain.trial("normal-1", "look.json").get("building") == "#0a0a0a" and server.call("GET", f"{plain.base}/state")["phase"] == "review_scene")
+        coloured = Chat(server)
+        coloured.say("make the building black")
+        coloured.brief()
+        got = coloured.trial("normal-1", "result.json")["final_state_sha256"]
+        check("final_state_sha256 stays equal for a plain colour", got == sha, f"{got[:12]} {sha[:12]}")
+        cases = (("make the weather dusty", "dust_air", {"dust_gm2": 25.0}), ("make it rain", "rain", {"wetness": 0.9}), ("make it snow", "snow", {"temperature_c": -5.0, "wetness": 0.6}))
+        shas = {sha}
+        for text, key, fields in cases:
+            chat = Chat(server)
+            chat.brief()
+            chat.say(text)
+            result, moved, shown = chat.trial("normal-2", "result.json"), chat.trial("normal-2", "world.json"), chat.trial("normal-2", "look.json")
+            check(f"{text!r}: the picture is set", shown.get(key) is True, shown)
+            check(f"{text!r}: the physics is set", all(moved[k] == v for k, v in fields.items()), {k: moved[k] for k in fields})
+            check(f"{text!r}: nothing else moved", all(moved[k] == world[k] for k in moved if k not in fields and k != "schema"))
+            check(f"{text!r}: final_state_sha256 differs", result["final_state_sha256"] not in shas, result["final_state_sha256"][:12])
+            shas.add(result["final_state_sha256"])
+        # A weather goes back: the values before it return, and so does the state.
+        chat = Chat(server)
+        chat.brief()
+        chat.say("make it rain")
+        chat.say("no rain")
+        check("no rain puts the wet glass back", chat.trial("normal-3", "world.json")["wetness"] == world["wetness"] and chat.trial("normal-3", "result.json")["final_state_sha256"] == sha)
+        check("no rain clears the picture", "rain" not in chat.trial("normal-3", "look.json"))
 
 
 def one(phrase, model):
@@ -186,5 +294,6 @@ if __name__ == "__main__":
     if a.live:
         sys.exit(0 if live(a.live) else 1)
     offline()
+    both_sides()
     print(f"{failed} failed" if failed else "all passed")
     sys.exit(1 if failed else 0)

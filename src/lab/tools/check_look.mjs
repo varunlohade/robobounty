@@ -1,7 +1,8 @@
 // Drives lab.html with look changes and checks real pixels: node src/lab/tools/check_look.mjs [--live MODEL] [--out DIR]
-// Needs vite on port 5199. It starts its own run server on port 5198 and stops it. With no --live it reads stored AI replies from policy/server/fixtures_lab and proves the routing, the view and the replay.
+// Needs vite on port 5199. It starts its own run server on a free port, so one already open stays untouched and stops it. With no --live it reads stored AI replies from policy/server/fixtures_lab and proves the routing, the view and the replay.
 // With --live, the brief and the look messages make real AI calls, and it reports send to changed pixels. The time includes the screenshot that saw the change.
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -10,14 +11,15 @@ const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); r
 const ROOT = resolve(import.meta.dirname, '../../..');
 const OUT = resolve(arg('out', join(ROOT, 'design/shell')));
 const LIVE = arg('live', null);
-const SERVER = 'http://127.0.0.1:5198';
+const SERVER_PORT = await new Promise(r => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => r(port)); }); });
+const SERVER = `http://127.0.0.1:${SERVER_PORT}`;
 const ORIGIN = 'http://localhost:5199';
 const PORT = 9750 + Math.floor(Math.random() * 100);
 const profile = mkdtempSync(join(tmpdir(), 'crashlab-look-'));
 mkdirSync(OUT, { recursive: true });
 
 // Stored replies stand in for the planner in both modes: this check is about the look, and its live cost is the route calls.
-const server = spawn(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/server.py'), '--recorded', join(ROOT, 'policy/server/fixtures_lab'), ...(LIVE ? ['--live-route'] : [])],
+const server = spawn(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/server.py'), '--port', String(SERVER_PORT), '--recorded', join(ROOT, 'policy/server/fixtures_lab'), ...(LIVE ? ['--live-route'] : [])],
   { stdio: 'inherit', env: { ...process.env, ...(LIVE ? { CRASHLAB_ROUTE_MODEL: LIVE } : {}) } });
 const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--window-size=1440,900',
   '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
@@ -118,7 +120,7 @@ try {
   await send('Runtime.enable'); await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await wait(1000);
-  await send('Page.navigate', { url: `${ORIGIN}/lab.html` });
+  await send('Page.navigate', { url: `${ORIGIN}/lab.html?server=${SERVER_PORT}` });
   await until(`document.getElementById('lab')?.dataset.server === 'up'`, 'server up', 30);
   await js(STATS);
 
@@ -256,7 +258,7 @@ try {
     const looked = await (await get('trials/normal-1/result.json')).json();
     check('a look keeps final_state_sha256', !!looked.final_state_sha256 && looked.final_state_sha256 === plain.final_state_sha256, `${String(looked.final_state_sha256).slice(0, 16)} and ${String(plain.final_state_sha256).slice(0, 16)}`);
   }
-  await send('Page.navigate', { url: `${ORIGIN}/lab.html` });
+  await send('Page.navigate', { url: `${ORIGIN}/lab.html?server=${SERVER_PORT}` });
   await until(`document.querySelector('.viewport')?.dataset.tid === 'normal-1'`, 'replay after reload', 60);
   await until(`document.querySelector('.viewport').dataset.look?.includes('#0a0a0a')`, 'look after reload', 20);
   await js(STATS);

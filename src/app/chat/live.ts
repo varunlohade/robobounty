@@ -1,7 +1,9 @@
 // The chat backend for the local run server. DEMO SHORTCUT: an embedded runtime can replace this transport.
 import type { ChatAction, ChatBackend, ChatEvent } from './backend.ts';
 
-export const SERVER = 'http://127.0.0.1:5198';
+// ?server=PORT points the page at another local run server. Checks use it, so they never touch one that is already open.
+const ASKED_PORT = new URLSearchParams(location.search).get('server');
+export const SERVER = `http://127.0.0.1:${ASKED_PORT && /^\d{4,5}$/.test(ASKED_PORT) ? ASKED_PORT : 5198}`;
 const STORE_KEY = 'crashlab-session';
 
 function remembered(): string | null {

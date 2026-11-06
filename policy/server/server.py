@@ -7,6 +7,7 @@ Chat text is untrusted. It goes to the LLM layer on stdin, and only validated va
 Jobs start from fixed argv lists. At most MAX_PROCS sim or LLM processes run at once, across all sessions.
 """
 import argparse
+import ast
 import hashlib
 import json
 import os
@@ -201,7 +202,7 @@ def plain_number(v):
 
 
 def changed_words(old, new, fields):
-    """The values a follow-up moved, such as Wind 2.1 to 14.8 m/s. A wrong guess by the planner shows here as plain numbers."""
+    """The values a follow-up moved, such as Wind 2.1 \u2192 14.8 m/s. A wrong guess by the planner shows here as plain numbers."""
     words = []
     for k in sorted(fields):
         if k == "elements":
@@ -209,8 +210,31 @@ def changed_words(old, new, fields):
             if old.get(k) != new.get(k):
                 words.append(f"Scene elements {before} to {after}")
         elif old[k] != new[k]:
-            words.append(f"{FIELD_WORDS[k][0]} {plain_number(old[k])} to {plain_number(new[k])}{FIELD_WORDS[k][1]}")
+            words.append(f"{FIELD_WORDS[k][0]} {plain_number(old[k])} \u2192 {plain_number(new[k])}{FIELD_WORDS[k][1]}")
     return words
+
+
+def controller_number(name):
+    """A limit the run's controller used, read from its source, so the chat cannot drift from the code."""
+    for node in ast.parse(CONTROLLER.read_text()).body:
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == name:
+            return ast.literal_eval(node.value)
+    raise KeyError(name)
+
+
+def held_words(result, wind):
+    """Why a run ended held on, in plain words. The numbers come from result.json and the run's recorded wind, and the limits from the controller."""
+    time_s, hold_s = result["time_s"], result["hold_s"]
+    share = "all" if hold_s >= 0.995 * time_s else "most" if hold_s >= 0.5 * time_s else "part"
+    pause = f"The robot paused for {share} of the run"
+    if result["outcome"] == "wind_hold":
+        limit, resume, peak = controller_number("WIND_PAUSE_MS"), controller_number("WIND_RESUME_MS"), max(wind, default=0.0)
+        if peak > limit:
+            return f"{pause}, because wind of {peak:.1f} m/s is above its {limit:.0f} m/s limit. It waits for wind under {resume:.0f} m/s, and wind during the pause averaged {result['hold_mean_wind_ms']:.1f} m/s."
+        return f"{pause}. Wind stayed at or under {peak:.1f} m/s, below its {limit:.0f} m/s limit, and averaged {result['hold_mean_wind_ms']:.1f} m/s during the pause."
+    if result["outcome"] == "battery_stop":
+        return f"{pause}, because its battery voltage ran low. It ended with {result['end_battery'] * 100:.0f}% of its charge."
+    return f"It stopped and held on: {result['outcome']}."
 
 
 def thumb_and_end(run):
@@ -228,6 +252,7 @@ class Session:
         self.lock = threading.Lock()
         self.busy = False
         self.routing = False  # One AI reading of a message at a time.
+        self.before_weather = {}  # World values a weather replaced, so the next weather or "no rain" can put them back.
         self.look = {}  # Scenery for the viewer. It feeds nothing to physics and stays out of world.json.
         self.working_now = None
         self.phase = "brief"
@@ -359,6 +384,22 @@ class Session:
             self.working(previous)
         return routed.look, routed.planner_words, routed.uncovered, True, True
 
+    def weather_ranges(self, patch):
+        """The world fields one weather message moves, as exact ranges. A value the weather replaced is kept, so the next weather or "no rain" puts it back. Empty for a look that is only scenery."""
+        if not any(k in patch for k in look_module.WEATHER_FIELDS):
+            return {}
+        target = {}
+        for kind in look_module.WEATHER_FIELDS:
+            if patch.get(kind, self.look.get(kind)):
+                for field, value in look_module.WEATHER_PHYSICS[kind].items():
+                    target[field] = max(target.get(field, value), value)
+        current = self.world["world"] if self.world else json.loads((HIGHRISE / "worlds" / "nominal.json").read_text())
+        for field in target:
+            self.before_weather.setdefault(field, current[field])
+        for field in [f for f in self.before_weather if f not in target]:
+            target[field] = self.before_weather.pop(field)
+        return {f: {"min": v, "max": v} for f, v in target.items() if not self.world or current[f] != v}
+
     def apply_look(self, patch):
         before = self.look
         self.look = look_module.merged(before, patch)
@@ -380,21 +421,35 @@ class Session:
             return
         finally:
             self.routing = False
+        patch = look_module.one_weather(patch)
+        weather = {} if job_running else self.weather_ranges(patch)
         if patch:
             self.apply_look(patch)
         if uncovered:
             self.say(f"I cannot do that yet: {' '.join(uncovered)}.")
         elif not patch and not words and planner_ok:
             self.say("I cannot do that yet.")
-        if not words or not planner_ok:
-            return
-        if job_running:
+        if job_running and (words and planner_ok or any(patch.get(k) for k in look_module.WEATHER_FIELDS)):
             self.say("I am still working on the last step. Send the rest again when it finishes.")
             return
-        self.plan_words(words, patch)
+        if not weather and (not words or not planner_ok):
+            return
+        if words and planner_ok:
+            self.plan_words(words, patch, weather)
+        elif self.world:
+            self.change_weather(weather)
+        else:
+            self.plan.update(weather)
+
+    def change_weather(self, weather):
+        """The physics half of a weather word. No planner call: code sets the values, and they pass the same build checks as any plan."""
+        self.emit(type="retire")
+        old = self.plan
+        self.plan = {**old, **weather}
+        self.build(change=(old, set(weather)))
 
     # Steps 1 to 4: quick questions, build, look, requirements, one normal run.
-    def plan_words(self, text, patch):
+    def plan_words(self, text, patch, weather=None):
         self.emit(type="retire")
         joined = f"{self.brief} {text}".strip()
         if len(joined) > MAX_BRIEF_CHARS:
@@ -414,7 +469,7 @@ class Session:
             self.tool("plan_world", "rejected", [json.dumps({"rejection": code, "llm_s": reply.get("seconds")})])
             self.say(REJECTION_WORDS.get(code, f"The planner could not answer ({code}). Nothing changed."), fail=True)
             return
-        old, new = self.plan, {k: dict(v) for k, v in reply["plan"].items()}
+        old, new = self.plan, {**{k: dict(v) for k, v in reply["plan"].items()}, **(weather or {})}
         self.brief, self.plan = joined, {**old, **new}
         if "elements" in old and "elements" in new:
             self.plan["elements"] = {**old["elements"], **new["elements"]}
@@ -534,7 +589,7 @@ class Session:
         self.emit(type="trial", tid=tid, label="Normal run", passed=result["passed"], open=True)
         self.phase = "review_scene"
         cleaned = f"It cleaned {result['coverage'] * 100:.1f}%."
-        word = f"It passed. {cleaned}" if result["passed"] else f"It failed: {result['failure']}. {cleaned}" if result["failure"] else f"It stopped and held on: {result['outcome']}. {cleaned}"
+        word = f"It passed. {cleaned}" if result["passed"] else f"It failed: {result['failure']}. {cleaned}" if result["failure"] else f"{held_words(result, json.loads((self.exports[tid] / 'wind.json').read_text()))} {cleaned}"
         self.emit(type="card", title="Does the scene look right?", body=f"{word} Watch the run on the right. Say what to change, or confirm.", result=word,
                   actions=[{"label": "Looks right", "action": "scene_ok", "primary": True}])
 
