@@ -1,6 +1,6 @@
 import { el, icon } from '../app/dom.ts';
 import type { ChatAction, ChatEvent } from '../app/chat/backend.ts';
-import type { LiveBackend } from '../app/chat/live.ts';
+import { SERVER, type LiveBackend, type ServerEvent } from '../app/chat/live.ts';
 
 // Server tool titles the chat shows, in plain words. Any other title stays hidden.
 const STEP_WORDS: Record<string, string> = {
@@ -13,6 +13,15 @@ const STEP_WORDS: Record<string, string> = {
 const NOT_DONE = /^(failed|rejected|refused)/;
 // The server would start the campaign on these words. The lab stops at one run, so they stay here.
 const CONFIRM = new Set(['yes', 'y', 'yep', 'ok', 'okay', 'looks right', 'looks good', 'it looks right', 'correct']);
+
+const PLACEHOLDER: Record<string, { empty: string; world: string }> = {
+  window: { empty: 'Describe your robot and where it works', world: 'Ask for a change to the world' },
+  inspection: { empty: 'Ask for a change to the plant', world: 'Ask for a change to the plant' },
+};
+const FALLBACK_NAME: Record<string, string> = { window: 'Window cleaning robot', inspection: 'Inspection robot' };
+
+interface PackRow { name: string; label: string }
+interface PackList { packs: PackRow[]; import: { available: boolean; note: string } }
 
 const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -28,8 +37,14 @@ export class LabChat {
   private busy = false;
   private hasWorld = false;
   private timer = 0;
+  private menu = el('div', 'chat-menu');
+  private test = el('button', 'chat-test', 'List test scenarios');
+  private robotName = el('span', 'chat-robot');
+  /** The user chose a robot from the + menu. */
+  onPick: (pack: string) => void = () => {};
+  private runCards: HTMLElement[] = [];
 
-  constructor(private backend: LiveBackend) {
+  constructor(private backend: LiveBackend, private pack = 'window') {
     const head = el('div', 'chat-head');
     const fresh = el('button', 'chat-new', 'New chat');
     fresh.type = 'button';
@@ -40,7 +55,7 @@ export class LabChat {
     this.log.append(this.list, this.live);
 
     const box = el('form', 'chat-box');
-    this.input.placeholder = 'Describe your robot and where it works';
+    this.input.placeholder = this.words().empty;
     this.input.setAttribute('aria-label', 'Message');
     this.input.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.submit(); }
@@ -49,10 +64,103 @@ export class LabChat {
     this.send.type = 'submit';
     this.send.setAttribute('aria-label', 'Send');
     this.send.append(icon('send', true));
-    foot.append(el('span', '', 'Agent'), this.send);
-    box.append(this.input, foot);
+    const plus = el('button', 'chat-plus');
+    plus.type = 'button';
+    plus.setAttribute('aria-label', 'Choose a robot');
+    plus.setAttribute('aria-haspopup', 'menu');
+    plus.title = 'Choose a robot';
+    plus.append(icon('plus', true));
+    plus.addEventListener('click', e => { e.stopPropagation(); void this.toggleMenu(); });
+    const left = el('div', 'chat-foot-left');
+    this.robotName.textContent = FALLBACK_NAME[pack] ?? pack;
+    left.append(plus, this.robotName);
+    foot.append(left, this.send);
+    this.menu.hidden = true;
+    this.menu.setAttribute('role', 'menu');
+    box.append(this.menu, this.input, foot);
     box.addEventListener('submit', e => { e.preventDefault(); this.submit(); });
-    this.root.append(head, this.log, box);
+    addEventListener('click', e => { if (!this.menu.contains(e.target as Node)) this.menu.hidden = true; });
+    addEventListener('keydown', e => { if (e.key === 'Escape') this.menu.hidden = true; });
+    this.test.type = 'button';
+    this.test.hidden = true;
+    this.test.addEventListener('click', () => {
+      this.setBusy(true);
+      void this.backend.act({ action: 'list_scenarios' } as ChatAction);
+    });
+    this.root.append(head, this.log, this.test, box);
+  }
+
+  private words() {
+    return PLACEHOLDER[this.pack] ?? PLACEHOLDER.window;
+  }
+
+  private async toggleMenu() {
+    if (!this.menu.hidden) { this.menu.hidden = true; return; }
+    this.menu.replaceChildren(el('div', 'chat-menu-note', 'Loading robots'));
+    this.menu.hidden = false;
+    let list: PackList;
+    try {
+      const res = await fetch(`${SERVER}/api/packs`, { signal: AbortSignal.timeout(5_000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      list = await res.json();
+    } catch (err) {
+      this.menu.replaceChildren(el('div', 'chat-menu-note chat-fail', `Could not list the robots: ${String(err)}`));
+      return;
+    }
+    const rows: HTMLElement[] = [el('div', 'chat-menu-head', 'Robot')];
+    for (const p of list.packs) {
+      const row = el('button', p.name === this.pack ? 'chat-menu-row on' : 'chat-menu-row');
+      row.type = 'button';
+      row.setAttribute('role', 'menuitem');
+      row.dataset.pack = p.name;
+      row.append(el('span', '', p.label), el('span', 'chat-menu-tag', p.name === this.pack ? 'Current' : ''));
+      row.addEventListener('click', () => {
+        this.menu.hidden = true;
+        if (p.name !== this.pack) this.onPick(p.name);
+      });
+      rows.push(row);
+    }
+    const file = el('button', 'chat-menu-row chat-menu-import');
+    file.type = 'button';
+    file.disabled = true;
+    file.title = list.import.note;
+    file.setAttribute('role', 'menuitem');
+    file.append(el('span', '', 'Import a robot file'), el('span', 'chat-menu-tag', list.import.available ? '' : 'Not yet'));
+    rows.push(el('div', 'chat-menu-line'), file);
+    this.menu.replaceChildren(...rows);
+    const named = list.packs.find(p => p.name === this.pack);
+    if (named) this.robotName.textContent = named.label;
+  }
+
+  /** The agent's list of test scenarios, with the button that runs it. */
+  scenarios(e: ServerEvent) {
+    if (e.rejection) {
+      this.note(`No scenario list came: ${String(e.rejection).replaceAll('_', ' ')}. Ask again.`, true);
+      return;
+    }
+    const card = el('div', 'chat-card chat-list-card');
+    const run = el('button', 'chat-run', `Run ${e.to_run} scenarios`);
+    run.type = 'button';
+    run.addEventListener('click', () => {
+      run.disabled = true;
+      this.setBusy(true);
+      void this.backend.act({ action: 'run_campaign' } as ChatAction);
+    });
+    card.append(el('div', 'chat-card-title', `${e.count} scenarios: ${e.to_run} to run, ${e.held_back} held back`));
+    if (e.count_reason) card.append(el('div', 'chat-card-text', e.count_reason));
+    const groups = el('details', 'chat-details');
+    groups.append(el('summary', '', `${(e.groups ?? []).length} groups`));
+    for (const g of e.groups ?? []) groups.append(el('div', 'chat-group', `${g.name} (${g.count}). ${g.reason}`));
+    card.append(groups);
+    if (e.note) card.append(el('div', 'chat-card-note', e.note));
+    card.append(run);
+    this.runCards.push(run);
+    this.append(card);
+  }
+
+  /** A campaign started, so no list waits for its button. */
+  campaignRunning() {
+    for (const b of this.runCards) (b as HTMLButtonElement).disabled = true;
   }
 
   async start() {
@@ -65,12 +173,14 @@ export class LabChat {
 
   worldReady() {
     this.hasWorld = true;
-    this.input.placeholder = 'Ask for a change to the world';
+    this.input.placeholder = this.words().world;
+    this.test.hidden = this.busy;
   }
 
   worldGone() {
     this.hasWorld = false;
-    this.input.placeholder = 'Describe your robot and where it works';
+    this.input.placeholder = this.words().empty;
+    this.test.hidden = true;
   }
 
   jobDone() {
@@ -84,6 +194,7 @@ export class LabChat {
   private setBusy(on: boolean) {
     this.busy = on;
     this.send.disabled = on;
+    this.test.hidden = on || !this.hasWorld;
   }
 
   private submit() {

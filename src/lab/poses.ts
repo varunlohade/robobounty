@@ -37,6 +37,11 @@ export async function loadPoses(url: string): Promise<PoseReplay> {
   return replay;
 }
 
+/** A scene with no run yet: the plant and the route, and no robot. */
+export function previewReplay(scene: Pick<PoseReplay, 'solids' | 'scenery' | 'route' | 'floor_friction' | 'note'>): PoseReplay {
+  return { format: 'robot-pack-replay/1', pack: '', robot: '', label: '', simulated: true, fps: 1, body_labels: [], body_parents: [], pose_layout: [], frames: [], result: { verdict: '', passed: true, reason: '' }, ...scene };
+}
+
 const POSE_SIZE = 7;
 const VIEW_OFFSET = new THREE.Vector3(-2.2, -4.0, 2.7); // The same chase as the pack's own render.
 const VIEW_AIM = new THREE.Vector3(0.2, 0.5, 0.55);
@@ -352,7 +357,11 @@ export class PosesView {
   }
 
   private buildChase() {
-    const { frames, fps } = this.replay;
+    const { frames, fps, route } = this.replay;
+    if (!frames.length) {
+      this.chase = [new THREE.Vector2(route[0]?.x ?? 0, route[0]?.y ?? 0)];
+      return;
+    }
     const half = Math.round((CHASE_SECONDS * fps) / 2);
     const a = new THREE.Vector3();
     const xy = frames.map((_, i) => { this.poseAt(i, 0, a); return [a.x, a.y]; });
@@ -391,6 +400,7 @@ export class PosesView {
   /** Puts every capsule at its recorded pose, and moves the camera with the robot. */
   seek(frame: number) {
     this.frame = Math.max(0, Math.min(this.replay.frames.length - 1, frame));
+    if (!this.replay.frames.length) { this.frame = 0; this.dirty = true; return; }
     const a = new THREE.Vector3(), b = new THREE.Vector3(), dir = new THREE.Vector3();
     const q = this.replay.frames[this.frame].q;
     this.bodies.forEach(({ mesh, parent }, i) => {

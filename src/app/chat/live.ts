@@ -58,8 +58,10 @@ export class LiveBackend implements ChatBackend {
     if (old) {
       const res = await fetch(`${SERVER}/api/sessions/${old}/state`, { signal: AbortSignal.timeout(REPLY_DEADLINE_MS) });
       // A tab can remember a session from the other page or an older build. Keep it only if it runs the engine this page asked for.
-      const wanted = (this.newSession as { engine?: string }).engine === 'v5' ? 'v5' : 'old';
-      if (res.ok && (await res.json()).engine === wanted) { this.id = old; return; }
+      const { engine, pack } = this.newSession as { engine?: string; pack?: string };
+      const wanted = engine === 'v5' ? 'v5' : 'old';
+      const state = res.ok ? await res.json() : null;
+      if (state && (pack ? state.pack === pack : state.engine === wanted)) { this.id = old; return; }
     }
     const res = await post('/api/sessions', this.newSession);
     if (!res.ok) throw new Error(`run server: HTTP ${res.status}`);
@@ -119,7 +121,7 @@ export class LiveBackend implements ChatBackend {
     });
     source.onmessage = m => {
       this.lastSeen = Date.now();
-      this.lastId = Number(m.lastEventId);
+      if (m.lastEventId) this.lastId = Number(m.lastEventId); // A grid event has no id, and must not reset the place in the list.
       const event = JSON.parse(m.data) as ServerEvent;
       if (event.restart) clearTimeout(this.quietNote);
       this.chain = this.chain.then(async () => {

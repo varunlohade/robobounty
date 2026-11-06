@@ -1,17 +1,28 @@
 import { el } from '../app/dom.ts';
-import { LiveBackend, health, type ServerEvent } from '../app/chat/live.ts';
+import { LiveBackend, SERVER, health, type ServerEvent } from '../app/chat/live.ts';
 import { Replay, loadMujoco } from '../app/replay.ts';
 import { isV5, loadTrial, loadTrialFrom, type Trial } from '../app/trial.ts';
 import { SimView, restoreOnLoss } from '../app/view.ts';
 import { worldPage } from '../app/world_page.ts';
 import { lookOf } from '../view/real/look.ts';
 import { LabChat, replayNote } from './chat.ts';
-import { loadPoses, posesPage } from './poses.ts';
+import { Grid } from './grid.ts';
+import { PosesView, loadPoses, posesPage, previewReplay, type PoseReplay } from './poses.ts';
 
 const NS = 'http://www.w3.org/2000/svg';
 const HEALTH_RETRY_MS = 2_000;
 const TRIAL_TRIES = 3;
 const TRIAL_RETRY_MS = 3_000;
+const TRIAL_DEADLINE_MS = 15_000;
+const PACK_KEY = 'crashlab-pack';
+const WINDOW_NOTE = 'Simulated. Hand-built physics, not checked against real hardware.';
+
+function chosenPack(): string | null {
+  try { return sessionStorage.getItem(PACK_KEY); } catch { return null; }
+}
+function choosePack(pack: string) {
+  try { sessionStorage.setItem(PACK_KEY, pack); } catch { /* no storage: the page keeps the window robot */ }
+}
 // Lucide 0.400 outlines: panel-left, layout-grid, settings.
 const ACTIVITY = [
   ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M9 3v18'],
@@ -61,15 +72,20 @@ function shell(root: HTMLElement, chat: HTMLElement) {
   };
   const tabs = el('div', 'lab-tabs');
   tabs.append(tab);
+  const gridTab = el('button', 'lab-tab lab-tab-grid', 'test_run.grid');
+  gridTab.type = 'button';
+  gridTab.hidden = true;
+  tabs.append(gridTab);
   const main = el('main', 'lab-main');
   main.append(tabs);
   const body = el('div', 'lab-body');
   body.append(activityBar(), chat, main);
   const statusRight = el('div', 'lab-status-end');
   const status = el('footer', 'lab-status');
-  status.append(el('span', '', 'Simulated. Hand-built physics, not checked against real hardware.'), statusRight);
+  const statusNote = el('span', 'lab-status-note', WINDOW_NOTE);
+  status.append(statusNote, statusRight);
   root.append(titleBar(name), body, status);
-  return { main, statusRight, setName };
+  return { main, statusRight, setName, tab, gridTab, statusNote };
 }
 
 async function replayOnly(root: HTMLElement, id: string) {
@@ -117,8 +133,15 @@ function plainName(said: string[]): string {
 }
 
 async function live(root: HTMLElement) {
+  const pack = chosenPack();
+  root.dataset.pack = pack ?? 'window';
   const onEvent = async (e: ServerEvent) => {
     switch (e.type) {
+      case 'pose_world': showPoseWorld(e); break;
+      case 'pose_trial': await showPoseTrial(String(e.url)); break;
+      case 'scenarios': scenarios = e; chat.scenarios(e); grid?.setScenarios(e); break;
+      case 'grid': onGrid(e); break;
+      case 'campaign_done': await onCampaignDone(e); break;
       case 'world': await showWorld(e); break;
       case 'no_world': clear(); clear = () => {}; current = () => null; host.replaceChildren(empty); setName('new'); chat.worldGone(); break;
       case 'look': applyLook(e); break;
@@ -133,9 +156,10 @@ async function live(root: HTMLElement) {
         break;
     }
   };
-  const backend = new LiveBackend(onEvent, { engine: 'v5' });
-  const chat = new LabChat(backend);
-  const { main, statusRight, setName } = shell(root, chat.root);
+  const backend = new LiveBackend(onEvent, pack ? { pack } : { engine: 'v5' });
+  const chat = new LabChat(backend, pack ?? 'window');
+  chat.onPick = next => { choosePack(next); backend.reset(); };
+  const { main, statusRight, setName, tab, gridTab, statusNote } = shell(root, chat.root);
   const simLine = el('span');
   const llmLine = el('span');
   const aiLine = el('span');
@@ -143,7 +167,7 @@ async function live(root: HTMLElement) {
 
   const host = el('div', 'page');
   const empty = el('div', 'lab-empty');
-  empty.append(el('h2', '', 'Describe your robot and where it works'), el('p', '', 'The world builds here, then one run plays.'));
+  empty.append(el('h2', '', 'Describe your robot and where it works'), el('p', '', 'The world builds here, then one run plays. Press + in the chat box to choose a robot.'));
   host.append(empty);
   main.append(host);
 
@@ -174,7 +198,130 @@ async function live(root: HTMLElement) {
     clear();
     clear = stop;
     host.replaceChildren(next);
+    tab.classList.remove('off');
+    gridTab.classList.remove('on');
   };
+
+  // The inspection robot's scene. The newest run, if any, keeps playing when only the picture changed.
+  let poseView: () => PosesView | null = () => null;
+  let shownReplay: PoseReplay | null = null;
+  let shownHash = '';
+  let again: (() => void) | null = null;
+
+  function playPoses(replay: PoseReplay, key: string) {
+    const world = posesPage(replay, statusRight, fixed);
+    swap(world.page, () => { world.stop(); poseView = () => null; });
+    world.start();
+    poseView = () => world.view;
+    world.viewport.dataset.tid = key;
+    shownReplay = replay;
+    statusNote.textContent = replay.note;
+    jump = world.jump;
+  }
+  let jump: (frame: number) => void = () => {};
+
+  function showPoseWorld(e: ServerEvent) {
+    setName('inspection_plant');
+    chat.worldReady();
+    statusNote.textContent = String(e.note);
+    const same = shownReplay && e.hash === shownHash;
+    shownHash = String(e.hash);
+    const scene = { solids: e.solids, scenery: e.scenery, route: e.route, floor_friction: e.floor_friction };
+    if (same && shownReplay!.frames.length) {
+      playPoses({ ...shownReplay!, ...scene }, 'same_physics');
+      return;
+    }
+    const replay = previewReplay({ ...scene, note: String(e.note) });
+    again = () => playPreview(replay);
+    playPreview(replay);
+  }
+
+  function playPreview(replay: PoseReplay) {
+    const page = el('div', 'world-body');
+    const viewport = el('div', 'viewport');
+    viewport.append(el('div', 'sim-tag sim-label', 'Simulated. World preview. No robot has run yet.'));
+    page.append(viewport);
+    let view: PosesView | null = null;
+    swap(page, () => { view?.dispose(); poseView = () => null; });
+    view = new PosesView(viewport, replay);
+    poseView = () => view;
+    shownReplay = replay;
+    viewport.dataset.ready = 'true';
+  }
+
+  async function showPoseTrial(url: string) {
+    const replay = await fetchWith(() => loadPoses(`${SERVER}${url}`), url);
+    if (!replay) return;
+    again = () => playPoses(replay, url);
+    playPoses(replay, url);
+  }
+
+  // The test run. One grid per session, kept while the main area shows something else.
+  let scenarios: ServerEvent | null = null;
+  let grid: Grid | null = null;
+  const showGrid = () => {
+    if (!grid) return;
+    const g = grid;
+    swap(g.root, () => g.leave());
+    tab.classList.add('off');
+    gridTab.classList.add('on');
+    g.enter();
+  };
+  gridTab.addEventListener('click', () => { if (!gridTab.classList.contains('on')) showGrid(); });
+  tab.addEventListener('click', () => { if (tab.classList.contains('off')) again?.(); });
+
+  function makeGrid(e: ServerEvent) {
+    return new Grid({
+      base: `${SERVER}/api/sessions/${backend.id}/campaigns/${e.campaign}`,
+      statusRight,
+      play: async (how: ServerEvent) => {
+        if (how.kind === 'poses') {
+          const replay = await fetchWith(() => loadPoses(`${SERVER}${how.url}`), String(how.url));
+          if (!replay) return null;
+          const world = posesPage(replay, statusRight, fixed);
+          return { page: world.page, start: async () => { world.start(); poseView = () => world.view; world.viewport.dataset.tid = String(how.url); }, stop: () => { world.stop(); poseView = () => null; }, jump: (t: number) => world.jump(Math.round(t * replay.fps)) };
+        }
+        const trial = await fetchTrial(String(how.tid));
+        if (!trial) return null;
+        const world = worldPage(trial, statusRight, fixed);
+        return { page: world.page, start: async () => { await world.start(); current = () => world.view; world.viewport.dataset.tid = String(how.tid); }, stop: () => { world.stop(); current = () => null; }, jump: () => {} };
+      },
+    });
+  }
+
+  function onGrid(e: ServerEvent) {
+    if (!grid || grid.campaign !== e.campaign) {
+      grid?.leave();
+      grid = makeGrid(e);
+      const list = scenarios;
+      if (list && list.campaign === e.campaign) grid.setScenarios(list);
+      grid.update(e);
+      chat.campaignRunning();
+      gridTab.hidden = false;
+      const outgoing = host.firstElementChild === empty ? (empty.remove(), null) : host.firstElementChild as HTMLElement | null;
+      const stopOld = clear;
+      const g = grid;
+      if (outgoing) Object.assign(outgoing.style, { position: 'absolute', inset: '0', zIndex: '4', pointerEvents: 'none' });
+      host.append(g.root);
+      tab.classList.add('off');
+      gridTab.classList.add('on');
+      g.enter();
+      clear = () => g.leave();
+      void g.zoomFrom(outgoing).then(() => { stopOld(); outgoing?.remove(); });
+      return;
+    }
+    grid.update(e);
+  }
+
+  // After a reload the stored events come back, and a finished campaign sends no grid event, so the page asks for the last one.
+  async function onCampaignDone(e: ServerEvent) {
+    if (!grid || grid.campaign !== e.campaign) {
+      const res = await fetch(`${SERVER}/api/sessions/${backend.id}/campaigns/${e.campaign}/grid`, { signal: AbortSignal.timeout(TRIAL_DEADLINE_MS) });
+      if (!res.ok) return;
+      onGrid(await res.json());
+    }
+    grid?.done(e);
+  }
 
   async function showWorld(e: ServerEvent) {
     const area = e.area as Trial['manifest']['area'];
@@ -210,12 +357,14 @@ async function live(root: HTMLElement) {
 
   const fixed = (code: string, words: string) => { chat.note(words, /gave_up|failed/.test(code)); backend.report(code); };
 
-  async function fetchTrial(tid: string): Promise<Trial | null> {
+  const fetchTrial = (tid: string) => fetchWith(() => loadTrialFrom(backend.trialBase(tid)), tid);
+
+  async function fetchWith<T>(load: () => Promise<T>, what: string): Promise<T | null> {
     for (let attempt = 1; ; attempt++) {
       try {
-        return await loadTrialFrom(backend.trialBase(tid));
+        return await load();
       } catch (err) {
-        console.warn(`replay ${tid}, try ${attempt}: ${String(err)}`);
+        console.warn(`replay ${what}, try ${attempt}: ${String(err)}`);
         if (attempt === TRIAL_TRIES) {
           fixed('trial_failed', 'The replay did not load after 3 tries. The run itself is safe. Ask for a change to run it again, or reload the page.');
           return null;
@@ -229,6 +378,7 @@ async function live(root: HTMLElement) {
   async function showTrial(tid: string) {
     const trial = await fetchTrial(tid);
     if (!trial) return;
+    again = () => void showTrial(tid);
     const world = worldPage(trial, statusRight, fixed);
     swap(world.page, () => world.stop());
     current = () => world.view;
@@ -251,7 +401,7 @@ async function live(root: HTMLElement) {
       await new Promise(r => setTimeout(r, HEALTH_RETRY_MS));
     }
   }
-  (window as unknown as { __lab: unknown }).__lab = { view: () => current() };
+  (window as unknown as { __lab: unknown }).__lab = { view: () => current() ?? poseView(), jump: (f: number) => jump(f), grid: () => grid };
   await chat.start();
 }
 
