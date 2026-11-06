@@ -104,7 +104,7 @@ async function flow(mode) {
       await c.until(`location.pathname === '/home.html' && document.querySelector('.sh-who')?.dataset.who === 'guest'`, 'home', 30);
     }, 1500);
     await step('crashlab', async () => {
-      await clickText('CrashLab', 'nav .sh-item[href="crashlab.html"]').catch(async () => { await go('crashlab.html'); });
+      await clickOn('nav a.sh-item[href="crashlab.html"]');
       await c.until(`location.pathname === '/crashlab.html' && document.body.innerText.includes('Choose a robot')`, 'crashlab page', 30);
     }, 1200);
     await step('pick-robot', async () => {
@@ -158,13 +158,15 @@ async function flow(mode) {
       await c.until(replayOk, 'the replay', 90);
       const rail = await c.js(`document.querySelector('.grid-rail').innerText`);
       check(`${mode}: the detail shows the judge and the log`, rail.includes('Judge') && rail.includes('Last log lines'));
-      check(`${mode}: the charts mark the failure`, await c.js(`document.querySelectorAll('.spark .spark-fail').length > 0`));
+      check(`${mode}: the timeline marks the failure`, await c.js(`document.querySelectorAll('.scrub .mark').length > 0`));
+      check(`${mode}: the replay fills the main area`, await c.js(`document.querySelector('.grid-replay .viewport').getBoundingClientRect().width > 600`));
       check(`${mode}: no bounty offer before an AI try`, !(await c.js(`!!document.querySelector('.grid-post')`)));
     }, 2500);
     await step('open-in-rerun', async () => {
       await clickText('Open in Rerun', '.grid-file');
       await c.until(`document.querySelector('.grid-page').dataset.rerun === 'done'`, 'the Rerun file', 300);
       await wait(800);
+      check(`${mode}: a slip is not called off the glass`, await c.js(`document.querySelector('.sim-off').hidden`));
       const file = readdirSync(downloads).find(f => f.endsWith('.rrd'));
       check(`${mode}: Open in Rerun downloads a real .rrd`, Boolean(file) && readFileSync(join(downloads, file)).subarray(0, 3).toString() === 'RRF', file);
     });
@@ -279,7 +281,7 @@ async function flow(mode) {
       await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
     });
     await step('data-shows-runs', async () => {
-      await clickText('Data', 'nav');
+      await clickOn('nav a.sh-item[href="data.html"]');
       await c.until(`location.pathname === '/data.html' && !!document.querySelector('.campaigns')?.children.length`, 'the data page', 30);
       const words = await c.js(`document.querySelector('.campaigns').innerText`);
       if (live) check(`${mode}: Data lists this lab run`, words.includes(`Lab run ${session.slice(0, 8)}`), words.slice(0, 200));

@@ -189,7 +189,9 @@ export function worldPage(trial: Trial, statusRight: HTMLElement, onFix?: OnFix)
       slider.value = String(f);
       slider.style.setProperty('--done', `${(f / maxFrame) * 100}%`);
       const { area } = manifest;
-      offGlass.hidden = !result.failure || !(Math.abs(robot[1]) > OFF_GLASS_M || robot[0] < area.x0 - OFF_GLASS_M || robot[0] > area.x1 + OFF_GLASS_M
+      // The glass runs past the work area, so a robot outside the area is still on it until the judge says it came off.
+      const detach = result.fired.detach;
+      offGlass.hidden = !result.failure || !detach || f / manifest.hz < detach.t || !(Math.abs(robot[1]) > OFF_GLASS_M || robot[0] < area.x0 - OFF_GLASS_M || robot[0] > area.x1 + OFF_GLASS_M
         || robot[2] < area.z0 - OFF_GLASS_M || robot[2] > area.z1 + OFF_GLASS_M);
       position.x.textContent = `${robot[0].toFixed(3)} m`;
       position.z.textContent = `${robot[2].toFixed(3)} m`;

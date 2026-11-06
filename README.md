@@ -12,40 +12,39 @@ The idea and structure drew on an existing commercial product category, simulati
 
 Tested on macOS on Apple Silicon, with Node 26 and Python 3.12.
 
-### Recorded run (fastest)
-
-This needs no Python, no AI and no run server. It loads the finished Dubai campaign from a file.
+Set up once. Use Python 3.12: the pinned numpy has no ready-made wheel for 3.14.
 
 ```
 git clone <this repo> crashlab
 cd crashlab
 npm ci
-npx vite --port 5199
-```
-
-Open `http://localhost:5199/app.html?recorded=1`. The app labels this mode "Recorded run". It has no bounty, because a recorded run takes no submissions.
-
-### Live run
-
-Set up Python once. Use Python 3.12: the pinned numpy has no ready-made wheel for 3.14.
-
-```
 python3.12 -m venv policy/.venv
 policy/.venv/bin/pip install mujoco==3.8.1 numpy==2.2.6 pillow
 ```
 
-Keep vite running. In a second terminal, start the run server. Choose one line:
+Then one command starts vite, the run server, the site server and the board server. Choose one line:
 
 ```
-policy/.venv/bin/python policy/server/supervise.py --recorded policy/server/fixtures
-policy/.venv/bin/python policy/server/supervise.py
+npm run demo -- --recorded
+npm run demo -- --stored
+npm run demo
 ```
 
-`supervise.py` starts `server.py`, restarts it after a freeze or a crash, and keeps each chat's world across the restart. It refuses a port that is already in use, so stop an old server first. Every automatic fix writes one chat line and one line in `policy/runs/server/recovery-<port>.log`.
+- `--recorded` plays stored results. The lab runs no AI and no sim, and the app labels this "Recorded run". Ask AI on a Slipped world shows one stored result of a real AI fix, labelled "Recorded result". It did not help.
+- `--stored` uses stored AI replies and real physics. It makes no AI call.
+- With no option, the AI calls are real. They go through the `claude` command-line tool, which must be installed and logged in. The limit is 10 calls a session and 40 an hour.
 
-The first line uses stored AI replies, so it makes no AI call. The second makes real calls through the `claude` command-line tool, which must be installed and logged in. It has a limit of 10 calls a session and 40 an hour.
+A fix sent to the bounty board always runs real sims in the sandbox, in all three modes, since that proof must be real.
 
-Open `http://localhost:5199/app.html`. The simulations, the judging and the bounty gate run for real in both modes.
+The script prints the address, `http://localhost:5199/`. Press Ctrl+C to stop all four servers. The script checks each port first. It refuses a port in use and kills nothing it did not start. To use other ports, add `--ports 6199,6198,6297,6298` (web, run, site, board).
+
+The flow: guest login, home, CrashLab, pick a robot, the AI builds the world, change it, list scenarios, run, the grid, click a red square, replay, Open file, edit and re-run or Ask AI, Post a bounty, submit a fix, hidden world proof, dispute window, finalize, claim, Data. A real fix to try on a Stalled bounty is in `policy/bounty/fixtures/fix5/good_match_fan.py`. No fix for the Slipped failure exists yet.
+
+Optional: the inspection robot needs `policy/.venv-newton`. The Open in Rerun button needs `policy/rerun_lab/.venv`, and it hides without it. See `policy/rerun_lab/`.
+
+`supervise.py` restarts a frozen or crashed run server, and each chat's world survives the restart. Every automatic fix writes one chat line and one line in `policy/runs/server/recovery-<port>.log`.
+
+`app.html` is the earlier single-robot app. `app.html?recorded=1` still plays the finished Dubai campaign from a file, with no server.
 
 ### Checks
 
@@ -55,6 +54,8 @@ policy/.venv/bin/python policy/highrise/run_trial.py policy/highrise/worlds/nomi
 ```
 
 The first line recomputes every headline number from `docs/evidence/` and needs only Python's standard library. The second line runs one world.
+
+`node scripts/check_e2e.mjs` drives the whole flow in headless Chrome, once with `--recorded` and once with `--stored`, on its own ports. It saves a picture of each step in `design/e2e/` and prints each step's time.
 
 The contract tests need Foundry:
 

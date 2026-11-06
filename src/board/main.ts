@@ -414,6 +414,7 @@ function openPost(ref: string | null) {
   const pay = h('input') as HTMLInputElement;
   const windowS = h('input') as HTMLInputElement;
   pay.type = windowS.type = 'number';
+  company.value = 'Demo company (test)';
   pay.value = '40';
   windowS.value = '60';
   const error = h('span', 'bad');
