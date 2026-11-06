@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 /// @title FailureBounty
 /// @notice Holds a company's USDC-style bounty and pays one fixed amount per new robot failure.
 /// A resolver proposes, an arbiter can reject during a dispute window, anyone can finalize after it,
-/// and the winner pulls the money. No function accepts native value.
+/// then the resolver pays the winner, or the winner pulls the money. No function accepts native value.
 contract FailureBounty {
     enum Status {
         None,
@@ -234,6 +234,22 @@ contract FailureBounty {
         emit FailureClaimed(bountyId, fingerprint, msg.sender, amount);
 
         _callToken(abi.encodeWithSignature("transfer(address,uint256)", msg.sender, amount));
+    }
+
+    /// @notice The bounty's resolver pays a finalized failure to its named submitter, and to nobody else.
+    /// `claim` stays open, so a stuck resolver cannot trap a winner's money.
+    function payout(uint256 bountyId, bytes32 fingerprint) external nonReentrant {
+        Bounty storage b = _bounty(bountyId);
+        if (msg.sender != b.resolver) revert NotResolver();
+        Failure storage f = failures[bountyId][fingerprint];
+        if (f.status != Status.Finalized) revert WrongStatus();
+
+        f.status = Status.Claimed;
+        address submitter = f.submitter;
+        uint256 amount = f.amount;
+        emit FailureClaimed(bountyId, fingerprint, submitter, amount);
+
+        _callToken(abi.encodeWithSignature("transfer(address,uint256)", submitter, amount));
     }
 
     /// @notice Company takes back only money not tied to a proposal, after deadline plus grace.

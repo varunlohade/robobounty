@@ -21,7 +21,7 @@ As a check on the tests, we broke the contract in 17 ways, one at a time, on a t
 2. The company, resolver and arbiter must be three different addresses.
 3. Until the deadline, the resolver calls `propose(bountyId, submitter, fingerprint, resultHash, isTopPrize)`. This call reserves the money.
 4. The arbiter can call `reject` until the dispute window ends. A rejection frees the money, and the fingerprint can be proposed again.
-5. After the window, anyone can call `finalize`. Only the named submitter can call `claim`.
+5. After the window, anyone can call `finalize`. The resolver then calls `payout`, which sends the money only to the named submitter. The submitter can also call `claim`, so a stuck resolver cannot trap the money.
 6. Each fingerprint pays once per bounty.
 7. The top prize replaces the per-failure amount for that one failure. A bounty has one live top prize.
 8. After deadline plus grace, the company can call `refund`. It gets only money that no proposal holds.

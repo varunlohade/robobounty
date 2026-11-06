@@ -76,6 +76,14 @@ contract Handler is Test {
         } catch {}
     }
 
+    function payout(uint256 a, uint256 b) external {
+        uint256 before = usdc.balanceOf(WINNER);
+        vm.prank(RESOLVER);
+        try fb.payout(_id(a), _fp(b)) {
+            totalPaid += usdc.balanceOf(WINNER) - before;
+        } catch {}
+    }
+
     function refund(uint256 a) external {
         uint256 before = usdc.balanceOf(COMPANY);
         vm.prank(COMPANY);

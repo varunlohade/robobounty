@@ -79,6 +79,94 @@ contract FailureBountyTest is Test {
         assertEq(uint8(_status(id, FP1)), uint8(FailureBounty.Status.Claimed));
     }
 
+    // Agent payout
+
+    function _finalized(address who, bytes32 fp) internal returns (uint256 id) {
+        id = _create();
+        _propose(id, who, fp);
+        vm.warp(block.timestamp + WINDOW);
+        fb.finalize(id, fp);
+    }
+
+    function test_Payout_resolverPaysOnlyTheSubmitter() public {
+        uint256 id = _finalized(alice, FP1);
+        uint256 resolverBefore = usdc.balanceOf(resolver);
+        vm.expectEmit(true, true, true, true);
+        emit FailureBounty.FailureClaimed(id, FP1, alice, PER_FAILURE);
+        vm.prank(resolver);
+        fb.payout(id, FP1);
+        assertEq(usdc.balanceOf(alice), PER_FAILURE);
+        assertEq(usdc.balanceOf(resolver), resolverBefore);
+        assertEq(usdc.balanceOf(address(fb)), CAP - PER_FAILURE);
+        assertEq(uint8(_status(id, FP1)), uint8(FailureBounty.Status.Claimed));
+    }
+
+    function test_Payout_onlyResolver() public {
+        uint256 id = _finalized(alice, FP1);
+        address[4] memory others = [company, arbiter, alice, stranger];
+        for (uint256 i; i < others.length; i++) {
+            vm.prank(others[i]);
+            vm.expectRevert(FailureBounty.NotResolver.selector);
+            fb.payout(id, FP1);
+        }
+        assertEq(usdc.balanceOf(alice), 0);
+    }
+
+    function test_Payout_onlyFinalized() public {
+        uint256 id = _create();
+        vm.prank(resolver);
+        vm.expectRevert(FailureBounty.WrongStatus.selector);
+        fb.payout(id, FP1);
+
+        _propose(id, alice, FP1);
+        vm.prank(resolver);
+        vm.expectRevert(FailureBounty.WrongStatus.selector);
+        fb.payout(id, FP1);
+
+        vm.prank(arbiter);
+        fb.reject(id, FP1, RESULT);
+        vm.prank(resolver);
+        vm.expectRevert(FailureBounty.WrongStatus.selector);
+        fb.payout(id, FP1);
+        assertEq(usdc.balanceOf(alice), 0);
+    }
+
+    function test_Payout_unknownBounty() public {
+        vm.prank(resolver);
+        vm.expectRevert(FailureBounty.UnknownBounty.selector);
+        fb.payout(99, FP1);
+    }
+
+    function test_Payout_thenClaimAndPayoutBothRefused() public {
+        uint256 id = _finalized(alice, FP1);
+        vm.prank(resolver);
+        fb.payout(id, FP1);
+        vm.prank(alice);
+        vm.expectRevert(FailureBounty.WrongStatus.selector);
+        fb.claim(id, FP1);
+        vm.prank(resolver);
+        vm.expectRevert(FailureBounty.WrongStatus.selector);
+        fb.payout(id, FP1);
+        assertEq(usdc.balanceOf(alice), PER_FAILURE);
+    }
+
+    function test_Payout_afterClaimRefused() public {
+        uint256 id = _finalized(alice, FP1);
+        vm.prank(alice);
+        fb.claim(id, FP1);
+        vm.prank(resolver);
+        vm.expectRevert(FailureBounty.WrongStatus.selector);
+        fb.payout(id, FP1);
+        assertEq(usdc.balanceOf(alice), PER_FAILURE);
+    }
+
+    function test_Payout_claimStaysOpenWhenTheAgentIsStuck() public {
+        uint256 id = _finalized(alice, FP1);
+        vm.prank(alice);
+        fb.claim(id, FP1);
+        assertEq(usdc.balanceOf(alice), PER_FAILURE);
+    }
+
     function test_SpecHashAndRolesAreStored() public {
         uint256 id = _create();
         (address c, address r, address a, bytes32 spec,,,,,,,) = fb.bounties(id);
