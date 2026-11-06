@@ -1,0 +1,404 @@
+{
+ "Window robot for towers in Dubai. High floor.": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "city": "dubai"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the building black": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "building": "#0a0a0a"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the building white": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "building": "#f7f7f5"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the building grey": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "building": "#808285"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the building bronze": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "building": "#cd7f32"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the building teal": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "building": "#008080"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "blue glass": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "glass_tint": "#1f5fbf"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "green glass": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "glass_tint": "#2e8b57"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "gold glass": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "glass_tint": "#d4a017"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "clear glass": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "glass_tint": "clear"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "dusk": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "time": "dusk"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "night": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "time": "night"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "noon": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "time": "noon"
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "fog 2": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "fog": 2
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "no fog": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "fog": 0
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the weather dusty": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "dust_air": true
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make it rain": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "rain": true
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make it snow": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "snow": true
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "no rain": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "rain": false
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "no snow": [
+  {
+   "calls": [
+    {
+     "fn": "set_look",
+     "args": {
+      "snow": false
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "Make the wind stronger and wet the glass.": [
+  {
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 8.0
+     }
+    },
+    {
+     "fn": "set_weather",
+     "args": {
+      "wetness": 0.8
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the robot dance": [
+  {
+   "calls": [],
+   "say": "",
+   "cannot_build": [
+    "no_function"
+   ]
+  }
+ ],
+ "make the wind 6 m/s": [
+  {
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 6.0
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the wind 7 m/s": [
+  {
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 7.0
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the wind 8 m/s": [
+  {
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 8.0
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the wind 9 m/s": [
+  {
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 9.0
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make the wind 14 m/s": [
+  {
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 14.0
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "wet the glass": [
+  {
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "wetness": 0.9
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "make it calm": [
+  {
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 0.5,
+      "gust_ms": 1.0
+     }
+    }
+   ],
+   "say": ""
+  }
+ ],
+ "add a control cabinet beside the walkway": [
+  {
+   "calls": [
+    {
+     "fn": "add_box",
+     "args": {
+      "name": "control_cabinet",
+      "x": 3.0,
+      "y": 1.2,
+      "sx": 0.6,
+      "sy": 0.4,
+      "sz": 1.9
+     }
+    }
+   ],
+   "say": "I added a grey control cabinet beside the walkway."
+  },
+  {
+   "calls": [],
+   "say": ""
+  }
+ ]
+}

@@ -19,6 +19,7 @@ import engine
 import llm
 import mujoco
 import scenarios
+import scenarios_pack
 from scene import SceneError
 
 INSTRUCTION_REASONS = {"code_or_instructions", "file_or_secret_request"}
@@ -170,7 +171,7 @@ def main():
         if os.environ.get("CRASHLAB_RECORDED_REPLIES"):
             llm.BACKENDS["recorded"] = _recorded
             os.environ["CRASHLAB_LLM"] = "recorded"
-        reply = {"plan": plan, "build": build, "scenarios": propose, "route": route, "agent": agent}[sys.argv[1]](req)
+        reply = {"plan": plan, "build": build, "scenarios": propose, "route": route, "agent": agent, "scenarios_pack": scenarios_pack.run}[sys.argv[1]](req)
     json.dump(reply, sys.stdout, allow_nan=False)
 
 

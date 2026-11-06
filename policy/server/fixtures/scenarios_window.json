@@ -1,0 +1,705 @@
+{
+ "count_reason": "A hand-written list for the plumbing check, one group per failure idea.",
+ "scenarios": [
+  {
+   "name": "steady wind 4",
+   "group": "Steady wind",
+   "reason": "Steady wind presses on the body and may pause or peel the robot.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 4.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "steady wind 7.5",
+   "group": "Steady wind",
+   "reason": "Steady wind presses on the body and may pause or peel the robot.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 7.5
+     }
+    }
+   ]
+  },
+  {
+   "name": "steady wind 9",
+   "group": "Steady wind",
+   "reason": "Steady wind presses on the body and may pause or peel the robot.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 9.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "steady wind 11",
+   "group": "Steady wind",
+   "reason": "Steady wind presses on the body and may pause or peel the robot.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 11.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "steady wind 14",
+   "group": "Steady wind",
+   "reason": "Steady wind presses on the body and may pause or peel the robot.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 14.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "steady wind 18",
+   "group": "Steady wind",
+   "reason": "Steady wind presses on the body and may pause or peel the robot.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "steady_ms": 18.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "gusts 15 m/s",
+   "group": "Gusts",
+   "reason": "A sudden gust could lift the seal before the robot pauses.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "gust_ms": 15.0,
+      "gust_start_s": 30.0,
+      "gust_duration_s": 6.0,
+      "gust_count": 1,
+      "gust_period_s": 45.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "gusts 22 m/s",
+   "group": "Gusts",
+   "reason": "A sudden gust could lift the seal before the robot pauses.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "gust_ms": 22.0,
+      "gust_start_s": 60.0,
+      "gust_duration_s": 6.0,
+      "gust_count": 2,
+      "gust_period_s": 45.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "gusts 28 m/s",
+   "group": "Gusts",
+   "reason": "A sudden gust could lift the seal before the robot pauses.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "gust_ms": 28.0,
+      "gust_start_s": 40.0,
+      "gust_duration_s": 6.0,
+      "gust_count": 3,
+      "gust_period_s": 45.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "gusts 34 m/s",
+   "group": "Gusts",
+   "reason": "A sudden gust could lift the seal before the robot pauses.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "gust_ms": 34.0,
+      "gust_start_s": 80.0,
+      "gust_duration_s": 6.0,
+      "gust_count": 2,
+      "gust_period_s": 45.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "gusts 40 m/s",
+   "group": "Gusts",
+   "reason": "A sudden gust could lift the seal before the robot pauses.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "gust_ms": 40.0,
+      "gust_start_s": 50.0,
+      "gust_duration_s": 6.0,
+      "gust_count": 1,
+      "gust_period_s": 45.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "gusts 48 m/s",
+   "group": "Gusts",
+   "reason": "A sudden gust could lift the seal before the robot pauses.",
+   "calls": [
+    {
+     "fn": "set_wind",
+     "args": {
+      "gust_ms": 48.0,
+      "gust_start_s": 30.0,
+      "gust_duration_s": 6.0,
+      "gust_count": 4,
+      "gust_period_s": 45.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "wet glass 0.15",
+   "group": "Wet glass",
+   "reason": "Wet glass lowers track grip, so the robot may slide down a lane.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "wetness": 0.15
+     }
+    }
+   ]
+  },
+  {
+   "name": "wet glass 0.3",
+   "group": "Wet glass",
+   "reason": "Wet glass lowers track grip, so the robot may slide down a lane.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "wetness": 0.3
+     }
+    }
+   ]
+  },
+  {
+   "name": "wet glass 0.5",
+   "group": "Wet glass",
+   "reason": "Wet glass lowers track grip, so the robot may slide down a lane.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "wetness": 0.5
+     }
+    }
+   ]
+  },
+  {
+   "name": "wet glass 0.7",
+   "group": "Wet glass",
+   "reason": "Wet glass lowers track grip, so the robot may slide down a lane.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "wetness": 0.7
+     }
+    }
+   ]
+  },
+  {
+   "name": "wet glass 0.9",
+   "group": "Wet glass",
+   "reason": "Wet glass lowers track grip, so the robot may slide down a lane.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "wetness": 0.9
+     }
+    }
+   ]
+  },
+  {
+   "name": "wet glass 1",
+   "group": "Wet glass",
+   "reason": "Wet glass lowers track grip, so the robot may slide down a lane.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "wetness": 1.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "weak seal 2400 Pa 200 mm2",
+   "group": "Weak suction",
+   "reason": "A worn fan or torn skirt reduces the pressure that holds the robot.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "suction_pa": 2400.0,
+      "seal_leak_mm2": 200.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "weak seal 2000 Pa 300 mm2",
+   "group": "Weak suction",
+   "reason": "A worn fan or torn skirt reduces the pressure that holds the robot.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "suction_pa": 2000.0,
+      "seal_leak_mm2": 300.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "weak seal 1700 Pa 400 mm2",
+   "group": "Weak suction",
+   "reason": "A worn fan or torn skirt reduces the pressure that holds the robot.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "suction_pa": 1700.0,
+      "seal_leak_mm2": 400.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "weak seal 1400 Pa 500 mm2",
+   "group": "Weak suction",
+   "reason": "A worn fan or torn skirt reduces the pressure that holds the robot.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "suction_pa": 1400.0,
+      "seal_leak_mm2": 500.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "weak seal 1100 Pa 700 mm2",
+   "group": "Weak suction",
+   "reason": "A worn fan or torn skirt reduces the pressure that holds the robot.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "suction_pa": 1100.0,
+      "seal_leak_mm2": 700.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "weak seal 900 Pa 900 mm2",
+   "group": "Weak suction",
+   "reason": "A worn fan or torn skirt reduces the pressure that holds the robot.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "suction_pa": 900.0,
+      "seal_leak_mm2": 900.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "battery start 0.6",
+   "group": "Low battery",
+   "reason": "A partly charged robot may stop before it finishes the glass.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "battery_start_frac": 0.6
+     }
+    }
+   ]
+  },
+  {
+   "name": "battery start 0.4",
+   "group": "Low battery",
+   "reason": "A partly charged robot may stop before it finishes the glass.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "battery_start_frac": 0.4
+     }
+    }
+   ]
+  },
+  {
+   "name": "battery start 0.25",
+   "group": "Low battery",
+   "reason": "A partly charged robot may stop before it finishes the glass.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "battery_start_frac": 0.25
+     }
+    }
+   ]
+  },
+  {
+   "name": "battery start 0.15",
+   "group": "Low battery",
+   "reason": "A partly charged robot may stop before it finishes the glass.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "battery_start_frac": 0.15
+     }
+    }
+   ]
+  },
+  {
+   "name": "battery start 0.08",
+   "group": "Low battery",
+   "reason": "A partly charged robot may stop before it finishes the glass.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "battery_start_frac": 0.08
+     }
+    }
+   ]
+  },
+  {
+   "name": "deep joint 0.006 m",
+   "group": "Pane joints",
+   "reason": "A deep joint between panes may break the seal as the skirt crosses it.",
+   "calls": [
+    {
+     "fn": "set_panes",
+     "args": {
+      "joint_depth": 0.006,
+      "joint_gap": 0.004
+     }
+    }
+   ]
+  },
+  {
+   "name": "deep joint 0.012 m",
+   "group": "Pane joints",
+   "reason": "A deep joint between panes may break the seal as the skirt crosses it.",
+   "calls": [
+    {
+     "fn": "set_panes",
+     "args": {
+      "joint_depth": 0.012,
+      "joint_gap": 0.008
+     }
+    }
+   ]
+  },
+  {
+   "name": "deep joint 0.02 m",
+   "group": "Pane joints",
+   "reason": "A deep joint between panes may break the seal as the skirt crosses it.",
+   "calls": [
+    {
+     "fn": "set_panes",
+     "args": {
+      "joint_depth": 0.02,
+      "joint_gap": 0.012
+     }
+    }
+   ]
+  },
+  {
+   "name": "deep joint 0.028 m",
+   "group": "Pane joints",
+   "reason": "A deep joint between panes may break the seal as the skirt crosses it.",
+   "calls": [
+    {
+     "fn": "set_panes",
+     "args": {
+      "joint_depth": 0.028,
+      "joint_gap": 0.018
+     }
+    }
+   ]
+  },
+  {
+   "name": "deep joint 0.036 m",
+   "group": "Pane joints",
+   "reason": "A deep joint between panes may break the seal as the skirt crosses it.",
+   "calls": [
+    {
+     "fn": "set_panes",
+     "args": {
+      "joint_depth": 0.036,
+      "joint_gap": 0.026
+     }
+    }
+   ]
+  },
+  {
+   "name": "dust 5 g per m2",
+   "group": "Dust on the glass",
+   "reason": "Dust leaks past the seal and blurs the sensors.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "dust_gm2": 5.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "dust 20 g per m2",
+   "group": "Dust on the glass",
+   "reason": "Dust leaks past the seal and blurs the sensors.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "dust_gm2": 20.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "dust 35 g per m2",
+   "group": "Dust on the glass",
+   "reason": "Dust leaks past the seal and blurs the sensors.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "dust_gm2": 35.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "dust 50 g per m2",
+   "group": "Dust on the glass",
+   "reason": "Dust leaks past the seal and blurs the sensors.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "dust_gm2": 50.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "dust 60 g per m2",
+   "group": "Dust on the glass",
+   "reason": "Dust leaks past the seal and blurs the sensors.",
+   "calls": [
+    {
+     "fn": "set_weather",
+     "args": {
+      "dust_gm2": 60.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "ac unit a on a lane",
+   "group": "Things on the wall",
+   "reason": "The robot cannot see things fixed to the glass, so it may hit one.",
+   "calls": [
+    {
+     "fn": "add_part",
+     "args": {
+      "name": "ac_unit_a",
+      "part": "ac_unit",
+      "x_m": 0.3,
+      "below_top_m": 1.5
+     }
+    }
+   ]
+  },
+  {
+   "name": "ac unit b on a lane",
+   "group": "Things on the wall",
+   "reason": "The robot cannot see things fixed to the glass, so it may hit one.",
+   "calls": [
+    {
+     "fn": "add_part",
+     "args": {
+      "name": "ac_unit_b",
+      "part": "ac_unit",
+      "x_m": 1.0,
+      "below_top_m": 2.2
+     }
+    }
+   ]
+  },
+  {
+   "name": "shop sign on a lane",
+   "group": "Things on the wall",
+   "reason": "The robot cannot see things fixed to the glass, so it may hit one.",
+   "calls": [
+    {
+     "fn": "add_part",
+     "args": {
+      "name": "shop_sign",
+      "part": "sign",
+      "x_m": 0.8,
+      "below_top_m": 1.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "kitchen vent on a lane",
+   "group": "Things on the wall",
+   "reason": "The robot cannot see things fixed to the glass, so it may hit one.",
+   "calls": [
+    {
+     "fn": "add_part",
+     "args": {
+      "name": "kitchen_vent",
+      "part": "vent_hood",
+      "x_m": 0.5,
+      "below_top_m": 2.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "frame clip on a lane",
+   "group": "Things on the wall",
+   "reason": "The robot cannot see things fixed to the glass, so it may hit one.",
+   "calls": [
+    {
+     "fn": "add_part",
+     "args": {
+      "name": "frame_clip",
+      "part": "window_frame_bracket",
+      "x_m": 1.1,
+      "below_top_m": 1.2
+     }
+    }
+   ]
+  },
+  {
+   "name": "rusted vent on a lane",
+   "group": "Things on the wall",
+   "reason": "The robot cannot see things fixed to the glass, so it may hit one.",
+   "calls": [
+    {
+     "fn": "add_part",
+     "args": {
+      "name": "rusted_vent",
+      "part": "vent_hood",
+      "x_m": 1.5,
+      "below_top_m": 2.6
+     }
+    }
+   ]
+  },
+  {
+   "name": "clean speed 0.08",
+   "group": "Clean speed",
+   "reason": "A different speed changes how joints and turns load the seal.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "clean_speed_ms": 0.08
+     }
+    }
+   ]
+  },
+  {
+   "name": "clean speed 0.12",
+   "group": "Clean speed",
+   "reason": "A different speed changes how joints and turns load the seal.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "clean_speed_ms": 0.12
+     }
+    }
+   ]
+  },
+  {
+   "name": "clean speed 0.18",
+   "group": "Clean speed",
+   "reason": "A different speed changes how joints and turns load the seal.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "clean_speed_ms": 0.18
+     }
+    }
+   ]
+  },
+  {
+   "name": "clean speed 0.2",
+   "group": "Clean speed",
+   "reason": "A different speed changes how joints and turns load the seal.",
+   "calls": [
+    {
+     "fn": "set_robot",
+     "args": {
+      "clean_speed_ms": 0.2
+     }
+    }
+   ]
+  }
+ ],
+ "not_tested": [
+  {
+   "factor": "Sand in the air",
+   "reason": "Only dust already on the glass has physics."
+  },
+  {
+   "factor": "Sensor ageing",
+   "reason": "Sensors stay as new for the whole run."
+  }
+ ]
+}

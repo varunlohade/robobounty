@@ -1,6 +1,6 @@
 """One pack step in its own process, under that pack's own Python: <python> -m packs.<pack>.job <command>, with a JSON request on stdin and a JSON reply on stdout.
 
-Commands: catalog, start, call, replay_calls, outline, run, judge. The server imports only this file's table and ask(). A pack's job.py calls serve() with its hooks.
+Commands: catalog, start, call, describe, replay_calls, run, judge. The server imports only this file's table and ask(). A pack's job.py calls serve() with its hooks.
 A pack may need a Python the server does not have, so nothing here imports a pack. Worlds and calls are data, and each pack checks them itself.
 run writes progress.json about once a second while the sim steps: t, x, y, status. It is also the run's heartbeat, and it stops when the sim stops. Results are simulated.
 """
@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 POLICY = Path(__file__).resolve().parent.parent
-# max_procs: measured with check_campaign.py --measure on this Mac, see docs/LAB-EVENTS.md and the numbers in AI-USE.md.
+# max_procs comes from measure_packs.py on this Mac, 2026-11-06, with vite taking about 4 cores: the count before a normal-priority probe slows past about 1.5x at p95.
 PACKS = {
     "window": {"python": POLICY / ".venv" / "bin" / "python", "label": "Window cleaning robot", "viewer": "trial", "max_procs": 8},
     "inspection": {"python": POLICY / ".venv-newton" / "bin" / "python", "label": "Inspection robot", "viewer": "poses", "max_procs": 6},
@@ -107,6 +107,7 @@ def serve(hooks):
     """The reply goes on the real stdout. A library print from the sim goes to stderr."""
     real_stdout = os.dup(1)
     os.dup2(2, 1)
+    sys.stdout = sys.stderr
     command = sys.argv[1]
     req = json.load(sys.stdin)
     table = {
@@ -114,7 +115,7 @@ def serve(hooks):
         "start": lambda: {"world": (w := hooks.start()), "hash": hooks.physics_hash(w), "scene": hooks.scene(w)},
         "call": lambda: (lambda o: {"result": o["result"], "rerun": o["rerun"], "world": o["world"], "hash": hooks.physics_hash(o["world"]), "scene": hooks.scene(o["world"])})(hooks.call(req["world"], req["fn"], req.get("args"))),
         "replay_calls": lambda: replay_calls(hooks, req),
-        "outline": lambda: hooks.outline(req["world"]),
+        "describe": lambda: {"hash": hooks.physics_hash(req["world"]), "scene": hooks.scene(req["world"])},
         "run": lambda: run(hooks, req),
         "judge": lambda: hooks.judge_again(Path(req["out"])),
     }

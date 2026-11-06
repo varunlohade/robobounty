@@ -378,5 +378,27 @@
    ],
    "say": ""
   }
+ ],
+ "add a control cabinet beside the walkway": [
+  {
+   "calls": [
+    {
+     "fn": "add_box",
+     "args": {
+      "name": "control_cabinet",
+      "x": 3.0,
+      "y": 1.2,
+      "sx": 0.6,
+      "sy": 0.4,
+      "sz": 1.9
+     }
+    }
+   ],
+   "say": "I added a grey control cabinet beside the walkway."
+  },
+  {
+   "calls": [],
+   "say": ""
+  }
  ]
 }
