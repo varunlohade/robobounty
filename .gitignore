@@ -39,3 +39,6 @@ design/film/*/
 cache/
 **/__pycache__/
 design/ui-refs
+
+.claude/
+MUJOCO_LOG.TXT

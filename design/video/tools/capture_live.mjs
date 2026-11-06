@@ -1,0 +1,144 @@
+// Drives the real app in live mode with stored AI replies (no LLM call, real sim, real gate), and records it. Same steps as src/app/tools/check_live.mjs.
+// Needs vite on 5199 and a free port 5198. Starts its own run server, at low priority.
+import { spawn } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { openChrome, wait } from './cdp.mjs';
+
+// CRASHLAB_REPO and CRASHLAB_BASE point at a private copy of the repo at a commit, so another worker's edits or test server can't reach the capture.
+const ROOT = process.env.CRASHLAB_REPO ?? resolve(import.meta.dirname, '../../..');
+const BASE = process.env.CRASHLAB_BASE ?? 'http://localhost:5199';
+const PORT = process.env.CRASHLAB_SERVER_PORT ?? '5198';
+const OUT = resolve(import.meta.dirname, '../_cap/live');
+mkdirSync(OUT, { recursive: true });
+const server = spawn('nice', ['-n', '15', join(ROOT, 'policy/.venv/bin/python'), join(ROOT, 'policy/server/server.py'), '--port', PORT, '--recorded', join(ROOT, 'policy/server/fixtures')], { stdio: 'ignore' });
+await wait(1500);
+const c = await openChrome(9378);
+process.on('exit', () => { c.close(); server.kill(); });
+const t0 = Date.now();
+const frames = [], marks = [];
+const mark = name => { marks.push({ name, t: (Date.now() - t0) / 1000, frame: frames.length }); console.log(name, ((Date.now() - t0) / 1000).toFixed(1)); save(); };
+const save = () => writeFileSync(join(OUT, 'manifest.json'), JSON.stringify({ frames, marks }));
+let recording = false;
+let recorder = Promise.resolve();
+const startRecording = () => { recording = true; recorder = (async () => {
+  while (recording) {
+    const t = (Date.now() - t0) / 1000;
+    const file = `f${String(frames.length).padStart(5, '0')}.jpg`;
+    const got = await Promise.race([c.shot(join(OUT, file), 'jpeg').then(() => true), wait(5000).then(() => false)]);
+    if (got) frames.push({ file, t });
+    await wait(120);
+  }
+})(); };
+const { js, until } = c;
+const idle = () => js(`Number(document.getElementById('app').dataset.idle ?? 0)`);
+const idleAfter = n => until(`Number(document.getElementById('app').dataset.idle ?? 0) > ${n}`, 'job finished', 3000);
+const hasButton = label => `[...document.querySelectorAll('.chat-list button')].some(x => x.textContent.startsWith(${JSON.stringify(label)}) && !x.disabled)`;
+const press = label => js(`(() => { const b = [...document.querySelectorAll('.chat-list button')].reverse().find(x => x.textContent.startsWith(${JSON.stringify(label)}) && !x.disabled); if (!b) throw new Error('no button ' + ${JSON.stringify(label)}); b.click(); })()`);
+const tab = name => js(`[...document.querySelectorAll('.tab')].find(t => t.textContent.endsWith(${JSON.stringify(name)})).click()`);
+const BRIEF = "I'm building a window-cleaning robot for towers in Dubai";
+
+await c.send('Page.navigate', { url: `${BASE}/app.html` });
+await until(`document.getElementById('app')?.dataset.server === 'up' && !!document.querySelector('.chat-input textarea')`, 'app up', 200);
+await wait(1500);
+startRecording();
+await wait(500);
+mark('empty');
+await wait(1500);
+for (let i = 2; i <= BRIEF.length; i += 2) {
+  await js(`(() => { const t = document.querySelector('.chat-input textarea'); t.value = ${JSON.stringify(BRIEF.slice(0, i))}; t.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  await wait(90);
+}
+await wait(600);
+mark('send');
+let n = await idle();
+await js(`(() => { const t = document.querySelector('.chat-input textarea'); t.value = ${JSON.stringify(BRIEF)}; t.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('.send').click(); })()`);
+await idleAfter(n);
+mark('question');
+await wait(2500);
+while (await js(hasButton('Use the default'))) {
+  n = await idle();
+  await js(`document.querySelector('.chat-list .card:last-child button:not(:disabled)').click()`);
+  await idleAfter(n).catch(() => {});
+}
+mark('answered');
+await until(hasButton('Looks right'), 'scene question', 2000);
+await until(`document.querySelector('.viewport')?.dataset.tid?.startsWith('normal')`, 'normal run playing', 1500);
+mark('normal_run');
+await tab('World');
+await wait(9000);
+await js(`document.querySelector('.chat-list').scrollTop = 0`);
+mark('log_top');
+await wait(4000);
+await js(`document.querySelector('.chat-list').scrollTop = 1e9`);
+n = await idle();
+await press('Looks right');
+await idleAfter(n);
+await until(hasButton('Approve'), 'review', 100);
+mark('review');
+await wait(5000);
+n = await idle();
+await press((await js(hasButton('Approve first 12'))) ? 'Approve first 12' : 'Approve');
+mark('approved');
+await until(`document.querySelectorAll('.cell canvas').length > 0`, 'first result', 1500);
+await tab('worlds');
+mark('filling');
+await idleAfter(n);
+mark('map');
+await wait(4000);
+n = await idle();
+await press('Show the recorded result');
+await idleAfter(n);
+mark('fix');
+await tab('Fix');
+await wait(3000);
+n = await idle();
+await press('Send to a bounty');
+await idleAfter(n);
+await until(`!!document.querySelector('.bounty .fund')`, 'draft', 100);
+mark('bounty_draft');
+await wait(5000);
+await js(`document.querySelector('.page.bounty').scrollTop = 1e9`);
+await wait(2500);
+n = await idle();
+await js(`document.querySelector('.fund button').click()`);
+await idleAfter(n);
+await until(`!!document.querySelector('.ledger .ledger-track')`, 'ledger', 100);
+await js(`document.querySelector('.ledger').scrollIntoView({ block: 'start' })`);
+mark('funded');
+await wait(3000);
+const paste = async (label, text, seed) => {
+  mark(`paste_${label}`);
+  const before = await idle();
+  await js(`(() => { const a = document.querySelector('.world-paste'); a.value = ${JSON.stringify(text)}; a.scrollIntoView({ block: 'center' }); document.querySelector('.bounty input[aria-label=Seed]').value = ${JSON.stringify(String(seed))}; })()`);
+  await wait(2000);
+  await js(`[...document.querySelectorAll('.bounty button')].find(b => b.textContent === 'Run the gate').click()`);
+  await idleAfter(before);
+  await js(`document.querySelector('.verdict')?.scrollIntoView({ block: 'center' })`);
+  mark(`verdict_${label}`);
+  await wait(4000);
+  console.log(label, await js(`document.querySelector('.verdict').dataset.code`));
+};
+const fixtures = join(ROOT, 'policy/bounty/fixtures');
+const meta = JSON.parse(readFileSync(join(fixtures, 'meta.json'), 'utf8'));
+await paste('pass', readFileSync(join(fixtures, 'nominal_pass.json'), 'utf8'), meta.pass_seed);
+await paste('fail', readFileSync(join(fixtures, 'failing.json'), 'utf8'), meta.failing_seed);
+await js(`document.querySelector('.ledger').scrollIntoView({ block: 'start' })`);
+mark('dispute');
+await until(`!!document.querySelector('[data-ledger=ledger_finalize]')`, 'dispute end', 800);
+mark('finalize');
+await js(`document.querySelector('[data-ledger=ledger_finalize]').click()`);
+await until(`!!document.querySelector('[data-ledger=ledger_claim]')`, 'finalized', 100);
+await wait(2000);
+await js(`document.querySelector('[data-ledger=ledger_claim]').click()`);
+await until(`document.querySelector('.ledger').textContent.includes('Claimed')`, 'claimed', 100);
+await js(`document.querySelector('.ledger').scrollIntoView({ block: 'start' })`);
+mark('claimed');
+await wait(4000);
+mark('end');
+recording = false;
+await recorder;
+save();
+console.log('problems', c.problems);
+console.log('frames', frames.length);
+process.exit(0);

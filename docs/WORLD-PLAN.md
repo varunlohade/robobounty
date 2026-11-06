@@ -52,3 +52,23 @@ Cut: curved glass, moving machinery, people, fluids, cloth.
 
 ## Limits
 Blender at about 17 s per frame gives about 34 frames in a 10 minute wait. Physics stops at detach, so the fall is not shown. Calibration, cross-machine replay and robot import are not done by the deadline. Isaac Sim is worth a look only if a real team already runs it.
+
+## After the AI loop: test in all directions
+Owner's words: "after this have a tab somewhere saying simulate it in all possible directions". One button in `lab.html` starts the scenario agent on the current world. It reuses policy/crashlab/scenarios.py and the campaign runner, and shows the worlds, their reasons and results in a tab. It runs on sim5. It lists what it did not test. It never claims to cover every case.
+
+### Owner's spec for that tab (2026-11-06)
+His words: "when clicked it runs and writes down all possible combination and on the ui you can see all 44 square each running the simulator and whichever fails its marked as fails with possible reason which a user can click and check and change the robots code so like vscode after clicking a file will open up for failed ones we can have a option to open file, and see why it failed".
+1. Click: the agent writes the list of worlds. The count comes from the agent; 44 is an example.
+2. A grid has one square per world, each running at the same time and showing live progress.
+3. A failed square is marked failed, with a possible reason from the diagnosis, labelled as possible.
+4. Click a failed square: replay of that recorded run, and why it failed.
+5. "Open file": a VS Code style editor tab opens the robot's controller at the traced line. The user can edit it and re-run that world, then all worlds. Edits go to a session copy, and the frozen files never change.
+Check how squares show live state: 44 WebGL views will not fit, so use one shared canvas or light 2D squares fed from each run's progress.
+
+## Other robots and Newton (owner, 2026-11-06)
+His words: "i want to have world building where we actually build the world around it and simulate real physics with newton 1.1 ... Imagine a robotics company using it ... not using anything gimmicky but actually something useful." "I also need to see the code as well." "don't worry about licenses ... We're not selling it" for now; keep a note of what is used, so it can change before any sale.
+Robot pack = model + controller + judge + world functions. Backend per pack: MuJoCo for the window robot, Newton for others if the test in policy/newton_lab passes. Installed Newton is 1.7.0, CPU only on macOS. Code must be visible: a VS Code style editor tab shows the robot's controller and the world file.
+
+### Import a robot from the chat (owner, 2026-11-06)
+His words: "a person imports a robot in the channel, like there is an option to import in the chat window, and then we build everything around it."
+A "+" in the chat box offers: import a file (MJCF, URDF or a zip with its meshes) or pick from a library (Menagerie, Newton's robots). The file is untrusted data: strict parse, size caps, no paths outside the upload. The app reads joints, actuators, mass and size, shows the robot in the main area, and says plainly what it found. It then asks only for what is missing: "What drives this robot?" with options: a trained controller if one exists, the user's code, or a passive drop test. A robot with no controller must say so, never fake motion. Then the AI builds the world around it with the engine functions. Build order: after the Newton test and the robot pack split.

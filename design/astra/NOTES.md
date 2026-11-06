@@ -116,3 +116,81 @@ The direction scales through additional bounty rows, paginated rankings, and evi
 **Second review:** All local links and image paths resolve, the selected-failure anchor exists, and the generated HTML contains the revised sorting, outcome, and payout copy. Type remains at least 16px. No scripts, banned visual effects, or overflow-hiding fixes were introduced. The small selected-score and outcome-type increases add about 12px to the table column's height; the supplied render had room for that increase. No new render was performed, so exact revised fit remains unverified.
 
 These changes improve discoverability in the static design, not application functionality. The search, sign-in, non-active tabs, filters, sorting, join and replay controls still need implementation. The sample bounty link and in-page failure link work without JavaScript. The expensive feel comes from controlled typography and alignment; the next usability gain is working behaviour, not more ornament.
+
+## Round 3 — A sentence becomes a test
+
+Created `site-1.html` and `site-2.html`, with `build_round3.py` as their construction source. The new composition borrows focus, breathing room and real product evidence from the supplied reference, while deliberately changing the visual structure: Palatino headlines sit on white space, an editable brief sits beside four world previews, and the campaign result uses an evidence workspace. No cinematic hero card, overlaid marketing headline, pill-button pair, logo strip, reference branding, or borrowed wording.
+
+Palette: #FFFFFF, #242823, #2C5043, #A8342A, #626B60, #DCE1DA. Palatino is used for display headings; Arial handles the brief, controls and evidence labels. Deep green is the sole quiet accent, red is reserved for failures, and all declared text is at least 16px. Rounded corners are limited to controls, the brief editor and small image edges. No glass or shadows were needed.
+
+The home page leads with the user's plain-English brief, four sharp world setup images, and visible pass/fail labels, plus links into the campaign result and open bounties. The result repeats the exact brief, shows the four-world subset and a 71 ± 4 score across 300 sample scenes, opens the wrong-object run, and compares it with an illustrative 93 ± 2 result after a target-check fix. It links to the existing bounty/leaderboard page. The failure replay is separate from the world setup imagery. Both pages visibly say “Sample data.”
+
+Honesty: outcomes, scene counts, scores, ranges, timing and the fix are illustrative. The before/after stills are supplied images from different source tasks, not proof of a paired controlled experiment; the comparison is explicitly labeled illustrative on the page. There is no generation or playback backend: editing the brief changes its text only, and build/replay/sign-in controls remain static. Navigation links work. The new pages say “replay the recorded run” and make no seed-reproduction claim.
+
+Checks: inspected all four sharp assets and the supplied reference. Source review tightened the home-page vertical budget and kept image containers explicitly sized to avoid intrinsic-image overflow. Both pages pass local asset/link/anchor checks, minimum type-size checks, and checks for prohibited visual effects and wording. No rendering was attempted. The next PNG review should verify the home footer clearance and the result page's incident/comparison wrapping; exact rendered fit remains unverified.
+
+## Round 3 PNG critique — applied refinements
+
+**What the renders actually showed:** No visible clipping or overlapping text in either supplied PNG. The pages are recognizably different from the reference: white editorial layout, dark Palatino headings, exposed UI, multiple small scenes, no cinematic card or overlaid marketing copy. The result feels professional and calm, but the home page's wide, shallow crops and equal-weight labels made it feel more like a generic scene browser than a premium product demonstration. Robot bodies and relevant object positions were cropped away. The brief editor had conspicuous empty space, and the headline required interpretation before the product promise became clear. The before/after comparison was readable but visually subordinate to almost everything else.
+
+**Home fixes:** Replaced the abstract headline with “Write the test in words. See the worlds it builds.” Shortened the editor from a 208px text area to 176px while retaining room for the displayed brief. A single fine connecting rule joins the brief editor to the output area. Reorganized the four outputs as square 220px scene images with adjacent Palatino titles and plain pass/fail labels, preserving the full source composition. Output copy now says “From this brief: four test worlds.” Tightened the introduction and bounty strip to fund the new image proportions within the screenshot budget. No additional cards, decorative colour fields, or shadows were added.
+
+**Result fixes:** Enlarged the before/after stills from 96px to 112px and comparison scores from 28px to 36px. The heading now makes the numerical difference explicit: “After the fix: 22 points higher.” Before and after labels are explicit. Changed “Same test set” to “Illustrative rerun,” retaining 300 sample scenes and the visible illustrative-comparison disclosure. Clarified that the four thumbnails are world setup images, with outcomes from sample runs. Reduced surrounding spacing to make room without pushing the footer down.
+
+**Second source review:** Checked all image paths, navigation targets and anchors; retained the minimum 16px type size, explicit image heights, sample labels, and before/after range values. Confirmed no prohibited effects, reference wording, seed claims or overflow suppression in the new pages. No browser render was performed. Revised wrapping and footer clearance still require a fresh 1440 × 900 PNG. The reference-distinction judgment is based on the supplied screenshots; the revised design keeps that same structural separation. Build, sign-in and replay remain static mockup controls.
+
+## Round 4 — The simulation workbench
+
+Created `app-1.html`, `app-2.html`, and `app-3.html` from `_brief/PRODUCT.md` and `_brief/BRIEF-round4.md`. `build_round4.py` is the construction source. Each is a static 1440 × 900 Mac-style app window with a 424px conversation pane, a simulation/scenario/result pane, and links between the three screens. White surfaces, near-black ink, deep green (#315749), and failure-only red (#A5352C). Palatino carries headings and the user's words; Arial carries UI text; Menlo/Monaco/Consolas is used only for code. Body text is at least 16px; code and small labels are at least 13px.
+
+**App 1:** The exact requested user message leads to a short setup explanation and first-test action. The right pane has wind, suction and grip readings plus a flat SVG façade, distant city, dirt film and cleaned path. The robot is a flat square on tracks, about one fifth of a pane's width, with one upward tether and no arms. The schematic is explicitly a geometry preview, not a fabricated photo.
+
+**App 2:** The first test passes, then the scenario agent explains its proposed 40 cases: 8 dust, 8 high-floor wind, and 6 each for humidity, friction, mullion geometry and heat. All 40 worlds have individual plain-language reasons in six groups. Each group names the physics mechanism it proposes to change; the UI states that equations or assumptions belong in PARAMETERS.md. Seal wear, water ingress and tether fatigue stay on the not-tested list, with a “Send to a bounty” affordance. Forty is the sample agent's recommendation, not a fixed setting.
+
+**App 3:** All 40 worlds appear in a compact grid, with 31 passes and 9 failures. Six failures involve wind/dust; the other three concern humidity, low friction and a raised edge. S4 is opened with a recorded-run preview and three-event timeline. The chat traces the failure to a 28 kPa cutoff on line 88, while simulated grip is lost at 32 kPa, then offers “Try a fix.” Bounty status is a draft covering three untested gaps, with a reward per new valid failure; nothing is represented as published.
+
+**Review and checks:** Tightened the chat copy and scenario-list spacing so the first-test action, not-tested list, fix control and bounty draft have space above their composers. Explicitly sized the SVG containers. Static checks pass for the exact opening message, required actions, 40 scenario reasons, 40 result tiles, nine failed results, local links and anchors, sample disclosures, and absence of prohibited effects or clipping suppression. No browser rendering was performed; the next PNG review should check the dense 40-world plan and the bottom of each chat pane.
+
+**Honesty:** Every number, result and code excerpt is illustrative. All screens say “Simulated” and “Sample data,” and disclose hand-built physics, simplified weather and lack of hardware validation. The depicted coverage is a proposed model contract, not a claim that this HTML implements physics or changes controller code. No PARAMETERS.md or physics implementation was created. The controls do not run simulations, apply fixes, send messages or publish bounties. Screen navigation works; all other controls are static. Replay wording is “replay the recorded run.”
+
+## Round 4 PNG review — completeness and engineering credibility
+
+The three supplied renders are complete at 1440 × 900: no visible clipped content, all chat actions remain above the composer, and all 40 plan entries and 40 result tiles are present. The white split-pane workspace, Palatino hierarchy, scene-specific controls and code trace distinguish it from a generic chatbot or dark editor clone. It feels restrained, but the repeated thumbnails and decorative under-preview copy weakened its engineering character. The UI alone cannot establish trustworthy physics.
+
+**App 1 fixes:** Replaced the two generic explanatory panels with concrete included-model and excluded-model statements. Defined the first-test pass criterion as finishing one pane without slip or a tether catch. Corrected the grip display: μ is the coefficient's symbol, not a unit following 0.72. Clarified that pressure is suction magnitude. Preserved the square tracked robot, single tether, dirt/clean path, distant city and pane-relative scale.
+
+**App 2 full-brief audit and fixes:** Retained the first-test result, the exact “Test this on 40 worlds” and “See the 40 worlds” text, the all-worlds action, all six required groups, and the not-tested list with “Send to a bounty.” Rewrote every one of the 40 entries as a condition plus a plain risk or reference purpose. Explained the higher allocation to wind/dust through their interaction at the seal, rather than merely repeating the counts. The plan explicitly calls itself targeted, not exhaustive. Group subtitles identify model terms or assumptions; the footer now states the implementation/documentation gate rather than implying the HTML demonstrates implemented physics. Untested effects explicitly say “No pass claimed.” Counts remain 8 + 8 + 6 + 6 + 6 + 6 = 40.
+
+**App 3 fixes:** Changed the duplicate miniatures into visibly varied, explicitly labeled scenario schematics: dust, wind load, moisture, low-grip patches, joint geometry and temperature each have a different schematic cue. These are not claims that appearance validates physics. Zoomed the opened failure to the contact region; the robot now has an earlier-position outline and a slip annotation instead of a nearly invisible red corner in a distant façade view. Qualified the causal explanation as occurring “in this model.” The 31/9 totals, S4 selection, controller cutoff, timeline, fix action and draft bounty remain consistent.
+
+**Verification:** Rebuilt all three HTML files. Static checks verify 40 individual scenario reasons, six groups, the required app-2 actions, modelling gate, 40 results with nine failures, valid local links/anchors, sample and simulated labels, minimum declared text sizes, and absence of prohibited effects or overflow suppression. No fresh rendering was attempted. The revised app-2 rationale/footer wrapping and app-3 close-up annotations need the next PNG check. These remain design mockups with sample physics, code and outcomes; no model validation, simulation execution or publishing occurred.
+
+## Round 5 — Design system (defined before implementation)
+
+**Idea:** An evidence workbench: conversation proposes work; structured views expose runs, code changes and local payout decisions.
+
+### Tokens
+
+| Token | Value | Use |
+|---|---|---|
+| `--app` | `#0B0C0E` | Application backdrop |
+| `--panel` | `#111317` | Chat, inspector, secondary workspace |
+| `--raised` | `#16191E` | Inputs, menus, approval surfaces |
+| `--hover` | `#1E2228` | Hover and selected-row affordances |
+| `--border` | `#292E36` | Low-contrast dividers |
+| `--text` | `#E8EBF0` | Primary text |
+| `--muted` | `#9CA6B4` | Secondary text |
+| `--subtle` | `#788392` | Tertiary labels |
+| `--accent` | `#91A7FF` | Focus, selection, primary-action fill |
+| `--accent-ink` | `#101729` | Text on primary actions |
+| `--red` | `#F18B91` | Failed/rejected/danger |
+| `--amber` | `#E6BB72` | Held, flaky, review required |
+| `--green` | `#88C9A0` | Passed, accepted, completed |
+
+Typography: system sans (`-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`); 11, 12, 13, 14, 16, 20px only; 13px body; tabular numbers. Code: `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`. No serif. Spacing: 4, 8, 12, 16, 20, 24, 32px. Radius: 4px small controls, 6px inputs/cards, 8px floating surfaces. Icon set: inline Lucide SVG geometry, 24-unit viewBox, 1.75 stroke width, round caps and joins. No gradients, shadows, glows or glass.
+
+Layout: 40px native title bar; 40px activity rail; 336px AI conversation; right workspace with a 40px tab strip; 24px status bar. All screens are 1440 × 900. Shared dividers provide hierarchy without outlining every section. Viewport, inspector, table, chart and code regions have distinct responsibilities.
+
+Components: primary, secondary and ghost buttons; native inputs/selects; segmented control; semantic badge with text; tooltip; sorted table header; selectable tree/list row; pipeline progress; scrubber and transport; contextual empty state; non-modal toast; command shortcut hint; syntax-highlighted, line-numbered code; inline diff; ledger stepper. Enabled controls receive hover/pressed and `:focus-visible` treatments. Disabled controls use native `disabled` state. Active tabs/rows/segments use explicit styling and accessible state. Static interaction states will be represented without JavaScript; local screen links work, operational buttons are mockups.
+
+Content contract: preserve the supplied 52-world totals (31 failed, 13 held, 5 flaky, 3 passed), 10/10 controls, fix improvement from 11 to 17 passes on 104 fresh worlds with 0 worse, removal of a guard, not-applied status, and gate threshold 7/8. Other values are sample. Keep “Simulated,” “Replay of recorded run,” and “Local ledger. Not on chain.” visible where relevant. No operation in this task applies code, funds a bounty, sends a message or publishes anything.

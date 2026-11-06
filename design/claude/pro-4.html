@@ -1,0 +1,203 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>CrashLab: Bounty</title><style>
+@font-face{font-family:Inter;src:url(pro-assets/inter-latin-wght-normal.woff2) format("woff2");font-weight:100 900}
+@font-face{font-family:"JetBrains Mono";src:url(pro-assets/jetbrains-mono-latin-wght-normal.woff2) format("woff2");font-weight:100 800}
+:root{--app:#0B0C0E;--panel:#111317;--raised:#16191E;--hover:#1E2228;--active:#262B32;
+--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+--t1:#ECEEF1;--t2:#A3A9B3;--t3:#737A85;--t4:#4B515B;
+--ac:#3E7BFA;--ac-h:#5089FB;--ac-p:#2F6AE6;--ac-t:#7DA7FF;--ac-bg:rgba(62,123,250,.14);--ring:rgba(62,123,250,.45);
+--red:#E5534B;--red-t:#F27B73;--red-bg:rgba(229,83,75,.13);--amb:#D69A2D;--amb-t:#E3B04F;--amb-bg:rgba(214,154,45,.13);--grn:#3FA66A;--grn-t:#5CC186;--grn-bg:rgba(63,166,106,.13);
+--f-suc:#E2574C;--f-slip:#D3A017;--f-edge:#14A39A;--f-teth:#9A78F0;
+--sans:Inter,-apple-system,system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden;background:var(--app)}
+body{font:400 13px/20px var(--sans);color:var(--t1);font-feature-settings:"tnum","cv11";font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
+svg{display:block;flex:none}
+.t11{font-size:11px;line-height:16px}.t12{font-size:12px;line-height:16px}.t13{font-size:13px;line-height:20px}.t14{font-size:14px;line-height:20px}.t16{font-size:16px;line-height:24px}.t20{font-size:20px;line-height:28px;letter-spacing:-.01em}
+.m{font-weight:500}.c2{color:var(--t2)}.c3{color:var(--t3)}.mono{font-family:var(--mono);font-size:12px;line-height:16px}
+.row{display:flex;align-items:center}.gap4{gap:4px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.grow{flex:1;min-width:0}.nowrap{white-space:nowrap}.right{text-align:right}
+
+/* title bar */
+.title{height:40px;flex:none;background:var(--app);display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--line);position:relative}
+.lights{display:flex;gap:8px;margin-right:16px}.lights i{width:12px;height:12px;border-radius:6px;background:#32363D}
+.brand{display:flex;align-items:center;gap:8px;font-weight:500}
+.crumb{display:flex;align-items:center;gap:4px;height:28px;padding:0 8px;border-radius:6px;color:var(--t2);margin-left:4px}
+.crumb svg{color:var(--t3)}
+.cmdk{position:absolute;left:50%;top:6px;margin-left:-180px;width:360px;height:28px;background:var(--raised);border-radius:6px;display:flex;align-items:center;gap:8px;padding:0 4px 0 8px;color:var(--t3)}
+kbd{font:500 11px/16px var(--sans);color:var(--t2);background:var(--hover);border-radius:4px;padding:0 4px;min-width:20px;text-align:center;display:inline-block}
+.avatar{width:24px;height:24px;border-radius:6px;background:var(--active);color:var(--t2);font-size:11px;line-height:24px;text-align:center;font-weight:500;margin-left:4px}
+
+/* shell */
+.shell{flex:1;display:flex;min-height:0}
+.chat{width:372px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column}
+.work{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--panel)}
+.status{height:24px;flex:none;background:var(--app);border-top:1px solid var(--line);display:flex;align-items:center;padding:0 12px;gap:16px;font-size:12px;line-height:16px;color:var(--t3)}
+.status svg{color:var(--t3)}.status .row{gap:4px}
+
+/* tabs */
+.tabs{height:36px;flex:none;background:var(--app);display:flex;align-items:stretch;border-bottom:1px solid var(--line);padding-right:8px}
+.tab{display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--t3);border-right:1px solid var(--line);margin-bottom:-1px;position:relative}
+.tab .n{font-size:11px;line-height:16px;color:var(--t2);background:var(--hover);border-radius:4px;padding:0 4px;font-weight:500}
+.tab.on{background:var(--panel);color:var(--t1)}
+.tab.on svg{color:var(--t2)}
+.tab.file{font-family:var(--mono);font-size:12px}
+.tabs .sp{flex:1;border-bottom:0}
+
+/* buttons */
+.btn{height:28px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 12px;border-radius:6px;font:500 13px/20px var(--sans);white-space:nowrap;color:var(--t1);border:0}
+.btn-p{background:var(--ac);color:#fff}.btn-s{background:var(--hover)}.btn-g{background:transparent;color:var(--t2);padding:0 8px}
+.btn-p kbd{background:rgba(255,255,255,.18);color:#fff}
+.btn-d{background:var(--raised);color:var(--t4)}
+.btn-sm{height:24px;padding:0 8px;font-size:12px;line-height:16px;border-radius:4px;gap:4px}
+.ib{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;color:var(--t2);flex:none}
+.ib.s{width:24px;height:24px;border-radius:4px}
+.ib.on{background:var(--ac-bg);color:var(--ac-t)}.ib.hov{background:var(--hover);color:var(--t1)}
+.vr{width:1px;height:16px;background:var(--line2);flex:none;margin:0 4px}
+
+/* badges */
+.bdg{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 8px 0 4px;border-radius:4px;font:500 12px/16px var(--sans);white-space:nowrap}
+.bdg.plain{padding:0 8px}
+.b-n{background:var(--hover);color:var(--t2)}.b-r{background:var(--red-bg);color:var(--red-t)}.b-a{background:var(--amb-bg);color:var(--amb-t)}.b-g{background:var(--grn-bg);color:var(--grn-t)}.b-ac{background:var(--ac-bg);color:var(--ac-t)}
+.smp{font-size:11px;line-height:16px;color:var(--t3);font-weight:400}
+
+/* inputs */
+.inp{height:28px;background:var(--raised);border-radius:6px;display:flex;align-items:center;gap:8px;padding:0 8px;color:var(--t2);white-space:nowrap}
+.inp svg{color:var(--t3)}
+.inp.focus{box-shadow:0 0 0 1px var(--ac),0 0 0 3px var(--ring);color:var(--t1)}
+.sel{height:28px;background:var(--raised);border-radius:6px;display:inline-flex;align-items:center;gap:4px;padding:0 4px 0 8px;color:var(--t1);white-space:nowrap}
+.sel .lb{color:var(--t3)}.sel>svg:last-child{color:var(--t3)}
+.seg{height:28px;background:var(--raised);border-radius:6px;display:inline-flex;padding:2px;gap:0}
+.seg span{display:flex;align-items:center;gap:4px;padding:0 8px;border-radius:4px;color:var(--t2);white-space:nowrap}
+.seg span.on{background:var(--active);color:var(--t1)}
+.seg b{font-weight:400;color:var(--t3)}.seg .on b{color:var(--t2)}
+.caret{display:inline-block;width:1px;height:16px;background:var(--ac-t);margin-left:-4px}
+
+/* panel header */
+.ph{height:32px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line);font-size:12px;line-height:16px;font-weight:500;color:var(--t2)}
+.ph .sp{flex:1}
+
+/* chat */
+.chat-h{height:36px;flex:none;display:flex;align-items:center;padding:0 4px 0 12px;border-bottom:1px solid var(--line);gap:0}
+.chat-b{flex:1;min-height:0;padding:12px;display:flex;flex-direction:column;gap:12px;overflow:hidden;justify-content:flex-start}
+.u{background:var(--raised);border-radius:8px;padding:8px 12px}
+.a{color:var(--t1);padding:0 4px}
+.a p+p{margin-top:8px}
+.steps{display:flex;flex-direction:column;padding:0}
+.st{height:24px;display:flex;align-items:center;gap:8px;padding:0 4px;border-radius:4px;color:var(--t2);white-space:nowrap}
+.st svg:first-child{color:var(--t3)}
+.st .meta{margin-left:auto;color:var(--t3);font-size:12px;line-height:16px}
+.st.run{color:var(--t1)}.st.run svg:first-child{color:var(--ac-t)}
+.st.hov{background:var(--raised)}
+.card{background:var(--raised);border-radius:8px;overflow:hidden}
+.card-h{display:flex;align-items:center;gap:8px;padding:8px 12px 4px}
+.card-b{padding:4px 12px 8px}
+.kv{display:flex;justify-content:space-between;align-items:center;min-height:24px;gap:12px}
+.kv>:first-child{color:var(--t2)}.kv>:last-child{white-space:nowrap}
+.card-f{display:flex;gap:8px;padding:8px 12px 12px}
+.note{display:flex;gap:8px;padding:8px 12px;background:var(--amb-bg);color:var(--amb-t);margin:4px 0 0}
+.note svg{margin-top:3px}
+.linkrow{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-top:1px solid var(--line);color:var(--t2)}
+.linkrow svg:last-child{margin-left:auto;color:var(--t3)}
+.opts{display:flex;gap:4px;padding:4px 4px 0}
+.comp{margin:0 12px 12px;background:var(--raised);border-radius:8px;flex:none;box-shadow:inset 0 0 0 1px var(--line)}
+.comp .ta{padding:12px 12px 8px;color:var(--t3);min-height:40px}
+.comp .bar{display:flex;align-items:center;gap:4px;padding:0 8px 8px}
+.chip{height:24px;display:inline-flex;align-items:center;gap:4px;padding:0 8px 0 4px;border-radius:4px;background:var(--hover);color:var(--t2);font-size:12px;line-height:16px;white-space:nowrap}
+.chip svg{color:var(--t3)}
+.send{width:24px;height:24px;border-radius:4px;background:var(--hover);color:var(--t4);display:flex;align-items:center;justify-content:center}
+.send.live{background:var(--ac);color:#fff}
+
+.sugg{display:flex;flex-direction:column}
+.sg{height:28px;display:flex;align-items:center;gap:8px;padding:0 4px;color:var(--t2);border-radius:4px;white-space:nowrap}
+.sg svg{color:var(--t3)}
+/* tables */
+.tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+.tbl th{height:28px;font-weight:500;font-size:12px;line-height:16px;color:var(--t3);text-align:left;padding:0 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl th.sorted{color:var(--t1)}
+.tbl th .row{gap:4px}
+.tbl td{height:32px;padding:0 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;color:var(--t2)}
+.tbl td.p{color:var(--t1)}
+.tbl th:first-child,.tbl td:first-child{padding-left:12px}
+.tbl th:last-child,.tbl td:last-child{padding-right:12px}
+.tbl tr.sel-r td{background:var(--ac-bg);color:var(--t1)}
+.tbl tr.hov-r td{background:var(--raised)}
+.tbl .num{text-align:right}
+.tbl .num .row{justify-content:flex-end}
+.sw{width:8px;height:8px;border-radius:2px;flex:none;display:inline-block}
+
+/* inspector */
+.sec{padding:8px 0;border-bottom:1px solid var(--line)}
+.sec-h{height:24px;display:flex;align-items:center;gap:4px;padding:0 12px 0 8px;font-weight:500;color:var(--t1)}
+.sec-h svg{color:var(--t3)}
+.prop{height:28px;display:grid;grid-template-columns:92px 1fr;align-items:center;padding:0 12px 0 28px;gap:8px}
+.prop>span:first-child{color:var(--t2);white-space:nowrap}
+.val{height:24px;background:var(--raised);border-radius:4px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;color:var(--t1);white-space:nowrap}
+.val i{font-style:normal;color:var(--t3);font-size:12px;line-height:16px}
+.val.ro{background:none;padding:0 8px}
+.val.foc{box-shadow:0 0 0 1px var(--ac),0 0 0 3px var(--ring)}
+.tooltip{position:absolute;background:var(--active);color:var(--t1);border-radius:6px;padding:4px 8px;font-size:12px;line-height:16px;display:flex;gap:8px;align-items:center;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.4);z-index:5}
+.toast{position:absolute;background:var(--hover);border-radius:8px;padding:8px 8px 8px 12px;display:flex;align-items:center;gap:8px;box-shadow:inset 0 0 0 1px var(--line),0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.4);white-space:nowrap;z-index:5}
+
+/* viewport */
+.vp{position:relative;overflow:hidden;background:#000}
+.vp img{position:absolute;display:block}
+.vp-tag{position:absolute;background:rgba(11,12,14,.82);color:var(--t1);border-radius:4px;padding:2px 8px;font-size:12px;line-height:16px;white-space:nowrap}
+.overlay{position:absolute;inset:0;pointer-events:none}
+
+/* timeline */
+.tl-bar{height:36px;display:flex;align-items:center;padding:0 8px;gap:4px;border-bottom:1px solid var(--line)}
+.play{width:28px;height:28px;border-radius:6px;background:var(--hover);color:var(--t1);display:flex;align-items:center;justify-content:center}
+
+/* code */
+.code{font:400 12px/20px var(--mono);color:#C8CDD5}
+.cl{display:grid;grid-template-columns:36px 36px 20px 1fr;height:20px;white-space:pre}
+.cl .n{color:var(--t4);text-align:right;padding-right:8px}.cl .g{text-align:center;color:var(--t3)}
+.cl.del{background:rgba(229,83,75,.12)}.cl.del .n,.cl.del .g{color:var(--red-t)}
+.cl.add{background:rgba(63,166,106,.12)}.cl.add .n,.cl.add .g{color:var(--grn-t)}
+.k{color:#B9A3F0}.fn{color:#8DB4F5}.str{color:#9CCB9A}.lens{height:20px;display:flex;align-items:center;gap:8px;padding-left:92px;font:400 12px/16px var(--sans);color:var(--t3)}.tgr{color:var(--grn-t)}.nu{color:#E2B27A}.cm{color:#6B727D}.se{color:#7FB7C9}
+</style></head><body>
+<header class="title"><div class="lights"><i></i><i></i><i></i></div><div class="brand"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#ECEEF1" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M9.5 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V6.5"/><path d="M13.5 2.5 9.8 6.2l.9 1.9-2.3.2-.6 2.2-3.3 2.9"/></svg>CrashLab</div><div class="crumb"><span class="c3">/</span>&nbsp;Dubai tower robot<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></div>
+<div class="cmdk"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg><span class="grow">Search worlds, files and commands</span><kbd>⌘K</kbd></div>
+<div class="grow"></div><div class="row gap4"><span class="bdg plain b-n">Simulated</span><div class="vr"></div><span class="ib"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" /></svg></span><span class="ib"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M15 3v18" /></svg></span><span class="ib"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg></span><span class="avatar">VL</span></div></header>
+<div class="shell"><aside class="chat"><div class="chat-h"><span class="m" style="margin-right:4px">First tests</span><svg class="c3" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg><span class="grow"></span><span class="ib"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="M12 5v14" /></svg></span><span class="ib"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg></span><span class="ib"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg></span></div>
+<div class="chat-b"><div class="u">Send what we did not test to a bounty.</div><div class="steps"><div class="st"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Listed gaps</span><span class="meta">7</span></div><div class="st"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Drafted bounty</span></div><div class="st"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Funded local ledger</span><span class="meta">1,000</span></div><div class="st"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Ran gate on submissions</span><span class="meta">3 of 4</span></div></div><div class="a"><p>Testers sent 4 worlds. Submission 3 passed the gate: the failure repeated 7 of 8 times and the reference twin passed.</p><p>It pays 100 from the local ledger. Nothing moves on chain.</p></div><div class="card"><div class="card-h"><span class="t14 m grow">Propose payout</span><span class="bdg plain b-ac">Needs approval</span></div>
+      <div class="card-b"><div class="kv"><span>Submission</span><span>3</span></div><div class="kv"><span>New failure</span><span><span class="mono">slip_distance</span></span></div><div class="kv"><span>Amount</span><span>100 test units</span></div><div class="kv"><span>Dispute window</span><span>60 s</span></div></div>
+      <div class="card-f"><span class="btn btn-p">Propose</span><span class="btn btn-s">Hold</span><span class="btn btn-g">See replay</span></div></div><div class="a"><p>After you propose, a 60 s dispute window opens. I did not check 3 things, and they are listed with the verdict.</p></div><div class="sugg"><div class="sg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 10 20 15 15 20" /><path d="M4 4v7a4 4 0 0 0 4 4h12" /></svg>Show the replay of submission 3</div><div class="sg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 10 20 15 15 20" /><path d="M4 4v7a4 4 0 0 0 4 4h12" /></svg>Add a gap to this bounty</div><div class="sg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 10 20 15 15 20" /><path d="M4 4v7a4 4 0 0 0 4 4h12" /></svg>Pause new submissions</div></div></div>
+<div class="comp"><div class="ta">Ask for a change or a new test</div><div class="bar"><span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" /></svg>Bounty</span><span class="grow"></span><span class="btn btn-g btn-sm">Auto<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></span><span class="send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7" /><path d="M12 19V5" /></svg></span></div></div></aside><main class="work"><div class="tabs"><div class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" /></svg>World</div><div class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2" /><path d="M8.5 2h7" /><path d="M7 16h10" /></svg>Test run<span class=n>52</span></div><div class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>Fix</div><div class="tab on"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></svg>Bounty</div><div class="tab file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="m5 12-3 3 3 3" /><path d="m9 18 3-3-3-3" /></svg>controller.py</div><div class="sp"></div><div class="row gap4"><span class="ib"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M12 3v18" /></svg></span><span class="ib"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg></span></div></div>
+    <div class="row gap8" style="height:44px;flex:none;padding:0 12px;border-bottom:1px solid var(--line)">
+      <span class="t14 m nowrap">Find new failures in the window robot</span>
+      <span class="bdg b-a"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22" /><line x1="6" x2="6" y1="18" y2="11" /><line x1="10" x2="10" y1="18" y2="11" /><line x1="14" x2="14" y1="18" y2="11" /><line x1="18" x2="18" y1="18" y2="11" /><polygon points="12 2 20 7 4 7" /></svg>Local ledger. Not on chain.</span>
+      <span class="grow"></span><span class="mono c3">spec 0xb80f33…299f</span><span class="ib s"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg></span>
+      <span class="btn btn-s"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>Share</span><span class="btn btn-s"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3" /></svg>Run the gate</span>
+    </div>
+    <div class="row" style="height:64px;flex:none;border-bottom:1px solid var(--line)"><div style="padding:0 16px;padding-left:12px;"><div class="t12 c2">Cap</div><div class="t20 m">1,000</div></div><div style="padding:0 16px;border-left:1px solid var(--line);"><div class="t12 c2">Per failure</div><div class="t20 m">100</div></div><div style="padding:0 16px;border-left:1px solid var(--line);"><div class="t12 c2">Reserved</div><div class="t20 m">100</div></div><div style="padding:0 16px;border-left:1px solid var(--line);"><div class="t12 c2">Left</div><div class="t20 m">900</div></div><div style="padding:0 16px;border-left:1px solid var(--line);"><div class="t12 c2">Gate needs</div><div class="t20 m">7 of 8</div></div><div style="padding:0 16px;border-left:1px solid var(--line);"><div class="t12 c2">Dispute window</div><div class="t20 m">60 s</div></div><span class="grow"></span><span class="t12 c3" style="padding-right:12px">Amounts in test units</span></div>
+    <div class="grow row" style="align-items:stretch;min-height:0">
+      <div class="grow" style="min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--line);position:relative">
+        <div class="ph"><span style="color:var(--t1)">Submissions</span><span class="c3" style="font-weight:400">4</span><span class="sp"></span><span class="smp">Submission 4 is sample</span></div>
+        <table class="tbl"><colgroup><col style="width:52px"><col style="width:128px"><col style="width:88px"><col><col style="width:116px"><col style="width:104px"></colgroup>
+        <thead><tr><th class="sorted"><span class="row">No.<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg></span></th><th>Tester</th><th>Seed</th><th>Result</th><th>Repeats</th><th>Status</th></tr></thead><tbody><tr><td class="p">4</td><td><span class="mono">0x7ac2…91de</span></td><td>3100031</td><td>Running</td><td><span class="row gap8">—</span></td><td><span class="bdg b-a"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4" /><path d="m16.2 7.8 2.9-2.9" /><path d="M18 12h4" /><path d="m16.2 16.2 2.9 2.9" /><path d="M12 18v4" /><path d="m4.9 19.1 2.9-2.9" /><path d="M2 12h4" /><path d="m4.9 4.9 2.9 2.9" /></svg>In gate</span></td></tr><tr class="sel-r"><td class="p">3</td><td><span class="mono">0xf109…b703</span></td><td>3100024</td><td><span class=mono>slip_distance</span></td><td><span class="row gap8"><svg width="46" height="12" viewBox="0 0 46 12"><rect x="0" y="0" width="4" height="12" rx="1" fill="#C9CED6"/><rect x="6" y="0" width="4" height="12" rx="1" fill="#C9CED6"/><rect x="12" y="0" width="4" height="12" rx="1" fill="#C9CED6"/><rect x="18" y="0" width="4" height="12" rx="1" fill="#C9CED6"/><rect x="24" y="0" width="4" height="12" rx="1" fill="#C9CED6"/><rect x="30" y="0" width="4" height="12" rx="1" fill="#C9CED6"/><rect x="36" y="0" width="4" height="12" rx="1" fill="#C9CED6"/><rect x="42" y="0" width="4" height="12" rx="1" fill="#3A3F48"/></svg>7 of 8</span></td><td><span class="bdg b-g"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Accepted</span></td></tr><tr><td class="p">2</td><td><span class="mono">0xf109…b703</span></td><td>3100011</td><td><span class=mono>no_failure</span></td><td><span class="row gap8">0 of 1</span></td><td><span class="bdg b-r"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>Rejected</span></td></tr><tr><td class="p">1</td><td><span class="mono">0xf109…b703</span></td><td>3100007</td><td><span class=mono>invalid_file</span></td><td><span class="row gap8">—</span></td><td><span class="bdg b-r"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>Rejected</span></td></tr></tbody></table>
+        <div class="ph" style="border-top:0;margin-top:16px;border-top:1px solid var(--line)"><span style="color:var(--t1)">Not tested</span><span class="c3" style="font-weight:400">7 in this bounty</span><span class="sp"></span><span class="smp">Sample list</span></div>
+        <table class="tbl" style="margin-top:0"><colgroup><col style="width:240px"><col></colgroup><thead><tr><th>Gap</th><th>Why the code cannot test it</th></tr></thead><tbody><tr><td class="p">Salt crust on the seal</td><td>Chemistry is not in the model</td></tr><tr><td class="p">Cracked or chipped glass</td><td>No fracture model</td></tr><tr><td class="p">Bird strike</td><td>No impact events</td></tr><tr><td class="p">Tether wear over months</td><td>No ageing model</td></tr><tr><td class="p">Pump wear</td><td>No ageing model</td></tr><tr><td class="p">Facade crane in the path</td><td>No moving obstacles</td></tr><tr><td class="p">Sensor drift</td><td>Noise only, no drift</td></tr></tbody></table>
+        <div class="ph" style="margin-top:16px;border-top:1px solid var(--line)"><span style="color:var(--t1)">Disputes</span><span class="c3" style="font-weight:400">0</span></div>
+        <div class="grow" style="display:flex;align-items:center;padding:0 12px"><div class="row gap12"><span class="ib" style="background:var(--raised);color:var(--t3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8" /><path d="m16 16 6-6" /><path d="m8 8 6-6" /><path d="m9 7 8 8" /><path d="m21 11-8-8" /></svg></span><div><div class="m">No disputes yet</div><div class="c2">They appear here when the window opens.</div></div></div></div>
+        <div class="toast" style="right:12px;bottom:12px"><svg class="tgr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg><span>Gate finished for submission 3</span><span class="btn btn-g btn-sm">View</span></div>
+      </div>
+      <div style="width:336px;flex:none;display:flex;flex-direction:column;overflow:hidden">
+        <div class="ph"><span style="color:var(--t1)">Verdict, submission 3</span><span class="sp"></span><span class="ib s"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></span></div>
+        <div style="padding:12px 12px 8px">
+          <div class="row gap8"><span style="color:var(--grn-t)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.875" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg></span><span class="t16 m">Accepted</span></div>
+          <p class="c2" style="margin-top:4px">New <span class="mono">slip_distance</span> failure. It repeated on jittered re-runs and the reference twin passed.</p>
+        </div>
+        <div style="padding:0 12px 8px"><div class="kv"><span>Repeats</span><span>7 of 8</span></div><div class="kv"><span>Gate needs</span><span>7</span></div><div class="kv"><span>Reference twin</span><span>Pass</span></div><div class="kv"><span>Sim runs</span><span>10</span></div><div class="kv"><span>Time</span><span>48.2 s</span></div></div>
+        <div class="ph" style="border-top:1px solid var(--line)"><span>Ledger</span><span class="sp"></span><span class="c3" style="font-weight:400">Step 4 of 6</span></div>
+        <div style="padding:8px 12px"><div class="row gap8" style="position:relative;height:28px"><div style="position:absolute;left:7.5px;top:20px;bottom:-4px;width:1px;background:var(--line2)"></div><span style="color:var(--grn-t)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.875" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg></span><span class="grow " style="color:var(--t2)">Drafted</span><span class="t12 c3">7 gaps</span></div><div class="row gap8" style="position:relative;height:28px"><div style="position:absolute;left:7.5px;top:20px;bottom:-4px;width:1px;background:var(--line2)"></div><span style="color:var(--grn-t)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.875" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg></span><span class="grow " style="color:var(--t2)">Funded</span><span class="t12 c3">1,000 test units</span></div><div class="row gap8" style="position:relative;height:28px"><div style="position:absolute;left:7.5px;top:20px;bottom:-4px;width:1px;background:var(--line2)"></div><span style="color:var(--grn-t)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.875" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg></span><span class="grow " style="color:var(--t2)">Submission accepted</span><span class="t12 c3">Submission 3</span></div><div class="row gap8" style="position:relative;height:28px"><div style="position:absolute;left:7.5px;top:20px;bottom:-4px;width:1px;background:var(--line2)"></div><span style="color:var(--ac-t)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.875" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="1" /></svg></span><span class="grow m" style="color:var(--t1)">Payout proposed</span><span class="t12 c3">Waiting for you</span></div><div class="row gap8" style="position:relative;height:28px"><div style="position:absolute;left:7.5px;top:20px;bottom:-4px;width:1px;background:var(--line2)"></div><span style="color:var(--t4)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.875" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /></svg></span><span class="grow " style="color:var(--t3)">Dispute window</span><span class="t12 c3">60 s</span></div><div class="row gap8" style="position:relative;height:28px"><span style="color:var(--t4)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.875" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /></svg></span><span class="grow " style="color:var(--t3)">Paid</span><span class="t12 c3">100 test units</span></div></div>
+        <div class="row gap8" style="padding:4px 12px 12px"><span class="btn btn-s" style="flex:1">Propose payout</span><span class="btn btn-d">Pay</span></div>
+        <div class="ph" style="border-top:1px solid var(--line)"><span>Not checked</span><span class="c3" style="font-weight:400">3</span></div>
+        <div class="c2" style="padding:8px 12px">
+          <div class="row gap8" style="height:24px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><line x1="9" x2="15" y1="15" y2="9" /></svg>World ID of the submitter</div>
+          <div class="row gap8" style="height:24px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><line x1="9" x2="15" y1="15" y2="9" /></svg>Collusion with the company</div>
+          <div class="row gap8" style="height:24px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><line x1="9" x2="15" y1="15" y2="9" /></svg>Money left and the deadline</div>
+        </div>
+      </div>
+    </div></main></div>
+<footer class="status"><span class="row"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>Simulated</span><span>Hand-built physics, not checked against real hardware</span><span class="grow"></span><span class="row" style="color:var(--t2)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22" /><line x1="6" x2="6" y1="18" y2="11" /><line x1="10" x2="10" y1="18" y2="11" /><line x1="14" x2="14" y1="18" y2="11" /><line x1="18" x2="18" y1="18" y2="11" /><polygon points="12 2 20 7 4 7" /></svg>Local ledger. Not on chain.</span><span>AI calls 4 of 10</span><span class="mono" style="font-size:12px">sim 0e36d3bf</span></footer>
+</body></html>
