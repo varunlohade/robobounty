@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { openChrome, wait } from '../../lab/tools/browser.mjs';
 
-const BASE = 'http://localhost:5199';
+const BASE = `http://localhost:${process.env.CRASHLAB_WEB_PORT ?? 5199}`; // scripts/demo.sh's --ports picks another.
 const OUT = process.argv[2] ?? 'design/site2';
 mkdirSync(OUT, { recursive: true });
 const PAGES = ['home', 'crashlab', 'data', 'providers'];
@@ -156,7 +156,7 @@ for (const pack of ['inspection', 'window']) {
   await wait(250);
   await shot(`live-crashlab-${pack}`);
   await ev(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Open CrashLab').click()`);
-  await wait(3500);
+  await until(`location.pathname === '/lab.html' && !!document.querySelector('.lab-title a')`, 'the lab page', 60).catch(() => null);
   say((await ev(`location.pathname`)) === '/lab.html', `Open CrashLab reaches lab.html for ${pack}`);
   say((await ev(`sessionStorage.getItem('crashlab-pack')`)) === pack, `lab.html has ${pack} preselected`);
   say(await ev(`[...document.querySelectorAll('.lab-title a')].some(a => a.getAttribute('href') === 'home.html')`), 'lab has a way home');
