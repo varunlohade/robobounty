@@ -141,7 +141,7 @@ class Chat:
         raise TimeoutError(f"no idle in {seconds} s. Said: {self.lines()[-4:]}")
 
     def state(self):
-        return self.call("GET", f"/api/sessions/{self.sid}/state")[1]
+        return {k: v for k, v in self.call("GET", f"/api/sessions/{self.sid}/state")[1].items() if k in ("phase", "busy")}  # /state also names the engine and pack, which these checks do not compare.
 
     def say(self, text, seconds=120):
         """Sends a message, answers any quick question, and returns the seconds until the chat is idle."""
