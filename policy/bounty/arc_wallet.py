@@ -41,6 +41,7 @@ CONFIG_TTL_S = 20
 DEMO_FIX = HERE / "fixtures" / "fix5" / "good_match_fan.py"
 DEMO_GROUP = "stalled"
 DEMO_SESSION = "0000000000000000000000000a4c0001"
+REJECT_LATE = "The company's signed rejection did not reach the chain in the dispute window, so the agent will not finalize or pay this fix. The contract still lets anyone finalize, and the engineer can then claim."
 
 
 class Reader(M.ArcChain):
@@ -174,6 +175,11 @@ def check_cap(root, bounty_id, pay):
         raise M.ArcError("over_cap", "This pay is above what is left of ARC_CAP_USDC, so nothing was sent." + M.NOT_PAID)
 
 
+def plan_deadlines(folder):
+    path = folder / "arc_plan.json"
+    return json.loads(path.read_text())["deadlines"] if path.is_file() else []
+
+
 def fund_plan(bounty_id, root):
     """The exact call the company's wallet sends. The server chooses every field, then checks the receipt against them."""
     value = need_on(root)
@@ -184,8 +190,11 @@ def fund_plan(bounty_id, root):
     pay = money["per_failure"] * A.TOKEN_UNIT
     check_cap(root, bounty_id, pay)
     chain = reader()
+    deadline = chain.now() + A.DEADLINE_S
+    with B.locked(folder / ".lock"):
+        B.write_json(folder / "arc_plan.json", {"deadlines": plan_deadlines(folder) + [deadline]})
     return {"contract": value["contract"], "usdc": M.USDC, "resolver": value["resolver"], "arbiter": value["arbiter"], "spec_hash": money["spec_hash"], "cap": str(pay), "per_failure": str(pay), "top_prize": "0",
-            "deadline": str(chain.now() + A.DEADLINE_S), "grace": str(A.GRACE_S), "dispute_window": str(money["dispute_window_s"]), "fee_wei": str(chain.fee_wei()), "chain_hex": value["chain_hex"]}
+            "deadline": str(deadline), "grace": str(A.GRACE_S), "dispute_window": str(money["dispute_window_s"]), "fee_wei": str(chain.fee_wei()), "chain_hex": value["chain_hex"]}
 
 
 def _word(data, i):
@@ -215,10 +224,11 @@ def verify_funded(bounty_id, create_tx, approve_tx, root):
     log = logs[0]
     chain_bounty, company = int(log["topics"][1], 16), _address_word(log["topics"][2])
     data = log["data"]
-    fields = {"resolver": _address_word(_word(data, 0)), "arbiter": _address_word(_word(data, 1)), "spec": "0x" + _word(data, 2), "cap": int(_word(data, 3), 16), "per": int(_word(data, 4), 16), "window": int(_word(data, 8), 16)}
-    want = {"resolver": value["resolver"].lower(), "arbiter": value["arbiter"].lower(), "spec": money["spec_hash"].lower(), "cap": pay, "per": pay, "window": money["dispute_window_s"]}
-    if fields != want:
-        raise B.BoardError("tx_wrong_fields", "That bounty's roles, spec or amounts differ from this board's, so it does not fund this bounty.")
+    deadline = int(_word(data, 6), 16)
+    fields = {"resolver": _address_word(_word(data, 0)), "arbiter": _address_word(_word(data, 1)), "spec": "0x" + _word(data, 2), "cap": int(_word(data, 3), 16), "per": int(_word(data, 4), 16), "top": int(_word(data, 5), 16), "refund_opens": int(_word(data, 7), 16), "window": int(_word(data, 8), 16)}
+    want = {"resolver": value["resolver"].lower(), "arbiter": value["arbiter"].lower(), "spec": money["spec_hash"].lower(), "cap": pay, "per": pay, "top": 0, "refund_opens": deadline + A.GRACE_S, "window": money["dispute_window_s"]}
+    if fields != want or deadline not in plan_deadlines(folder):
+        raise B.BoardError("tx_wrong_fields", "That bounty's roles, spec, amounts or times differ from this board's plan, so it does not fund this bounty.")
     row = chain.read(value["contract"], BOUNTY_READ, chain_bounty).split("\n")
     if row[0].lower() != company or row[3].lower() != money["spec_hash"].lower():
         raise B.BoardError("tx_wrong_fields", "The contract does not hold this bounty as the receipt says.")
@@ -264,7 +274,7 @@ def request_reject(bounty_id, n, nonce, signature, root):
     folder = X.folder_of(bounty_id, root)
     funding = funding_of(folder)
     steps = steps_of(folder, n)
-    if not funding or steps.get("state") != "Pending":
+    if not funding or steps.get("state") != "Pending" or reader().now() >= (steps.get("dispute_ends_at") or 0):
         raise B.BoardError("wrong_state", "This fix is not in its dispute window on chain.")
     if not signer_ok(funding["company"], reject_message(bounty_id, n, nonce), signature):
         raise B.BoardError("bad_signature", "That signature is not from the wallet that funded this bounty. Connect that wallet and try again.")
@@ -307,6 +317,7 @@ def advance(chain, root, bounty_id, n, contract):
     status, ends, submitter = chain.failure(chain_bounty, fingerprint, contract)
     steps.update(fix=n, chain_bounty=chain_bounty, fingerprint=fingerprint, submitter=wallet, amount_base_units=numbers["pay"], state=status if status != "None" else None, dispute_ends_at=ends or None, recorded=bool(row["result"].get("recorded")), message=None, chain_now=chain.now())
     moved = False
+    request = folder / "fixes" / str(n) / "arc_reject.json"
     if status == "None":
         check_cap(root, bounty_id, numbers["pay"])
         on_chain = chain.read(contract, BOUNTY_READ, chain_bounty).split("\n")
@@ -315,9 +326,10 @@ def advance(chain, root, bounty_id, n, contract):
         steps["balance_before"] = chain.read_int(M.USDC, "balanceOf(address)(uint256)", wallet)
         chain.send("propose", RESOLVER, contract, "propose(uint256,address,bytes32,bytes32,bool)", chain_bounty, wallet, fingerprint, numbers["result_hash"], "false")
         moved = True
+    elif status in ("Pending", "Finalized") and request.is_file() and (status == "Finalized" or chain.now() >= ends):
+        steps["message"] = REJECT_LATE
     elif status == "Pending":
-        request = folder / "fixes" / str(n) / "arc_reject.json"
-        if request.is_file() and chain.now() < ends:
+        if request.is_file():
             asked = json.loads(request.read_text())
             if not signer_ok(funding["company"], reject_message(bounty_id, n, asked["nonce"]), asked["signature"]):
                 raise M.ArcError("bad_signature", "The reject request has no good signature from the company's wallet, so the arbiter sent nothing." + M.NOT_PAID)
@@ -334,7 +346,7 @@ def advance(chain, root, bounty_id, n, contract):
         moved = True
     elif status == "Rejected" and not steps.get("ledger_rejected"):
         try:
-            X.ledger_step(bounty_id, n, "reject", root=root)
+            X.ledger_step(bounty_id, n, "chain_reject", root=root)
             steps["ledger_rejected"] = True
         except B.BoardError:
             steps["ledger_rejected"] = False
@@ -453,6 +465,7 @@ def main():
         M.cap_units()
         if saved["label"] != label_of(chain.real) or saved["resolver"] != chain.addresses[RESOLVER] or saved["arbiter"] != chain.addresses[ARBITER]:
             raise M.ArcError("wrong_deploy", "Refused: arc.json names another network or other wallets than ARC_RPC_URL and ARC_WALLET_DIR.")
+        chain.gas_ready(ARBITER)
         if a.command == "check":
             print(f"{label_of(chain.real)} Ready. Contract {saved['contract']}. {AGENT_NAME}: {chain.addresses[RESOLVER]}.")
             return 0

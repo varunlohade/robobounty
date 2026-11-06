@@ -11,7 +11,7 @@ POST /api/bounties/fix                     {session, campaign, group, title, pay
 POST /api/bounties/<id>/fix                {source}. An engineer session; the tester id comes from it. The server sets every other field. Any other field is refused. The reply holds claim_secret, once.
 POST /api/bounties/<id>/fixes/<n>/approve|decline|reject|finalize   {}
 POST /api/bounties/<id>/fixes/<n>/claim    {secret}. An engineer session.
-POST /api/budget/stop                      {}. A company session.
+POST /api/budget/stop                      {}. The company that deposited the budget.
 """
 import queue
 import re
@@ -32,7 +32,7 @@ MAX_STEP_BODY = 256
 POST_FIELDS = {"session", "campaign", "group", "title", "pay"}
 FIX_FIELDS = {"source"}
 ERROR_STATUS = {"unknown_campaign": 404, "already_posted": 409, "campaign_published": 409, "not_fixable": 409, "campaign_stale": 409, "no_hidden_worlds": 409, "cap_reached": 409, "same_source": 409, "source_too_large": 413, "wrong_state": 409, "queue_full": 503,
-                "bad_secret": 403, "on_chain": 409, "not_funded": 409, "no_wallet": 409, "budget_stopped": 409, "over_budget": 409, "over_per_bounty": 409, "no_budget": 404, "not_found": 404, "budget_mismatch": 409}
+                "bad_secret": 403, "on_chain": 409, "not_funded": 409, "no_wallet": 409, "budget_stopped": 409, "over_budget": 409, "over_per_bounty": 409, "no_budget": 404, "not_your_budget": 403, "not_found": 404, "budget_mismatch": 409}
 PUBLIC_FILES = {"manifest.json": "application/json", "model.xml": "application/xml", "qpos.json": "application/json", "result.json": "application/json", "world.json": "application/json",
                 "controller.py.txt": "text/plain", "trace.json": "application/json", "wind.json": "application/json", "dirt.bin": "application/octet-stream"}
 ONE = re.compile(r"/api/bounties/([0-9]{1,9})")
@@ -116,8 +116,10 @@ def _post(h, root):
         B.set_owner(made["id"], s["account_id"], root)
         h.reply(201, {**made, "mine": True})
     elif path == "/api/budget/stop":
-        h.need("company")
+        s = h.need("company")
         h.body(MAX_STEP_BODY, set())
+        if budget.view(root)["funded"] and budget.owner_of(root) != s["account_id"]:
+            raise B.BoardError("not_your_budget", "Only the company that deposited this budget can stop it.")
         h.reply(200, budget.stop(root))
     elif m := SUBMIT.fullmatch(path):
         bounty_id = int(m[1])

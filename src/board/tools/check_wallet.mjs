@@ -51,6 +51,12 @@ mkdirSync(boardRoot, { recursive: true });
 const env = { ...process.env, ARC_RPC_URL: RPC, ARC_WALLET_DIR: keys, ARC_CAP_USDC: '2' };
 console.log(execFileSync(PY, [join(ROOT, 'policy/bounty/arc_wallet.py'), 'deploy', '--yes', '--root', boardRoot], { env, encoding: 'utf8' }).split('\n').filter(l => /"contract": "0x/.test(l)).join(''));
 const CONTRACT = JSON.parse(readFileSync(join(boardRoot, 'arc.json'), 'utf8')).contract;
+const agentCheck = () => { try { return { code: 0, out: execFileSync(PY, [join(ROOT, 'policy/bounty/arc_wallet.py'), 'check', '--root', boardRoot], { env, encoding: 'utf8' }) }; } catch (e) { return { code: e.status, out: String(e.stdout) }; } };
+rpc('anvil_setBalance', ARBITER, '0x0');
+const noGas = agentCheck();
+rpc('anvil_setBalance', ARBITER, '0x56bc75e2d63100000');
+check('the agent refuses to start when the arbiter has no gas', noGas.code === 1 && noGas.out.includes('arbiter wallet has too little'), noGas.out);
+check('and starts when the arbiter has gas', agentCheck().code === 0);
 
 const log = [];
 const demo = spawn('bash', [join(ROOT, 'scripts/demo.sh'), '--recorded', '--arc', '--ports', `${webPort},${runPort},${sitePort},${boardPort}`, '--board-root', boardRoot], { stdio: ['ignore', 'pipe', 'pipe'], env });
@@ -88,6 +94,7 @@ const TEST_WALLET = `(() => {
         const selector = params[0].data.slice(0, 10);
         popup('tx:' + selector);
         if (s.chain !== ${JSON.stringify(CHAIN)}) throw new Error('The page sent a transaction on the wrong chain');
+        if (params[0].chainId !== ${JSON.stringify(CHAIN)}) throw new Error('The page sent a transaction with no Arc chain id');
         if (s.rejectTx === selector) throw refuse();
         return forward('eth_sendTransaction', [s.revertTx === selector ? { ...params[0], gas: '0xea60' } : params[0]]);
       }
@@ -112,7 +119,7 @@ const stepTx = name => c.js(`[...document.querySelectorAll('[data-step="${name}"
 const shot = async name => { await wait(300); await c.shot(join(OUT, `wallet-${name}.png`)); };
 const showChain = () => c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent === 'On chain')?.scrollIntoView({ block: 'start' })`);
 const login = async (role, next = 'bounties.html') => {
-  await go(`login.html?switch=1&next=${encodeURIComponent(next)}`);
+  await go(`login.html?seed=1&switch=1&next=${encodeURIComponent(next)}`);
   const label = role === 'company' ? 'Demo company' : 'Demo engineer';
   const find = `[...(document.querySelector('.lg-sheet')?.querySelectorAll('button, a') ?? [])].find(n => n.textContent.trim().startsWith(${JSON.stringify(label)}))`;
   await c.until(`!!${find}`, label, 30);
@@ -186,6 +193,13 @@ try {
   check('reverted tx: the page does not show funded', (await stepState('funded')) === 'live' && !existsSync(join(boardRoot, '1/arc_funding.json')));
   await shot('reverted-tx');
   unlocked(COMPANY, USDC, 'approve(address,uint256)', CONTRACT, '0');
+
+  // Another tab moved the wallet to mainnet after the page switched it.
+  await setWallet({ account: COMPANY, chain: '0x1', connected: true, added: true });
+  await clearPopups();
+  const plan = (await boardPost('/api/arc/bounties/1/plan', {})).body;
+  const moved = await c.js(`import('/src/board/wallet.ts').then(w => w.sendCreate(${JSON.stringify(COMPANY)}, ${JSON.stringify(plan)})).then(() => 'sent', e => e.message)`);
+  check('a wallet on another network: the send is refused before any popup', moved.includes('another network') && !(await popups()).some(p => p.startsWith('tx:')), moved);
 
   await setWallet({ account: COMPANY, chain: CHAIN, connected: true, added: true });
   await clearPopups();
@@ -274,7 +288,7 @@ try {
   check('double pay: a claim after the payout reverts', refused(ENGINEER, 'claim(uint256,bytes32)'));
   await setWallet({ account: ENGINEER, chain: CHAIN, connected: true, added: true, revertTx: cast('sig', 'claim(uint256,bytes32)') });
   const claimData = cast('calldata', 'claim(uint256,bytes32)', '1', fp);
-  const claimTx = await c.js(`ethereum.request({ method: 'eth_sendTransaction', params: [{ from: ${JSON.stringify(ENGINEER)}, to: ${JSON.stringify(CONTRACT)}, data: ${JSON.stringify(claimData)} }] })`);
+  const claimTx = await c.js(`ethereum.request({ method: 'eth_sendTransaction', params: [{ from: ${JSON.stringify(ENGINEER)}, to: ${JSON.stringify(CONTRACT)}, data: ${JSON.stringify(claimData)}, chainId: ${JSON.stringify(CHAIN)} }] })`);
   for (let i = 0; i < 20 && !JSON.parse(rpc('eth_getTransactionReceipt', claimTx)); i++) await wait(500);
   check('double claim: the tx reverts on chain', BigInt(receipt(claimTx).status) === 0n);
   const again = await boardPost('/api/arc/bounties/1/fixes/1/claimed', { tx: claimTx });
@@ -298,6 +312,18 @@ try {
   check('reject: the money stays in the contract and the engineer got none of it', usdc(CONTRACT) === 1_000_000n && usdc(ENGINEER) === 1_000_000n);
   await showChain();
   await shot('rejected');
+
+  // A bounty the company made with other times or prizes than the plan does not fund this one.
+  const money = JSON.parse(readFileSync(join(boardRoot, '2/ledger.json'), 'utf8')).bounty;
+  const planned = JSON.parse(readFileSync(join(boardRoot, '2/arc_plan.json'), 'utf8')).deadlines.at(-1);
+  unlocked(COMPANY, USDC, 'mint(address,uint256)', COMPANY, '3000000');
+  unlocked(COMPANY, USDC, 'approve(address,uint256)', CONTRACT, '3000000');
+  const soon = Number(cast('block', 'latest', '--field', 'timestamp', '--rpc-url', RPC)) + 5;
+  for (const [what, deadline, grace, top] of [['a 5 s deadline', soon, 3600, 0], ['a short grace', planned, money.dispute_window_s, 0], ['a top prize', planned, 3600, 1_000_000]]) {
+    const tx = JSON.parse(unlocked(COMPANY, CONTRACT, 'createBounty(address,address,bytes32,uint256,uint256,uint256,uint64,uint64,uint64)', RESOLVER, ARBITER, money.spec_hash, '1000000', '1000000', String(top), String(deadline), String(grace), String(money.dispute_window_s), '--json')).transactionHash;
+    const answer = await boardPost('/api/arc/bounties/2/funded', { create_tx: tx });
+    check(`${what} does not fund a bounty`, answer.status === 409 && answer.body.error === 'tx_wrong_fields', JSON.stringify(answer));
+  }
 
   // The cap, in code, before any send.
   await postBounty('Third bounty over the cap', 'coverage', 1).catch(() => null);

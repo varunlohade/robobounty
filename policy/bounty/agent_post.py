@@ -47,11 +47,18 @@ def limits_of(plan, fields):
     return limits
 
 
+def _own(bounty_id, root):
+    """An agent's bounty belongs to the company that deposited the budget. With no such company, nobody owns it."""
+    if budget.owner_of(root):
+        B.set_owner(bounty_id, budget.owner_of(root), root)
+
+
 def post_fix(session, cid, group, status, pay, root, runs):
     what = f"fix_failure {session[:8]}/{cid}/{group}"
     budget.check(pay, what, root)
     view = X.post(session, cid, group, f"Fix {group.replace('_', ' ')}: the AI could not", COMPANY, pay, posted_by="agent", root=root, runs=runs)
     budget.hold(view["id"], pay, what, root)
+    _own(view["id"], root)
     return {"kind": "fix_failure", "posted": True, "id": view["id"], "group": group, "trigger": status, "pay": pay}
 
 
@@ -61,6 +68,7 @@ def post_find(factor, fields, plan, pay, root):
     limits = limits_of(plan, fields)
     view = B.post(f"Find a new failure: {factor[:80]}", COMPANY, [factor[:300]], pay, pay, limits, root=root)
     budget.hold(view["id"], pay, what, root)
+    _own(view["id"], root)
     return {"kind": "find_failure", "posted": True, "id": view["id"], "pay": pay, "limits": limits}
 
 

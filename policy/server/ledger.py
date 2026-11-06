@@ -64,6 +64,17 @@ class Ledger:
         self.bounty["available"] += row["amount"]
         self._save()
 
+    def reject_from_chain(self, fingerprint):
+        """The chain already rejected this fix and the chain holds the money, so this file's clock and earlier states give way. A Claimed row keeps its refusal."""
+        row = self.failures.get(fingerprint)
+        if row and row["status"] == "Rejected":
+            return
+        if not row or row["status"] not in ("Pending", "Finalized"):
+            raise LedgerError("WrongStatus")
+        row["status"] = "Rejected"
+        self.bounty["available"] += row["amount"]
+        self._save()
+
     def finalize(self, fingerprint, now=None):
         row = self._pending(fingerprint)
         if (time.time() if now is None else now) < row["dispute_ends_at"]:

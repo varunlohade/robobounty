@@ -9,6 +9,7 @@ export class WalletError extends Error {}
 const NO_WALLET = 'No browser wallet found. Install MetaMask or Rabby, then reload this page.';
 const RECEIPT_MS = 120_000;
 const TIP_WEI = 1_000_000_000n;
+const ARC_TESTNET = '0x4cef52'; // 5042002. Fixed here, so a page or server fault cannot move a send to another chain.
 
 const codeOf = (e: any): number | undefined => e?.code ?? e?.data?.originalError?.code ?? e?.cause?.code;
 function plain(e: unknown, rejected: string): Error {
@@ -68,7 +69,9 @@ export async function sign(address: string, message: string) {
 // A wallet that sets too low a fee on Arc gets dropped with no error, so the server's fee goes along with each send.
 async function send(address: string, to: string, data: string, plan: { fee_wei: string }, what: string): Promise<string> {
   const fee = BigInt(plan.fee_wei);
-  return ask('eth_sendTransaction', [{ from: address, to, data, maxFeePerGas: `0x${fee.toString(16)}`, maxPriorityFeePerGas: `0x${(TIP_WEI < fee ? TIP_WEI : fee).toString(16)}` }], `You rejected the ${what} in your wallet. Nothing was sent.`);
+  const chain = String(await ask('eth_chainId', [], `You rejected the ${what} in your wallet. Nothing was sent.`)).toLowerCase();
+  if (chain !== ARC_TESTNET) throw new WalletError('Your wallet is on another network, so nothing was sent. Press the button again to switch back.');
+  return ask('eth_sendTransaction', [{ from: address, to, data, chainId: ARC_TESTNET, maxFeePerGas: `0x${fee.toString(16)}`, maxPriorityFeePerGas: `0x${(TIP_WEI < fee ? TIP_WEI : fee).toString(16)}` }], `You rejected the ${what} in your wallet. Nothing was sent.`);
 }
 
 export async function waitReceipt(tx: string, what: string) {

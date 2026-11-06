@@ -1,4 +1,4 @@
-"""The agent's capped budget. budget.json {cap, held, spent, stopped, per_bounty_max, by_bounty} and spend.jsonl, one row per decision. LOCAL. NOT ON CHAIN. Test units only.
+"""The agent's capped budget. budget.json {cap, held, spent, stopped, per_bounty_max, by_bounty, owner} and spend.jsonl, one row per decision. LOCAL. NOT ON CHAIN. Test units only.
 
 Code holds money when a bounty is posted and spends it on a claim. The agent chooses no payout: the gate result and the ledger do.
 """
@@ -24,8 +24,8 @@ def _log(root, **row):
         f.write(json.dumps({"at": time.time(), **row}) + "\n")
 
 
-def fund(cap, per_bounty_max, root=B.ROOT):
-    """Sets the company's budget once. A second fund is refused, so a cap cannot grow behind the log."""
+def fund(cap, per_bounty_max, root=B.ROOT, owner=None):
+    """Sets the company's budget once. A second fund is refused, so a cap cannot grow behind the log. owner is the depositing company's account. With none, no company can stop this budget."""
     cap, per = B._amount(cap, "The budget cap"), B._amount(per_bounty_max, "The per-bounty limit")
     if per > cap:
         raise B.BoardError("bad_budget", "The per-bounty limit cannot be above the cap.")
@@ -33,7 +33,7 @@ def fund(cap, per_bounty_max, root=B.ROOT):
     with B.locked(Path(root) / ".budget.lock"):
         if _path(root).is_file():
             raise B.BoardError("budget_exists", "This board already has a budget.")
-        B.write_json(_path(root), {"cap": cap, "held": 0, "spent": 0, "stopped": False, "per_bounty_max": per, "by_bounty": {}})
+        B.write_json(_path(root), {"cap": cap, "held": 0, "spent": 0, "stopped": False, "per_bounty_max": per, "by_bounty": {}, "owner": owner})
         _log(root, kind="fund", amount=cap, per_bounty_max=per)
     return view(root)
 
@@ -42,7 +42,13 @@ def view(root=B.ROOT):
     if not _path(root).is_file():
         return {"funded": False, "ledger_label": B.LEDGER_LABEL}
     saved = json.loads(_path(root).read_text())
+    saved.pop("owner", None)
     return {"funded": True, **saved, "left": saved["cap"] - saved["held"] - saved["spent"], "unit": "test units", "ledger_label": B.LEDGER_LABEL}
+
+
+def owner_of(root=B.ROOT):
+    """The company account that deposited this budget, or None."""
+    return json.loads(_path(root).read_text()).get("owner") if _path(root).is_file() else None
 
 
 def _refuse(root, code, reason, amount, what):

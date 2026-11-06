@@ -407,7 +407,7 @@ def ledger_step(bounty_id, n, step, tester=None, root=B.ROOT, secret=None):
         book = B._ledger(folder)
         before = book.path.read_bytes()
         try:
-            {"reject": book.reject, "finalize": book.finalize}[step](fingerprint) if step != "claim" else book.claim(fingerprint, caller)
+            {"reject": book.reject, "finalize": book.finalize, "chain_reject": book.reject_from_chain}[step](fingerprint) if step != "claim" else book.claim(fingerprint, caller)
         except B.ledger_module.LedgerError as e:
             raise B.BoardError("ledger_refused", f"The ledger refused this: {e}.") from None
         entry = book.failures[fingerprint]

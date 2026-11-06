@@ -23,6 +23,9 @@ sys.path.insert(0, str(HERE))
 import board_fix as X
 import board_fix_gate as FG
 import board_fix_run  # noqa: F401 turns the LLM off, and turns the inspection re-judge on
+import anvil_mirror as AM
+import arc_mirror as M
+import arc_wallet as W
 import board_store as B
 import check_auth_helper as H
 import budget
@@ -248,6 +251,120 @@ def f3_and_secret(root):
     check("find bounty: the right secret is paid", B.ledger_step(made["id"], fp, "claim", "ana", find, secret="find-secret")["status"] == "Claimed")
 
 
+class FakeChain:
+    """Stands in for the RPC only. arc_wallet.advance runs as it is. The contract's two reject rules are here, so a late or failed send acts as on chain."""
+    real = False
+    addresses = ["0x" + "1" * 40, "0x" + "2" * 40]
+
+    def __init__(self, wallet):
+        self.wallet, self.status, self.ends, self.time, self.fail, self.sent, self.txs = wallet, "Pending", 1000, 500, False, [], {}
+
+    def run(self, *args):
+        return "0x" + "ab" * 32
+
+    def read_int(self, *args):
+        return 0
+
+    def now(self):
+        return self.time
+
+    def failure(self, *args):
+        return self.status, self.ends, self.wallet
+
+    def send(self, name, *args):
+        if name == "reject" and (self.fail or self.time >= self.ends):
+            raise M.ArcError("reverted", "The reject transaction reverted." + M.NOT_PAID)
+        self.sent.append(name)
+        self.status = {"reject": "Rejected", "finalize": "Finalized", "payout": "Claimed"}[name]
+
+
+def arc_agent(root):
+    """A signed rejection never turns into a payout, and a chain rejection always reaches the ledger."""
+    agent = root / "arc_agent"
+    agent.mkdir()
+    wallet = "0x" + "3" * 40
+    runs = agent / "runs"
+    small_campaign(runs, [("t", {}, 1, FAKE)], [("h", {}, 2, FAKE)], [("p", {}, 3, FAKE_PASS)])
+    info = X.post(SESSION, "c1", "timed_out", "Arc check", "Check company", 40, root=agent, runs=runs)
+    bid = info["id"]
+    row = X.reserve(bid, "ana", INSPECTION + "\n# a fix\n", agent, secret="s")
+    folder = X.folder_of(bid, agent)
+    result = {"accepted": True, "code": "accepted", "patched_sha256": row["source_sha256"], "sets": {}, "target": []}
+    payout = FG.propose(row, result, folder, agent)
+    X.save_fix({**row, "state": "done", "result": result, "payout": payout, "wallet": wallet}, agent)
+    B.write_json(folder / "arc_funding.json", {"chain_bounty": 1, "company": "0x" + "4" * 40, "cap_base_units": 40 * AM.TOKEN_UNIT})
+    chain = FakeChain(wallet)
+    n = row["n"]
+    step = lambda: W.advance(chain, agent, bid, n, "0x" + "5" * 40)
+    request = folder / "fixes" / str(n) / "arc_reject.json"
+    saved = W.signer_ok, W.need_on, W.reader
+    W.signer_ok, W.need_on, W.reader = (lambda *a: True), (lambda *a: {}), (lambda: chain)
+    try:
+        B.write_json(request, {"nonce": "n", "signature": "s"})
+        chain.fail = True
+        try:
+            step()
+            failed = False
+        except M.ArcError:
+            failed = True
+        check("arc: an arbiter send that fails is said, and nothing else goes out", failed and not chain.sent)
+        chain.fail, chain.time = False, 1000
+        step()
+        check("arc: a signed rejection past the window does not finalize", not chain.sent and chain.status == "Pending" and W.steps_of(folder, n)["message"] == W.REJECT_LATE, W.steps_of(folder, n)["message"])
+        check("arc: and the company cannot sign one in past the window", refused(lambda: W.request_reject(bid, n, "n", "s", agent), "wrong_state"))
+        chain.status = "Finalized"
+        step()
+        check("arc: a signed rejection stops the payout of a fix someone else finalized", not chain.sent and W.steps_of(folder, n)["message"] == W.REJECT_LATE)
+        chain.status, chain.time = "Pending", 500
+        step()
+        check("arc: in the window, the signed rejection goes out", chain.sent == ["reject"] and chain.status == "Rejected", str(chain.sent))
+        request.unlink()
+        chain.status, chain.time, chain.sent = "Pending", 1000, []
+        while step():
+            pass
+        check("arc: with no rejection, the agent still finalizes and pays", chain.sent == ["finalize", "payout"], str(chain.sent))
+    finally:
+        W.signer_ok, W.need_on, W.reader = saved
+
+    with B.locked(folder / ".lock"):
+        book = B._ledger(folder)
+        book.failures[payout["fingerprint"]]["dispute_ends_at"] = time.time() - 1
+        book._save()
+    check("arc: the local button still keeps the local window", refused(lambda: X.ledger_step(bid, n, "reject", root=agent), "ledger_refused"))
+    chain.status = "Rejected"
+    step()
+    held = B._ledger(folder).failures[payout["fingerprint"]]["status"]
+    check("arc: a chain rejection after the local window wins over the ledger", held == "Rejected" and W.steps_of(folder, n)["ledger_rejected"] is True and X.get_fix(bid, n, agent)["payout"]["status"] == "Rejected", held)
+
+
+def budget_owner(root):
+    """Only the company that deposited a budget can stop it, on the real server."""
+    owned, port = root / "budget_owned", ARGS.port + 1
+    budget.fund(100, 50, owned, owner=H.COMPANY)
+    orphan = root / "budget_orphan"
+    budget.fund(100, 50, orphan)
+    other = H.A.board_token(H.A.new_session(H.A.sign_up(f"other{time.time_ns()}@company.example", "correct horse battery", "Other company", "check"), "company"))
+    check("budget: no public view holds the owner", "owner" not in budget.view(owned))
+    for folder, name, codes in ((owned, "owned", {"other": 403, "owner": 200}), (orphan, "with no depositor", {"other": 403, "owner": 403})):
+        log = open(folder / "server.log", "ab")
+        server = subprocess.Popen([str(X.PYTHON), str(HERE / "board_server.py"), "--root", str(folder), "--port", str(port)], stdout=log, stderr=subprocess.STDOUT)
+        try:
+            for _ in range(100):
+                try:
+                    http(port, "GET", "/api/health")
+                    break
+                except OSError:
+                    time.sleep(0.2)
+            status, reply = http(port, "POST", "/api/budget/stop", {}, token=other)
+            check(f"budget {name}: another company cannot stop it", status == codes["other"] and reply.get("error") == "not_your_budget" and not budget.view(folder)["stopped"], f"{status} {reply}")
+            status, reply = http(port, "POST", "/api/budget/stop", {})
+            check(f"budget {name}: the depositing company gets {codes['owner']}", status == codes["owner"] and budget.view(folder)["stopped"] is (codes["owner"] == 200), f"{status}")
+        finally:
+            server.terminate()
+            server.wait()
+            log.close()
+
+
 # The structural part, with real runs. Each hostile tail goes on the end of a controller file, as if the code rules had missed it.
 JUDGE_PATCH = '''
 import packs.inspection.pack as PACK
@@ -307,11 +424,11 @@ def base_run(root, name, world, seed):
     return (name, world, seed, json.loads((out / "job_result.json").read_text()))
 
 
-def http(port, method, path, body=None):
+def http(port, method, path, body=None, token=None):
     bearer = {}
     if method == "POST":
         body, value = H.signed(body)
-        bearer = {"Authorization": value}
+        bearer = {"Authorization": f"Bearer {token}" if token else value}
     data = json.dumps(body).encode() if body is not None else None
     request = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, method=method, headers={"Content-Type": "application/json", "Origin": ORIGIN, **bearer})
     try:
@@ -720,6 +837,8 @@ def main():
     site_rule(root)
     could_not_run(root)
     f3_and_secret(root)
+    arc_agent(root)
+    budget_owner(root)
     if not ARGS.fast:
         full(root)
     print(f"{sum(results)} of {len(results)} passed. Folder {root}", flush=True)

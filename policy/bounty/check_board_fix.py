@@ -290,7 +290,7 @@ def t8(session, cid):
     source = X.SERVER_RUNS / session / "campaigns" / cid
     campaign = runs / session / "campaigns" / cid
     shutil.copytree(source, campaign)
-    budget.fund(100, 30, root)
+    budget.fund(100, 30, root, owner=H.COMPANY)
     groups = ["slip_distance", "false_done", "detach", "coverage", "stalled"]
     made = {}
     for g in groups:
