@@ -101,11 +101,83 @@ check(again["human_id"] == done["human_id"], "the returning proof names the same
 ctx = fresh("b1", SESSION)
 check(code_of(lambda: W.verify(prove_result(ctx["rp_context"]["nonce"]), "b1", SESSION, ENV, db, upstream(True, GOOD))) == "replayed", "a session proof works once")
 
-W.add_login("tok", done["human_id"], "staging", db)
+W.add_login("tok", done["human_id"], "staging", "human", db)
 check(W.login_of("tok", db)["human_id"] == done["human_id"], "a login names its human")
+check(W.login_of("tok", db)["credential"] == "human", "a human login says human")
 check(W.login_of("forged", db) is None and W.login_of(None, db) is None, "a forged token names nobody")
 check(W.login_of("tok", db, now=__import__("time").time() + W.LOGIN_S + 1) is None, "a login expires")
 W.drop_login("tok", db)
 check(W.login_of("tok", db) is None, "sign out ends the login")
+
+# Device mode. Mock replies again: these prove what the server does with a 3.0 reply, not that a real World App proof passes.
+DEV = {**ENV, "WORLD_CREDENTIAL": "device"}
+DEV_GOOD = {"success": True, "environment": "staging", "protocol_version": "3.0", "results": [{"identifier": "device", "success": True}]}
+sent = []
+
+
+def dev_upstream(result, env):
+    sent.append(env)
+    return True, DEV_GOOD
+
+
+def dev_ctx(browser="d1", saved=None):
+    return W.request_context(browser, saved, DEV, db)
+
+
+def dev_result(ctx, **item):
+    nonce = ctx["rp_context"]["nonce"]
+    return {"protocol_version": "3.0", "nonce": nonce, "action": DEV["WORLD_ACTION"], "environment": "production",
+            "responses": [{"identifier": "device", "nullifier": "0x" + "cd" * 16, "merkle_root": "0x1", "proof": "0x1", "signal_hash": W._signal_hash(nonce, DEV), **item}]}
+
+
+def dev_verify(result, browser="d1", post=dev_upstream):
+    return lambda: W.verify(result, browser, None, DEV, db, post)
+
+
+check(W.credential_of(ENV) == "human" and W.status(ENV)["credential"] == "human", "no WORLD_CREDENTIAL means human")
+check(not W.status({**ENV, "WORLD_CREDENTIAL": "orb"})["on"], "an unknown WORLD_CREDENTIAL turns World ID off")
+ctx = fresh()
+check(ctx["credential"] == "human" and "signal" not in ctx, "human mode asks for no device signal")
+ctx = fresh()
+check(code_of(lambda: W.verify(dev_result(ctx), "b1", None, ENV, db, upstream(True, DEV_GOOD))) == "bad_shape", "human mode refuses a device proof")
+
+ctx = dev_ctx()
+check(ctx["credential"] == "device" and ctx["mode"] == "enrol" and ctx["signal"] == ctx["rp_context"]["nonce"], "device mode puts the nonce in the signal")
+check(dev_ctx("d1", SESSION)["mode"] == "enrol", "device mode ignores a saved session, because 3.0 has none")
+check(code_of(dev_verify(enrol_result(ctx["rp_context"]["nonce"]))) == "wrong_credential", "device mode refuses a 4.0 human proof")
+check(code_of(dev_verify(dev_result(ctx, identifier="orb"))) == "wrong_credential", "device mode refuses a legacy orb proof")
+check(code_of(dev_verify(dev_result(ctx, identifier="selfie"))) == "wrong_credential", "device mode refuses a selfie proof")
+check(code_of(dev_verify({**dev_result(ctx), "action": "other"})) == "wrong_action", "device mode refuses another action")
+check(code_of(dev_verify(dev_result(ctx, signal_hash="0x1234"))) == "bad_nonce", "device mode refuses a proof made for another request")
+other = dev_result(ctx)
+other["responses"][0].pop("signal_hash")
+check(code_of(dev_verify(other)) == "bad_nonce", "device mode refuses a proof with no signal hash")
+check(code_of(dev_verify(dev_result(ctx), "someone-else")) == "bad_nonce", "a device nonce from another browser is refused")
+
+ctx = dev_ctx()
+check(code_of(dev_verify(dev_result(ctx), post=upstream(False, {"code": "invalid_proof"}))) == "proof_rejected", "an upstream refusal of a device proof is refused")
+ctx = dev_ctx()
+check(code_of(dev_verify(dev_result(ctx), post=upstream(True, {**DEV_GOOD, "environment": "production"}))) == "wrong_environment", "a device proof from the wrong environment is refused")
+ctx = dev_ctx()
+check(code_of(dev_verify(dev_result(ctx), post=upstream(True, {**DEV_GOOD, "results": [{"identifier": "orb", "success": True}]}))) == "proof_rejected", "upstream passing another credential is refused")
+ctx = dev_ctx()
+check(code_of(dev_verify(dev_result(ctx), post=upstream(True, {**DEV_GOOD, "protocol_version": "4.0"}))) == "wrong_credential", "upstream naming protocol 4.0 is refused")
+
+ctx = dev_ctx()
+replay = dev_result(ctx)
+device = W.verify(replay, "d1", None, DEV, db, dev_upstream)
+check(device["verified"] is True and device["credential"] == "device" and device["session_id"] is None, "a good device reply signs in, labelled device, with no session")
+check("cd" * 16 not in device["human_id"], "the device id hides the nullifier")
+check(sent[-1]["WORLD_ENVIRONMENT"] == "staging", "the server's environment goes to the verify call")
+check(code_of(dev_verify(replay)) == "bad_nonce", "a replayed device proof is refused")
+ctx2 = dev_ctx()
+check(code_of(dev_verify({**replay, "nonce": ctx2["rp_context"]["nonce"]})) == "bad_nonce", "an old device proof under a fresh nonce is refused")
+again = W.verify(dev_result(dev_ctx()), "d1", None, DEV, db, dev_upstream)
+check(again["human_id"] == device["human_id"], "the same device signs in again with a new proof and the same id")
+W.add_login("dtok", device["human_id"], "staging", device["credential"], db)
+check(W.login_of("dtok", db)["credential"] == "device", "a device login still says device")
+ctx = fresh()
+check(W.login_of("dtok", db)["credential"] == "device" and ctx["credential"] == "human", "switching back to human mode does not relabel a device login")
+W.drop_login("dtok", db)
 print(f"{failed} FAILED" if failed else "ALL PASS (mock replies only, no real World ID call)")
 sys.exit(1 if failed else 0)

@@ -2,7 +2,7 @@
 const GUEST_KEY = 'crashlab-guest';
 
 export type Who =
-  | { kind: 'verified'; humanId: string; environment: string }
+  | { kind: 'verified'; humanId: string; environment: string; credential: 'human' | 'device' }
   | { kind: 'guest' }
   | { kind: 'none' };
 
@@ -19,7 +19,7 @@ export async function whoIs(): Promise<Who> {
     const res = await fetch('/site-api/auth/me', { signal: AbortSignal.timeout(4_000) });
     if (res.ok) {
       const me = await res.json();
-      if (me.verified === true && typeof me.human_id === 'string') return { kind: 'verified', humanId: me.human_id, environment: String(me.environment ?? '') };
+      if (me.verified === true && typeof me.human_id === 'string') return { kind: 'verified', humanId: me.human_id, environment: String(me.environment ?? ''), credential: me.credential === 'human' ? 'human' : 'device' };
     }
   } catch { /* no server: nobody can be verified */ }
   return guestChosen() ? { kind: 'guest' } : { kind: 'none' };

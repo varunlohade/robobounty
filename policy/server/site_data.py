@@ -314,7 +314,7 @@ def providers():
          "detail": f"Headless calls, chosen by CRASHLAB_LLM_MODEL (now {model}). The scenario and route steps pin claude-opus-5-5. The model picks functions, and code checks each one. No model decides a verdict.", "frame": None},
     ]
     state = world.status()
-    entries.append({"id": "world", "kind": "Identity", "name": "World ID", "by": "Proof of one human", "does": "Signs people in to this site", "version": state["environment"] or "off", "status": "On, server check" if state["on"] else "Not set up", "tone": "ok" if state["on"] else "quiet",
+    entries.append({"id": "world", "kind": "Identity", "name": "World ID", "by": "Verified device, not proof of a unique human" if state["credential"] == "device" else "Proof of one human", "does": "Signs people in to this site", "version": state["environment"] or "off", "status": "On, server check" if state["on"] else "Not set up", "tone": "ok" if state["on"] else "quiet",
                     "detail": "The server signs each request and checks each proof." if state["on"] else "This server has no World ID settings yet, so people enter as local guests, shown as not verified.", "frame": None})
     return {"entries": entries, **board_people()}
 
@@ -378,7 +378,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"verified": True, **who} if who else {"verified": False})
         if path == "/site-api/auth/world":
             state = world.status()
-            return self.reply(200, {"on": state["on"], "missing": state["missing"]})
+            return self.reply(200, {"on": state["on"], "missing": state["missing"], "credential": state["credential"]})
         parts = path.strip("/").split("/")
         if len(parts) == 4 and parts[1] == "film" and parts[2] in ROBOTS and WORLD_DIR.fullmatch(parts[3]):
             film = DEMO / parts[2] / parts[3] / "film.jpg"
@@ -418,9 +418,10 @@ class Handler(BaseHTTPRequestHandler):
                     raise world.Rejected("bad_shape") from None
                 done = world.verify(result, browser, jar.get("crashlab_world"))
                 token = secrets.token_urlsafe(32)
-                world.add_login(token, done["human_id"], done["environment"])
-                return self.reply(200, {"verified": True, "human_id": done["human_id"], "environment": done["environment"]},
-                                  keep + [("crashlab_login", token, world.LOGIN_S), ("crashlab_world", done["session_id"], 365 * 86400)])
+                world.add_login(token, done["human_id"], done["environment"], done["credential"])
+                session = [("crashlab_world", done["session_id"], 365 * 86400)] if done["session_id"] else []
+                return self.reply(200, {"verified": True, "human_id": done["human_id"], "environment": done["environment"], "credential": done["credential"]},
+                                  keep + [("crashlab_login", token, world.LOGIN_S)] + session)
         except world.Rejected as r:
             return self.reply(409 if r.code != "not_configured" else 503, {"verified": False, "code": r.code, "words": r.words}, keep)
         self.reply(404, {"error": "not_found"})

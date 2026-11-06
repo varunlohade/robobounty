@@ -5,7 +5,7 @@ import { icon, type IconName } from './icons.ts';
 import { enterAsGuest, whoIs } from './session.ts';
 import { button, getJson, h, START_SERVER } from './ui.ts';
 
-interface Status { on: boolean; missing: string[] }
+interface Status { on: boolean; missing: string[]; credential?: string | null }
 type Face = 'ready' | 'off' | 'asking' | 'waiting' | 'verifying' | 'verified' | 'failed';
 const root = document.getElementById('site')!;
 const go = h('div', 'go');
@@ -14,7 +14,8 @@ const live = h('div', '');
 const error = h('div', 'lg-error');
 error.hidden = true;
 error.setAttribute('role', 'alert');
-const proves = h('p', 'lg-proves', 'World ID proves you are one unique human. It shares no name, email or face.');
+const proves = h('p', 'lg-proves');
+proves.hidden = true;
 const staging = h('p', 'lg-staging', 'This server uses World ID staging, which accepts test proofs.');
 staging.hidden = true;
 const head = h('p', 'lg-head', 'Scan with World App');
@@ -22,6 +23,7 @@ head.setAttribute('aria-live', 'polite');
 const proof = h('div', 'lg-proof');
 proof.hidden = true;
 let cancel: AbortController | null = null;
+let deviceMode = true;
 
 const panel = h('section', 'lg-panel', h('div', 'lg-mark', 'CrashLab'),
   h('h1', '', 'Crash tests for robots'),
@@ -150,8 +152,10 @@ function offState(status: Status | null) {
     status ? null : h('code', '', START_SERVER)));
 }
 
-function onState() {
+function onState(credential: string | null | undefined) {
   face('ready');
+  deviceMode = credential !== 'human';
+  proves.textContent = deviceMode ? 'World ID checks this device only. Not proof of a unique human. It shares no name, email or face.' : 'World ID proves you are one unique human. It shares no name, email or face.';
   proves.hidden = false;
   go.replaceChildren(button('pri', 'Sign in with World ID', () => { void start(); }), button('bare', 'Enter as local guest', guest));
   note.replaceChildren();
@@ -179,10 +183,13 @@ async function start() {
     if (!ctx.ok) throw new Error(ctx.body.words ?? 'The server would not sign this request.');
     const c = ctx.body;
     if (c.environment === 'staging') staging.hidden = false;
-    const { IDKit, CredentialRequest } = await import('@worldcoin/idkit-core');
+    const { IDKit, CredentialRequest, deviceLegacy } = await import('@worldcoin/idkit-core');
     const config = { app_id: c.app_id, rp_context: c.rp_context, environment: c.environment };
     const credential = CredentialRequest('proof_of_human');
-    const request = c.mode === 'prove'
+    // Device mode only. The signal carries the nonce, because a World ID 3.0 proof has no nonce of its own.
+    const request = c.credential === 'device'
+      ? await IDKit.request({ ...config, action: c.action, allow_legacy_proofs: true }).preset(deviceLegacy({ signal: c.signal }))
+      : c.mode === 'prove'
       ? await IDKit.proveSession(c.session_id, config).constraints(credential)
       : await IDKit.request({ ...config, action: c.action, session_id: 'create', allow_legacy_proofs: false }).constraints(credential);
     const uri = request.connectorURI;
@@ -208,14 +215,14 @@ async function start() {
     const reply = await post('/site-api/auth/world/verify', done.result);
     if (!reply.ok || reply.body.verified !== true) throw new Error(reply.body.words ?? 'The server refused this proof. You are not signed in.');
     face('verified');
-    live.replaceChildren(h('div', 'lg-done', icon('ok', 16), 'The server verified your proof. Opening CrashLab.'));
+    live.replaceChildren(h('div', 'lg-done', icon('ok', 16), reply.body.credential === 'human' ? 'The server verified your proof. Opening CrashLab.' : 'Verified device. Not proof of a unique human. Opening CrashLab.'));
     location.href = nextPage();
   } catch (err) {
-    onState();
+    onState(deviceMode ? 'device' : 'human');
     const words = err instanceof Error ? err.message : '';
     if (words !== 'cancelled' && !cancel?.signal.aborted) fail(words || 'World ID did not finish. You are not signed in.');
   }
 }
 
 whoIs().then(who => { if (who.kind !== 'none') location.replace(nextPage()); });
-getJson<Status>('/site-api/auth/world').then(s => (s.on ? onState() : offState(s))).catch(() => offState(null));
+getJson<Status>('/site-api/auth/world').then(s => (s.on ? onState(s.credential) : offState(s))).catch(() => offState(null));

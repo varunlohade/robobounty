@@ -45,7 +45,7 @@ function whoRow(box: HTMLElement, who: Who) {
     box.dataset.who = 'verified';
     const ok = icon('check', 16);
     ok.classList.add('sh-ok');
-    name.append(make('span', '', 'Verified human'), make('small', 'sh-mono', `${who.humanId.slice(0, 6)}…${who.humanId.slice(-4)}`));
+    name.append(make('span', '', who.credential === 'human' ? 'Verified human' : 'Verified device. Not proof of a unique human.'), make('small', 'sh-mono', `${who.humanId.slice(0, 6)}…${who.humanId.slice(-4)}`));
     box.replaceChildren(ok, name);
   } else {
     box.dataset.who = 'guest';

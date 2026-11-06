@@ -2,6 +2,9 @@
 
 First visit: one uniqueness proof that also creates a World ID session. Later visits: a proof of that saved session. World ID 4.0 uniqueness proofs are one-time per action, so a second uniqueness login would fail.
 Adapted from policy/sponsors/world_id.py on sponsors-switch-on. Each rejection has a fixed code. No text from the proof or the upstream reply reaches a message.
+
+WORLD_CREDENTIAL picks what a sign-in proves. "human", the default, is Proof of Human on World ID 4.0. "device" is the deprecated deviceLegacy preset for a person with World App and no Orb: a World ID 3.0 proof that does not show one person has one account.
+A 3.0 proof has no session and no nonce in its circuit, so device mode signs in with a fresh proof each visit and puts the nonce in the signal. The official verifier also accepts a repeated 3.0 nullifier, so the nonce check here is what stops a replay.
 """
 import hashlib
 import json
@@ -34,6 +37,7 @@ WORDS = {
     "replayed": "That proof was already used. Start again.",
     "proof_rejected": "World ID rejected this proof.",
     "wrong_environment": "The proof came from the wrong World ID environment.",
+    "wrong_credential": "That World ID proof is not the credential this server asks for.",
     "verify_unreachable": "The World ID check did not answer. You are not signed in.",
 }
 SCHEMA = """
@@ -41,6 +45,7 @@ CREATE TABLE IF NOT EXISTS humans (nullifier TEXT PRIMARY KEY, session_id TEXT U
 CREATE TABLE IF NOT EXISTS proofs (session_nullifier TEXT PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS nonces (nonce TEXT PRIMARY KEY, browser TEXT NOT NULL, expires_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS logins (token_sha TEXT PRIMARY KEY, human_id TEXT NOT NULL, environment TEXT NOT NULL, expires_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS devices (nullifier TEXT PRIMARY KEY, device_id TEXT NOT NULL, at REAL NOT NULL);
 """
 
 
@@ -54,7 +59,13 @@ def _open(path):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path, timeout=10, isolation_level=None)
     db.executescript(SCHEMA)
+    if not any(column[1] == "credential" for column in db.execute("PRAGMA table_info(logins)")):
+        db.execute("ALTER TABLE logins ADD COLUMN credential TEXT NOT NULL DEFAULT 'human'")  # Every login before this column came from a 4.0 Proof of Human.
     return db
+
+
+def credential_of(env):
+    return env.get("WORLD_CREDENTIAL") or "human"
 
 
 def status(env=None):
@@ -63,7 +74,9 @@ def status(env=None):
     missing = [n for n in NEEDS if not env.get(n)]
     if not missing and env["WORLD_ENVIRONMENT"] not in ("staging", "production"):
         missing = ["WORLD_ENVIRONMENT must be staging or production"]
-    return {"on": not missing, "missing": missing, "environment": env.get("WORLD_ENVIRONMENT") if not missing else None}
+    if not missing and credential_of(env) not in ("device", "human"):
+        missing = ["WORLD_CREDENTIAL must be device or human"]
+    return {"on": not missing, "missing": missing, "environment": env.get("WORLD_ENVIRONMENT") if not missing else None, "credential": credential_of(env) if not missing else None}
 
 
 def _sign(action, env):
@@ -74,19 +87,30 @@ def _sign(action, env):
     return json.loads(done.stdout)
 
 
+def _signal_hash(signal, env):
+    child = {k: v for k, v in env.items() if k in ("PATH", "HOME")}
+    done = subprocess.run(["node", str(HELPER)], input=json.dumps({"hash_signal": signal}).encode(), capture_output=True, timeout=30, env=child, cwd=HERE)
+    if done.returncode != 0:
+        raise Rejected("not_configured")
+    return json.loads(done.stdout)["signal_hash"]
+
+
 def request_context(browser, saved_session, env=None, db=DB):
     """What the browser needs to open IDKit. The signature is made here, and the key never leaves the server."""
     env = os.environ if env is None else env
     if not status(env)["on"]:
         raise Rejected("not_configured")
+    device = credential_of(env) == "device"
     with closing(_open(db)) as d:
-        known = saved_session and d.execute("SELECT 1 FROM humans WHERE session_id=?", (saved_session,)).fetchone()
+        known = not device and saved_session and d.execute("SELECT 1 FROM humans WHERE session_id=?", (saved_session,)).fetchone()
     action = None if known else env["WORLD_ACTION"]
     signed = _sign(action, env)
     with closing(_open(db)) as d:
         d.execute("INSERT OR REPLACE INTO nonces VALUES (?,?,?)", (signed["nonce"], browser, signed["expires_at"]))
-    ctx = {"app_id": env["WORLD_APP_ID"], "environment": env["WORLD_ENVIRONMENT"],
+    ctx = {"app_id": env["WORLD_APP_ID"], "environment": env["WORLD_ENVIRONMENT"], "credential": credential_of(env),
            "rp_context": {"rp_id": env["WORLD_RP_ID"], "nonce": signed["nonce"], "created_at": signed["created_at"], "expires_at": signed["expires_at"], "signature": signed["sig"]}}
+    if device:
+        return {**ctx, "mode": "enrol", "action": action, "signal": signed["nonce"]}
     return {**ctx, "mode": "prove", "session_id": saved_session} if known else {**ctx, "mode": "enrol", "action": action}
 
 
@@ -130,11 +154,57 @@ def _human_id(nullifier, action):
     return "0x" + hashlib.sha256(f"crashlab.site.human.v1|{action}|{nullifier}".encode()).hexdigest()
 
 
+def _hex_number(value):
+    try:
+        return int(value, 16) if isinstance(value, str) and value.startswith("0x") else None
+    except ValueError:
+        return None
+
+
+def _verify_device(result, browser, env, db, post):
+    """One deviceLegacy proof, tied to this request by its signal. A known nullifier signs in again, because a 3.0 proof has no session."""
+    if not isinstance(result.get("nonce"), str) or result.get("protocol_version") != "3.0" or "session_id" in result:
+        raise Rejected("wrong_credential" if result.get("protocol_version") == "4.0" else "bad_shape")
+    items = result.get("responses")
+    if not isinstance(items, list) or len(items) != 1 or not isinstance(items[0], dict):
+        raise Rejected("bad_shape")
+    item = items[0]
+    if item.get("identifier") != "device":
+        raise Rejected("wrong_credential")
+    if result.get("action") != env["WORLD_ACTION"]:
+        raise Rejected("wrong_action")
+    nullifier = _nullifier(item.get("nullifier"))
+    wanted = _hex_number(_signal_hash(result["nonce"], env))
+    if wanted is None or _hex_number(item.get("signal_hash")) != wanted:
+        raise Rejected("bad_nonce")
+    with closing(_open(db)) as d:
+        taken = d.execute("DELETE FROM nonces WHERE nonce=? AND browser=? AND expires_at>=?", (result["nonce"], browser, time.time())).rowcount
+    if taken != 1:
+        raise Rejected("bad_nonce")
+    ok, reply = post(result, env)
+    if not ok or reply.get("success") is not True:
+        raise Rejected("proof_rejected")
+    if reply.get("environment") != env["WORLD_ENVIRONMENT"]:
+        raise Rejected("wrong_environment")
+    if reply.get("protocol_version", "3.0") != "3.0":
+        raise Rejected("wrong_credential")
+    if not any(isinstance(r, dict) and r.get("success") is True and r.get("identifier") == "device" for r in reply.get("results") or []):
+        raise Rejected("proof_rejected")
+    device_id = "0x" + hashlib.sha256(f"crashlab.site.device.v1|{env['WORLD_ACTION']}|{nullifier}".encode()).hexdigest()
+    with closing(_open(db)) as d:
+        d.execute("INSERT OR IGNORE INTO devices VALUES (?,?,?)", (nullifier, device_id, time.time()))
+    return {"verified": True, "human_id": device_id, "session_id": None, "environment": env["WORLD_ENVIRONMENT"], "credential": "device"}
+
+
 def verify(result, browser, saved_session, env=None, db=DB, post=post_verify):
     """Returns {"verified": True, ...} or raises Rejected. `post` is replaced only by the labelled mock tests."""
     env = os.environ if env is None else env
     if not status(env)["on"]:
         raise Rejected("not_configured")
+    if credential_of(env) == "device":
+        if not isinstance(result, dict):
+            raise Rejected("bad_shape")
+        return _verify_device(result, browser, env, db, post)
     if not isinstance(result, dict) or not isinstance(result.get("nonce"), str) or result.get("protocol_version") != "4.0":
         raise Rejected("bad_shape")
     items = result.get("responses")
@@ -181,18 +251,18 @@ def verify(result, browser, saved_session, env=None, db=DB, post=post_verify):
                 d.execute("INSERT INTO proofs VALUES (?)", (chosen["session_nullifier"][0],))
         except sqlite3.IntegrityError:
             raise Rejected("already_enrolled" if enrol else "replayed") from None
-    return {"verified": True, "human_id": human, "session_id": session, "environment": env["WORLD_ENVIRONMENT"]}
+    return {"verified": True, "human_id": human, "session_id": session, "environment": env["WORLD_ENVIRONMENT"], "credential": "human"}
 
 
 def _token_sha(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def add_login(token, human_id, environment, db=DB, now=None):
+def add_login(token, human_id, environment, credential, db=DB, now=None):
     now = time.time() if now is None else now
     with closing(_open(db)) as d:
         d.execute("DELETE FROM logins WHERE expires_at<?", (now,))
-        d.execute("INSERT OR REPLACE INTO logins VALUES (?,?,?,?)", (_token_sha(token), human_id, environment, now + LOGIN_S))
+        d.execute("INSERT OR REPLACE INTO logins (token_sha, human_id, environment, expires_at, credential) VALUES (?,?,?,?,?)", (_token_sha(token), human_id, environment, now + LOGIN_S, credential))
 
 
 def login_of(token, db=DB, now=None):
@@ -200,8 +270,8 @@ def login_of(token, db=DB, now=None):
         return None
     now = time.time() if now is None else now
     with closing(_open(db)) as d:
-        row = d.execute("SELECT human_id, environment FROM logins WHERE token_sha=? AND expires_at>=?", (_token_sha(token), now)).fetchone()
-    return {"human_id": row[0], "environment": row[1]} if row else None
+        row = d.execute("SELECT human_id, environment, credential FROM logins WHERE token_sha=? AND expires_at>=?", (_token_sha(token), now)).fetchone()
+    return {"human_id": row[0], "environment": row[1], "credential": row[2]} if row else None
 
 
 def drop_login(token, db=DB):
