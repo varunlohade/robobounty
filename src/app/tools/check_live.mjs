@@ -1,4 +1,5 @@
-// Drives the live app end to end in headless Chrome, with no user input: node src/app/tools/check_live.mjs <out dir> [--recorded [DIR]]
+// Drives the live app end to end in headless Chrome, with no user input: node src/app/tools/check_live.mjs <out dir> [--recorded [DIR]] [--sponsors-mock]
+// --sponsors-mock switches on 0G, World ID and the chain ledger against LOCAL MOCKS and anvil (policy/sponsors/mocks). It makes no sponsor call and no paid LLM call. Do not combine it with --recorded.
 // Needs `npx vite --port 5199` running. It starts its own run server on port 5198. Real LLM calls unless --recorded. A DIR with only brief.json keeps the scenario agent live and skips the hostile message, which needs a live planner.
 import { spawn } from 'node:child_process';
 import { createServer, request } from 'node:http';
@@ -12,7 +13,8 @@ const OUT = resolve(process.argv[2] ?? '/tmp/crashlab-live-check');
 const flag = process.argv.indexOf('--recorded');
 const RECORDED = flag > 0;
 const REPLIES = RECORDED ? resolve(process.argv[flag + 1]?.startsWith('--') ? join(import.meta.dirname, '../../../policy/server/fixtures') : process.argv[flag + 1] ?? join(import.meta.dirname, '../../../policy/server/fixtures')) : null;
-const LIVE_HOSTILE = !REPLIES || !REPLIES.endsWith('hybrid_replies');
+const SPONSORS = process.argv.includes('--sponsors-mock');
+const LIVE_HOSTILE = !SPONSORS && (!REPLIES || !REPLIES.endsWith('hybrid_replies'));
 const ROOT = resolve(import.meta.dirname, '../../..');
 const SERVER_PORT = Number(process.env.CRASHLAB_SERVER_PORT ?? 5198);
 const APP_PORT = Number(process.env.CRASHLAB_APP_PORT ?? 5199);
@@ -25,11 +27,23 @@ const LIVE_FIX = process.argv.includes('--live-fix');
 const CONTROLLER = join(ROOT, 'policy/highrise/controller.py');
 const sha = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 mkdirSync(OUT, { recursive: true });
-const server = spawn(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/server.py'), '--port', String(SERVER_PORT), '--app-port', String(APP_PORT), ...(RECORDED ? ['--recorded', REPLIES] : [])], { stdio: 'inherit' });
+const PYTHON = join(ROOT, 'policy/.venv/bin/python');
+let stack = null;
+let stackInfo = null;
+if (SPONSORS) {
+  stack = spawn(PYTHON, [join(ROOT, 'policy/sponsors/mocks/mock_stack.py'), '--anvil-port', String(SERVER_PORT + 2547), '--mock-port', String(SERVER_PORT + 2548)], { stdio: ['ignore', 'pipe', 'inherit'] });
+  stackInfo = await new Promise((done, fail) => {
+    let text = '';
+    stack.stdout.on('data', chunk => { text += chunk; if (text.includes('\n')) done(JSON.parse(text.split('\n')[0])); });
+    stack.on('exit', code => fail(new Error(`mock stack exit ${code}`)));
+  });
+  stack.removeAllListeners('exit');
+}
+const server = spawn(PYTHON, [join(ROOT, 'policy/server/server.py'), '--port', String(SERVER_PORT), '--app-port', String(APP_PORT), ...(RECORDED ? ['--recorded', REPLIES] : [])], { stdio: 'inherit', env: stackInfo ? stackInfo.web : process.env });
 const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'crashlab-chrome-'))}`,
   '--window-size=1440,900', '--force-device-scale-factor=1', '--hide-scrollbars', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--mute-audio', 'about:blank'], { stdio: 'ignore' });
 const foreign = createServer((_, res) => { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><title>other</title>'); }).listen(SERVER_PORT - 2, '127.0.0.1');
-const bye = () => { chrome.kill(); server.kill(); foreign.close(); };
+const bye = () => { chrome.kill(); server.kill(); stack?.kill(); foreign.close(); };
 process.on('exit', bye);
 
 let failed = 0;
@@ -302,7 +316,17 @@ await press('Send to a bounty');
 await idleAfter(n);
 await until(`!!document.querySelector('.bounty .fund')`, 'bounty draft', 30);
 check('chapter is Bounty', (await chapter()) === 'Bounty');
-check('the label says local ledger', (await js(`document.querySelector('.bounty').textContent`)).includes('Local ledger. Not on chain.') && (await js(`document.querySelector('.status').textContent`)).includes('Local ledger. Not on chain.'));
+const LEDGER_LABEL = SPONSORS ? 'Local test chain 31337, not Arc.' : 'Local ledger. Not on chain.';
+check('the ledger label is honest about where the money is', (await js(`document.querySelector('.bounty').textContent`)).includes(LEDGER_LABEL) && (await js(`document.querySelector('.status').textContent`)).includes(LEDGER_LABEL));
+const WORLD_LABEL = SPONSORS ? 'World ID: local mock, no real proof' : 'World ID not connected';
+check('the World ID label shows on the page and the status line', (await js(`document.querySelector('.world-id').textContent`)).includes(WORLD_LABEL) && (await js(`document.querySelector('.status').textContent`)).includes(WORLD_LABEL));
+const labelsOnScreen = await js(`[...document.querySelectorAll('.status .status-ledger, .status .status-keep')].filter(s => s.textContent).every(s => { const r = s.getBoundingClientRect(); return r.right <= innerWidth && s.scrollWidth <= s.clientWidth; })`);
+check('those labels are not cut off on the status line', labelsOnScreen);
+if (SPONSORS) {
+  const status = await js(`document.querySelector('.status').textContent`);
+  check('the status line names the 0G mock and counts receipts from real files', status.includes('0G Private Computer (local mock)') && /LLM calls used: 0G \d+\. processResponse true on \d+/.test(status) && /Last request [0-9a-f]+/.test(status), status.slice(0, 200));
+  check('the status tooltip states what receipts do not prove', (await js(`[...document.querySelectorAll('.status span')].map(s => s.title).join(' ')`)).includes('does not show that the signature covers the prompt'));
+}
 const gateInfo = JSON.parse(execFileSync(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/bounty_job.py'), 'constants'], { input: '{}' }).toString());
 const testerText = await js(`document.querySelector('.bounty').textContent`);
 check('the rule text uses the gate constants', testerText.includes(`${gateInfo.repeat_need} of ${gateInfo.reruns} must end`), `${gateInfo.repeat_need} of ${gateInfo.reruns}`);
@@ -322,13 +346,49 @@ check('a hostile paste is rejected with a plain reason', hostileWorld !== 'accep
 check('the hostile paste made no elements and shows nowhere', (await js(`document.querySelectorAll('.verdict img').length`)) === 0 && !(await js(`document.querySelector('.verdict').textContent`)).includes('onerror') && (await js(`String(window.__pwned)`)) === 'undefined');
 const fixtures = join(ROOT, 'policy/bounty/fixtures');
 const meta = JSON.parse(readFileSync(join(fixtures, 'meta.json'), 'utf8'));
+if (SPONSORS) {
+  check('no verified human: the gate does not run', (await paste(readFileSync(join(fixtures, 'failing.json'), 'utf8'), meta.failing_seed)) === 'no_verified_human');
+  const clickWorld = label => js(`[...document.querySelectorAll('.world-id button')].find(b => b.textContent === ${JSON.stringify(label)}).click()`);
+  await clickWorld('Mock World App: reject');
+  await until(`document.querySelector('.world-id').dataset.state === 'cancelled'`, 'World ID rejected', 15);
+  check('the rejected path says nothing was stored', (await js(`document.querySelector('.world-id').textContent`)).includes('Nothing was stored'));
+  await shot('11b-world-id-rejected.png');
+  await clickWorld('Mock World App: approve');
+  await until(`document.querySelector('.world-id').dataset.state === 'verified' && document.querySelector('.world-id').textContent.includes('Submissions used: 0 of 3')`, 'World ID verified', 15);
+  await shot('11c-world-id-verified.png');
+  const sid = await js(`sessionStorage.getItem('crashlab-session')`);
+  const h = { Origin: `http://localhost:${APP_PORT}`, 'Content-Type': 'application/json' };
+  const api = (path, body) => fetch(`${SERVER}/api/sessions/${sid}/${path}`, { method: 'POST', headers: h, body: JSON.stringify(body) });
+  const ctx = await (await api('world_context', {})).json();
+  const again = await (await fetch(ctx.mock_world_app, { method: 'POST', body: JSON.stringify({ outcome: 'approve', action: ctx.action, nonce: ctx.rp_context.nonce, environment: ctx.environment, signal_hash: ctx.mock_signal_hash }) })).json();
+  const replay = await api('world_verify', { result: again.result });
+  const replayBody = await replay.json();
+  check('a replayed World ID proof is rejected by the server', replay.status === 400 && replayBody.code === 'nullifier_replayed', replayBody.code);
+}
 const passCode = await timed('gate_passing_world', () => paste(readFileSync(join(fixtures, 'nominal_pass.json'), 'utf8'), meta.pass_seed));
 check('a passing world gets no pay', passCode === 'no_failure', passCode);
 await shot('12-bounty-rejected.png');
 const failCode = await timed('gate_failing_world', () => paste(readFileSync(join(fixtures, 'failing.json'), 'utf8'), meta.failing_seed));
 console.log('failing fixture verdict', failCode, await js(`document.querySelector('.verdict').textContent`));
 await shot('13-bounty-verdict.png');
-if (failCode === 'accepted') {
+if (failCode === 'accepted' && SPONSORS) {
+  await until(`document.querySelector('.ledger').textContent.includes('dispute window open')`, 'the resolver proposes on anvil', 30);
+  await shot('14-ledger-dispute-window.png');
+  check('the proposal shows a real tx and reserves the money', /Propose tx 0x[0-9a-f]{64}/.test(await js(`document.querySelector('.ledger').textContent`)) && (await js(`document.querySelector('.ledger').textContent`)).includes('Available: 900 USDC'));
+  check('chain mode offers no signing button: the web app holds no key', (await js(`document.querySelectorAll('[data-ledger]').length`)) === 0);
+  await until(`document.querySelector('.ledger').textContent.includes(': Finalized.')`, 'the resolver finalizes after the window', 100);
+  const fingerprint = await js(`(document.querySelector('.ledger').textContent.match(/Failure (0x[0-9a-f]+)/) || [])[1]`);
+  const full = JSON.parse(execFileSync(PYTHON, ['-c', `import sys, json; sys.path.insert(0, 'policy/sponsors'); import chain; print(json.dumps(list(chain.Chain().snapshot()['failures'])))`], { cwd: ROOT, env: stackInfo.web }).toString());
+  const claimed = execFileSync(PYTHON, [join(ROOT, 'policy/sponsors/resolver.py'), 'claim', '--fingerprint', full.find(f => f.startsWith(fingerprint))], { env: stackInfo.tester }).toString();
+  console.log('claim', claimed.trim());
+  await until(`document.querySelector('.ledger').textContent.includes(': Claimed.')`, 'claimed on chain', 20);
+  const balances = await js(`document.querySelector('.ledger').textContent`);
+  console.log('balances', await js(`[...document.querySelectorAll('.chain-balances .fact')].map(f => f.textContent).join(' | ')`));
+  check('the balances moved on chain', /Balance, tester\s*100 USDC/.test(balances) && /Balance, bounty contract\s*900 USDC/.test(balances));
+  await shot('15-ledger-claimed.png');
+  const again = await timed('gate_duplicate', () => paste(readFileSync(join(fixtures, 'failing.json'), 'utf8'), meta.failing_seed));
+  check('the same failure cannot pay twice', again === 'duplicate', again);
+} else if (failCode === 'accepted') {
   check('a proposal opens the dispute window', (await js(`document.querySelector('.ledger').textContent`)).includes('dispute window open'));
   await shot('14-ledger-dispute-window.png');
   await until(`!!document.querySelector('[data-ledger=ledger_finalize]')`, 'dispute window end', 90);

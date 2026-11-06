@@ -67,6 +67,8 @@ The caller counts this id's earlier submissions that reached the sim, the same w
 
 The cap is a gate argument and not in the spec, so `spec_hash` does not commit to it.
 
+**With a World ID store:** `--world-db F --human-cap N` replaces `--human-id` and `--human-used`. The gate reads the human and the count from the server's store of checked proofs for the submitter's wallet (`policy/sponsors/world_store.py`). A wallet with no verified human gets `no_verified_human` and no sim. The gate counts one submission in one transaction just before the sim, so two gates at once cannot pass the cap. The verdict then says `world_id_connected: true`. The run server uses this when World ID is on. So far this has run only against a local mock of the verify service. See `docs/SWITCH-ON.md`.
+
 ## Jitter
 
 Today the jitter comes from `HMAC-SHA256(salt, "crashlab.bounty.jitter.v1|" + submission hash + "|" + label)`. The submission hash covers the world, claim seed, submitter and bounty id. Each re-run gets its own seed. Each float field moves by up to 1% of its schema range, and stays inside the company limits.

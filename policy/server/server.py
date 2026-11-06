@@ -26,11 +26,17 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parent
+POLICY = HERE.parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(POLICY / "sponsors"))
+import chain as chain_module
 import ledger as ledger_module
+import sponsor_status
+import world_id
+import world_store
+import zg_receipts
 from stored_fix import STORED_FIX, ab_rows, recorded_fix
 
-POLICY = HERE.parent
 HIGHRISE = POLICY / "highrise"
 CRASHLAB = POLICY / "crashlab"
 RUNS = POLICY / "runs" / "server"
@@ -47,6 +53,12 @@ LLM_CAP_USD = "0.50"
 MAX_LLM_PER_SESSION = 10
 MAX_LLM_PER_HOUR = 40  # across all sessions
 MAX_SUBMIT_BODY_BYTES = 64 * 1024  # the gate applies its own lower limit to the world file
+LLM_SCRIPTS = {"plan_job.py", "diagnose.py"}  # only these children get the 0G key
+MAX_WORLD_TRIES = 20  # per session: each one can reach the verify service
+DEFAULT_HUMAN_CAP = 5
+CHAIN_WATCH_S = 2
+CHAIN_WATCH_MAX_S = 6 * 3600
+JOB_CONTEXT = threading.local()
 GATE = POLICY / "bounty" / "gate.py"
 CONTROLLER = HIGHRISE / "controller.py"
 # Local test addresses for the ledger's separate roles. They have no key and no wallet.
@@ -133,7 +145,12 @@ LLM_LIMIT = LlmLimit()
 
 def spawn(argv, **kw):
     # Own process group, so shutdown can stop a campaign and its pool. Low priority, so the Mac stays usable.
-    env = {**os.environ, "CRASHLAB_RECORDED_REPLIES": RECORDED} if RECORDED else None
+    env = sponsor_status.child_env(("ZG_API_KEY",) if any(Path(a).name in LLM_SCRIPTS for a in argv) else ())
+    if RECORDED:
+        env["CRASHLAB_RECORDED_REPLIES"] = RECORDED
+    receipts = getattr(JOB_CONTEXT, "receipts", None)
+    if receipts:
+        env["CRASHLAB_LLM_RECEIPTS"] = str(receipts)
     p = subprocess.Popen(["nice", "-n", "5", *argv], start_new_session=True, env=env, **kw)
     with LIVE_LOCK:
         LIVE.add(p)
@@ -171,7 +188,7 @@ def run_one(argv, stdout_file):
 
 def llm_label():
     if not RECORDED:
-        return "claude headless"
+        return sponsor_status.llm_status()["label"]
     stored = [n for n in ("brief", "scenarios") if (Path(RECORDED) / f"{n}.json").exists()]
     return f"stored {' and '.join(stored)} reply, check only"
 
@@ -209,7 +226,10 @@ class Session:
         self.last_campaign, self.fix_try, self.fix_summary, self.fix_decision = None, None, None, None
         self.ledger, self.bounty_salt, self.spec_path, self.gate_info, self.verdicts = None, None, None, None, []
         self.last_seconds, self.last_recorded = None, None
-        self.tester = "0x" + hashlib.sha256(self.id.encode()).hexdigest()[:40]
+        self.salt_path = None
+        self.world_tries = 0
+        self.receipts = self.dir / "llm_receipts.jsonl"
+        self.tester = os.environ["ARC_TESTER_ADDRESS"].lower() if sponsor_status.arc_status()["on"] else "0x" + hashlib.sha256(self.id.encode()).hexdigest()[:40]
 
     def llm_allowed(self):
         hit = LLM_LIMIT.take(self)
@@ -244,6 +264,7 @@ class Session:
             self.busy = True
 
         def body():
+            JOB_CONTEXT.receipts = self.receipts
             try:
                 target(*args)
             except Exception as e:
@@ -251,6 +272,7 @@ class Session:
                 self.say(f"Job failed: {type(e).__name__}. See the run server log.", fail=True)
             finally:
                 self.working()
+                self.llm_used_event()
                 with self.lock:
                     self.busy = False
                 self.emit(type="idle")
@@ -756,7 +778,58 @@ class Session:
         self.fix_summary = f"{self.fix_summary.rstrip('.')}. You {self.fix_decision} it. policy/highrise/controller.py did not change."
         self.report()
 
-    # Step 9: the bounty. A local ledger with the contract's states. No chain, wallet or key.
+    def llm_used_event(self):
+        """Only when 0G was chosen: the backend each call really used, and what its receipts show. The label for the plain Claude case is unchanged."""
+        if sponsor_status.llm_status()["chosen"] != "0g":
+            return
+        summary = zg_receipts.summary(self.receipts)
+        if summary:
+            self.emit(type="llm_used", line=summary["line"], limits=summary["limits"], request_ids=summary["request_ids"], process_response=summary["process_response"], file=summary["file"], commit=summary["commit"])
+
+    def world_info(self):
+        state = sponsor_status.world_status()
+        info = {"on": state["on"], "label": state["label"], "mock": bool(state.get("mock")), "missing": state.get("missing", [])}
+        if state["on"]:
+            found = world_store.human_of(sponsor_status.world_db(), self.tester, sponsor_status.WORLD_ACTION, 1)
+            info.update(verified=found is not None, used=found[1] if found else 0, cap=self.human_cap())
+        return info
+
+    @staticmethod
+    def human_cap():
+        text = os.environ.get("WORLD_HUMAN_CAP", "")
+        return int(text) if text.isdigit() and int(text) > 0 else DEFAULT_HUMAN_CAP
+
+    def world_context(self):
+        if self.world_tries >= MAX_WORLD_TRIES:
+            return 429, {"error": "too_many_tries"}
+        self.world_tries += 1
+        try:
+            return 200, world_id.request_context(self.tester)
+        except world_id.Rejected as e:
+            return 409, {"code": e.code, "words": e.words}
+
+    def world_verify(self, result):
+        """The tester's wallet comes from the session, never from the proof."""
+        try:
+            done = world_id.verify(result, self.tester)
+        except world_id.Rejected as e:
+            self.tool("world_id", "rejected", [json.dumps({"code": e.code})])
+            return 400, {"code": e.code, "words": e.words}
+        self.tool("world_id", "verified", [json.dumps({"human_id": done["human_id"][:18], "wallet": self.tester, "action": sponsor_status.WORLD_ACTION})])
+        self.emit(type="world_id", world=self.world_info())
+        return 200, {"verified": True}
+
+    def chain_ledger(self):
+        """A ChainLedger when Arc is on and the chain answers, with no note. Otherwise None, and the note says why the local ledger stands in."""
+        state = sponsor_status.arc_status()
+        if not state["on"]:
+            return None, state.get("reason")
+        try:
+            return chain_module.ChainLedger(chain_module.Chain(), chain_module.resolver_dir() / "inbox"), None
+        except (chain_module.ChainError, OSError) as e:
+            return None, f"Arc is off: the chain read failed ({e})."
+
+    # Step 9: the bounty. A local ledger with the contract's states, or chain reads when Arc is on. This process never holds a signing key.
     def bounty_job(self, command, request):
         SLOTS.take(1)
         try:
@@ -768,24 +841,72 @@ class Session:
             SLOTS.give(1)
 
     def bounty_draft(self):
-        self.chapter("bounty", "Local ledger")
+        chain_ledger, arc_note = self.chain_ledger()
+        self.chapter("bounty", "Test chain" if chain_ledger else "Local ledger")
         self.working("reading the gate's rules")
         self.gate_info = self.bounty_job("constants", {})
         preview = self.bounty_job("spec", {"groups": self.proposal["groups"], "salt": "00" * 32, "preview": True})
+        if chain_ledger and preview:
+            spec_limits = json.loads((Path(os.environ["ARC_SPEC_DIR"]) / "spec.json").read_text())["limits"]
+            preview = {"limits": spec_limits, "narrowed": list(spec_limits)}
         if not self.gate_info or not preview:
             self.gate_info = None
             self.say("The gate would not load, so I cannot draft the bounty. It may be mid-edit. Try again.", fail=True)
             return
         unresolved = [{"id": t["id"], "rule": t["rule"], "severity": t["severity"], "count": t["count"]} for t in self.types]
-        self.emit(type="bounty_draft", not_tested=self.proposal["not_tested"], unresolved=unresolved, limits=preview["limits"], narrowed=preview["narrowed"], gate=self.gate_info,
-                  label=ledger_module.LABEL, min_window=ledger_module.MIN_DISPUTE_WINDOW, defaults={"cap": 1000, "per_failure": 100, "window": ledger_module.MIN_DISPUTE_WINDOW}, tester=self.tester,
+        label = chain_ledger.snap["label"] if chain_ledger else ledger_module.LABEL
+        chain_view = {"bounty": chain_ledger.bounty, "address": chain_ledger.snap["address"], "usdc": chain_ledger.snap["usdc"], "chain_id": chain_ledger.snap["chain_id"]} if chain_ledger else None
+        self.emit(type="bounty_draft", not_tested=self.proposal["not_tested"], unresolved=unresolved, limits=preview["limits"], narrowed=preview["narrowed"], gate=self.gate_info, chain=chain_view, arc_note=arc_note, world=self.world_info(),
+                  label=label, min_window=ledger_module.MIN_DISPUTE_WINDOW, defaults={"cap": 1000, "per_failure": 100, "window": ledger_module.MIN_DISPUTE_WINDOW}, tester=self.tester,
                   fix=self.fix_summary)
-        self.tool("bounty_draft", ledger_module.LABEL, [json.dumps({"not_tested": len(self.proposal["not_tested"]), "unresolved_failure_types": len(unresolved), "gate_needs": f"{self.gate_info['repeat_need']} of {self.gate_info['reruns']}"})])
+        self.tool("bounty_draft", label, [json.dumps({"not_tested": len(self.proposal["not_tested"]), "unresolved_failure_types": len(unresolved), "gate_needs": f"{self.gate_info['repeat_need']} of {self.gate_info['reruns']}"})])
 
     def ledger_event(self):
+        if getattr(self.ledger, "is_chain", False):
+            snap = self.ledger.refresh()
+            self.emit(type="ledger", bounty=snap["bounty"], failures=snap["failures"], now=snap["now"], label=snap["label"], balances=snap["balances"], decimals=snap["decimals"], chain_id=snap["chain_id"], waiting=self.ledger.waiting())
+            return
         self.emit(type="ledger", bounty=self.ledger.bounty, failures=self.ledger.failures, now=time.time(), label=ledger_module.LABEL)
 
+    def use_chain_bounty(self):
+        """The company already funded this bounty by the deploy script. Here we only check that the chain holds this spec."""
+        chain_ledger, note = self.chain_ledger()
+        if not chain_ledger:
+            self.say(note or "Arc is off.", fail=True)
+            return
+        spec_dir = Path(os.environ["ARC_SPEC_DIR"])
+        spec_hash = "0x" + hashlib.sha256(json.dumps(json.loads((spec_dir / "spec.json").read_text()), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        if chain_ledger.bounty["spec_hash"].lower() != spec_hash:
+            self.say("The bounty on chain commits to a different spec than ARC_SPEC_DIR holds, so I will not use it.", fail=True)
+            return
+        self.spec_path, self.salt_path = spec_dir / "spec.json", spec_dir / "salt.hex"
+        (self.dir / "bounty").mkdir(exist_ok=True)
+        self.ledger = chain_ledger
+        self.ledger_event()
+        self.tool("use_chain_bounty", chain_ledger.snap["label"], [json.dumps({"bounty_id": chain_ledger.bounty["id"], "contract": chain_ledger.snap["address"], "spec_hash": spec_hash[:18]})])
+        threading.Thread(target=self.watch_chain, daemon=True).start()
+
+    def watch_chain(self):
+        """The resolver and the arbiter act from other processes, so the app learns of it by reading the chain."""
+        last, stop_at, failed = None, time.time() + CHAIN_WATCH_MAX_S, False
+        while time.time() < stop_at:
+            time.sleep(CHAIN_WATCH_S)
+            try:
+                snap = self.ledger.refresh()
+            except chain_module.ChainError as e:
+                if not failed:
+                    self.say(f"The chain read failed ({e}). The ledger above may be stale.", fail=True)
+                failed = True
+                continue
+            failed = False
+            state = json.dumps([snap["failures"], snap["balances"], snap["bounty"], self.ledger.waiting()], sort_keys=True)
+            if state != last:
+                last = state
+                self.ledger_event()
+
     def fund(self, value):
+        if sponsor_status.arc_status()["on"]:
+            return self.use_chain_bounty()
         amounts = [value.get(k) for k in ("cap", "per_failure", "window")]
         if not all(type(v) is int and 0 < v < 10**12 for v in amounts):
             self.say("The amounts must be whole positive numbers.", fail=True)
@@ -794,6 +915,7 @@ class Session:
         folder.mkdir(exist_ok=True)
         self.bounty_salt = secrets.token_hex(32)
         (folder / "salt.hex").write_text(self.bounty_salt)
+        self.salt_path = folder / "salt.hex"
         self.spec_path = folder / "spec.json"
         spec = self.bounty_job("spec", {"groups": self.proposal["groups"], "salt": self.bounty_salt, "out": str(self.spec_path)})
         if not spec:
@@ -816,15 +938,20 @@ class Session:
         folder.mkdir(parents=True)
         (folder / "world.json").write_bytes(text.encode("utf-8", "replace"))
         paid = folder / "paid.json"
-        paid.write_text(json.dumps(self.ledger.paid_list()))
+        try:
+            paid.write_text(json.dumps(self.ledger.paid_list()))
+        except chain_module.ChainError as e:
+            self.emit(type="verdict", n=n, accepted=False, code="chain_read_failed", reason=f"The paid list could not be read from the chain ({e}), so the gate did not run.", repeat=None, wall=0)
+            return
         self.emit(type="gate_running", n=n)
         self.working(f"gate.py: up to {self.gate_info['reruns'] + 2} runs")
         t0 = time.time()
+        identity = ["--world-db", sponsor_status.world_db(), "--human-cap", str(self.human_cap())] if sponsor_status.world_status()["on"] else []
         SLOTS.take(2)
         try:
             with open(self.dir / "gate.log", "ab") as log:
-                p = spawn([PYTHON, str(GATE), "--world", str(folder / "world.json"), "--spec", str(self.spec_path), "--paid", str(paid), "--salt-file", str(self.dir / "bounty" / "salt.hex"),
-                           "--submitter", self.tester, "--seed", seed, "--out", str(folder)], stdout=log, stderr=subprocess.STDOUT)
+                p = spawn([PYTHON, str(GATE), "--world", str(folder / "world.json"), "--spec", str(self.spec_path), "--paid", str(paid), "--salt-file", str(self.salt_path),
+                           "--submitter", self.tester, "--seed", seed, "--out", str(folder), *identity], stdout=log, stderr=subprocess.STDOUT)
                 code = p.wait()
                 finish(p)
         finally:
@@ -839,7 +966,13 @@ class Session:
         keep = {k: v.get(k) for k in ("accepted", "code", "reason", "stage", "repeat", "fingerprint", "result_hash", "reference_check", "hardware_check", "not_checked", "human_cap")}
         self.emit(type="verdict", n=n, wall=round(time.time() - t0, 1), runs=len(v.get("runs") or []), **keep)
         self.tool("gate", f"{time.time() - t0:.1f} s", [json.dumps({"accepted": v["accepted"], "code": v["code"], "runs": len(v.get("runs") or [])})])
-        if v["accepted"]:
+        if sponsor_status.world_status()["on"]:
+            self.emit(type="world_id", world=self.world_info())
+        if v["accepted"] and getattr(self.ledger, "is_chain", False):
+            self.ledger.request_propose(v)
+            self.say("The gate accepted. The separate resolver process checks the verdict and sends propose. This server holds no key.")
+            self.ledger_event()
+        elif v["accepted"]:
             try:
                 self.ledger.propose(self.tester, v["fingerprint"], v["result_hash"])
             except ledger_module.LedgerError as e:
@@ -847,6 +980,8 @@ class Session:
             self.ledger_event()
 
     def ledger_step(self, name, fingerprint):
+        if getattr(self.ledger, "is_chain", False):
+            return 409, {"error": "signed_elsewhere"}
         try:
             if name == "ledger_reject":
                 self.ledger.reject(fingerprint)
@@ -860,6 +995,14 @@ class Session:
         self.ledger_event()
         self.tool(name, ledger_module.LABEL, [json.dumps({"fingerprint": fingerprint[:18], "status": self.ledger.failures[fingerprint]["status"]})])
         return 200, {"ok": True}
+
+
+def sponsors_view():
+    """Names of what is missing, never a value."""
+    arc = sponsor_status.arc_status()
+    world = sponsor_status.world_status()
+    return {"llm": sponsor_status.llm_status(), "world": {k: world.get(k) for k in ("on", "label", "missing", "mock") if k in world},
+            "arc": {"on": arc["on"], "label": arc.get("label"), "missing": arc.get("missing", []), "reason": arc.get("reason")}}
 
 
 SESSIONS = {}
@@ -915,7 +1058,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.refuse()
         parts = urlsplit(self.path).path.strip("/").split("/")
         if parts == ["api", "health"]:
-            return self.reply(200, {"ok": True, "sim_sha": sim_hash(), "llm": llm_label(), "max_procs": MAX_PROCS, "llm_session_cap": LLM_LIMIT.session_cap})
+            return self.reply(200, {"ok": True, "sim_sha": sim_hash(), "llm": llm_label(), "max_procs": MAX_PROCS, "llm_session_cap": LLM_LIMIT.session_cap, "sponsors": sponsors_view()})
         if len(parts) >= 4 and parts[:2] == ["api", "sessions"]:
             s = self.session(parts[2])
             if s is None:
@@ -958,7 +1101,7 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "-1"))
         except ValueError:
             length = -1
-        limit = MAX_SUBMIT_BODY_BYTES if self.path.endswith("/submit") else MAX_BODY_BYTES
+        limit = MAX_SUBMIT_BODY_BYTES if self.path.endswith(("/submit", "/world_verify")) else MAX_BODY_BYTES
         if not 0 <= length <= limit:
             self.close_connection = True
             return self.reply(413, {"error": "too_large"})
@@ -989,6 +1132,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r"[0-9]{1,10}", body["seed"]):
                     return self.reply(400, {"error": "bad_seed"})
                 status, out = s.start(s.submit, body["world"], body["seed"])
+                return self.reply(status, out)
+            if parts[3] == "world_context":
+                status, out = s.world_context()
+                return self.reply(status, out)
+            if parts[3] == "world_verify" and isinstance(body.get("result"), dict):
+                if s.world_tries > MAX_WORLD_TRIES:
+                    return self.reply(429, {"error": "too_many_tries"})
+                status, out = s.world_verify(body["result"])
                 return self.reply(status, out)
             if parts[3] == "action" and isinstance(body.get("action"), str):
                 status, out = s.action(body["action"], body.get("value"))

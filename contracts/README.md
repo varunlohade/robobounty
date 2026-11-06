@@ -2,6 +2,8 @@
 
 The contract pays testers for new robot failures, in a 6-decimal USDC-style token. It runs on a local test EVM only. Nothing here is deployed, and no human or outside firm has audited it.
 
+`script/Deploy.s.sol` deploys and funds one bounty from env vars. It has run only on local anvil. See `docs/SWITCH-ON.md`.
+
 ## Run the tests
 
 ```

@@ -23,3 +23,6 @@ LLM calls have a limit of 10 a session and 40 an hour across sessions. The bount
 
 ## Checking the numbers
 Every headline number comes from one campaign, `campaign_dubai_final`. `policy/runs` is not in git, so `docs/evidence/` holds its JSON summaries. `python3 policy/crashlab/check_numbers.py --evidence` recomputes the numbers and checks the app data and the site.
+
+## Sponsors
+0G, World ID and Arc are off until you set their env vars, and the labels say so. They have run only against local mocks and anvil. Steps: `docs/SWITCH-ON.md`. Check: `policy/.venv/bin/python policy/sponsors/check_sponsors.py`.

@@ -55,6 +55,8 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
   const llmLine = el('span', '', 'LLM unknown');
   const llmCount = el('span');
   const bountyLabel = el('span', 'status-ledger');
+  const worldLabel = el('span', 'status-ledger');
+  const receiptLine = el('span', 'status-keep');
   statusEnd.append(counts, simLine);
 
   const worldHost = el('div', 'page');
@@ -73,6 +75,8 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
     act: action => backend.act(action),
     submit: (world, seed) => backend.submit(world, seed),
     sampleWorld: () => (lastFailedWorld ? JSON.stringify(lastFailedWorld, null, 1) : null),
+    worldContext: () => (backend as LiveBackend).worldContext(),
+    worldVerify: result => (backend as LiveBackend).worldVerify(result),
   });
   const pages: [string, HTMLElement][] = [['World', worldHost], ['Worlds', worldsView.page], ['Fix', fixView.page], ['Bounty', bountyView.page], ['Report', reportPage], ['controller.py', codePage]];
   const TAB = { worlds: 1, fix: 2, bounty: 3, report: 4, code: 5 };
@@ -217,8 +221,13 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
         fixView.decided(e);
         if (e.code) codeText(codePage, e.code, `controller.py, session copy ${e.copy_sha}. The real file did not change (${e.real_sha}). Runs here still use the real file.`);
         break;
-      case 'bounty_draft': bountyView.showDraft(e); bountyLabel.textContent = e.label; show(TAB.bounty); break;
-      case 'ledger': bountyView.showLedger(e); break;
+      case 'bounty_draft': bountyView.showDraft(e); bountyLabel.textContent = e.label; worldLabel.textContent = e.world.label; show(TAB.bounty); break;
+      case 'ledger': bountyView.showLedger(e); bountyLabel.textContent = e.label; break;
+      case 'world_id': bountyView.showWorld(e.world); break;
+      case 'llm_used':
+        receiptLine.textContent = e.line;
+        receiptLine.title = `${e.limits} Request IDs: ${e.request_ids.join(', ') || 'none'}. File: ${e.file}. Hash chain head: ${e.commit}.`;
+        break;
       case 'gate_running': bountyView.gateRunning(e); break;
       case 'verdict': bountyView.showVerdict(e); break;
       case 'failures': worldsView.setFailures(e as never); break;
@@ -241,7 +250,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
   chatHead.append(newChat);
 
   const status = el('footer', 'status');
-  status.append(el('span', '', 'Simulated'), llmLine, llmCount, bountyLabel, el('span', '', 'Hand-built physics, not checked against real hardware'), statusEnd);
+  status.append(el('span', '', 'Simulated'), llmLine, receiptLine, llmCount, bountyLabel, worldLabel, el('span', '', 'Hand-built physics, not checked against real hardware'), statusEnd);
   app.classList.add('live');
   app.append(chatHead, el('div', 'head-rule'), tabs, chat.root, divider(), pane, bar.root, status);
 
@@ -255,6 +264,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
     const info = await health();
     simLine.textContent = `sim ${info.sim_sha.slice(0, 8)}`;
     llmLine.textContent = `LLM: ${info.llm}`;
+    llmLine.title = llmLine.textContent;
     app.dataset.server = 'up';
   } catch {
     chat.addEvent({ type: 'text', fail: true, text: 'The run server is not running. Start it: policy/.venv/bin/python policy/server/server.py, or open the Recorded run.' });

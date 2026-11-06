@@ -15,7 +15,7 @@ async function post(path: string, body: unknown): Promise<Response> {
   return fetch(`${SERVER}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 }
 
-export interface ServerInfo { sim_sha: string; llm: string; max_procs: number }
+export interface ServerInfo { sim_sha: string; llm: string; max_procs: number; sponsors?: { world: { label: string }; arc: { reason?: string | null } } }
 export const health = async (): Promise<ServerInfo> => (await (await fetch(`${SERVER}/api/health`)).json());
 
 export type ServerEvent = { type: string; [key: string]: any };
@@ -86,6 +86,16 @@ export class LiveBackend implements ChatBackend {
     const res = await post(`/api/sessions/${this.id}/submit`, { world, seed });
     if (res.ok) return null;
     return res.status === 409 ? 'I am still working, or the bounty is not funded yet.' : res.status === 413 ? 'That file is too large.' : res.status === 400 ? 'The seed must be a whole number.' : `The run server refused that: HTTP ${res.status}.`;
+  }
+
+  async worldContext(): Promise<{ ok: boolean; body: any }> {
+    const res = await post(`/api/sessions/${this.id}/world_context`, {});
+    return { ok: res.ok, body: await res.json() };
+  }
+
+  async worldVerify(result: unknown): Promise<{ ok: boolean; body: any }> {
+    const res = await post(`/api/sessions/${this.id}/world_verify`, { result });
+    return { ok: res.ok, body: await res.json() };
   }
 
   reset() {

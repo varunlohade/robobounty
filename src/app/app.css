@@ -249,3 +249,9 @@ p { margin: 0; }
 .tester-note { color: var(--text-3); }
 .sim-elements { left: 10px; top: 40px; color: var(--text); border: 1px solid var(--text-3); }
 .status-ledger { color: var(--text); font-weight: 600; }
+/* Long labels must not push the ledger and World ID labels off the line. Others shrink, and their title holds the full text. */
+.status > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.status > span:first-child { flex: none; order: -2; }
+.status > .status-ledger, .status > .status-keep { flex: none; order: -1; }
+.status-end { flex: none; }
+.world-id { margin: 12px 0; }

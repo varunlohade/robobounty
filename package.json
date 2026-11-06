@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@mujoco/mujoco": "3.16.0",
+    "@worldcoin/idkit-core": "4.6.0",
     "three": "0.180.0"
   },
   "devDependencies": {

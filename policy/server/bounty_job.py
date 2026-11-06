@@ -40,6 +40,8 @@ def limits_for(groups, nominal):
 def spec(req):
     nominal = W.load(POLICY / "highrise" / "worlds" / "nominal.json")
     limits, narrowed = limits_for(req["groups"], nominal)
+    if req.get("schema_limits"):  # the widest a company can set: only for local checks, whose fixture worlds sit outside the moderate ranges
+        limits, narrowed = {name: list(bounds) for name, bounds in W.FIELDS.items()}, []
     body = {"schema": G.SPEC_SCHEMA, "bounty_id": 1, "limits": limits, "reference_world": nominal, "salt_commit": hashlib.sha256(bytes.fromhex(req["salt"])).hexdigest(), "frozen": G.current_frozen()}
     if req.get("preview"):
         return {"limits": limits, "narrowed": narrowed}

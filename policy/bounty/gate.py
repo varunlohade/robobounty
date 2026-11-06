@@ -1,6 +1,6 @@
 """CrashLab bounty gate: decides if one submitted world file counts as a new, valid failure. See README.md.
 
-gate.py --world W --spec S --paid P --salt-file F --submitter 0x.. [--seed N] [--out DIR] [--human-id 0x.. --human-used K --human-cap N]
+gate.py --world W --spec S --paid P --salt-file F --submitter 0x.. [--seed N] [--out DIR] [--human-id 0x.. --human-used K --human-cap N] [--world-db F --human-cap N]
 Writes verdict.json into a new run folder. Exit 0 means accepted, 1 means rejected. It sends nothing on chain.
 """
 import argparse
@@ -47,6 +47,7 @@ COUNT = re.compile(r"[0-9]{1,6}")
 PROPOSE = "propose(uint256,address,bytes32,bytes32,bool)"
 HOLDS = {"wind_hold", "battery_stop"}
 HUMAN_CAP_LABEL = "World ID is NOT connected. The human id and the count come from the caller and nothing verifies them, so one person can use many ids."
+HUMAN_VERIFIED_LABEL = "World ID is connected. The human id and the count come from the server's store of checked proofs for this wallet. The check is only as strong as the credential and the verify service."
 NOT_CHECKED = [
     "World ID of the submitter (risk 12): the backend must check it before the resolver proposes. The human cap trusts the caller's id and count.",
     "Collusion between submitter and company or solver (risk 11).",
@@ -183,6 +184,30 @@ def check_human_cap(human_id, used, cap):
         numbers.append(value)
     row.update(human_id=human_id, used=numbers[0], cap=numbers[1])
     return row
+
+
+def verified_human_cap(db, submitter, bounty_id, cap):
+    """The cap fed from verified identity: the wallet must have a stored World ID, and the store counts its submissions."""
+    sys.path.insert(0, str(POLICY / "sponsors"))
+    import sponsor_status
+    import world_store
+    found = world_store.human_of(db, submitter, sponsor_status.WORLD_ACTION, bounty_id)
+    if found is None:
+        raise Rejected("no_verified_human", "This wallet has no verified World ID, so the gate will not run.")
+    if isinstance(cap, str) and COUNT.fullmatch(cap):
+        cap = int(cap)
+    if isinstance(cap, bool) or not isinstance(cap, int) or cap < 1:
+        raise Rejected("bad_human_cap", "With World ID, the human cap must be a whole number of 1 or more.")
+    return {"world_id_connected": True, "label": HUMAN_VERIFIED_LABEL, "human_id": found[0], "used": found[1], "cap": cap}
+
+
+def reserve_verified_slot(db, submitter, bounty_id, submission_hash, cap):
+    """One atomic count just before the sim, so two gates at once cannot pass the cap."""
+    sys.path.insert(0, str(POLICY / "sponsors"))
+    import sponsor_status
+    import world_store
+    if not world_store.reserve_submission(db, submitter, sponsor_status.WORLD_ACTION, bounty_id, submission_hash, cap):
+        raise Rejected("human_cap", f"This verified human already used all {cap} submissions for this bounty.")
 
 
 def hardware_hold(world):
@@ -360,7 +385,7 @@ def repeats_enough(labels, failure):
     return labels.count(failure) >= REPEAT_NEED
 
 
-def run_gate(world_path, spec_path, paid_path, salt_path, submitter, seed, out_root=RUNS, human_id=None, human_used=None, human_cap=None):
+def run_gate(world_path, spec_path, paid_path, salt_path, submitter, seed, out_root=RUNS, human_id=None, human_used=None, human_cap=None, world_db=None):
     """Always writes one verdict. Returns (verdict, folder). Every check before stage "sim" costs no sim time."""
     verdict = {"schema": VERDICT_SCHEMA, "accepted": False, "code": None, "reason": None, "stage": "file", "fingerprint": None, "result_hash": None,
                "propose": None, "submission_hash": None, "spec_hash": None, "submitter": None, "claim_seed": None, "human_cap": {"world_id_connected": False, "label": HUMAN_CAP_LABEL}, "runs": [], "limits_of_this_result": "Simulation only. The physics is hand-built and not calibrated to a real robot."}
@@ -383,9 +408,13 @@ def run_gate(world_path, spec_path, paid_path, salt_path, submitter, seed, out_r
         if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**31:
             raise Rejected("bad_seed", "The seed must be a whole number from 0 to 2147483647.")
         verdict["claim_seed"] = seed
-        human = verdict["human_cap"] = check_human_cap(human_id, human_used, human_cap)
+        if world_db and (human_id is not None or human_used is not None):
+            raise Rejected("bad_human_cap", "With a World ID store, the caller must not supply a human id or count.")
+        human = verdict["human_cap"] = verified_human_cap(world_db, submitter, spec["bounty_id"], human_cap) if world_db else check_human_cap(human_id, human_used, human_cap)
         if human["cap"] is not None and human["used"] >= human["cap"]:
-            raise Rejected("human_cap", f"This human id already used {human['used']} of {human['cap']} submissions for this bounty. World ID is not connected, so the caller supplied this id and count.")
+            source = "This verified human" if world_db else "This human id"
+            note = "" if world_db else " World ID is not connected, so the caller supplied this id and count."
+            raise Rejected("human_cap", f"{source} already used {human['used']} of {human['cap']} submissions for this bounty.{note}")
 
         verdict["stage"] = "world"
         world = check_world(read_json(world_path, MAX_SUBMISSION_BYTES, "world"))
@@ -405,6 +434,8 @@ def run_gate(world_path, spec_path, paid_path, salt_path, submitter, seed, out_r
 
         verdict["stage"] = "sim"
         submission = verdict["submission_hash"]
+        if world_db:
+            reserve_verified_slot(world_db, submitter, spec["bounty_id"], submission, human["cap"])
         folder = new_folder(Path(out_root), submission[2:18])
         _low_priority()
         with mp.get_context("spawn").Pool(MAX_PROCS, initializer=_low_priority) as pool:
@@ -460,7 +491,7 @@ def run_gate(world_path, spec_path, paid_path, salt_path, submitter, seed, out_r
                               "sent": False}
     except Rejected as r:
         verdict["code"], verdict["reason"] = r.code, r.reason
-    verdict["not_checked"] = NOT_CHECKED
+    verdict["not_checked"] = NOT_CHECKED[1:] if world_db else NOT_CHECKED
     if folder is None:
         folder = new_folder(Path(out_root), f"rejected_{verdict['code']}")
     (folder / "verdict.json").write_text(json.dumps(verdict, indent=1) + "\n")
@@ -479,8 +510,9 @@ def main():
     ap.add_argument("--human-id", help="NOT verified: World ID is not connected. A 32-byte hash from the caller.")
     ap.add_argument("--human-used", help="NOT verified: earlier submissions by this id that reached the sim, counted by the caller.")
     ap.add_argument("--human-cap", help="Most submissions per human id. Needs --human-id and --human-used. World ID is not connected.")
+    ap.add_argument("--world-db", help="The server's store of checked World ID proofs. It feeds the human cap in place of --human-id and --human-used.")
     a = ap.parse_args()
-    verdict, folder = run_gate(a.world, a.spec, a.paid, a.salt_file, a.submitter, a.seed, a.out, a.human_id, a.human_used, a.human_cap)
+    verdict, folder = run_gate(a.world, a.spec, a.paid, a.salt_file, a.submitter, a.seed, a.out, a.human_id, a.human_used, a.human_cap, a.world_db)
     print(json.dumps({"accepted": verdict["accepted"], "code": verdict["code"], "reason": verdict["reason"], "verdict": str(folder / "verdict.json")}, indent=1))
     sys.exit(0 if verdict["accepted"] else 1)
 
