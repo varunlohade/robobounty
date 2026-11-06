@@ -1,66 +1,92 @@
-/* The sign-in page: one recorded film edge to edge, and one solid panel on top. Tokens from design/claude/NOTES.md. */
-.lg{position:fixed;inset:0;overflow:hidden;background:var(--app);color:var(--t1)}
-.lg-back{position:absolute;inset:0;overflow:hidden}
-.lg-film{width:100%;height:100%;display:block;object-fit:cover;object-position:left center;background:var(--app)}
-.lg-cap{position:absolute;left:12px;top:12px;display:flex;align-items:center;gap:12px;max-width:calc(100% - 524px);padding:4px 4px 4px 12px;border-radius:6px;background:#0B0C0E;font-size:13px;line-height:18px;color:var(--t1)}
-.lg-cap p{min-width:0}
-.lg-cap button{flex:none;height:28px;padding:0 10px;border-radius:4px;background:var(--hover);font-size:13px;font-weight:500;transition:background-color 120ms var(--enter),transform 160ms var(--enter)}
-.lg-cap button:hover{background:var(--active)}
-.lg-cap button:active{transform:scale(.97)}
-.lg-panel{position:absolute;right:32px;top:50%;transform:translateY(-50%);width:440px;max-height:calc(100% - 48px);overflow:auto;display:flex;flex-direction:column;padding:28px;border-radius:8px;background:var(--panel)}
-.lg-panel[data-state=waiting] .go{order:1;margin-top:8px}.lg-panel[data-state=waiting] .lg-foot{order:2}
-.lg-panel[data-state=verifying] .qr{display:none}
-.lg-panel[data-state=off] .lg-staging,.lg-panel[data-state=verified] .lg-staging{display:none}
-.lg-mark{font-size:15px;line-height:20px;font-weight:500;letter-spacing:-.01em}
-.lg-panel h1{margin-top:24px;font-size:30px;line-height:36px;font-weight:500;letter-spacing:-.02em}
-.lg-lede{margin-top:10px;font-size:15px;line-height:22px;color:var(--t2)}
-.lg-head{margin-top:20px;font-size:20px;line-height:28px;font-weight:500;letter-spacing:-.01em}
-.lg-panel .go{margin-top:24px;display:flex;flex-direction:column;gap:4px}
-.lg-panel .go .btn{width:100%;height:44px;padding:0 20px;font-size:14px}
-.lg-panel .go .btn.bare{color:var(--t3);font-size:13px}
-.lg-proves{margin-top:12px;font-size:13px;line-height:18px;color:var(--t2)}
-.lg-staging{margin-top:8px;font-size:13px;line-height:18px;color:var(--amber-t)}
-.lg-error{display:grid;grid-template-columns:16px 1fr;gap:8px;margin-top:16px;padding:10px 12px;border-radius:6px;background:var(--raised);font-size:13px;line-height:18px;color:var(--red-t)}
-.lg-error svg{margin-top:1px}
-.lg-note{margin-top:16px;padding:12px;border-radius:6px;background:var(--raised);font-size:13px;line-height:18px}
-.lg-note b{display:block;font-weight:500}
-.lg-note p{margin-top:2px;color:var(--t2)}
-.lg-note .quiet{color:var(--t3)}
-.lg-note code{display:block;margin-top:8px;color:var(--t2);font-size:12px;line-height:16px;overflow-wrap:anywhere}
-.lg-verify{margin-top:12px;display:flex;flex-direction:column;gap:12px}
-.lg-panel .qr{width:min(100%,272px);height:auto;aspect-ratio:1;align-self:center;padding:12px;background:#fff;border-radius:6px}
-.lg-panel .qr svg{display:block;width:100%;height:100%}
-.lg-panel .steps{list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:18px}
-.lg-panel .steps li{display:grid;grid-template-columns:16px 1fr;gap:8px;color:var(--t3)}
-.lg-panel .steps li svg{margin-top:1px}
-.lg-panel .steps li.done{color:var(--t2)}.lg-panel .steps li.done svg{color:var(--green-t)}
-.lg-panel .steps li.now{color:var(--t1)}
-.lg-panel .steps small{display:block;font-size:12px;line-height:16px;color:var(--t3);margin-top:1px}
-.lg-panel .steps a{color:var(--blue-t);text-decoration:underline;text-underline-offset:2px}
-.lg-done{display:flex;align-items:center;gap:8px;margin-top:24px;height:44px;font-weight:500;color:var(--green-t)}
-.lg-proof{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
-.lg-proof dl{display:grid;grid-template-columns:repeat(4,auto);justify-content:space-between;gap:12px}
-.lg-proof dt{order:2;font-size:12px;line-height:16px;color:var(--t3)}
-.lg-proof dd{order:1;font-size:20px;line-height:28px;font-weight:500}
-.lg-proof dl>div{display:flex;flex-direction:column}
-.lg-proof .bad dd{color:var(--red-t)}
-.lg-from{margin-top:8px;font-size:12px;line-height:16px;color:var(--t3)}
-.lg-foot{margin-top:12px;font-size:12px;line-height:16px;color:var(--t3)}
-.lg-panel[data-state=asking] .lg-proof,.lg-panel[data-state=waiting] .lg-proof,.lg-panel[data-state=verifying] .lg-proof,.lg-panel[data-state=verified] .lg-proof{display:none}
-.lg-panel[data-state=waiting] h1,.lg-panel[data-state=waiting] .lg-lede,.lg-panel[data-state=verifying] h1,.lg-panel[data-state=verifying] .lg-lede,.lg-panel[data-state=verified] .lg-lede{display:none}
-.lg-panel:not([data-state=waiting]):not([data-state=verifying]) .lg-head{display:none}
-.lg-panel:not([data-state=waiting]) .lg-proves-qr{display:none}
+/* The sign-in page: one recorded film edge to edge, and one white sheet that rises over it. The sheet moves by transform only. */
+@font-face{font-family:"Instrument Sans";src:url(/login/instrument-sans-latin-wght.woff2) format("woff2");font-weight:400 600;font-display:swap}
+html,body{background:#000;margin:0}
+.lg *{box-sizing:border-box;margin:0}
+.lg{--ink:#0b0b0b;--grey:#4f4f4f;--fill:#efefef;--bad:#b3261e;--amber:#8a5a00;--sheet-ease:cubic-bezier(.23,1,.32,1);
+  position:fixed;inset:0;overflow:hidden;background:#000;color:var(--ink);font:400 20px/1.35 "Instrument Sans",Inter,system-ui,sans-serif;font-feature-settings:normal;-webkit-font-smoothing:antialiased}
+.lg-film{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;object-position:left top;background:#000}
+.lg-brand,.lg-sim{position:absolute;top:28px;height:52px;border-radius:26px;background:#fff;display:flex;align-items:center}
+.lg-brand{left:28px;padding:0 22px 0 16px;gap:9px;font-weight:600;font-size:18px;letter-spacing:-.02em}
+.lg-brand svg{width:24px;height:24px}
+.lg-sim{right:28px;padding:0 22px;color:var(--grey);font-size:15px}
 
-@media (max-width:1040px){.lg-panel{right:16px;width:400px;padding:24px}.lg-cap{max-width:calc(100% - 444px)}}
-@media (max-width:760px){
-  .lg{display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
-  .lg-back{position:relative;inset:auto;flex:none;height:75vw}
-  .lg-film{width:200%;height:auto;max-width:none}
-  .lg-cap{position:static;flex:none;max-width:none;border-radius:0;padding:8px 8px 8px 16px;background:var(--app);font-size:12px;line-height:16px}
-  .lg-cap button{height:44px;padding:0 14px}
-  .lg-panel{position:static;transform:none;flex:1 0 auto;width:100%;max-height:none;overflow:visible;padding:20px 16px 24px;border-radius:0}
-  .lg-panel h1{margin-top:16px;font-size:26px;line-height:32px}
-  .lg-panel .go{margin-top:20px}
-  .lg-proof dd{font-size:18px;line-height:24px}
+/* The sheet is as tall as the screen and its top edge is set by a transform, so a change of height never lays out or paints the film. */
+.lg-sheet{position:absolute;inset:0;background:#fff;border-radius:44px 44px 0 0;overflow:hidden auto;transform:translateY(100%);transition:transform 300ms var(--sheet-ease);will-change:transform;overscroll-behavior:contain}
+.lg-sheet:before{content:"";position:absolute;left:50%;top:12px;width:56px;height:5px;margin-left:-28px;border-radius:3px;background:#dcdcdc}
+.lg-step{display:flex;justify-content:space-between;gap:40px;padding:44px 56px 48px;animation:lg-in 200ms var(--sheet-ease)}
+@keyframes lg-in{from{opacity:0}}
+.lg h1{font-weight:500;font-size:clamp(52px,6.67vw,96px);line-height:.98;letter-spacing:-.05em}
+.lg-left{display:flex;flex-direction:column;justify-content:space-between;gap:28px;min-width:0}
+.lg-opts{flex:0 1 580px;min-width:0;display:flex;flex-direction:column;gap:14px;padding-top:6px}
+.lg-opt{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.lg-opt span{color:var(--grey);font-size:21px;letter-spacing:-.01em}
+.lg-pill{display:inline-flex;align-items:center;justify-content:center;height:72px;width:330px;flex:none;padding:0 24px;border:0;border-radius:36px;background:var(--ink);color:#fff;font:500 20px/1 "Instrument Sans",Inter,system-ui,sans-serif;letter-spacing:-.01em;cursor:pointer;text-decoration:none;transition:transform 160ms var(--sheet-ease),opacity 120ms var(--sheet-ease)}
+.lg-pill:hover{opacity:.84}
+.lg-pill:active{transform:scale(.97)}
+.lg-pill.grey{background:var(--fill);color:var(--ink);opacity:1}
+.lg-pill.grey:hover{opacity:.72}
+.lg-text{background:none;border:0;padding:12px 0;margin:-12px 0;color:var(--grey);font:400 20px/1.35 "Instrument Sans",Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none;transition:opacity 120ms var(--sheet-ease)}
+.lg-text:hover{opacity:.64}
+.lg-links{display:flex;flex-wrap:wrap;gap:12px 32px}
+.lg :focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.lg-pill:focus-visible{outline-offset:4px}
+
+.lg-form{flex:0 1 620px;min-width:0;display:flex;flex-direction:column;gap:14px;align-items:flex-end;padding-top:8px}
+.lg-input{width:100%;height:72px;border:0;border-radius:36px;background:#f1f1f1;padding:0 32px;font:400 22px/1 "Instrument Sans",Inter,system-ui,sans-serif;color:var(--ink);outline-offset:3px}
+.lg-input::placeholder{color:#6f6f6f}
+.lg-tabs{position:relative;display:grid;grid-template-columns:1fr 1fr;width:100%;height:60px;padding:5px;border-radius:30px;background:#f1f1f1}
+.lg-knob{position:absolute;left:5px;top:5px;bottom:5px;width:calc(50% - 5px);border-radius:25px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.06);transition:transform 200ms var(--sheet-ease)}
+.lg-tabs[data-mode=create] .lg-knob{transform:translateX(100%)}
+.lg-tab{position:relative;border:0;background:none;border-radius:25px;color:var(--grey);font:500 18px/1 "Instrument Sans",Inter,system-ui,sans-serif;letter-spacing:-.01em;cursor:pointer}
+.lg-tab[aria-pressed=true]{color:var(--ink)}
+.lg-submit{display:flex;align-items:center;justify-content:space-between;gap:20px;width:100%}
+.lg-honest{padding-left:32px;font-size:20px;color:var(--grey);white-space:nowrap}
+.lg-small.bad{color:var(--bad);align-self:flex-start;padding-left:32px;margin-top:0}
+
+.lg-say{margin-top:24px;max-width:600px;font-size:23px;line-height:1.3;letter-spacing:-.01em;color:var(--grey)}
+.lg-say.lg-status{color:var(--ink)}
+.lg-say.bad{color:var(--bad)}
+.lg-small{margin-top:10px;max-width:600px;font-size:18px;line-height:1.35;color:var(--grey)}
+.lg-small a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.lg-small.amber{color:var(--amber)}
+.lg-small code{display:block;margin-top:6px;font:400 15px/1.4 "JetBrains Mono",ui-monospace,monospace;overflow-wrap:anywhere}
+.lg-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin-top:24px}
+.lg-qr{width:330px;height:330px;flex:none;background:#fff}
+.lg-qr.empty{background:var(--fill);border-radius:24px}
+.lg-qr svg{display:block;width:100%;height:100%}
+
+@media (max-width:1240px){
+  .lg-step{padding:40px 40px 40px;gap:32px}
+  .lg-opts{flex-basis:480px}
+  .lg-opt span{font-size:19px}
+  .lg-pill{width:290px;height:68px;font-size:18px}
+  .lg-form{flex-basis:540px}
+  .lg-honest,.lg-small.bad{padding-left:24px;font-size:18px}
+  .lg-qr{width:300px;height:300px}
 }
-@media (prefers-reduced-motion:reduce){.lg-cap button{transition:none}}
+@media (max-width:760px){
+  .lg-brand,.lg-sim{top:16px;height:44px;border-radius:22px}
+  .lg-brand{left:16px;font-size:17px;padding:0 18px 0 12px}
+  .lg-sim{right:16px;padding:0 16px}
+  .lg-sheet{border-radius:32px 32px 0 0}
+  .lg-step{flex-direction:column;padding:36px 20px 28px;gap:24px}
+  .lg h1{font-size:52px}
+  .lg-opts,.lg-form{flex:none;width:100%;padding-top:0;gap:16px}
+  .lg-opt{flex-direction:column;align-items:stretch;gap:6px}
+  .lg-opt span{font-size:18px}
+  .lg-pill{width:100%;height:60px;font-size:18px}
+  .lg-input{height:60px;padding:0 24px;font-size:18px}
+  .lg-submit{flex-direction:column-reverse;align-items:stretch;gap:10px}
+  .lg-honest{padding-left:24px;font-size:18px}
+  .lg-small.bad{padding-left:24px}
+  .lg-tabs{height:56px}
+  .lg-tab{font-size:17px}
+  .lg-say{margin-top:14px;font-size:20px}
+  .lg-small{font-size:17px}
+  .lg-row{margin-top:18px}
+  .lg-row .lg-pill{width:100%}
+  .lg-qr{width:min(100%,270px);height:auto;aspect-ratio:1;align-self:center}
+  .lg-left{display:contents}
+  .lg-links{order:3}
+}
+@media (prefers-reduced-motion:reduce){.lg-sheet,.lg-pill,.lg-text,.lg-knob{transition:none}.lg-step{animation:none}.lg-pill:active{transform:none}}

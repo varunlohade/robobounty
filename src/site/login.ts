@@ -1,70 +1,49 @@
 import QR from 'qrcode-generator';
-import './shell.css';
 import './login.css';
-import { icon, type IconName } from './icons.ts';
 import { enterAsGuest, whoIs } from './session.ts';
-import { button, getJson, h, START_SERVER } from './ui.ts';
+import { getJson, h, START_SERVER } from './ui.ts';
 
 interface Status { on: boolean; missing: string[]; credential?: string | null }
-type Face = 'ready' | 'off' | 'asking' | 'waiting' | 'verifying' | 'verified' | 'failed';
 const root = document.getElementById('site')!;
-const go = h('div', 'go');
-const note = h('div', '');
-const live = h('div', '');
-const error = h('div', 'lg-error');
-error.hidden = true;
-error.setAttribute('role', 'alert');
-const proves = h('p', 'lg-proves');
-proves.hidden = true;
-const staging = h('p', 'lg-staging', 'This server uses World ID staging, which accepts test proofs.');
-staging.hidden = true;
-const head = h('p', 'lg-head', 'Scan with World App');
-head.setAttribute('aria-live', 'polite');
-const proof = h('div', 'lg-proof');
-proof.hidden = true;
-let cancel: AbortController | null = null;
-let deviceMode = true;
+const MARK = '<svg viewBox="0 0 28 28" aria-hidden="true"><g fill="currentColor"><path d="M3 20.2A11 11 0 0 1 18.6 4.6z"/><path d="M25 7.8A11 11 0 0 1 9.4 23.4z"/></g></svg>';
 
-const panel = h('section', 'lg-panel', h('div', 'lg-mark', 'CrashLab'),
-  h('h1', '', 'Crash tests for robots'),
-  h('p', 'lg-lede', 'Describe the job. AI builds the world and runs your robot through it. Every failure comes with its reason.'),
-  head, go, error, live, proves, staging, note, proof,
-  h('p', 'lg-foot', 'Simulated. Hand-built physics and an upstream walking policy, not checked against real hardware.'));
-panel.setAttribute('aria-label', 'Sign in to CrashLab');
-const face = (f: Face) => { panel.dataset.state = f; };
-
-// The background is one recorded film with its labels baked in. The page plays it and does nothing else: no canvas, no per-tile elements, no timers.
-const film = Object.assign(document.createElement('video'), { className: 'lg-film', muted: true, loop: true, playsInline: true, autoplay: false, preload: 'none', poster: '/login/film-poster.jpg', disablePictureInPicture: true });
+// The background is one recorded film with its labels baked in. The page plays it and does nothing else. With reduced motion it stays on the poster.
+const film = Object.assign(document.createElement('video'), { className: 'lg-film', muted: true, loop: true, playsInline: true, preload: 'none', poster: '/login/film-poster.jpg', disablePictureInPicture: true });
 film.setAttribute('muted', '');
 film.setAttribute('playsinline', '');
 film.setAttribute('aria-hidden', 'true');
 const still = matchMedia('(prefers-reduced-motion: reduce)');
-const caption = h('div', 'lg-cap', h('p', '', 'Simulated'));
-root.append(h('div', 'lg', h('div', 'lg-back', film), caption, panel));
 function setPlaying(on: boolean) {
   if (on) {
-    if (!film.getAttribute('src')) { film.preload = 'auto'; film.src = '/login/film-1080.mp4'; }
+    if (!film.getAttribute('src')) { film.preload = 'auto'; film.autoplay = true; film.src = '/login/film-1080.mp4'; }
     void film.play().catch(() => {});
   } else film.pause();
 }
-still.addEventListener('change', () => { if (still.matches) setPlaying(false); });
+still.addEventListener('change', () => setPlaying(!still.matches));
 if (!still.matches) setPlaying(true);
 
-// Small proof, read from the site's own data, never written here.
-interface Batch { id: string; total: number; passed: number; failed: number; holds: number }
-getJson<{ campaigns: Batch[] }>('/site-api/data').then(d => {
-  const batches = d.campaigns.filter(c => c.id === 'demo-window' || c.id === 'demo-inspection');
-  if (!batches.length) return;
-  const sum = (k: 'total' | 'passed' | 'failed' | 'holds') => batches.reduce((n, b) => n + b[k], 0);
-  const cell = (n: number, word: string, cls = '') => h('div', cls, h('dd', '', String(n)), h('dt', '', word));
-  proof.replaceChildren(h('dl', '', cell(sum('total'), 'runs'), cell(sum('passed'), 'passed'), cell(sum('failed'), 'failed', 'bad'), cell(sum('holds'), 'safe holds')),
-    h('p', 'lg-from', 'Latest recorded batches, window robot and walking robot.'));
-  proof.hidden = false;
-}).catch(() => {});
-// The server names its World ID environment on the providers list. Display only.
-getJson<{ entries?: { id: string; version: string }[] }>('/site-api/providers').then(d => {
-  if (d.entries?.find(e => e.id === 'world')?.version === 'staging') staging.hidden = false;
-}).catch(() => {});
+const brand = h('div', 'lg-brand');
+brand.innerHTML = `${MARK}CrashLab`;
+const sheet = h('section', 'lg-sheet');
+sheet.setAttribute('aria-label', 'Sign in to CrashLab');
+root.append(h('div', 'lg', film, brand, h('div', 'lg-sim', 'Simulated'), sheet));
+
+// The sheet's top edge follows the height of its step. Past the screen height the sheet scrolls.
+const fit = new ResizeObserver(() => place());
+function place() {
+  const step = sheet.firstElementChild as HTMLElement | null;
+  if (!step) return;
+  sheet.style.transform = `translateY(${Math.max(16, innerHeight - step.offsetHeight)}px)`;
+  step.style.marginBottom = step.offsetHeight > innerHeight - 16 ? '16px' : '';
+}
+addEventListener('resize', place);
+function show(step: HTMLElement) {
+  fit.disconnect();
+  sheet.replaceChildren(step);
+  sheet.scrollTop = 0;
+  fit.observe(step);
+  place();
+}
 
 // Where a visitor was going before login. Only a page of this site, so a link cannot send them elsewhere.
 function nextPage(): string {
@@ -72,51 +51,121 @@ function nextPage(): string {
   return /^[a-z]+\.html(\?[\w\-./=&%]*)?$/.test(asked) ? asked : 'home.html';
 }
 
-function guest() {
-  enterAsGuest();
-  location.href = nextPage();
+function pill(cls: string, label: string, on: () => void) {
+  const b = h('button', `lg-pill ${cls}`, label);
+  b.type = 'button';
+  b.addEventListener('click', on);
+  return b;
+}
+function textButton(label: string, on: () => void) {
+  const b = h('button', 'lg-text', label);
+  b.type = 'button';
+  b.addEventListener('click', on);
+  return b;
+}
+const guestButton = () => textButton('Enter as local guest', () => { stopRequest(); enterAsGuest(); location.href = nextPage(); });
+const backButton = () => textButton('Back', () => { stopRequest(); startStep(); });
+
+function startStep() {
+  const option = (who: string, label: string, on: () => void) => h('div', 'lg-opt', h('span', '', who), pill('', label, on));
+  show(h('div', 'lg-step', h('h1', '', 'Robots fall', h('br'), 'here first.'),
+    h('div', 'lg-opts',
+      option('For robotics teams', 'Continue with work email', companyStep),
+      option('For engineers', 'Continue with World ID', () => { void engineerStep(); }))));
 }
 
-function fail(words: string) {
-  face('failed');
-  error.replaceChildren(icon('x', 16), h('div', '', words));
-  error.hidden = false;
+// The one seam for company accounts. src/site/auth.ts replaces this when the account server is up. Until then nobody enters here, and nothing is stored.
+type CompanyMode = 'signin' | 'create';
+async function companyAuth(_mode: CompanyMode, _email: string, _password: string): Promise<{ ok: true } | { ok: false; words: string }> {
+  return { ok: false, words: 'Company accounts are not connected yet.' };
 }
 
-function step(cls: string, ic: IconName, text: string, ...small: (Node | string)[]) {
-  const mark = icon(ic, 16);
-  if (ic === 'loader') mark.classList.add('spin');
-  return h('li', cls, mark, h('div', '', text, small.length ? h('small', '', ...small) : null));
+function companyStep() {
+  let mode: CompanyMode = 'signin';
+  const title = h('h1', '');
+  const email = h('input', 'lg-input');
+  Object.assign(email, { type: 'email', required: true, placeholder: 'you@company.com', autocomplete: 'email', name: 'email' });
+  email.setAttribute('aria-label', 'Work email');
+  const password = h('input', 'lg-input');
+  Object.assign(password, { type: 'password', required: true, placeholder: 'Password', name: 'password' });
+  password.setAttribute('aria-label', 'Password');
+  const enter = h('button', 'lg-pill');
+  enter.type = 'submit';
+  const error = h('p', 'lg-small bad');
+  error.setAttribute('role', 'alert');
+  error.hidden = true;
+  const tab = (label: string, to: CompanyMode) => {
+    const b = h('button', 'lg-tab', label);
+    b.type = 'button';
+    b.dataset.mode = to;
+    b.addEventListener('click', () => setMode(to));
+    return b;
+  };
+  const tabs = h('div', 'lg-tabs', h('i', 'lg-knob'), tab('Sign in', 'signin'), tab('Create account', 'create'));
+  tabs.setAttribute('role', 'group');
+  tabs.setAttribute('aria-label', 'Sign in or create an account');
+  function setMode(to: CompanyMode) {
+    mode = to;
+    tabs.dataset.mode = to;
+    for (const b of tabs.querySelectorAll<HTMLButtonElement>('button')) b.setAttribute('aria-pressed', String(b.dataset.mode === to));
+    title.replaceChildren(...(to === 'signin' ? ['Company', h('br'), 'sign in.'] : ['New company', h('br'), 'account.']));
+    enter.textContent = to === 'signin' ? 'Sign in' : 'Create account';
+    password.autocomplete = to === 'signin' ? 'current-password' : 'new-password';
+    error.hidden = true;
+  }
+  setMode('signin');
+  const form = h('form', 'lg-form', tabs, email, password, h('div', 'lg-submit', h('p', 'lg-honest', 'Email not verified'), enter), error);
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    error.hidden = true;
+    void companyAuth(mode, email.value, password.value).then(r => {
+      if (r.ok) location.href = nextPage();
+      else { error.textContent = r.words; error.hidden = false; }
+    });
+  });
+  show(h('div', 'lg-step', h('div', 'lg-left', title, h('div', 'lg-links', backButton())), form));
+  email.focus({ preventScroll: true });
 }
 
-function qrSvg(text: string): HTMLElement {
+const status = getJson<Status>('/site-api/auth/world').catch(() => null);
+let environment = '';
+// The server names its World ID environment on the providers list. Display only.
+getJson<{ entries?: { id: string; version: string }[] }>('/site-api/providers').then(d => {
+  environment = d.entries?.find(e => e.id === 'world')?.version ?? '';
+}).catch(() => {});
+const stagingLine = () => environment === 'staging' ? h('p', 'lg-small amber', 'This server uses World ID staging, which accepts test proofs.') : null;
+
+function worldTitle(first: string, second: string) { return h('h1', '', first, h('br'), second); }
+function worldStep(title: HTMLElement, body: (Node | null)[], links: Node[], qr?: HTMLElement) {
+  show(h('div', 'lg-step', h('div', 'lg-left', h('div', '', title, ...body), h('div', 'lg-links', ...links)), qr ?? null));
+}
+
+function offStep(s: Status | null) {
+  worldStep(worldTitle('World ID', 'is off.'), [
+    h('p', 'lg-say lg-status', s ? 'World ID is not set up on this server yet.' : 'The site server does not answer, so World ID is off.'),
+    h('p', 'lg-small', 'A guest can use everything here, and is shown as not verified.'),
+    s?.missing.length ? h('p', 'lg-small', `Missing in .env: ${s.missing.join(', ')}`) : null,
+    s ? null : h('p', 'lg-small', h('code', '', START_SERVER)),
+  ], [backButton(), guestButton()]);
+}
+
+function failStep(words: string) {
+  worldStep(worldTitle('World ID', 'did not finish.'), [
+    h('p', 'lg-say bad', words),
+    h('div', 'lg-row', pill('', 'Try again', () => { void engineerStep(); })),
+  ], [backButton(), guestButton()]);
+}
+
+function qrBox(text: string): HTMLElement {
   const qr = QR(0, 'M');
   qr.addData(text);
   qr.make();
-  const box = h('div', 'qr');
+  const box = h('div', 'lg-qr');
   box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+  const svg = box.querySelector('svg')!;
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', 'QR code for this World ID request');
   return box;
-}
-
-function offState(status: Status | null) {
-  face('off');
-  proves.hidden = true;
-  go.replaceChildren(button('sec', 'Enter as local guest', guest));
-  note.replaceChildren(h('div', 'lg-note',
-    h('b', '', status ? 'World ID is not set up on this server yet' : 'The site server does not answer, so World ID is off'),
-    h('p', '', 'A guest can use everything here, and is shown as not verified.'),
-    status?.missing.length ? h('p', 'quiet', `Missing in .env: ${status.missing.join(', ')}`) : null,
-    status ? null : h('code', '', START_SERVER)));
-}
-
-function onState(credential: string | null | undefined) {
-  face('ready');
-  deviceMode = credential !== 'human';
-  proves.textContent = deviceMode ? 'World ID checks this device only. Not proof of a unique human. It shares no name, email or face.' : 'World ID proves you are one unique human. It shares no name, email or face.';
-  proves.hidden = false;
-  go.replaceChildren(button('pri', 'Sign in with World ID', () => { void start(); }), button('bare', 'Enter as local guest', guest));
-  note.replaceChildren();
-  live.replaceChildren();
 }
 
 async function post(path: string, body?: unknown) {
@@ -124,22 +173,29 @@ async function post(path: string, body?: unknown) {
   return { ok: res.ok, body: await res.json().catch(() => ({})) };
 }
 
-async function start() {
-  face('asking');
-  error.hidden = true;
-  cancel = new AbortController();
-  const waiting = h('button', 'btn pri wait', icon('loader'), 'Waiting for World App');
-  waiting.setAttribute('aria-disabled', 'true');
-  waiting.tabIndex = -1;
-  waiting.firstElementChild!.classList.add('spin');
-  const stop = button('bare', 'Cancel', () => cancel?.abort());
-  go.replaceChildren(waiting, stop);
-  live.replaceChildren(h('ul', 'steps verify-only', step('now', 'loader', 'Asking the server to sign this request')));
+let cancel: AbortController | null = null;
+function stopRequest() { cancel?.abort(); cancel = null; }
+
+async function engineerStep() {
+  stopRequest();
+  const run = new AbortController();
+  cancel = run;
+  const title = () => worldTitle('Scan with', 'World App.');
+  const empty = h('div', 'lg-qr empty');
+  empty.setAttribute('aria-hidden', 'true');
+  const asking = h('p', 'lg-say lg-status', 'Asking the server to sign this request.');
+  asking.setAttribute('aria-live', 'polite');
+  worldStep(title(), [asking], [backButton(), guestButton()], empty);
+  const s = await status;
+  if (run.signal.aborted) return;
+  if (!s?.on) { cancel = null; offStep(s); return; }
+  const device = s.credential !== 'human';
   try {
     const ctx = await post('/site-api/auth/world/context');
     if (!ctx.ok) throw new Error(ctx.body.words ?? 'The server would not sign this request.');
+    if (run.signal.aborted) return;
     const c = ctx.body;
-    if (c.environment === 'staging') staging.hidden = false;
+    if (c.environment) environment = c.environment;
     const { IDKit, CredentialRequest, deviceLegacy } = await import('@worldcoin/idkit-core');
     const config = { app_id: c.app_id, rp_context: c.rp_context, environment: c.environment };
     const credential = CredentialRequest('proof_of_human');
@@ -149,37 +205,33 @@ async function start() {
       : c.mode === 'prove'
       ? await IDKit.proveSession(c.session_id, config).constraints(credential)
       : await IDKit.request({ ...config, action: c.action, session_id: 'create', allow_legacy_proofs: false }).constraints(credential);
+    if (run.signal.aborted) return;
     const uri = request.connectorURI;
-    const openLink = h('a', '', 'open this request on your phone');
-    openLink.href = uri;
-    openLink.target = '_blank';
-    openLink.rel = 'noopener';
-    const steps = h('ul', 'steps',
-      step('done', 'check', 'Request created'),
-      step('now', 'loader', 'Scan the code with World App', 'Or ', openLink, '. The request ends in 5 minutes.'),
-      step('', 'circle', 'Check the proof on the server'));
-    head.textContent = 'Scan with World App';
-    go.replaceChildren(stop);
-    live.replaceChildren(h('div', 'lg-verify', qrSvg(uri), steps));
-    face('waiting');
-    const done = await request.pollUntilCompletion({ signal: cancel.signal, timeout: 300_000 });
-    if (!done.success) throw new Error(cancel.signal.aborted ? 'cancelled' : 'World ID did not finish. You are not signed in. You can try again.');
-    head.textContent = 'Checking your proof';
-    go.replaceChildren();
-    proves.hidden = true;
-    face('verifying');
-    steps.replaceChildren(step('done', 'check', 'Request created'), step('done', 'check', 'World App answered'), step('now', 'loader', 'Checking the proof on the server'));
+    const open = h('a', '', 'open this request on your phone');
+    open.href = uri;
+    open.target = '_blank';
+    open.rel = 'noopener';
+    worldStep(title(), [
+      h('p', 'lg-say', device ? 'Verified device. Not proof of a unique human. It shares no name, email or face.' : 'World ID proves you are one unique human. It shares no name, email or face.'),
+      h('p', 'lg-small', 'Waiting for World App. Or ', open, '. The request ends in 5 minutes.'),
+      stagingLine(),
+    ], [backButton(), guestButton()], qrBox(uri));
+    const done = await request.pollUntilCompletion({ signal: run.signal, timeout: 300_000 });
+    if (run.signal.aborted) return;
+    if (!done.success) throw new Error('You are not signed in. You can try again.');
+    worldStep(worldTitle('Checking', 'your proof.'), [h('p', 'lg-say lg-status', 'World App answered. The server is checking the proof.')], []);
     const reply = await post('/site-api/auth/world/verify', done.result);
+    if (run.signal.aborted) return;
     if (!reply.ok || reply.body.verified !== true) throw new Error(reply.body.words ?? 'The server refused this proof. You are not signed in.');
-    face('verified');
-    live.replaceChildren(h('div', 'lg-done', icon('ok', 16), reply.body.credential === 'human' ? 'The server verified your proof. Opening CrashLab.' : 'Verified device. Not proof of a unique human. Opening CrashLab.'));
+    cancel = null;
+    worldStep(worldTitle('Opening', 'CrashLab.'), [h('p', 'lg-say lg-status', reply.body.credential === 'human' ? 'The server verified your proof.' : 'Verified device. Not proof of a unique human.')], []);
     location.href = nextPage();
   } catch (err) {
-    onState(deviceMode ? 'device' : 'human');
-    const words = err instanceof Error ? err.message : '';
-    if (words !== 'cancelled' && !cancel?.signal.aborted) fail(words || 'World ID did not finish. You are not signed in.');
+    if (run.signal.aborted) return;
+    cancel = null;
+    failStep((err instanceof Error && err.message) || 'You are not signed in. You can try again.');
   }
 }
 
+startStep();
 whoIs().then(who => { if (who.kind !== 'none') location.replace(nextPage()); });
-getJson<Status>('/site-api/auth/world').then(s => (s.on ? onState(s.credential) : offState(s))).catch(() => offState(null));

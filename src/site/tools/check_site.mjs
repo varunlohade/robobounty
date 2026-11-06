@@ -48,15 +48,39 @@ await clearAll();
 await go('');
 await until(`location.pathname === '/login.html'`, 'login', 20).catch(() => null);
 const worldOn = await ev(`fetch('/site-api/auth/world').then(r => r.json()).then(s => s.on)`);
-await waitText(worldOn ? 'Sign in with World ID' : 'World ID is not set up');
+await waitText('Continue with World ID');
 say((await ev(`location.pathname`)) === '/login.html', '/ leads to login with no session', await ev(`location.pathname`));
 const offWords = await text();
-say(worldOn ? offWords.includes('Sign in with World ID') : offWords.includes('World ID is not set up on this server yet'), worldOn ? 'login offers World ID, as the server says it is set up' : 'login says World ID is not set up');
+say(offWords.includes('Continue with World ID') && offWords.includes('Continue with work email'), 'login offers the two paths');
 say(!offWords.includes('Verified human'), 'login shows no verified state');
+say(!offWords.includes('Send sign-in link') && !offWords.includes('Use SSO'), 'login promises no email or SSO');
+say(await ev(`(() => { const v = document.querySelector('video.lg-film'); return !!v && v.muted && v.loop && v.playsInline && v.poster.endsWith('/login/film-poster.jpg') && !v.controls; })()`), 'login film is muted, looping, inline, with a poster and no controls');
+say(await ev(`![...document.querySelectorAll('button')].some(b => /pause/i.test(b.textContent + (b.getAttribute('aria-label') ?? '')))`), 'login has no pause control');
 await shot('live-login');
 
-// Guest flow.
-await ev(`[...document.querySelectorAll('button')].find(b => b.textContent.includes('Enter as local guest')).click()`);
+// Company path. The look only: src/site/auth.ts connects it to the account server, so today nobody enters and nothing is stored.
+const clickButton = words => ev(`[...document.querySelectorAll('button')].find(b => b.textContent.includes(${JSON.stringify(words)})).click()`);
+await clickButton('Continue with work email');
+await waitText('Email not verified');
+const companyWords = await text();
+say(companyWords.includes('Email not verified'), 'the company step says the email is not verified');
+say(await ev(`!!document.querySelector('input[type=email]') && !!document.querySelector('input[type=password]')`), 'the company step asks for email and password');
+say(!companyWords.includes('Send sign-in link') && !companyWords.includes('Use SSO'), 'the company step promises no email or SSO');
+await clickButton('Create account');
+say(await ev(`document.querySelector('form button[type=submit]').textContent === 'Create account'`), 'the toggle switches to create account');
+await ev(`document.querySelector('input[type=email]').value = 'someone@example.com'; document.querySelector('input[type=password]').value = 'not-a-real-password'; document.querySelector('form button[type=submit]').click()`);
+await wait(400);
+say((await ev(`location.pathname`)) === '/login.html', 'the company step does not enter without the account server');
+say(await ev(`localStorage.length === 0`), 'the company step stores nothing in the browser');
+await go('login.html');
+
+// Guest flow. The World ID step always keeps a quiet guest way in.
+await waitText('Continue with World ID');
+await clickButton('Continue with World ID');
+await waitText(worldOn ? 'Scan with' : 'World ID is not set up');
+say((await text()).includes(worldOn ? 'Scan with' : 'World ID is not set up on this server yet'), worldOn ? 'the World ID step asks for a scan, as the server says it is set up' : 'the World ID step says it is not set up');
+await waitText('Enter as local guest');
+await clickButton('Enter as local guest');
 await until(`location.pathname === '/home.html'`, 'home', 20).catch(() => null);
 await waitText('Local guest');
 say((await ev(`location.pathname`)) === '/home.html', 'guest reaches home', await ev(`location.pathname`));
@@ -200,14 +224,15 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `{ const real = wi
     if (url.includes('/response/')) return json({ status: 'initialized' });
     return real(u, o); }; try { localStorage.clear(); } catch {} }` });
 await go('login.html', 900);
-say((await text()).includes('Sign in with World ID'), 'MOCK: with settings, login offers World ID');
+say((await text()).includes('Continue with World ID'), 'MOCK: with settings, login offers World ID');
 await shot('live-mock-login-on');
-await ev(`[...document.querySelectorAll('button')].find(b => b.textContent.includes('Sign in with World ID')).click()`);
+await ev(`[...document.querySelectorAll('button')].find(b => b.textContent.includes('Continue with World ID')).click()`);
 await wait(3000);
-const hasQr = await ev(`!!document.querySelector('.qr svg')`);
+const hasQr = await ev(`!!document.querySelector('.lg-qr svg')`);
 say(hasQr, 'MOCK: IDKit builds a request and the page draws its QR code', hasQr ? '' : (await text()).slice(0, 300));
 await shot('live-mock-login-verifying');
 say(!(await text()).includes('Verified human'), 'MOCK: waiting never shows verified');
+say((await text()).includes('Enter as local guest'), 'MOCK: the guest way in stays while waiting');
 
 b.close();
 console.log(failed ? `${failed} FAILED` : 'ALL PASS');

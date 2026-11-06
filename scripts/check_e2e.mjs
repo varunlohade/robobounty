@@ -52,6 +52,13 @@ async function flow(mode) {
     const b = await rect(find);
     await c.click(b.x, b.y);
   };
+  // The guest way in sits on the World ID step. The clicks wait out the sheet's 300 ms rise.
+  const enterAsGuest = async () => {
+    await clickText('Continue with World ID', '.lg-sheet');
+    await c.until(`!document.body.innerText.includes('Asking the server')`, 'the World ID step', 30);
+    await wait(450);
+    await clickText('Enter as local guest', '.lg-sheet');
+  };
   const say = words => c.js(`(() => { const t = document.querySelector('.chat-input'); t.value = ${JSON.stringify(words)}; document.querySelector('.chat-send').click(); })()`);
   const noVerifiedClaim = async where => {
     const words = await text();
@@ -97,7 +104,7 @@ async function flow(mode) {
       check(`${mode}: login keeps ?post=`, (await c.js('location.search')).includes(encodeURIComponent('bounties.html?post=nosession/c1/slip_distance')), await c.js('location.search'));
     });
     await step('post-link-after-guest', async () => {
-      await clickText('Enter as local guest');
+      await enterAsGuest();
       await c.until(`location.pathname === '/bounties.html' && !!document.querySelector('.overlay')`, 'the post dialog after login', 30);
       await c.until(`document.querySelector('.overlay .bad')?.textContent.includes('cannot be posted')`, 'a plain refusal of a bad link', 30);
       await noVerifiedClaim('the bounty page');
@@ -113,10 +120,10 @@ async function flow(mode) {
 
     await step('login', async () => {
       await go('');
-      await c.until(`location.pathname === '/login.html' && document.body.innerText.includes('Enter as local guest')`, '/ leads to login', 30);
+      await c.until(`location.pathname === '/login.html' && document.body.innerText.includes('Continue with World ID')`, '/ leads to login', 30);
     });
     await step('home', async () => {
-      await clickText('Enter as local guest');
+      await enterAsGuest();
       await c.until(`location.pathname === '/home.html' && document.querySelector('.sh-who')?.dataset.who === 'guest'`, 'home', 30);
     }, 1500);
     await step('crashlab', async () => {
