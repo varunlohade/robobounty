@@ -209,11 +209,27 @@ function fixDetail(b: Bounty, inner: HTMLElement) {
   inner.append(sect('Frozen judge and sim'));
   for (const [k, v] of Object.entries(b.frozen!).filter(([name]) => /judge|sim/.test(name))) inner.append(h('div', 'kv', h('span', '', code(k.split('/').pop()!)), h('span', '', code(short(v)))));
   inner.append(h('div', 'words small', b.scope!));
-  if (b.chain_mirror) {
-    inner.append(sect(b.chain_mirror.label, `Chain ${b.chain_mirror.chain_id}`));
-    for (const [k, v] of Object.entries(b.chain_mirror.txs).filter(([name]) => ['propose', 'finalize', 'claim'].includes(name))) inner.append(h('div', 'kv', h('span', '', cap1(k)), h('span', '', code(short(v)))));
-  }
+  if (b.chain_mirror) inner.append(...chainRows(b.chain_mirror));
+  if (b.evidence) inner.append(...evidenceRows(b.evidence));
   inner.append(...notChecked(b));
+}
+
+// The label comes from the mirror process, which reads the chain id. Only a real Arc testnet tx has a link.
+function chainRows(m: NonNullable<Bounty['chain_mirror']>) {
+  const rows: HTMLElement[] = [sect(m.label, m.chain_id ? `Chain ${m.chain_id}` : '')];
+  if (m.state) rows.push(h('div', 'kv', h('span', '', 'On chain'), h('span', '', m.paid ? `Claimed. ${(m.pay_base_units ?? 0) / 1e6} test USDC paid.` : m.state)));
+  for (const [k, v] of Object.entries(m.txs ?? {}).filter(([name]) => ['create_bounty', 'propose', 'reject', 'finalize', 'claim'].includes(name))) {
+    const url = m.tx_links?.[k];
+    const shown = url ? h('a', '', code(short(v))) : h('span', '', code(short(v)));
+    if (url) { shown.setAttribute('href', url); shown.setAttribute('target', '_blank'); shown.setAttribute('rel', 'noopener'); }
+    rows.push(h('div', 'kv', h('span', '', cap1(k.replace('_', ' '))), shown));
+  }
+  if (m.message) rows.push(h('div', 'words small', m.message));
+  return rows;
+}
+
+function evidenceRows(e: NonNullable<Bounty['evidence']>) {
+  return [sect(e.label), h('div', 'kv', h('span', '', 'Root hash'), h('span', '', code(short(e.root_hash)))), h('div', 'words small', e.rechecked ? 'Downloaded again, and the file hash matched.' : 'Not downloaded again yet, so this upload is not checked.')];
 }
 
 function latestProof(): FixResult | null {

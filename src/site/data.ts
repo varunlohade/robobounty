@@ -7,7 +7,7 @@ interface World {
   id: string; group: string; name: string; kind: string; kind_name: string; outcome: 'pass' | 'fail' | 'hold'; at: number | null; reading: string; line: string; repeat: string; flaky: boolean;
   reason: string; changes: string[]; seed: number | null; film: string | null; replay: string | null; bounds?: Record<string, number | null>;
 }
-interface Campaign extends Tally { id: string; label: string; robot: string; pack: string; sim: string | null; source: string; kind: 'rows' | 'totals'; note: string; held_back: number; worlds: World[]; coverage?: Coverage | null }
+interface Campaign extends Tally { id: string; label: string; robot: string; pack: string; sim: string | null; source: string; kind: 'rows' | 'totals'; note: string; held_back: number; worlds: World[]; coverage?: Coverage | null; evidence?: { label: string; root_hash: string; rechecked: boolean } | null }
 type SortKey = 'id' | 'group' | 'kind_name' | 'at' | 'reading' | 'repeat' | 'line';
 
 const { main, setStatus } = mountShell({ page: 'data', title: 'Data', subtitle: 'Campaign results. All simulated.' });
@@ -29,6 +29,7 @@ let sortUp = true;
 let openId: string | null = null;
 
 const campaignBox = h('div', 'campaigns');
+const evidenceBox = h('div', 'evidence');
 const summary = h('div', 'summary');
 const charts = h('div', 'charts');
 const libHead = h('div', 'libhead');
@@ -44,7 +45,7 @@ libHead.append(h('h2', '', 'Failure library'), chips, field);
 const coverageBox = h('div', 'coverage');
 const suiteBox = h('div', 'suites');
 let suites: Suites | null = null;
-page.append(campaignBox, summary, charts, coverageBox, libHead, libBody, suiteBox);
+page.append(campaignBox, evidenceBox, summary, charts, coverageBox, libHead, libBody, suiteBox);
 
 const swatch = (w: World) => (w.outcome === 'pass' ? 'c-pass' : w.outcome === 'hold' ? 'c-hold' : `c-${w.kind} c-fail`);
 
@@ -62,7 +63,14 @@ function filtered(): World[] {
   });
 }
 
+// Shown only when an upload wrote its record, and it says if the file has been downloaded again.
+function paintEvidence() {
+  const e = current.evidence;
+  evidenceBox.replaceChildren(...(e ? [h('p', 'quiet', `${e.label} Root hash ${e.root_hash}. ${e.rechecked ? 'Downloaded again, and the file hash matched.' : 'Not downloaded again yet, so this upload is not checked.'}`)] : []));
+}
+
 function paintCampaigns() {
+  paintEvidence();
   const body = h('tbody');
   for (const c of campaigns) {
     const tr = h('tr', 'row', h('td', 'main', c.label), h('td', 'hide-n', c.robot), h('td', 'num', String(c.total)), h('td', 'num', String(c.passed)), h('td', 'num', String(c.failed)), h('td', 'num', String(c.holds)),

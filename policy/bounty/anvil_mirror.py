@@ -22,6 +22,7 @@ CONTRACTS = X.POLICY.parent / "contracts"
 TOKEN_UNIT = 10**6
 GRACE_S = 3600
 DEADLINE_S = 7 * 24 * 3600
+CREATE_SIG = "createBounty(address,address,bytes32,uint256,uint256,uint256,uint64,uint64,uint64)"
 
 
 def run(*args):
@@ -38,14 +39,19 @@ class Chain:
         self.keys = [run("cast", "wallet", "private-key", MNEMONIC, str(i)) for i in range(4)]
         self.addresses = [run("cast", "wallet", "address", key) for key in self.keys]
 
+    run = staticmethod(run)
+
     def guard(self):
-        chain = int(run("cast", "chain-id", "--rpc-url", self.rpc))
+        chain = int(self.run("cast", "chain-id", "--rpc-url", self.rpc))
         if chain != CHAIN_ID or not self.rpc.startswith(f"http://{HOST}:"):
             raise SystemExit(f"Refused: chain {chain} at {self.rpc} is not the local test chain.")
 
+    def signer(self, who):
+        return ["--private-key", self.keys[who]]
+
     def send(self, name, who, to, sig, *args):
         self.guard()
-        reply = json.loads(run("cast", "send", "--json", "--rpc-url", self.rpc, "--private-key", self.keys[who], to, sig, *map(str, args)))
+        reply = json.loads(self.run("cast", "send", "--json", "--rpc-url", self.rpc, *self.signer(who), to, sig, *map(str, args)))
         if reply["status"] not in ("0x1", 1):
             raise RuntimeError(f"{name} reverted")
         self.txs[name] = reply["transactionHash"]
@@ -54,13 +60,15 @@ class Chain:
     def deploy(self, name, artifact, ctor_sig=None, *args):
         self.guard()
         code = json.loads((CONTRACTS / "out" / artifact).read_text())["bytecode"]["object"]
-        data = code + (run("cast", "abi-encode", ctor_sig, *map(str, args))[2:] if ctor_sig else "")
-        reply = json.loads(run("cast", "send", "--json", "--rpc-url", self.rpc, "--private-key", self.keys[0], "--create", data))
+        data = code + (self.run("cast", "abi-encode", ctor_sig, *map(str, args))[2:] if ctor_sig else "")
+        reply = json.loads(self.run("cast", "send", "--json", "--rpc-url", self.rpc, *self.signer(0), "--create", data))
+        if reply["status"] not in ("0x1", 1):
+            raise RuntimeError(f"{name} reverted")
         self.txs[name] = reply["transactionHash"]
         return reply["contractAddress"]
 
     def read(self, to, sig, *args):
-        return run("cast", "call", "--rpc-url", self.rpc, to, sig, *map(str, args))
+        return self.run("cast", "call", "--rpc-url", self.rpc, to, sig, *map(str, args))
 
     def refused(self, who, to, sig, *args):
         """A dry call that must revert. Returns the contract's error name or data."""
@@ -73,17 +81,26 @@ def selector(name):
     return run("cast", "sig", f"{name}()")[:10]
 
 
+def fix_numbers(folder, n):
+    """What the contract needs from one accepted fix with a ledger row, or None. Both mirrors read it here."""
+    row = json.loads((folder / "fixes" / str(n) / "fix.json").read_text())
+    if not row["result"] or not row["result"].get("accepted") or not row.get("payout") or "fingerprint" not in row["payout"]:
+        return None
+    money = json.loads((folder / "ledger.json").read_text())["bounty"]
+    return {"pay": money["per_failure"] * TOKEN_UNIT, "window": money["dispute_window_s"], "spec_hash": money["spec_hash"], "result_hash": row["payout"]["result_hash"],
+            "patched": "0x" + row["result"]["patched_sha256"], "local_status": row["payout"].get("status")}
+
+
+def fingerprint_on_chain(chain, chain_bounty, patched):
+    return chain.run("cast", "keccak", chain.run("cast", "abi-encode", "f(uint256,bytes32)", str(chain_bounty), patched))
+
+
 def mirror(root, bounty_id, n, port):
     folder = X.folder_of(bounty_id, root)
-    row = json.loads((folder / "fixes" / str(n) / "fix.json").read_text())
-    if not row["result"] or not row["result"]["accepted"] or not row.get("payout") or "fingerprint" not in row["payout"]:
+    numbers = fix_numbers(folder, n)
+    if not numbers:
         raise SystemExit("Only an accepted fix with a ledger row can be mirrored.")
-    ledger = json.loads((folder / "ledger.json").read_text())
-    pay = ledger["bounty"]["per_failure"] * TOKEN_UNIT
-    window = ledger["bounty"]["dispute_window_s"]
-    spec_hash = ledger["bounty"]["spec_hash"]
-    result_hash = row["payout"]["result_hash"]
-    patched = "0x" + row["result"]["patched_sha256"]
+    pay, window, spec_hash, result_hash, patched = (numbers[k] for k in ("pay", "window", "spec_hash", "result_hash", "patched"))
 
     run("forge", "build", "--root", str(CONTRACTS))
     anvil = subprocess.Popen(["anvil", "--host", HOST, "--port", str(port), "--chain-id", str(CHAIN_ID), "--silent"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -101,9 +118,9 @@ def mirror(root, bounty_id, n, port):
         chain.send("mint_test_token", 0, token, "mint(address,uint256)", company, pay)
         chain.send("approve", 0, token, "approve(address,uint256)", bounty, pay)
         now = int(run("cast", "block", "latest", "--field", "timestamp", "--rpc-url", chain.rpc))
-        chain.send("create_bounty", 0, bounty, "createBounty(address,address,bytes32,uint256,uint256,uint256,uint64,uint64,uint64)", resolver, arbiter, spec_hash, pay, pay, 0, now + DEADLINE_S, GRACE_S, window)
+        chain.send("create_bounty", 0, bounty, CREATE_SIG, resolver, arbiter, spec_hash, pay, pay, 0, now + DEADLINE_S, GRACE_S, window)
         chain_id = 1
-        fingerprint = run("cast", "keccak", run("cast", "abi-encode", "f(uint256,bytes32)", str(chain_id), patched))
+        fingerprint = fingerprint_on_chain(chain, chain_id, patched)
         other = run("cast", "keccak", run("cast", "abi-encode", "f(uint256,bytes32)", str(chain_id), "0x" + "11" * 32))
         before = {"company": int(run("cast", "--to-dec", chain.read(token, "balanceOf(address)", company))), "bounty": int(run("cast", "--to-dec", chain.read(token, "balanceOf(address)", bounty))), "tester": int(run("cast", "--to-dec", chain.read(token, "balanceOf(address)", tester)))}
         chain.send("propose", 1, bounty, "propose(uint256,address,bytes32,bytes32,bool)", chain_id, tester, fingerprint, result_hash, "false")

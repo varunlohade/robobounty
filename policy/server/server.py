@@ -405,6 +405,8 @@ def llm_label():
     if BATCH:
         return f"{recorded_batch.LABEL}, no AI and no sim"
     if not RECORDED:
+        if os.environ.get("CRASHLAB_LLM") == "0g":
+            return f"0G Private Computer, {os.environ.get('ZG_MODEL')}. Fixes and generated models still use Claude"
         return "claude headless"
     stored = [n for n in ("brief", "followup", "scenarios", "agent5") if (Path(RECORDED) / f"{n}.json").exists()]
     return f"stored {' and '.join(stored)} reply, check only"
@@ -926,7 +928,7 @@ class Session:
             self.working("reading your message" if round_no == 1 else "reading the result")
             schema = {**A.reply_schema()}
             schema["properties"] = {**schema["properties"], "calls": {**schema["properties"]["calls"], "items": {**schema["properties"]["calls"]["items"], "properties": {"fn": {"type": "string", "enum": [r["name"] for r in catalog["catalog"]] + ["undo"]}, "args": {"type": "object"}}}}}
-            reply = job(HERE / "plan_job.py", {"text": text, "round": round_no, "prompt": pack_prompt(catalog, world, text, self.chat_pack, feedback, round_no), "schema": schema, "model": A.MODEL}, "agent")
+            reply = self.ai_job({"text": text, "round": round_no, "prompt": pack_prompt(catalog, world, text, self.chat_pack, feedback, round_no), "schema": schema, "model": A.MODEL}, "agent")
             self.working()
             if not reply or not reply["ok"]:
                 code = str((reply or {}).get("rejection", "process_died"))
@@ -1007,7 +1009,7 @@ class Session:
         cid = f"c{self.campaign_n}"
         folder = self.dir / "campaigns" / cid
         base_hash = self.world["hash"]
-        reply = job(HERE / "plan_job.py", {"pack": self.pack, "world": world, "words": words, "out": str(folder), "limit": SCENARIO_LIMIT, "limits": testing_lab.L.load(self.dir, self.pack)}, "scenarios_pack")
+        reply = self.ai_job({"pack": self.pack, "world": world, "words": words, "out": str(folder), "limit": SCENARIO_LIMIT, "limits": testing_lab.L.load(self.dir, self.pack)}, "scenarios_pack")
         self.working()
         if reply is None:
             self.say("The scenario agent stopped with an error, so there is no list. Try again.", fail=True)
@@ -1172,6 +1174,19 @@ class Session:
         self.say(A.focus_line(target))
         return 200, {"ok": True}
 
+    def ai_job(self, request, command):
+        """One plan_job.py run. With 0G on, it saves each call's request id and receipt in the run folder, shows them in a Details row, and says plainly when 0G failed."""
+        reply = job(HERE / "plan_job.py", request, command)
+        rows = reply.pop("llm_calls", None) if isinstance(reply, dict) else None
+        if rows:
+            with open(self.dir / "llm_calls.jsonl", "a") as f:
+                f.writelines(json.dumps(row) + "\n" for row in rows)
+            self.tool("details", "", [row["line"] for row in rows])
+            for row in rows:
+                if row.get("say"):
+                    self.say(row["say"], fail=not row.get("fell_back"))
+        return reply
+
     def complete5(self, text):
         """The model for one turn. A failed first call falls back to the simple parser, whose words pass the same engine checks."""
         A = agent5()
@@ -1186,7 +1201,7 @@ class Session:
             if allowed:
                 self.working("reading your message" if round_no[0] == 1 else "reading the result")
                 try:
-                    reply = job(HERE / "plan_job.py", {"text": text, "round": round_no[0], "prompt": prompt, "schema": schema, "model": A.MODEL}, "agent")
+                    reply = self.ai_job({"text": text, "round": round_no[0], "prompt": prompt, "schema": schema, "model": A.MODEL}, "agent")
                 except StageHung:
                     reply = {"ok": False, "rejection": "froze_twice"}
                 self.working()
@@ -1329,7 +1344,7 @@ class Session:
         previous = self.working_now
         self.working("reading your message")
         try:
-            reply = job(HERE / "plan_job.py", {"text": text, "look": self.look, "has_world": self.world is not None}, "route")
+            reply = self.ai_job({"text": text, "look": self.look, "has_world": self.world is not None}, "route")
         except StageHung:
             reply = {"ok": False, "rejection": "froze_twice"}
         self.working(previous)
@@ -1420,7 +1435,7 @@ class Session:
             return
         follow_up = self.world is not None
         self.working("reading your change" if follow_up else "reading the brief")
-        reply = job(HERE / "plan_job.py", {"text": text, "current": self.world["world"]} if follow_up else {"text": joined}, "plan")
+        reply = self.ai_job({"text": text, "current": self.world["world"]} if follow_up else {"text": joined}, "plan")
         if reply is None:
             self.say("The planner process died, so nothing changed.", fail=True)
             return
@@ -1489,7 +1504,7 @@ class Session:
         self.round += 1
         folder = self.dir / f"world_{self.round}"
         base = self.world["world"] if change else None
-        reply = job(HERE / "plan_job.py", {"plan": self.plan, "seed": self.world_seed, "out": str(folder), "base": base, "changed": sorted(change[1]) if change else None}, "build")
+        reply = self.ai_job({"plan": self.plan, "seed": self.world_seed, "out": str(folder), "base": base, "changed": sorted(change[1]) if change else None}, "build")
         if not reply or not reply["ok"]:
             code = (reply or {}).get("rejection", "build_process_died")
             if change:
@@ -1593,7 +1608,7 @@ class Session:
         self.working("working out what could go wrong")
         folder = self.dir / f"scenarios_{self.round}"
         t0 = time.time()
-        reply = job(HERE / "plan_job.py", {"text": self.brief, "seed": self.round, "out": str(folder)}, "scenarios")
+        reply = self.ai_job({"text": self.brief, "seed": self.round, "out": str(folder)}, "scenarios")
         if reply is None or reply["verdict"] != "build" or not reply["worlds"]:
             code = (reply or {}).get("rejection", "process_died")
             self.tool("scenario_agent", "rejected", [str(code)])

@@ -30,7 +30,7 @@ MAX_POST_BODY = 4096
 MAX_STEP_BODY = 256
 POST_FIELDS = {"session", "campaign", "group", "title", "pay"}
 FIX_FIELDS = {"source"}
-ERROR_STATUS = {"unknown_campaign": 404, "already_posted": 409, "not_fixable": 409, "campaign_stale": 409, "no_hidden_worlds": 409, "cap_reached": 409, "same_source": 409, "source_too_large": 413, "wrong_state": 409, "queue_full": 503,
+ERROR_STATUS = {"unknown_campaign": 404, "already_posted": 409, "campaign_published": 409, "not_fixable": 409, "campaign_stale": 409, "no_hidden_worlds": 409, "cap_reached": 409, "same_source": 409, "source_too_large": 413, "wrong_state": 409, "queue_full": 503,
                 "bad_secret": 403, "budget_stopped": 409, "over_budget": 409, "over_per_bounty": 409, "no_budget": 404, "not_found": 404, "budget_mismatch": 409}
 PUBLIC_FILES = {"manifest.json": "application/json", "model.xml": "application/xml", "qpos.json": "application/json", "result.json": "application/json", "world.json": "application/json",
                 "controller.py.txt": "text/plain", "trace.json": "application/json", "wind.json": "application/json", "dirt.bin": "application/octet-stream"}

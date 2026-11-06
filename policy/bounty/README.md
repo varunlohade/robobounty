@@ -153,3 +153,7 @@ Of the 12 candidates, with no selection among them: 7 not repeatable, 2 referenc
 We changed the rule and did not search for fixtures again. Every fixture still gives its wanted result under 7 of 8: failing and edge clear, flaky gives 2 of 8, and the twin world still reaches a failing twin.
 
 The search scripts and raw output are in `policy/runs/bounty/fixture_search/`. That folder is not in git.
+
+## Arc testnet
+
+`arc_mirror.py` mirrors accepted fixes on Arc testnet in test USDC. It is off until the owner makes wallets and approves the deploy: `docs/SWITCH-ON.md`. The local ledger stays as it is. `check_arc.py` runs the flow and its failure paths on local anvil only.
