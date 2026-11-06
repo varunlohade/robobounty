@@ -1,0 +1,227 @@
+{
+ "label": "sim newton_lab f85fa21e6f4e",
+ "note": "Simulated. Not calibrated. Not a real-robot result.",
+ "worlds": {
+  "flat": {
+   "verdict": "reached",
+   "reached_t_s": 4.340000152587891,
+   "fell_t_s": null,
+   "closest_m": 0.738,
+   "last_3s_travel_m": 3.379,
+   "final_xy_m": [
+    9.986,
+    -3.612
+   ],
+   "min_up_z": 0.986,
+   "min_base_z_m": 0.358,
+   "obstacle_peak_N": 0.0,
+   "obstacle_contact_s": 0.0,
+   "foot_slip_mps": 0.118,
+   "body_on_ground_peak_N": 0.0,
+   "mean_ground_N": 161.2,
+   "nearest_object_m": null,
+   "shapes": 61,
+   "peak_base_z_m": 0.406,
+   "rtf": 2.09,
+   "peak_nacon": 3,
+   "peak_nefc": 14
+  },
+  "box_in_path": {
+   "verdict": "fell",
+   "reached_t_s": null,
+   "fell_t_s": 6.340000152587891,
+   "closest_m": 3.945,
+   "last_3s_travel_m": 0.212,
+   "final_xy_m": [
+    1.77,
+    -0.358
+   ],
+   "min_up_z": -1.0,
+   "min_base_z_m": 0.057,
+   "obstacle_peak_N": 1414.9,
+   "obstacle_contact_s": 1.12,
+   "foot_slip_mps": 0.196,
+   "body_on_ground_peak_N": 3450.2,
+   "mean_ground_N": 165.2,
+   "nearest_object_m": 0.289,
+   "shapes": 62,
+   "peak_base_z_m": 0.406,
+   "rtf": 1.46,
+   "peak_nacon": 4,
+   "peak_nefc": 17
+  },
+  "low_friction": {
+   "verdict": "fell",
+   "reached_t_s": null,
+   "fell_t_s": 2.4200000762939453,
+   "closest_m": 5.412,
+   "last_3s_travel_m": 0.331,
+   "final_xy_m": [
+    0.61,
+    -0.483
+   ],
+   "min_up_z": -1.0,
+   "min_base_z_m": 0.057,
+   "obstacle_peak_N": 0.0,
+   "obstacle_contact_s": 0.0,
+   "foot_slip_mps": 1.169,
+   "body_on_ground_peak_N": 2269.8,
+   "mean_ground_N": 123.3,
+   "nearest_object_m": null,
+   "shapes": 61,
+   "peak_base_z_m": 0.407,
+   "rtf": 2.04,
+   "peak_nacon": 4,
+   "peak_nefc": 17
+  },
+  "clear_box": {
+   "verdict": "reached",
+   "reached_t_s": 4.340000152587891,
+   "fell_t_s": null,
+   "closest_m": 0.738,
+   "last_3s_travel_m": 3.379,
+   "final_xy_m": [
+    9.986,
+    -3.612
+   ],
+   "min_up_z": 0.986,
+   "min_base_z_m": 0.358,
+   "obstacle_peak_N": 0.0,
+   "obstacle_contact_s": 0.0,
+   "foot_slip_mps": 0.118,
+   "body_on_ground_peak_N": 0.0,
+   "mean_ground_N": 161.2,
+   "nearest_object_m": 2.023,
+   "shapes": 62,
+   "peak_base_z_m": 0.406,
+   "rtf": 1.51,
+   "peak_nacon": 3,
+   "peak_nefc": 14
+  },
+  "ramp_drop": {
+   "verdict": "fell",
+   "reached_t_s": 7.619999885559082,
+   "fell_t_s": 4.659999847412109,
+   "closest_m": 1.461,
+   "last_3s_travel_m": 0.076,
+   "final_xy_m": [
+    4.45,
+    -0.165
+   ],
+   "min_up_z": -1.0,
+   "min_base_z_m": 0.056,
+   "obstacle_peak_N": 1970.1,
+   "obstacle_contact_s": 1.46,
+   "foot_slip_mps": 0.125,
+   "body_on_ground_peak_N": 2667.6,
+   "mean_ground_N": 131.0,
+   "nearest_object_m": 0.0,
+   "shapes": 62,
+   "peak_base_z_m": 0.637,
+   "rtf": 1.5,
+   "peak_nacon": 5,
+   "peak_nefc": 20
+  },
+  "ramp_long": {
+   "verdict": "reached",
+   "reached_t_s": 4.619999885559082,
+   "fell_t_s": null,
+   "closest_m": 0.996,
+   "last_3s_travel_m": 3.23,
+   "final_xy_m": [
+    8.806,
+    -4.243
+   ],
+   "min_up_z": 0.71,
+   "min_base_z_m": 0.358,
+   "obstacle_peak_N": 1992.4,
+   "obstacle_contact_s": 4.92,
+   "foot_slip_mps": 0.104,
+   "body_on_ground_peak_N": 0.0,
+   "mean_ground_N": 7.0,
+   "nearest_object_m": 0.0,
+   "shapes": 62,
+   "peak_base_z_m": 0.828,
+   "rtf": 1.5,
+   "peak_nacon": 3,
+   "peak_nefc": 13
+  },
+  "steps": {
+   "verdict": "not_reached",
+   "reached_t_s": null,
+   "fell_t_s": null,
+   "closest_m": 3.025,
+   "last_3s_travel_m": 3.04,
+   "final_xy_m": [
+    3.937,
+    -4.66
+   ],
+   "min_up_z": 0.812,
+   "min_base_z_m": 0.311,
+   "obstacle_peak_N": 2329.4,
+   "obstacle_contact_s": 3.3,
+   "foot_slip_mps": 0.177,
+   "body_on_ground_peak_N": 0.0,
+   "mean_ground_N": 75.4,
+   "nearest_object_m": 0.0,
+   "shapes": 65,
+   "peak_base_z_m": 0.623,
+   "rtf": 1.5,
+   "peak_nacon": 5,
+   "peak_nefc": 22
+  }
+ },
+ "weight_N": 147.3,
+ "low_friction_without_priority": {
+  "verdict": "reached",
+  "reached_t_s": 4.340000152587891,
+  "fell_t_s": null,
+  "closest_m": 0.738,
+  "last_3s_travel_m": 3.379,
+  "final_xy_m": [
+   9.986,
+   -3.612
+  ],
+  "min_up_z": 0.986,
+  "min_base_z_m": 0.358,
+  "obstacle_peak_N": 0.0,
+  "obstacle_contact_s": 0.0,
+  "foot_slip_mps": 0.118,
+  "body_on_ground_peak_N": 0.0,
+  "mean_ground_N": 161.2,
+  "vs_flat": {
+   "bitwise_equal": true,
+   "final_base_m": 0.0,
+   "max_base_m": 0.0
+  }
+ },
+ "clear_box_vs_flat": {
+  "bitwise_equal": true,
+  "final_base_m": 0.0,
+  "max_base_m": 0.0
+ },
+ "box_in_path_vs_flat": {
+  "bitwise_equal": false,
+  "final_base_m": 8.843293190002441,
+  "max_base_m": 8.843293190002441
+ },
+ "determinism": {
+  "same_seed_same_process": {
+   "bitwise_equal": true,
+   "final_base_m": 0.0,
+   "max_base_m": 0.0
+  },
+  "same_seed_new_process": {
+   "bitwise_equal": true,
+   "final_base_m": 0.0,
+   "max_base_m": 0.0
+  },
+  "different_seed": {
+   "bitwise_equal": false,
+   "final_base_m": 0.998689591884613,
+   "max_base_m": 0.998689591884613
+  },
+  "final_state_sha256": "50bcd0753500ecbe"
+ },
+ "failures": []
+}

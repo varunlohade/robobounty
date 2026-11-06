@@ -1,0 +1,136 @@
+{
+ "label": "sim newton_lab f85fa21e6f4e",
+ "note": "Simulated. CPU only. Other work may share this machine.",
+ "one_process": [
+  {
+   "worlds": 1,
+   "backend": "mujoco_warp",
+   "wall_s": 3.75,
+   "cpu_s": 3.75,
+   "physics_steps_per_s_all_worlds": 267,
+   "rtf_per_world": 1.33,
+   "rtf_total": 1.33,
+   "walking": 1,
+   "x_range_m": [
+    5.3,
+    5.3
+   ]
+  },
+  {
+   "worlds": 1,
+   "backend": "mujoco_warp",
+   "wall_s": 3.62,
+   "cpu_s": 3.62,
+   "physics_steps_per_s_all_worlds": 276,
+   "rtf_per_world": 1.38,
+   "rtf_total": 1.38,
+   "walking": 1,
+   "x_range_m": [
+    5.3,
+    5.3
+   ]
+  },
+  {
+   "worlds": 4,
+   "backend": "mujoco_warp",
+   "wall_s": 3.59,
+   "cpu_s": 3.58,
+   "physics_steps_per_s_all_worlds": 1115,
+   "rtf_per_world": 1.39,
+   "rtf_total": 5.57,
+   "walking": 4,
+   "x_range_m": [
+    5.3,
+    5.41
+   ]
+  },
+  {
+   "worlds": 16,
+   "backend": "mujoco_warp",
+   "wall_s": 4.14,
+   "cpu_s": 4.14,
+   "physics_steps_per_s_all_worlds": 3862,
+   "rtf_per_world": 1.21,
+   "rtf_total": 19.31,
+   "walking": 16,
+   "x_range_m": [
+    5.21,
+    5.43
+   ]
+  },
+  {
+   "worlds": 64,
+   "backend": "mujoco_warp",
+   "wall_s": 5.46,
+   "cpu_s": 5.45,
+   "physics_steps_per_s_all_worlds": 11728,
+   "rtf_per_world": 0.92,
+   "rtf_total": 58.64,
+   "walking": 64,
+   "x_range_m": [
+    5.12,
+    5.45
+   ]
+  },
+  {
+   "worlds": 256,
+   "backend": "mujoco_warp",
+   "wall_s": 10.3,
+   "cpu_s": 10.3,
+   "physics_steps_per_s_all_worlds": 24848,
+   "rtf_per_world": 0.49,
+   "rtf_total": 124.24,
+   "walking": 256,
+   "x_range_m": [
+    5.11,
+    5.46
+   ]
+  }
+ ],
+ "native_c": {
+  "worlds": 1,
+  "backend": "mujoco_c",
+  "wall_s": 0.3,
+  "cpu_s": 0.3,
+  "physics_steps_per_s_all_worlds": 3302,
+  "rtf_per_world": 16.51,
+  "rtf_total": 16.51,
+  "walking": 1,
+  "x_range_m": [
+   5.25,
+   5.25
+  ]
+ },
+ "processes": [
+  {
+   "processes": 4,
+   "wall_s_including_startup": 8.1,
+   "rtf_each": [
+    1.51,
+    1.5,
+    1.51,
+    1.5
+   ],
+   "rtf_total": 6.02
+  },
+  {
+   "processes": 12,
+   "wall_s_including_startup": 14.1,
+   "rtf_each": [
+    0.81,
+    0.83,
+    0.87,
+    0.84,
+    0.86,
+    0.85,
+    0.84,
+    0.89,
+    0.83,
+    0.85,
+    0.85,
+    0.86
+   ],
+   "rtf_total": 10.18
+  }
+ ]
+}
