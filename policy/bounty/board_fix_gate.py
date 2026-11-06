@@ -128,7 +128,9 @@ def _run(row, root, code_root, folder, sub, t0):
     shutil.copyfile(source, controller)
     reply = work / "preflight.json"
     code = board_gate._process([py, str(X.RUNNER), "preflight", info["pack"], str(controller), str(world_file), str(work / "preflight"), str(reply)], sub / "gate.log", 300)
-    row_one = json.loads(reply.read_text()) if code == 0 and reply.is_file() else {"limit": "crashed"}
+    if code != 0 or not reply.is_file():
+        return _fail("gate_crashed", "The first run stopped with an error in the board, so there is no verdict.", "gate")
+    row_one = json.loads(reply.read_text())
     if row_one.get("limit"):
         return _fail("limit_hit", f"The first run hit a limit ({row_one['limit']}), so the sandbox stopped it. A kill counts as a fail.", "sim")
 
@@ -148,7 +150,7 @@ def _run(row, root, code_root, folder, sub, t0):
 
 def run(row, root=B.ROOT, code_root=X.POLICY):
     """Runs one reserved fix. The gate lock keeps one gate at a time, with the world gate too."""
-    root = Path(root)
+    root = Path(root).resolve()  # the sandbox and fix.py run in other folders
     bounty_id, n = row["bounty_id"], row["n"]
     folder = root / str(bounty_id)
     sub = folder / "fixes" / str(n)
