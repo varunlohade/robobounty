@@ -90,3 +90,16 @@ Guards for AI fixes: a fix is a session diff shown to the user. It is tested on 
 ### Objects must belong (owner, 2026-11-06)
 His words: "anything what you are building basically should also mimic the environment, so it shouldn't look just like it's just added for the sake of adding."
 Rule for every pack: objects use realistic materials and are things found at that site, with mounts or supports, never floating. A vague request becomes a plausible object, and the chat says what it chose. Plain shapes or bright colours appear only on a clear request.
+
+## Build plan: neutral policy testing, two robots (Fri 17:00 to Sat 09:00 IST)
+Facts: window run 3-28 s; campaigns 34-74 trials/min on 4 procs. Inspection run 17-46 s for 30 s sim. 
+1. Window pack adapter: `policy/packs/window/pack.py` wraps engine5, world5, compile5, run_trial5, judge5. Check: packs.missing() empty, one run passes. Owner A.
+2. Pack subprocess: `policy/server/pack_job.py`, `policy/packs/inspection/job.py`: catalog|call|run|judge, JSON on stdin/stdout, run with .venv-newton, writes a heartbeat and progress.json (t, xy, status) each second. Check: plant world runs under the run deadline. Owner A.
+3. Robot picker: chat "+" with two packs, import entry says not yet; session stores pack; turn5 becomes one loop over the pack. Check: a message on inspection adds a box. A server, B chat.
+4. Poses player: `src/lab/poses.ts`: three.js solids and scenery, one capsule per body, route line, same shell. Check: plant.replay.json.gz plays. B.
+5. Scenario agent per pack: `policy/crashlab/scenarios_pack.py`: scenarios {name, reason, calls[]}, each call replayed through pack.call on a copy, a refusal drops it, count from the agent, cap 50, 1 in 5 per group held back, not_tested list, reasons shown as "Reasoned guess: ...". Check: 40+ valid worlds from a stored reply. A.
+6. Grid: `src/lab/grid.ts`: a 2D canvas per square, `grid` SSE event at 1 Hz from progress files, swap() replaces the viewport, click returns to the full view. Hover: name, reason. Detail rail: judge reason, events, log lines, Open file. Red: failed, or no progress for 30 s. MAX_PROCS measured first. A/B.
+7. Code tab: CodeMirror 6 in `src/lab/code_tab.ts`, session copy, opened at the traced line. Run through fix.validate_source and fix.run_sandboxed with sandbox_worker5.py. Inspection: RouteFollower only. D.
+8. AI fix: fix.py gets --base controller5.py; held-back worlds are the fresh set; flag diff lines touching LOW_PRESSURE_PA, RESUME, TETHER, HOLD. Inspection: RouteFollower constants only. D.
+9. Recorded fallback: stored replies in policy/server/fixtures, one recorded batch each in policy/runs/demo, played by --recorded. C.
+Demo is safe after 1, 2, 5, 6, 9. Cut in order: ONNX upload, import, inspection AI fix, live inspection grid, code tab run. Bounty board: latest start 05:30 Sat.
