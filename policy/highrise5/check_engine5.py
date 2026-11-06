@@ -112,7 +112,7 @@ def part1_good():
     check("add_part and generate_object are not in the registry", not {"add_part", "generate_object"} & set(G.REGISTRY))
     json.dumps(G.catalog())
     rows = G.catalog()
-    check("the registry holds name, schema and re-run, as JSON", all(set(r) == {"name", "args", "rerun"} and r["rerun"] in ("yes", "no", "if_physics") for r in rows), f"{len(rows)} functions")
+    check("the registry holds name, schema and re-run, as JSON", all(set(r) - {"note"} == {"name", "args", "rerun"} and r["rerun"] in ("yes", "no", "if_physics") for r in rows), f"{len(rows)} functions")
     start = seeded()
     calls = bad_results = 0
     problems = []
@@ -473,13 +473,13 @@ def physics_rows(lane0, second_lane):
         ("set_tower", {"height": 170.0}), ("set_tower", {"floor_m": 4.0}),
         ("set_panes", {"w": 1.2}), ("set_panes", {"h": 3.0}), ("set_panes", {"offx": 0.3}), ("set_panes", {"offz": 1.0}), ("set_panes", {"joint_depth": 0.015}),
         ("set_panes", {"joint_gap": 0.02}), ("set_panes", {"skip": 2}),
-        ("set_work_area", {"w": 2.0}), ("set_work_area", {"h": 2.5}), ("set_work_area", {"drop": 30.0}), ("set_work_area", {"margin": 0.4}),
+        ("set_work_area", {"w": 2.0}), ("set_work_area", {"h": 2.5}), ("set_work_area", {"drop": 30.0}),
         ("add_ledge", {"name": "n", **LEDGE, **onlane}), ("add_sill", {"name": "n", **LEDGE, **onlane, "depth_m": 0.03, "thick_m": 0.05}),
         ("add_fin", {"name": "n", **FIN, **onlane}), ("add_sign", {"name": "n", **SIGN, **onlane}), ("add_balcony", {"name": "n", **BALCONY, "x_m": 1.0, "below_top_m": 1.5}),
         ("add_vent", {"name": "n", **VENT, **onlane}), ("add_frame_step", {"name": "n", **STEP, **onlane}),
         ("add_wet_patch", {"name": "n", "wetness": 0.9, **PATCH, **onlane}), ("add_dirt_patch", {"name": "n", "level": 2.0, **PATCH, **onlane}),
         ("add_cradle", {"name": "n", **CRADLE, "x_m": 1.0}),
-        ("set_corner", {"x_m": 2.0, "side": 1}), ("set_setback", {"above_top_m": 0.6, "depth_m": 2.0}),
+        ("set_corner", {"x_m": 2.0, "side": 1}),
         ("add_object", {**BOX, "x_m": x}),
         ("set_weather", {"wetness": 0.5}), ("set_weather", {"temperature_c": -5.0}), ("set_weather", {"humidity_pct": 90.0}), ("set_weather", {"dust_gm2": 20.0}),
         ("set_wind", {"steady_ms": 5.0}), ("set_wind", {"gust_ms": 15.0}), ("set_wind", {"gust_start_s": 10.0}), ("set_wind", {"gust_duration_s": 20.0}),
@@ -528,6 +528,31 @@ def part2_edges_are_wired():
         before, after = S5.Sim(world, SEED), S5.Sim(apply(world, fn, args), SEED)
         z = top + args.get("margin", args.get("above_top_m")) + 0.05
         check(f"{fn} moves the edge the nose sensor reads", not before._nose_reading(1.0, z)[1] and after._nose_reading(1.0, z)[1], f"at {z - top:.2f} above the area top")
+
+
+def part2_edges_matter(base):
+    """Margin and setback change nothing on nominal and the registry says so. They do change the run where the robot climbs past the area top."""
+    world = nominal()
+    for fn, args in (("set_work_area", {"margin": 0.4}), ("set_setback", {"above_top_m": 0.6, "depth_m": 2.0})):
+        r = new_run(apply(world, fn, args))
+        check(f"(e) {fn} {sorted(args)[0]} changes nothing on nominal, as its registry note says", r["final_state_sha256"] == base["final_state_sha256"] and not diff_numbers(base, r), brief(r))
+        check(f"(e) {fn} carries the may-change-nothing note", "may change nothing" in (G.REGISTRY[fn]["note"] or ""))
+    # In range for every value. Strong suction on dry glass with a tight seal: the tracks grip, the pivot sag the controller allows for does not happen,
+    # and the body climbs past the area top. The numbers below are not chosen to pass: this world fails with or without the edit, for different reasons.
+    strong = apply(apply(world, "set_weather", {"wetness": 0.0}), "set_robot", {"seal_leak_mm2": 20.0, "suction_pa": 5000.0})
+    for seed in (0, 1, 2, 3):
+        without = R5.run(strong, seed)
+        again = R5.run(strong, seed)
+        check(f"(e) strong suction seed {seed}: the same world repeats exactly", again["final_state_sha256"] == without["final_state_sha256"])
+        for fn, args in (("set_work_area", {"margin": 0.4}), ("set_setback", {"above_top_m": 0.6, "depth_m": 2.0})):
+            r = R5.run(apply(strong, fn, args), seed)
+            check(f"(e) strong suction seed {seed}: {fn} {sorted(args)[0]} moves a reported number", (r["outcome"], r["failure"]) != (without["outcome"], without["failure"]) or r["coverage"] != without["coverage"],
+                  f"without {brief(without)} | with {brief(r)}")
+    # A world that passes either way: at 2.8 m wide the last lane overshoots the area side, so the nose reaches a 0.4 m margin and the side step ends early.
+    wide = apply(world, "set_work_area", {"w": 2.8})
+    narrow = apply(wide, "set_work_area", {"margin": 0.4})
+    a, b = new_run(wide), new_run(narrow)
+    check("(e) width 2.8: margin 0.4 ends a side step early and moves the time", a["passed"] and b["passed"] and a["time_s"] != b["time_s"] and a["final_state_sha256"] != b["final_state_sha256"], f"margin 1.0 t={a['time_s']}, margin 0.4 t={b['time_s']}")
 
 
 def run_speed(world, speed, seed, **robot):
@@ -595,6 +620,7 @@ def main():
     part2_picture(base)
     dead = part2_every_function(base)
     part2_edges_are_wired()
+    part2_edges_matter(base)
     part2_speed()
     print(f"Functions that changed nothing: {dead}")
     print(f"{len(failures)} failed" + (f": {failures}" if failures else ""))

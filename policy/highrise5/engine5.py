@@ -48,6 +48,11 @@ WORLD_ERRORS = (
     ("must sit at the fixed distance", "fixed_by_kind"), ("must be an unrotated box", "fixed_by_kind"), ("must be -1 or 1", "out_of_range"),
     ("is outside", "out_of_range"), ("no glass to clean", "no_glass_to_clean"),
 )
+# Measured in check_engine5.py.
+EDGE_NOTE = ("A margin or setback may change nothing. It moves only the glass edge, and the run changes only if a nose sensor or the body reaches that edge. "
+             "On the nominal world neither does, at the smallest margin or the lowest setback. With strong suction on dry glass the robot climbs past the area top, and then both matter.")
+SPEED_NOTE = (f"clean_speed_ms above {W.MAX_CLEAN_SPEED_MS} refuses with out_of_range. Speeds just above that cap failed the nominal world on some seeds, and "
+              "a faster pass removes less dirt.")
 
 
 class Refuse(Exception):
@@ -339,15 +344,15 @@ def _registry():
     """name: args schema, rerun (yes, no or if_physics) and either an edit or a read. A pre check runs before the edit."""
     rows = {}
 
-    def row(name, args, rerun, edit=None, read=None, pre=None):
-        rows[name] = {"args": args, "rerun": rerun, "edit": edit, "read": read, "pre": pre}
+    def row(name, args, rerun, edit=None, read=None, pre=None, note=None):
+        rows[name] = {"args": args, "rerun": rerun, "edit": edit, "read": read, "pre": pre, "note": note}
 
     t, p, a = W.TOWER_FIELDS, W.BLOCKS["panes"], W.BLOCKS["area"]
     # A width edit moves no solid, so set_tower re-runs only when the physics hash says so.
     row("set_tower", _block_schema({"height": t["height_m"], "width": t["width_m"], "floor_m": t["floor_m"]}), "if_physics", set_tower)
     row("set_panes", _block_schema({"w": p["width_m"], "h": p["height_m"], "offx": p["offset_x_m"], "offz": p["offset_z_m"],
                                     "joint_depth": p["joint_depth_m"], "joint_gap": p["joint_gap_m"], "skip": p["skip_every"]}), "yes", set_panes)
-    row("set_work_area", _block_schema({"w": a["width_m"], "h": a["height_m"], "drop": a["drop_below_roof_m"], "margin": a["margin_m"]}), "yes", set_work_area)
+    row("set_work_area", _block_schema({"w": a["width_m"], "h": a["height_m"], "drop": a["drop_below_roof_m"], "margin": a["margin_m"]}), "yes", set_work_area, note=EDGE_NOTE)
     kinds = {
         "ledge": ("concrete", {0: "width_m", 1: "depth_m", 2: "thick_m"}),
         "sill": ("concrete", {0: "width_m", 1: "depth_m", 2: "thick_m"}),
@@ -364,7 +369,7 @@ def _registry():
         fixed = {1: W.KIND_BOXES[kind][1][0]} if 1 not in fields else None
         row(f"add_{kind}", _kind_schema(kind, fields), "yes", _kind_adder(kind, material, fields, fixed))
     row("set_corner", _removable(W.CORNER_FIELDS), "yes", set_corner, pre=_all_or_remove(set(W.CORNER_FIELDS)))
-    row("set_setback", _removable(W.SETBACK_FIELDS), "yes", set_setback, pre=_all_or_remove(set(W.SETBACK_FIELDS)))
+    row("set_setback", _removable(W.SETBACK_FIELDS), "yes", set_setback, pre=_all_or_remove(set(W.SETBACK_FIELDS)), note=EDGE_NOTE)
     pos = W.POS_FIELDS
     row("add_object", _schema({
         "name": NAME, "shape": {"type": "string", "enum": sorted(W.SHAPES)},
@@ -382,7 +387,7 @@ def _registry():
                                  "metal": _rule(W.MATERIAL_FIELDS["metal"])}, {"name"}), "no", set_material)
     row("assign_material", _schema({"name": NAME, "material": NAME}, {"name", "material"}), "no", assign_material)
     for name, block in (("set_weather", "weather"), ("set_wind", "wind"), ("set_robot", "robot"), ("set_robot_start", "robot_start")):
-        row(name, _block_schema(W.BLOCKS[block]), "yes", _block_setter(block))
+        row(name, _block_schema(W.BLOCKS[block]), "yes", _block_setter(block), note=SPEED_NOTE if block == "robot" else None)
     row("set_dirt", _schema({"level": _rule(a["dirt_level"])}, {"level"}), "yes", set_dirt)
     light, around = W.BLOCKS["light"], W.BLOCKS["surroundings"]
     row("set_light", _schema({"sun_level": _rule(light["sun_level"]), "azimuth": _rule(light["azimuth_deg"]), "haze": _rule(light["haze"]),
@@ -400,7 +405,7 @@ REGISTRY = _registry()
 
 def catalog():
     """The registry as plain JSON data, for the AI loop."""
-    return [{"name": name, "args": copy.deepcopy(r["args"]), "rerun": r["rerun"]} for name, r in REGISTRY.items()]
+    return [{"name": name, "args": copy.deepcopy(r["args"]), "rerun": r["rerun"], **({"note": r["note"]} if r["note"] else {})} for name, r in REGISTRY.items()]
 
 
 def new_state(world):
