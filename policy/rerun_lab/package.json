@@ -1,0 +1,7 @@
+{
+  "name": "rerun-lab",
+  "private": true,
+  "type": "module",
+  "description": "Prototype only. Not part of the app.",
+  "dependencies": { "@rerun-io/web-viewer": "0.42.0" }
+}

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rerun Lab</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; background: #16171a; color: #d8dade; font: 13px system-ui, sans-serif; }
+  #bar { display: flex; gap: 12px; align-items: center; height: 32px; padding: 0 12px; box-sizing: border-box; }
+  #bar b { color: #eb3c32; }
+  /* The viewer sets position: relative on its parent, so the frame sits on a wrapper. */
+  #stage { position: absolute; inset: 32px 0 0 0; }
+  #host { width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div id="bar"><b>SIMULATED</b><span id="name"></span><span id="status">Loading</span></div>
+<div id="stage"><div id="host"></div></div>
+<script type="module">
+  import { WebViewer } from '@rerun-io/web-viewer';
+
+  // ?run=window|inspection|compare&t=<seconds>. The viewer opens at t, the moment of failure.
+  const params = new URLSearchParams(location.search);
+  const run = params.get('run') ?? 'window';
+  const at = params.get('t');
+  const status = document.getElementById('status');
+  document.getElementById('name').textContent = run;
+  const url = new URL(`out/${run}.rrd`, location.href).href;
+  const viewer = new WebViewer();
+  window.viewer = viewer;
+  const started = performance.now();
+  window.lab = { run, started: false, opened: false, error: null };
+  try {
+    const host = document.getElementById('host');
+    await viewer.start(null, host, { width: `${host.clientWidth}px`, height: `${host.clientHeight}px`, hide_welcome_screen: true, check_for_updates_on_startup: false, theme: 'dark', render_backend: params.get('backend') ?? undefined });
+    window.lab.started = true;
+    window.lab.startMs = performance.now() - started;
+    await viewer.open(url);
+    window.lab.opened = true;
+    window.lab.openMs = performance.now() - started;
+    if (at !== null) await viewer.set_time({ duration_nanos: BigInt(Math.round(Number(at) * 1e9)), play_state: 'paused' });
+    window.lab.state = JSON.parse(JSON.stringify(await viewer.get_state(), (_, v) => typeof v === 'bigint' ? Number(v) : v));
+    status.textContent = `Loaded in ${(window.lab.openMs / 1000).toFixed(1)} s`;
+  } catch (err) {
+    window.lab.error = String(err);
+    status.textContent = `Could not load: ${err}`;
+  }
+</script>
+</body>
+</html>
