@@ -191,6 +191,11 @@ export class LabChat {
     this.append(el('div', fail ? 'chat-agent chat-fail' : 'chat-agent', text));
   }
 
+  /** A card another part of the page built, such as an AI fix's diff. */
+  attach(node: HTMLElement) {
+    this.append(node);
+  }
+
   private setBusy(on: boolean) {
     this.busy = on;
     this.send.disabled = on;

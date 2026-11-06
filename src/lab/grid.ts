@@ -15,7 +15,7 @@ export interface Row {
   first?: { status: Status; verdict: string | null; verdict_reason: string | null };
 }
 export interface Played { page: HTMLElement; start: () => Promise<void>; stop: () => void; jump: (t: number) => void }
-interface Deps { base: string; statusRight: HTMLElement; play: (how: ServerEvent) => Promise<Played | null> }
+interface Deps { base: string; statusRight: HTMLElement; play: (how: ServerEvent) => Promise<Played | null>; openFile?: (d: ServerEvent) => void; openWorld?: (d: ServerEvent) => void }
 
 const GAP = 6;
 const PAD = 8;
@@ -91,6 +91,7 @@ class Square {
       if (this.trail.length > TRAIL_MAX * 2) this.trail.splice(0, 2);
     }
     if (row.status === 'queued' && this.row.status !== 'queued') { this.trail = []; this.placed = false; }
+    if (this.film && !row.film) { this.film = null; this.shown = null; this.seenFrames = 0; } // A re-run with no picture must not keep the old run's picture.
     const stale = row.status !== this.row.status || row.t !== this.row.t || row.x !== this.row.x || row.y !== this.row.y || row.verdict !== this.row.verdict;
     if (stale) this.stale = true;
     this.row = row;
@@ -696,6 +697,7 @@ export class Grid {
     this.hover.replaceChildren(el('div', 'grid-hover-name', plainName(row.name)), el('div', 'grid-hover-group', row.group), el('div', 'grid-hover-reason', row.reason));
     const marks = [...new Set((row.marks ?? []).map(m => m.text))];
     if (marks.length) this.hover.append(el('div', 'grid-hover-group', marks.join(', ')));
+    if (row.first) this.hover.append(el('div', 'grid-hover-group', `First run: ${statusWord({ ...row, ...row.first })}`));
     if (row.verdict_reason) this.hover.append(el('div', `grid-hover-verdict${row.status === 'failed' || row.status === 'stuck' ? ' bad' : ''}`, row.verdict_reason));
     this.hover.hidden = false;
     const r = s.root.getBoundingClientRect(), box = this.root.getBoundingClientRect(), hw = this.hover.offsetWidth, hh = this.hover.offsetHeight;
@@ -869,9 +871,12 @@ export class Grid {
     const file = el('div', 'grid-file');
     const open = el('button', 'grid-btn', 'Open file');
     open.type = 'button';
-    open.disabled = true;
-    open.title = 'Coming next';
-    file.append(open, el('span', 'grid-soon', 'Coming next'));
+    open.addEventListener('click', () => this.deps.openFile?.(d));
+    const world = el('button', 'grid-btn', 'World file');
+    world.type = 'button';
+    world.addEventListener('click', () => this.deps.openWorld?.(d));
+    file.append(open, world);
+    if (d.first) out.push(section('Old and new', [fact('First run', statusWord({ ...d, ...d.first } as unknown as Row)), fact('Latest run', statusWord(d as unknown as Row))]));
     const code = d.code as { file: string; line: number; traced: boolean; why?: string } | null;
     const parts: HTMLElement[] = [];
     if (code) {

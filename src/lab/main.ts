@@ -6,6 +6,7 @@ import { SimView, restoreOnLoss } from '../app/view.ts';
 import { worldPage } from '../app/world_page.ts';
 import { lookOf } from '../view/real/look.ts';
 import { LabChat, replayNote } from './chat.ts';
+import { CodeTab } from './code_tab.ts';
 import { Grid } from './grid.ts';
 import { PosesView, loadPoses, posesPage, previewReplay, type PoseReplay } from './poses.ts';
 
@@ -85,7 +86,7 @@ function shell(root: HTMLElement, chat: HTMLElement) {
   const statusNote = el('span', 'lab-status-note', WINDOW_NOTE);
   status.append(statusNote, statusRight);
   root.append(titleBar(name), body, status);
-  return { main, statusRight, setName, tab, gridTab, statusNote };
+  return { main, statusRight, setName, tab, gridTab, statusNote, tabs };
 }
 
 async function replayOnly(root: HTMLElement, id: string) {
@@ -140,7 +141,8 @@ async function live(root: HTMLElement) {
       case 'pose_world': showPoseWorld(e); break;
       case 'pose_trial': await showPoseTrial(String(e.url)); break;
       case 'scenarios': scenarios = e; chat.scenarios(e); grid?.setScenarios(e); break;
-      case 'grid': onGrid(e); break;
+      case 'grid': onGrid(e); code.setGrid(e); break;
+      case 'code_run': case 'code_changed': case 'code_fix': case 'code_fix_decided': code.event(e); break;
       case 'campaign_done': await onCampaignDone(e); break;
       case 'world': await showWorld(e); break;
       case 'no_world': clear(); clear = () => {}; current = () => null; host.replaceChildren(empty); setName('new'); chat.worldGone(); break;
@@ -153,13 +155,22 @@ async function live(root: HTMLElement) {
       case 'idle':
         root.dataset.idle = String(Number(root.dataset.idle ?? 0) + 1);
         chat.jobDone();
+        code.jobDone();
         break;
     }
   };
   const backend = new LiveBackend(onEvent, pack ? { pack } : { engine: 'v5' });
   const chat = new LabChat(backend, pack ?? 'window');
   chat.onPick = next => { choosePack(next); backend.reset(); };
-  const { main, statusRight, setName, tab, gridTab, statusNote } = shell(root, chat.root);
+  const { main, statusRight, setName, tab, gridTab, statusNote, tabs } = shell(root, chat.root);
+  const code = new CodeTab({
+    session: () => backend.id!,
+    tabs,
+    show: page => { swap(page, () => {}); tab.classList.add('off'); },
+    back: () => { if (grid) showGrid(); else again?.(); },
+    chat: node => chat.attach(node),
+    note: (text, fail) => chat.note(text, fail),
+  });
   const simLine = el('span');
   const llmLine = el('span');
   const aiLine = el('span');
@@ -200,6 +211,7 @@ async function live(root: HTMLElement) {
     host.replaceChildren(next);
     tab.classList.remove('off');
     gridTab.classList.remove('on');
+    code.blur();
   };
 
   // The inspection robot's scene. The newest run, if any, keeps playing when only the picture changed.
@@ -274,6 +286,8 @@ async function live(root: HTMLElement) {
     return new Grid({
       base: `${SERVER}/api/sessions/${backend.id}/campaigns/${e.campaign}`,
       statusRight,
+      openFile: d => void code.openFile(String(e.campaign), d),
+      openWorld: d => code.openWorld(String(e.campaign), d),
       play: async (how: ServerEvent) => {
         if (how.kind === 'poses') {
           const replay = await fetchWith(() => loadPoses(`${SERVER}${how.url}`), String(how.url));
@@ -406,7 +420,7 @@ async function live(root: HTMLElement) {
       await new Promise(r => setTimeout(r, HEALTH_RETRY_MS));
     }
   }
-  (window as unknown as { __lab: unknown }).__lab = { view: () => current() ?? poseView(), jump: (f: number) => jump(f), grid: () => grid };
+  (window as unknown as { __lab: unknown }).__lab = { view: () => current() ?? poseView(), jump: (f: number) => jump(f), grid: () => grid, code: () => code };
   await chat.start();
 }
 

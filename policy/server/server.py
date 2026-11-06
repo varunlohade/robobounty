@@ -33,6 +33,7 @@ sys.path.insert(0, str(HERE))
 import engine
 import ledger as ledger_module
 import look as look_module
+import code_lab
 import pack_campaign
 import pack_job
 import recorded_batch
@@ -1078,17 +1079,46 @@ class Session:
         self.emit(type="campaign_done", campaign=cid, counts=counts, wall_s=grid["elapsed_s"], max_procs=limit, label=label, note=plan["note"])
         self.say(f"Done in {grid['elapsed_s']:.0f} s: {counts['passed']} passed, {counts['failed']} failed, {counts['stuck']} stuck, {counts['safe_hold']} safe holds, {counts['held']} held back. Simulated. {len(plan['not_tested'])} things stay not tested.")
 
+    def code_post(self, body):
+        """Save the session copy. With run one or all, also re-run that world or every world. A refused source neither saves nor runs."""
+        with self.lock:
+            if self.busy:
+                return 409, {"error": "busy", "words": "Another job is running. Press it again when it ends."}
+        status, out = code_lab.save(self, body.get("source"))
+        run, cid = body.get("run"), body.get("campaign")
+        if status != 200 or run not in ("one", "all"):
+            return status, out
+        if not (isinstance(cid, str) and _CID.match(cid) and (self.dir / "campaigns" / cid / "grid.json").exists()):
+            return 409, {"error": "no_campaign", "words": "There is no test run yet, so nothing can run again."}
+        index = body.get("index")
+        if run == "one" and type(index) is not int:
+            return 400, {"error": "no_world"}
+        return self.start(code_lab.run_worlds, self, cid, {index} if run == "one" else None, run)
+
+    def code_fix(self, body):
+        cid, group, fid = body.get("campaign"), body.get("group"), body.get("fix")
+        if not (isinstance(cid, str) and _CID.match(cid) and (self.dir / "campaigns" / cid / "grid.json").exists()):
+            return 409, {"error": "no_campaign"}
+        with self.lock:
+            if self.busy:
+                return 409, {"error": "busy", "words": "Another job is running. Press it again when it ends."}
+        if isinstance(fid, str) and re.fullmatch(r"f[0-9]{1,3}", fid):
+            return code_lab.decide_fix(self, cid, fid, body.get("accept") is True)
+        if not (isinstance(group, str) and re.fullmatch(r"[a-z_]{1,40}", group)):
+            return 400, {"error": "no_group"}
+        return self.start(code_lab.run_fix, self, cid, group)
+
     def world_replay(self, cid, index):
         """How to play one finished run. The window robot's run goes through export5, which replays it and refuses a mismatch."""
         folder = self.dir / "campaigns" / cid
-        run = folder / f"w{index:03d}"
+        run = code_lab.run_folder(folder, index)
         if not (run / "job_result.json").exists():
             return None
         if BATCH and self.pack != "inspection":
             return recorded_batch.trial(self, cid, index, BATCH)
         if self.pack == "inspection":
             return {"kind": "poses", "url": f"/api/sessions/{self.id}/campaigns/{cid}/worlds/{index}/poses"} if (run / "replay.json.gz").exists() else None
-        tid = f"{cid}-{index:03d}"
+        tid = f"{cid}-{index:03d}{code_lab.replay_tag(folder, index)}"
         with self.export_lock:
             if tid not in self.exports:
                 out = self.dir / "exports" / tid
@@ -2045,6 +2075,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(404, {"error": "no_session"})
             if parts[3] == "state" and len(parts) == 4:
                 return self.reply(200, {"phase": s.phase, "busy": s.busy, "engine": "v5" if s.v5 else "old", "pack": s.pack})
+            if parts[3] == "code" and len(parts) == 4 and s.pack:
+                return self.reply(200, code_lab.reply(s))
             if parts[3] == "campaigns" and len(parts) >= 6 and _CID.match(parts[4]):
                 return self.campaign_route(s, parts[4], parts[5:])
             if parts[3] == "pose_runs" and len(parts) == 6 and parts[5] == "replay" and _KEY.match(parts[4]) and s.pack == "inspection":
@@ -2081,8 +2113,15 @@ class Handler(BaseHTTPRequestHandler):
             detail = pack_campaign.world_detail(folder, index)
             if detail is None:
                 return self.reply(404, {"error": "no_world"})
+            detail = code_lab.overlay(s, folder, index, detail)
             if len(rest) == 2:
                 return self.reply(200, detail)
+            if rest[2] == "trace":
+                try:
+                    traced = code_lab.world_trace(s, cid, index)
+                except StageHung:
+                    traced = {"traced": False}
+                return self.reply(200, {**traced, "code": code_lab.overlay(s, folder, index, detail)["code"], "controller_sha": detail["controller_sha"]})
             if rest[2] == "replay":
                 try:
                     replay = s.world_replay(cid, index)
@@ -2097,7 +2136,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.head(200, "image/jpeg", len(data))
                 return self.wfile.write(data)
             if rest[2] == "poses" and s.pack == "inspection":
-                return self.gzip_json(folder / f"w{index:03d}" / "replay.json.gz")
+                return self.gzip_json(code_lab.run_folder(folder, index) / "replay.json.gz")
         self.reply(404, {"error": "not_found"})
 
     def stream(self, s):
@@ -2150,7 +2189,7 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "-1"))
         except ValueError:
             length = -1
-        limit = MAX_SUBMIT_BODY_BYTES if self.path.endswith("/submit") else MAX_BODY_BYTES
+        limit = MAX_SUBMIT_BODY_BYTES if self.path.endswith(("/submit", "/code")) else MAX_BODY_BYTES
         if not 0 <= length <= limit:
             self.close_connection = True
             return self.reply(413, {"error": "too_large"})
@@ -2198,6 +2237,10 @@ class Handler(BaseHTTPRequestHandler):
             if parts[3] == "action" and isinstance(body.get("action"), str):
                 status, out = s.action(body["action"], body.get("value"))
                 return self.reply(status, out)
+            if parts[3] == "code" and s.pack:
+                return self.reply(*s.code_post(body))
+            if parts[3] == "code_fix" and s.pack:
+                return self.reply(*s.code_fix(body))
         self.reply(404, {"error": "not_found"})
 
 
@@ -2218,6 +2261,8 @@ def main():
     ap.add_argument("--port", type=int, default=5198)
     ap.add_argument("--recorded", help="folder of stored LLM replies, for offline checks, or a recorded batch (policy/runs/demo), played with no AI and no sim. The status line says which.")
     ap.add_argument("--live-route", action="store_true", help="with --recorded: the AI reads each message live, and the planner still uses stored replies. For timing checks.")
+    ap.add_argument("--fix-patch", help="for checks: this file stands in for the AI's edit in the code tab's fix, and the chat says so.")
+    ap.add_argument("--live-fix", action="store_true", help="with --recorded: the code tab's AI fix calls the AI, and the rest uses stored replies. For the check of one real fix.")
     ap.add_argument("--scenario-limit", type=int, help="for checks: keep this many scenario worlds, from each group in turn.")
     ap.add_argument("--llm-session-cap", type=int, default=MAX_LLM_PER_SESSION)
     ap.add_argument("--llm-hour-cap", type=int, default=MAX_LLM_PER_HOUR)
@@ -2229,6 +2274,7 @@ def main():
     BATCH = RECORDED if RECORDED and recorded_batch.is_batch(RECORDED) else None
     if a.live_route:
         os.environ["CRASHLAB_LIVE_ROUTE"] = "1"
+    code_lab.T.__dict__.update(spawn=spawn, finish=finish, kill_group=kill_group, beat=beat, watched=watched, lock=CAMPAIGN_LOCK, slots=SLOTS, rule=DEADLINES["run"], max_procs=MAX_PROCS, recorded=lambda: RECORDED is not None and not a.live_fix, fix_patch=a.fix_patch)
     RUNS.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer((HOST, a.port), Handler)  # A port in use stops here, before anything below can touch another server's children.
     server.daemon_threads = True

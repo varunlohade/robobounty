@@ -163,6 +163,30 @@ Every path starts `/api/sessions/<sid>/campaigns/<campaign>`.
 - window: `{"kind": "trial", "tid": "c1-007", "label": "..."}`. Load it with the existing trial player from `/api/sessions/<sid>/trials/<tid>/<file>`.
 - inspection: `{"kind": "poses", "url": "/api/sessions/<sid>/campaigns/c1/worlds/7/poses"}`. That URL gives one gzip-encoded `robot-pack-replay/1` JSON: `format, pack, robot, label, note, simulated, fps, body_labels, body_parents, pose_layout, route, floor_friction, solids, scenery, result, frames[{t, q}]`. `q` holds 7 numbers per body in `pose_layout` order. It has the same shape as `policy/packs/inspection/out/plant.replay.json.gz`.
 
+## Code tab and AI fix (tasks 7 and 8, Owner D)
+
+Edits go to a session copy, `<session>/code/<file>`. A source file never changes. `policy/server/code_lab.py` holds this path, and `fix.py` runs each copy under `sandbox-exec` with `policy/server/sandbox_worker5.py`.
+
+| Route | Reply |
+|---|---|
+| `GET /api/sessions/<sid>/code` | `{pack, name, file, source, original, sha, original_sha, edited, scope, fix_scope, note, trace}` |
+| `POST .../code` with `{source}` | Saves. `422 {error: "refused", reasons: ["line 9: import os is not allowed"], words}` saves nothing and runs nothing. |
+| `POST .../code` with `{source, run: "one"\|"all", campaign, index}` | Saves, then re-runs. `202`, or `409 {error: "busy"}`. Held-back worlds never re-run. |
+| `POST .../code_fix` with `{campaign, group}` | `group` is a verdict code. `202`. One AI edit, then the proof. |
+| `POST .../code_fix` with `{campaign, fix, accept}` | `200`. Accept works only on a fix with status `helped`, and only while the session copy is still the one it was tested on. |
+| `GET .../campaigns/<cid>/worlds/<i>/trace` | Window: a traced re-run in the sandbox, cached: `{same_chain, traced, line, phase, t, rule, code, controller_sha}`. `traced` is true only if the re-run's hash chain equals the record's. Inspection: `{traced: false, ...}`, and the line stays "active code". |
+
+A re-run feeds the normal `grid` event, with every row of the campaign. A row that has re-run also has `first: {status, verdict, verdict_reason}`. World detail gets `first` and `controller_sha`, and it shows the latest run. `/replay` and `/poses` play the latest run.
+
+Stored events: `code_run {campaign, run, scope, sha, rows: [{index, name, change: better|worse|same, first, old, new}], counts}`, `code_changed {sha}`, `code_fix_decided {fix, accepted}` and:
+
+```json
+{"type": "code_fix", "fix": "f1", "campaign": "c1", "group": "slip_distance", "status": "helped", "words": "...", "diff": "unified diff", "flags": [{"line": 37, "text": "LOW_PRESSURE_PA = 900.0", "words": "..."}],
+ "sets": {"target": {"n": 6, "better": 2, "worse": 0, "same": 4}, "passed_before": {}, "held_back": {}, "other_failed": {}}, "pairs": [], "validation": [], "limits": [], "held_back_worlds_shown_to_llm": 0, "llm_note": null}
+```
+
+`status`: `helped`, `did_not_help`, `no_change`, `rejected` (the edit broke the code rules, so it never ran) or `cannot_fix` (no AI call ran). Inspection: only the RouteFollower constants, and a fall is `cannot_fix`, since the policy is a fixed ONNX file. A new verdict can arrive here: `controller_crashed`, when the session copy raised or hit a sandbox limit.
+
 ## Not in this contract yet
 
-Code tab, AI fix and running held-back worlds. Those belong to tasks 7 and 8.
+Running held-back worlds outside the fix proof.

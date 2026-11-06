@@ -9,7 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-json": "6.0.2",
+    "@codemirror/lang-python": "6.2.1",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@lezer/highlight": "1.2.5",
     "@mujoco/mujoco": "3.16.0",
+    "@worldcoin/idkit-core": "4.6.0",
     "three": "0.180.0"
   },
   "devDependencies": {

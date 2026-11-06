@@ -103,6 +103,61 @@ def run_one(ctl, tmp, name, wall=fix.TRIAL_WALL_S, rss=fix.TRIAL_RSS_MB):
     return out, fix.run_sandboxed([str(HERE / "sandbox_worker.py"), "trial", str(ctl), str(world_path), "1000", str(out)], out, ctl, wall_s=wall, rss_mb=rss)
 
 
+def check_session_code(tmp):
+    """The lab's code tab: hostile session copies under sandbox_worker5, the inspection rules, the safety flag, and a failure the AI may not touch."""
+    failures = []
+    outside = Path(tempfile.gettempdir()) / "crashlab_outside_probe5.txt"
+    outside.unlink(missing_ok=True)
+    warp = str(next((Path.home() / "Library" / "Caches" / "warp").iterdir()))
+    for pack, name, tail in (("window", "controller5.py", "class Controller:\n    phase, estimate = 'hostile', 0.0\n    def __init__(self, mission): pass\n    def step(self, o): return [0.0, 0.0, 1.0, 0.0, 1.0, 0.0]\n"),
+                             ("inspection", "controller.py", "raise SystemExit(0)\n")):
+        folder = Path(tmp) / f"session5_{pack}"
+        folder.mkdir()
+        ctl = folder / name
+        ctl.write_text(f"OWNER_HOME = {str(Path.home())!r}\nOUTSIDE = {str(outside)!r}\nREPO = {str(fix.ROOT)!r}\nCONTROLLER = {str(fix.PACK5[pack]['file'])!r}\n"
+                       + HOSTILE_PROBES.split("class Controller")[0].replace("attempt('edit_controller'", f"attempt('edit_warp_cache', lambda: open({warp!r} + '/x', 'w').write('x'))\nattempt('edit_controller'") + tail)
+        request = folder / "request.json"
+        out = folder / "run"
+        out.mkdir()
+        request = out / "request.json"
+        request.write_text(json.dumps({"world": NOMINAL, "seed": 1000, "out": str(out), "progress": str(out / "progress.json")}))
+        fix.sandbox_run5(pack, ctl, request, own_group=True)
+        probes = json.loads((out / "probes.json").read_text()) if (out / "probes.json").exists() else {}
+        print(f"session copy probes, {pack}:", probes)
+        if len(probes) != 9 or any(v != "blocked" for v in probes.values()):
+            failures.append(f"{pack} session copy probes: {probes}; log {(out / 'job.log').read_text()[-400:]}")
+    if outside.exists():
+        failures.append("a session copy wrote outside its run dir")
+
+    route = fix.PACK5["inspection"]["file"].read_text()
+    window = fix.PACK5["window"]["file"].read_text()
+    for name, text, rules in (("the walking policy", route.replace("self.scale = float(action_scale)", "self.scale = 2.0"), {}), ("a new import", "import os\n" + route, {}), ("open in RouteFollower", route.replace("self.next = 1 ", "self.next = open('x') "), {}),
+                              ("a constant made into code", route.replace("SPEED_MPS = 0.8", "SPEED_MPS = len('x')"), {}), ("an AI edit of RouteFollower logic", route.replace("self.next = 1 ", "self.next = 2 "), {"constants_only": True})):
+        if not fix.validate5("inspection", text, **rules):
+            failures.append(f"the inspection rules accepted {name}")
+    for name, text, rules in (("the source", route, {}), ("RouteFollower logic", route.replace("self.next = 1 ", "self.next = 2 "), {}), ("a constant", route.replace("SPEED_MPS = 0.8", "SPEED_MPS = 0.6"), {"constants_only": True})):
+        if fix.validate5("inspection", text, **rules):
+            failures.append(f"the inspection rules refused {name}: {fix.validate5('inspection', text, **rules)}")
+    if fix.validate5("window", window):
+        failures.append(f"controller5 fails the validator: {fix.validate5('window', window)}")
+    weak = "--- a/c\n+++ b/c\n@@ -1,2 +1,2 @@\n-LOW_PRESSURE_PA = 1500.0\n+LOW_PRESSURE_PA = 900.0\n CLEAN = 1\n@@ -9,1 +9,1 @@\n-SPEED = 1\n+SPEED = 2\n"
+    flags = fix.flags5(weak)
+    print("safety flags:", flags)
+    if [f["line"] for f in flags] != [1, 1]:
+        failures.append(f"safety flags are wrong: {flags}")
+
+    campaign = Path(tmp) / "session5_campaign"
+    campaign.mkdir()
+    (campaign / "scenarios.json").write_text(json.dumps({"worlds": []}))
+    (campaign / "grid.json").write_text(json.dumps({"rows": []}))
+    done = subprocess.run([sys.executable, str(HERE / "fix.py"), "run", str(campaign), "--base", "controller.py", "--pack", "inspection", "--group", "fell"], capture_output=True, text=True)
+    report = json.loads((campaign / "fix5" / "report.json").read_text())
+    print("a fall on the inspection robot:", report["status"], report["words"])
+    if report["status"] != "cannot_fix" or "not falls" not in report["words"] or report["llm"]:
+        failures.append(f"the fall refusal is wrong: {report['status']} {done.stderr[-200:]}")
+    return failures
+
+
 def main():
     failures = []
     before = hashlib.sha256(fix.BASE.read_bytes()).hexdigest()
@@ -186,6 +241,8 @@ def main():
         if json.loads((outs / "replay.json").read_text()).get("match"):
             failures.append("a forged result passed replay")
         print("forged result caught by replay: True")
+
+    failures += check_session_code(tmp)
 
     # accept refuses with no human at a terminal, and the file stays the same.
     tdir = Path(tmp) / "try"
