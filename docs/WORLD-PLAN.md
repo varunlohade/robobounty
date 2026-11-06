@@ -107,3 +107,7 @@ Demo is safe after 1, 2, 5, 6, 9. Cut in order: ONNX upload, import, inspection 
 ## Bounty board: solve what the company cannot (owner, 2026-11-06)
 His words: "we can have the bounty board to solve issues company are facing". Earlier: the AI tries a fix first; if it fails, the company posts a bounty for experienced engineers.
 Flow: a red failure the AI could not fix gets "Post a bounty": the failure pack and pay. Engineers read it and submit a controller change. Code runs it in the sandbox on the same worlds and on hidden held-back worlds, with the frozen judge and no regressions. A pass goes to the dispute window, then payment. Finding new failures stays as a second bounty type.
+
+### The agent pays people (owner, 2026-11-06)
+His words: "our AI agent can actually pay operators or pay people, pay people to try out test cases and pay it if it works well."
+The company funds a capped budget. The agent posts bounties from it. Code and the contract decide each payout from the gate result; the agent never does. Later: pay operators with real robots to run a test and upload logs, as real data for comparison with the simulator.
