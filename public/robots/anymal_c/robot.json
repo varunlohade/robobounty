@@ -1,0 +1,576 @@
+{
+ "format": "robot-mesh/1",
+ "robot": "anymal_c",
+ "source": "anybotics_anymal_c usd/anymal_c.usda, the asset Newton loads",
+ "vertices": 72588,
+ "indices": 174996,
+ "layout": {
+  "position": 0,
+  "normal": 871056,
+  "uv": 1161408,
+  "index": 1742112
+ },
+ "parts": [
+  {
+   "body": "base",
+   "colour": [
+    0.0785,
+    0.0785,
+    0.0785
+   ],
+   "texture": null,
+   "first_index": 0,
+   "index_count": 6663
+  },
+  {
+   "body": "base",
+   "colour": [
+    0.2536,
+    0.46,
+    0.202
+   ],
+   "texture": null,
+   "first_index": 6663,
+   "index_count": 264
+  },
+  {
+   "body": "base",
+   "colour": [
+    0.46,
+    0.0711,
+    0.068
+   ],
+   "texture": null,
+   "first_index": 6927,
+   "index_count": 1974
+  },
+  {
+   "body": "base",
+   "colour": [
+    0.46,
+    0.381,
+    0.078
+   ],
+   "texture": null,
+   "first_index": 8901,
+   "index_count": 2238
+  },
+  {
+   "body": "base",
+   "colour": [
+    0.9063,
+    0.9063,
+    0.9063
+   ],
+   "texture": null,
+   "first_index": 11139,
+   "index_count": 987
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "base.jpg",
+   "first_index": 12126,
+   "index_count": 702
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 12828,
+   "index_count": 588
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 13416,
+   "index_count": 588
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 14004,
+   "index_count": 588
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 14592,
+   "index_count": 588
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "battery.jpg",
+   "first_index": 15180,
+   "index_count": 36
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "bottom_shell.jpg",
+   "first_index": 15216,
+   "index_count": 30885
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "face.jpg",
+   "first_index": 46101,
+   "index_count": 18078
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "depth_camera.jpg",
+   "first_index": 64179,
+   "index_count": 36
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "wide_angle_camera.jpg",
+   "first_index": 64215,
+   "index_count": 444
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "face.jpg",
+   "first_index": 64659,
+   "index_count": 18078
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "depth_camera.jpg",
+   "first_index": 82737,
+   "index_count": 36
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "wide_angle_camera.jpg",
+   "first_index": 82773,
+   "index_count": 444
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "handle.jpg",
+   "first_index": 83217,
+   "index_count": 426
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "hatch.jpg",
+   "first_index": 83643,
+   "index_count": 138
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "remote.jpg",
+   "first_index": 83781,
+   "index_count": 930
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "depth_camera.jpg",
+   "first_index": 84711,
+   "index_count": 36
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "depth_camera.jpg",
+   "first_index": 84747,
+   "index_count": 36
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "lidar_cage.jpg",
+   "first_index": 84783,
+   "index_count": 1500
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "lidar.jpg",
+   "first_index": 86283,
+   "index_count": 696
+  },
+  {
+   "body": "base",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "top_shell.jpg",
+   "first_index": 86979,
+   "index_count": 28629
+  },
+  {
+   "body": "base",
+   "colour": [
+    0.4614,
+    0.4614,
+    0.4614
+   ],
+   "texture": null,
+   "first_index": 115608,
+   "index_count": 36
+  },
+  {
+   "body": "LF_HIP",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "hip.jpg",
+   "first_index": 115644,
+   "index_count": 768
+  },
+  {
+   "body": "LF_HIP",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 116412,
+   "index_count": 588
+  },
+  {
+   "body": "LF_THIGH",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "thigh.jpg",
+   "first_index": 117000,
+   "index_count": 5544
+  },
+  {
+   "body": "LF_THIGH",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 122544,
+   "index_count": 588
+  },
+  {
+   "body": "LF_SHANK",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "shank.jpg",
+   "first_index": 123132,
+   "index_count": 4806
+  },
+  {
+   "body": "LF_FOOT",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "foot.jpg",
+   "first_index": 127938,
+   "index_count": 2544
+  },
+  {
+   "body": "LH_HIP",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "hip.jpg",
+   "first_index": 130482,
+   "index_count": 768
+  },
+  {
+   "body": "LH_HIP",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 131250,
+   "index_count": 588
+  },
+  {
+   "body": "LH_THIGH",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "thigh.jpg",
+   "first_index": 131838,
+   "index_count": 5544
+  },
+  {
+   "body": "LH_THIGH",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 137382,
+   "index_count": 588
+  },
+  {
+   "body": "LH_SHANK",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "shank.jpg",
+   "first_index": 137970,
+   "index_count": 4806
+  },
+  {
+   "body": "LH_FOOT",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "foot.jpg",
+   "first_index": 142776,
+   "index_count": 2544
+  },
+  {
+   "body": "RF_HIP",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "hip.jpg",
+   "first_index": 145320,
+   "index_count": 768
+  },
+  {
+   "body": "RF_HIP",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 146088,
+   "index_count": 588
+  },
+  {
+   "body": "RF_THIGH",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "thigh.jpg",
+   "first_index": 146676,
+   "index_count": 5544
+  },
+  {
+   "body": "RF_THIGH",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 152220,
+   "index_count": 588
+  },
+  {
+   "body": "RF_SHANK",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "shank.jpg",
+   "first_index": 152808,
+   "index_count": 4806
+  },
+  {
+   "body": "RF_FOOT",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "foot.jpg",
+   "first_index": 157614,
+   "index_count": 2544
+  },
+  {
+   "body": "RH_HIP",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "hip.jpg",
+   "first_index": 160158,
+   "index_count": 768
+  },
+  {
+   "body": "RH_HIP",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 160926,
+   "index_count": 588
+  },
+  {
+   "body": "RH_THIGH",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "thigh.jpg",
+   "first_index": 161514,
+   "index_count": 5544
+  },
+  {
+   "body": "RH_THIGH",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "drive.jpg",
+   "first_index": 167058,
+   "index_count": 588
+  },
+  {
+   "body": "RH_SHANK",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "shank.jpg",
+   "first_index": 167646,
+   "index_count": 4806
+  },
+  {
+   "body": "RH_FOOT",
+   "colour": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "texture": "foot.jpg",
+   "first_index": 172452,
+   "index_count": 2544
+  }
+ ]
+}

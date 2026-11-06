@@ -1,4 +1,4 @@
-// A three.js player for a robot pack's replay JSON (format robot-pack-replay/1). It draws only what the file holds: solids, scenery, one capsule per body and the route.
+// A three.js player for a robot pack's replay JSON (format robot-pack-replay/1). It draws what the file holds: solids, scenery and the route. The robot is the asset's own meshes, one group per body at its recorded pose.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -42,14 +42,35 @@ export function previewReplay(scene: Pick<PoseReplay, 'solids' | 'scenery' | 'ro
   return { format: 'robot-pack-replay/1', pack: '', robot: '', label: '', simulated: true, fps: 1, body_labels: [], body_parents: [], pose_layout: [], frames: [], result: { verdict: '', passed: true, reason: '' }, ...scene };
 }
 
+interface RobotModel {
+  parts: { body: string; colour: number[]; texture: string | null; first_index: number; index_count: number }[];
+  vertices: number; indices: number; layout: { position: number; normal: number; uv: number; index: number };
+  bin: ArrayBuffer; base: string;
+}
+const robotModels = new Map<string, Promise<RobotModel>>();
+// The meshes export_robot.py wrote from the same asset the physics loaded. One fetch per robot, however many views open.
+function loadRobotModel(robot: string): Promise<RobotModel> {
+  let got = robotModels.get(robot);
+  if (!got) {
+    const base = `/robots/${encodeURIComponent(robot)}`;
+    got = (async () => {
+      const [head, bin] = await Promise.all([fetch(`${base}/robot.json`), fetch(`${base}/robot.bin`)]);
+      if (!head.ok || !bin.ok) throw new Error(`robot meshes: HTTP ${head.status}, ${bin.status}`);
+      return { ...(await head.json()), bin: await bin.arrayBuffer(), base } as RobotModel;
+    })();
+    got.catch(() => robotModels.delete(robot));
+    robotModels.set(robot, got);
+  }
+  return got;
+}
+
 const POSE_SIZE = 7;
 const VIEW_OFFSET = new THREE.Vector3(-2.2, -4.0, 2.7); // The same chase as the pack's own render.
 const VIEW_AIM = new THREE.Vector3(0.2, 0.5, 0.55);
 const CHASE_SECONDS = 1.5;
-const ROOT_RADIUS = 0.15;
-const LIMB_RADIUS = [0.07, 0.062, 0.044, 0.034]; // By depth from the root.
-const ROBOT_PAINT = 0x8c9198;
-const ROBOT_ROOT_PAINT = 0xaeb2b8;
+const ROBOT_ROUGH = 0.6;
+const ROBOT_REACH_M = 1.5; // Past any part's distance from its own body.
+const NORMAL_STRIDE = 4;
 const ROUTE_COLOUR = 0x3e7bfa;
 const ROUTE_Z = 0.012;
 const ROUTE_ORDER = 1;
@@ -179,7 +200,7 @@ export class PosesView {
   private scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
   private controls: OrbitControls;
-  private bodies: { mesh: THREE.Mesh; parent: number }[] = [];
+  private bodies: THREE.Group[] = [];
   private chase: THREE.Vector2[] = [];
   private disposers: (() => void)[] = [];
   private observer: ResizeObserver;
@@ -329,31 +350,68 @@ export class PosesView {
   }
 
   private buildRobot() {
-    const { body_parents: parents } = this.replay;
-    const a = new THREE.Vector3(), b = new THREE.Vector3();
-    const rootPaint = new THREE.MeshStandardMaterial({ color: ROBOT_ROOT_PAINT, roughness: 0.5 });
-    const limbPaint = new THREE.MeshStandardMaterial({ color: ROBOT_PAINT, roughness: 0.55 });
-    this.disposers.push(() => { rootPaint.dispose(); limbPaint.dispose(); });
-    const depth = parents.map(() => 0);
-    parents.forEach((parent, i) => { depth[i] = parent < 0 ? 0 : depth[parent] + 1; });
-    // The root's capsule reaches its furthest child, along its own x. Every other capsule joins a body to its parent.
-    let rootHalf = 0.1;
-    parents.forEach((parent, i) => {
-      if (parent >= 0 && parents[parent] < 0) rootHalf = Math.max(rootHalf, this.poseAt(0, i, a).distanceTo(this.poseAt(0, parent, b)));
+    const { body_labels: labels, robot } = this.replay;
+    if (!labels.length) return;
+    for (const label of labels) {
+      const group = new THREE.Group();
+      group.name = label;
+      this.scene.add(group);
+      this.bodies.push(group);
+    }
+    loadRobotModel(robot).then(model => {
+      if (!this.stopped) this.dressRobot(model);
+    }).catch(err => {
+      if (!this.stopped) this.host.append(el('div', 'sim-tag sim-key sim-bad', `The robot's meshes did not load, so the robot is not drawn. ${String(err)}`));
     });
-    parents.forEach((parent, i) => {
-      const radius = parent < 0 ? ROOT_RADIUS : LIMB_RADIUS[Math.min(depth[i] - 1, LIMB_RADIUS.length - 1)];
-      let length = rootHalf * 2;
-      if (parent >= 0) length = Math.max(0.001, this.poseAt(0, i, a).distanceTo(this.poseAt(0, parent, b)));
-      const g = new THREE.CapsuleGeometry(radius, length, 6, 16);
-      const mesh = new THREE.Mesh(g, parent < 0 ? rootPaint : limbPaint);
+  }
+
+  private dressRobot(model: RobotModel) {
+    const { position, normal, uv, index } = model.layout;
+    const positions = new THREE.BufferAttribute(new Float32Array(model.bin, position, model.vertices * 3), 3);
+    const normals = new THREE.BufferAttribute(new Int8Array(model.bin, normal, model.vertices * NORMAL_STRIDE), NORMAL_STRIDE, true);
+    const uvs = new THREE.BufferAttribute(new Float32Array(model.bin, uv, model.vertices * 2), 2);
+    const indices = new THREE.BufferAttribute(new Uint32Array(model.bin, index, model.indices), 1);
+    const paints = new Map<string, THREE.MeshStandardMaterial>();
+    const loader = new THREE.TextureLoader();
+    const anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    const paint = (colour: number[], texture: string | null) => {
+      const key = `${colour.join(',')}|${texture}`;
+      let material = paints.get(key);
+      if (!material) {
+        material = new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(colour[0], colour[1], colour[2]), roughness: ROBOT_ROUGH });
+        if (texture) {
+          const map = loader.load(`${model.base}/textures/${encodeURIComponent(texture)}`, () => { this.dirty = true; });
+          map.colorSpace = THREE.SRGBColorSpace;
+          map.anisotropy = anisotropy;
+          material.map = map;
+          this.disposers.push(() => map.dispose());
+        }
+        const made = material;
+        this.disposers.push(() => made.dispose());
+        paints.set(key, material);
+      }
+      return material;
+    };
+    const byLabel = new Map(this.bodies.map(g => [g.name, g]));
+    for (const part of model.parts) {
+      const body = byLabel.get(part.body);
+      if (!body) continue;
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', positions);
+      geometry.setAttribute('normal', normals);
+      geometry.setAttribute('uv', uvs);
+      geometry.setIndex(indices);
+      geometry.setDrawRange(part.first_index, part.index_count);
+      // Each part reads one slice of the shared buffers, so its bounds come from the body, not from its own vertices.
+      geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), ROBOT_REACH_M);
+      const mesh = new THREE.Mesh(geometry, paint(part.colour, part.texture));
       mesh.castShadow = true;
       mesh.renderOrder = ROBOT_ORDER;
-      mesh.name = this.replay.body_labels[i];
-      this.scene.add(mesh);
-      this.bodies.push({ mesh, parent });
-      this.disposers.push(() => g.dispose());
-    });
+      body.add(mesh);
+      this.disposers.push(() => geometry.dispose());
+    }
+    this.host.dataset.robotParts = String(model.parts.length);
+    this.dirty = true;
   }
 
   private buildChase() {
@@ -397,26 +455,17 @@ export class PosesView {
     requestAnimationFrame(tick);
   }
 
-  /** Puts every capsule at its recorded pose, and moves the camera with the robot. */
+  /** Puts every body at its recorded pose, and moves the camera with the robot. */
   seek(frame: number) {
     this.frame = Math.max(0, Math.min(this.replay.frames.length - 1, frame));
     if (!this.replay.frames.length) { this.frame = 0; this.dirty = true; return; }
-    const a = new THREE.Vector3(), b = new THREE.Vector3(), dir = new THREE.Vector3();
     const q = this.replay.frames[this.frame].q;
-    this.bodies.forEach(({ mesh, parent }, i) => {
-      this.poseAt(this.frame, i, a);
-      if (parent < 0) {
-        mesh.position.copy(a);
-        const at = i * POSE_SIZE;
-        mesh.quaternion.set(q[at + 3], q[at + 4], q[at + 5], q[at + 6]).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2));
-        this.base.copy(a);
-        return;
-      }
-      this.poseAt(this.frame, parent, b);
-      mesh.position.addVectors(a, b).multiplyScalar(0.5);
-      dir.subVectors(a, b);
-      if (dir.lengthSq() > 1e-9) mesh.quaternion.setFromUnitVectors(UP_Y, dir.normalize());
+    this.bodies.forEach((group, i) => {
+      const at = i * POSE_SIZE;
+      group.position.set(q[at], q[at + 1], q[at + 2]);
+      group.quaternion.set(q[at + 3], q[at + 4], q[at + 5], q[at + 6]);
     });
+    if (this.bodies.length) this.base.copy(this.bodies[0].position);
     if (this.chase.length) {
       const c = this.chase[this.frame];
       const dx = c.x - this.lastChase.x, dy = c.y - this.lastChase.y;
@@ -435,15 +484,14 @@ export class PosesView {
     return [this.base.x, this.base.y, this.base.z];
   }
 
-  /** The two ends of a body's capsule centreline as drawn: the check reads these. */
-  drawnEnds(body: number): [number[], number[]] | null {
-    const item = this.bodies[body];
-    if (!item) return null;
-    const g = item.mesh.geometry as THREE.CapsuleGeometry;
-    const half = g.parameters.height / 2;
-    const top = new THREE.Vector3(0, half, 0).applyQuaternion(item.mesh.quaternion).add(item.mesh.position);
-    const bottom = new THREE.Vector3(0, -half, 0).applyQuaternion(item.mesh.quaternion).add(item.mesh.position);
-    return [top.toArray(), bottom.toArray()];
+  /** A body's pose as drawn, and how many meshes it holds: the check reads these. */
+  drawnBody(body: number) {
+    const group = this.bodies[body];
+    if (!group) return null;
+    group.updateWorldMatrix(true, false);
+    const position = new THREE.Vector3(), quaternion = new THREE.Quaternion();
+    group.matrixWorld.decompose(position, quaternion, new THREE.Vector3());
+    return { position: position.toArray(), quaternion: quaternion.toArray(), meshes: group.children.length };
   }
 
   robotOnScreen() {
@@ -491,8 +539,6 @@ export class PosesView {
     this.renderer.domElement.remove();
   }
 }
-
-const UP_Y = new THREE.Vector3(0, 1, 0);
 
 /** The page for one replay: the same viewport, transport bar and status line as a window robot's run. */
 export function posesPage(replay: PoseReplay, statusRight: HTMLElement, onFix?: (code: string, words: string) => void) {

@@ -9,6 +9,7 @@ const ROOT = resolve(import.meta.dirname, '../../..');
 const OUT = resolve(arg('out', join(ROOT, 'design/shell')));
 const NAME = arg('name', 'plant');
 const TOLERANCE_M = 0.002;
+const TOLERANCE_Q = 0.001; // Per quaternion component. The file rounds to 0.0001.
 const dir = 'policy/packs/inspection/out';
 let failed = 0;
 const check = (name, ok, detail = '') => { if (!ok) failed++; console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? `: ${detail}` : ''}`); };
@@ -16,6 +17,7 @@ const c = await openChrome();
 try {
   await c.send('Page.navigate', { url: `http://localhost:5199/lab.html?poses=/${dir}/${NAME}.replay.json.gz` });
   await c.until(`document.querySelector('.viewport')?.dataset.ready === 'true'`, 'player ready', 30);
+  await c.until(`Number(document.querySelector('.viewport').dataset.robotParts) > 0`, 'robot meshes', 20);
   await wait(1500);
   const f0 = await c.js(`Number(document.querySelector('.viewport').dataset.frame)`);
   await wait(800);
@@ -39,22 +41,24 @@ print(json.dumps(out))`, join(ROOT, dir, `${NAME}.npz`), times], { encoding: 'ut
   for (const [n, f] of frames.entries()) {
     const drawn = JSON.parse(await c.js(`(() => {
       const app = window.__lab; app.jump(${f}); const v = app.view();
-      const ends = []; for (let i = 0; i < 17; i++) ends.push(v.drawnEnds(i));
-      return JSON.stringify({ base: v.robot(), ends, screen: v.robotOnScreen(), frame: v.frame });
+      const bodies = []; for (let i = 0; i < 17; i++) bodies.push(v.drawnBody(i));
+      return JSON.stringify({ base: v.robot(), bodies, screen: v.robotOnScreen(), frame: v.frame });
     })()`));
     const q = record[n].q;
     const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-    let worst = dist(drawn.base, q[0]);
-    for (let i = 1; i < 17; i++) {
-      // One end of the capsule sits at the body, within the link length rounding of the file.
-      worst = Math.max(worst, Math.min(dist(drawn.ends[i][0], q[i]), dist(drawn.ends[i][1], q[i])));
+    const turn = (a, b) => { const sign = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] < 0 ? -1 : 1; return Math.max(...a.map((v, k) => Math.abs(v - sign * b[k]))); };
+    let worst = dist(drawn.base, q[0]), worstTurn = 0;
+    for (let i = 0; i < 17; i++) {
+      worst = Math.max(worst, dist(drawn.bodies[i].position, q[i]));
+      worstTurn = Math.max(worstTurn, turn(drawn.bodies[i].quaternion, q[i].slice(3)));
     }
-    check(`frame ${f} (t ${record[n].t.toFixed(2)} s) matches the record`, worst < TOLERANCE_M, `worst ${(worst * 1000).toFixed(2)} mm over 17 bodies`);
+    check(`frame ${f} (t ${record[n].t.toFixed(2)} s) matches the record`, worst < TOLERANCE_M && worstTurn < TOLERANCE_Q, `worst ${(worst * 1000).toFixed(2)} mm, quaternion ${worstTurn.toFixed(5)} over 17 bodies`);
+    check(`frame ${f}: every body draws a real mesh`, drawn.bodies.every(b => b.meshes > 0), drawn.bodies.map(b => b.meshes).join(','));
     check(`frame ${f}: the camera stays on the robot`, drawn.screen.inFrame, `screen ${drawn.screen.x.toFixed(2)}, ${drawn.screen.y.toFixed(2)}`);
   }
   await c.js(`window.__lab.jump(${Math.round((17.1 / (count / 25)) * count)})`);
   await wait(800);
-  await c.shot(join(OUT, `poses-${NAME}.png`));
+  await c.shot(join(OUT, NAME === 'plant' ? 'poses-anymal.png' : `poses-${NAME}.png`));
   check('no console errors', c.problems.length === 0, [...new Set(c.problems)].slice(0, 8).join('\n'));
 } catch (err) {
   check('finished', false, String(err));
