@@ -28,6 +28,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import board_fix_routes
 import board_gate
 import board_spec
 import board_store as B
@@ -49,7 +50,7 @@ REPLAY_ROUTE = re.compile(r"/api/bounties/([0-9]{1,9})/submissions/([0-9]{1,9})/
 REPLAY_FILES = {"manifest.json": "application/json", "model.xml": "application/xml", "qpos.json": "application/json", "result.json": "application/json", "world.json": "application/json",
                 "controller.py.txt": "text/plain", "trace.json": "application/json", "wind.json": "application/json", "dirt.bin": "application/octet-stream"}
 LABELS = {"ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL}
-ERROR_STATUS = {"unknown_bounty": 404, "unknown_submission": 404, "tester_cap": 429, "ledger_refused": 409, "no_recorded_run": 404, "replay_refused": 409}
+ERROR_STATUS = {"unknown_bounty": 404, "unknown_submission": 404, "tester_cap": 429, "ledger_refused": 409, "no_recorded_run": 404, "replay_refused": 409, **board_fix_routes.ERROR_STATUS}
 
 ROOT = B.ROOT
 WAITING = queue.Queue(QUEUE_CAP)
@@ -135,6 +136,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed():
             return self.fail(403, "origin_refused", "This origin or host is not the board page.")
         try:
+            if board_fix_routes.route(self, "GET", ROOT):
+                return None
             if self.path == "/api/health":
                 return self.reply(200, {"ok": True, "waiting": WAITING.qsize(), "queue_cap": QUEUE_CAP, "max_per_tester": B.MAX_PER_TESTER, "robot": B.ROBOT, "sim_label": B.SIM_LABEL, "max_world_bytes": MAX_WORLD_BYTES, "fields": G.W.FIELDS, "reference_world": G.W.load(board_spec.NOMINAL), "aliases": board_spec.ALIASES, **LABELS})
             if self.path == "/api/bounties":
@@ -158,6 +161,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed():
             return self.fail(403, "origin_refused", "This origin or host is not the board page.")
         try:
+            if board_fix_routes.route(self, "POST", ROOT):
+                return None
             if self.path == "/api/bounties":
                 return self.post_bounty()
             m = ROUTE.fullmatch(self.path)
@@ -232,6 +237,7 @@ def main():
     ROOT.mkdir(parents=True, exist_ok=True)
     B.mark_interrupted(ROOT)
     threading.Thread(target=worker, daemon=True).start()
+    board_fix_routes.start(ROOT)
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     server.daemon_threads = True
 
