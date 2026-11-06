@@ -284,7 +284,12 @@ async function live(root: HTMLElement) {
         const trial = await fetchTrial(String(how.tid));
         if (!trial) return null;
         const world = worldPage(trial, statusRight, fixed);
-        return { page: world.page, start: async () => { await world.start(); current = () => world.view; world.viewport.dataset.tid = String(how.tid); }, stop: () => { world.stop(); current = () => null; }, jump: () => {} };
+        return { page: world.page, start: async () => { await world.start(); current = () => world.view; world.viewport.dataset.tid = String(how.tid); }, stop: () => { world.stop(); current = () => null; }, jump: (t: number) => {
+          const slider = world.page.querySelector<HTMLInputElement>('.scrub input');
+          if (!slider) return;
+          slider.value = String(Math.round(t * trial.manifest.hz));
+          slider.dispatchEvent(new Event('input'));
+        } };
       },
     });
   }

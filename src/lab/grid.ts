@@ -161,6 +161,8 @@ class Square {
     const take = (x: number, y: number) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); };
     if (o.kind === 'area') { take(o.x0, o.z0); take(o.x1, o.z1); } else for (const [x, y] of o.points) take(x, y);
     if (!Number.isFinite(x0)) return;
+    // A robot that leaves the outline stays in the square, with the scale eased to fit it.
+    for (let i = 0; i < this.trail.length; i += 2) take(this.trail[i], this.trail[i + 1]);
     const spanX = Math.max(x1 - x0, 0.5), spanY = Math.max(y1 - y0, 0.5);
     const aw = w - PAD * 2, ah = bottom - top - 4;
     const scale = Math.min(aw / (spanX * (1 + OUTLINE_MARGIN)), ah / (spanY * (1 + OUTLINE_MARGIN)));

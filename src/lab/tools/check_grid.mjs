@@ -167,6 +167,7 @@ try {
   const index = await c.js(`(document.querySelector('.sq[data-status=failed]') ?? document.querySelector('.sq[data-status=passed]')).dataset.index`);
   const statesBefore = await c.js(`document.querySelectorAll('.sq[data-status=passed], .sq[data-status=failed]').length`);
   const updatesBefore = await c.js(`Number(document.querySelector('.grid-page').dataset.updates)`);
+  const stillRunning = await c.js(`document.querySelector('.grid-page').dataset.running === 'true'`);
   await clickOn(`.sq[data-index="${index}"]`);
   await c.until(`document.querySelector('.grid-replay .viewport')?.dataset.ready === 'true' && Number(document.querySelector('.grid-replay .viewport').dataset.frame) > 0`, 'replay plays', 30);
   const rail = await c.js(`document.querySelector('.grid-rail').innerText`);
@@ -176,7 +177,7 @@ try {
   await wait(2500);
   await shot('grid-detail.png');
   const updatesDuring = await c.js(`Number(document.querySelector('.grid-page').dataset.updates)`);
-  check('the grid keeps taking events behind the replay', updatesDuring > updatesBefore, `${updatesBefore} -> ${updatesDuring}`);
+  if (stillRunning) check('the grid keeps taking events behind the replay', updatesDuring > updatesBefore, `${updatesBefore} -> ${updatesDuring}`);
   await clickOn('.grid-back');
   await wait(300);
   const statesAfter = await c.js(`document.querySelectorAll('.sq[data-status=passed], .sq[data-status=failed]').length`);
