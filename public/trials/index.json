@@ -4,23 +4,15 @@
   "label": "Nominal world, seed 1"
  },
  {
-  "id": "dubai-world-013",
-  "label": "Dubai world 013: detach"
+  "id": "dubai-final-world-016",
+  "label": "Dubai world_016: slip_distance, repeated 3 of 3"
  },
  {
-  "id": "dubai-world-009",
-  "label": "Dubai world 009: slip_distance"
+  "id": "dubai-final-world-033",
+  "label": "Dubai world_033: detach, repeated 3 of 3"
  },
  {
-  "id": "dubai-v4-world-007",
-  "label": "Dubai v4 world_007: slip_distance"
- },
- {
-  "id": "dubai-v4-world-008",
-  "label": "Dubai v4 world_008: false_done"
- },
- {
-  "id": "dubai-v4-world-011",
-  "label": "Dubai v4 world_011: detach"
+  "id": "dubai-final-world-038",
+  "label": "Dubai world_038: false_done, repeated 3 of 3"
  }
 ]

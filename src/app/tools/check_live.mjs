@@ -122,6 +122,7 @@ problems.length = 0; // The refusal above logs a CORS error on purpose.
 
 await send('Page.navigate', { url: APP });
 await until(`document.getElementById('app')?.dataset.server === 'up' && !!document.querySelector('.chat-input textarea')`, 'app and server up', 30);
+check('a Recorded run link is one click away', (await js(`document.querySelector('.chat-mode').textContent`)) === 'Recorded run');
 check('starts at Brief', (await chapter()) === 'Brief');
 check('status line says Simulated and names the sim', (await js(`document.querySelector('.status').textContent`)).startsWith('Simulated') && /sim [0-9a-f]{8}/.test(await js(`document.querySelector('.status').textContent`)));
 check('input box is rounded', parseFloat(await js(`getComputedStyle(document.querySelector('.chat-input')).borderRadius`)) >= 8);
@@ -279,6 +280,7 @@ check('chapter is Fix', (await chapter()) === 'Fix');
 if (!LIVE_FIX) {
   check('stored result is labelled Recorded result', fixText.includes('Recorded result'));
   check('the conclusion comes from the plan rule', fixText.includes('removed the low-pressure guard in the clean phase'));
+  check('the fix says 6 passed and 1 stopped on battery, not 7 better alone', fixText.includes('6 failed and now pass') && fixText.includes('stalled to battery stop') && fixText.includes('have not applied'));
   check('the stored numbers show', /Held-back worlds104\d+ to \d+/.test(fixText.replace(/\s+/g, '')) || fixText.includes('104'));
 }
 await js(`document.querySelector('.chat-list').scrollTop = 1e9`);

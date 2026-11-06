@@ -28,6 +28,7 @@ from urllib.parse import urlsplit
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import ledger as ledger_module
+from stored_fix import STORED_FIX, ab_rows, recorded_fix
 
 POLICY = HERE.parent
 HIGHRISE = POLICY / "highrise"
@@ -46,7 +47,6 @@ LLM_CAP_USD = "0.50"
 MAX_LLM_PER_SESSION = 10
 MAX_LLM_PER_HOUR = 40  # across all sessions
 MAX_SUBMIT_BODY_BYTES = 64 * 1024  # the gate applies its own lower limit to the world file
-STORED_FIX = POLICY / "runs" / "highrise" / "campaign_dubai_v4" / "fix"
 GATE = POLICY / "bounty" / "gate.py"
 CONTROLLER = HIGHRISE / "controller.py"
 # Local test addresses for the ledger's separate roles. They have no key and no wallet.
@@ -178,28 +178,6 @@ def llm_label():
 
 def sha_file(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-
-
-def ab_rows(ab, names):
-    """One table row per world set, from fix.py's own counts."""
-    rows = []
-    for key, label in names:
-        b = ab.get(key)
-        if b:
-            rows.append({"set": label, "n": b["n"], "pass_a": b["A"]["pass"], "pass_b": b["B"]["pass"], "fail_a": b["A"]["fail"], "fail_b": b["B"]["fail"], "better": b["better"], "worse": b["worse"],
-                         "same": b["same"], "p": b["sign_test_p_one_sided"], "limits_hit": b["limits_hit_B"], "replay_mismatch": b["replay_mismatch_B"]})
-    return rows
-
-
-def retest_conclusion(r):
-    """The three conclusions fixed in retest_2026-11-06/PLAN.md, before the run."""
-    required = r["sign_test_pass"] and r["controls_all_pass"] and not r["detach_or_slip_rose"]
-    floor = r["blind_point"]["floor"]
-    if not required:
-        return "did not help"
-    if floor["lowest_estimate_pa"] >= floor["guard_pa"]:
-        return "helped on the counts but removed the low-pressure guard in the clean phase. Not recommended as it stands."
-    return "helped on the counts and kept the guard"
 
 
 def sim_hash():
@@ -703,27 +681,9 @@ class Session:
 
     def fix_recorded(self):
         self.working("reading the stored fix report")
-        retest = json.loads((STORED_FIX / "retest_2026-11-06" / "report.json").read_text())
-        overall = json.loads((STORED_FIX / "report.json").read_text())
-        attempt = json.loads((STORED_FIX / "try_2" / "report.json").read_text())
-        conclusion = retest_conclusion(retest)
-        floor = retest["blind_point"]["floor"]
-        changed = [{"world": w["trial"], "before": w["A_failure"] or w["A"], "after": w["B_failure"] or w["B"]} for w in retest["per_world"] if (w["A_failure"] or w["A"]) != (w["B_failure"] or w["B"])]
-        fresh = retest["fresh"]
-        self.fix_summary = (f"Recorded result: {fresh['better']} better, {fresh['worse']} worse on {retest['fresh_worlds']} held-back worlds. Conclusion: {conclusion}")
-        self.tool("fix_report", "Recorded result", [json.dumps({"better": fresh["better"], "worse": fresh["worse"], "p": fresh["sign_test_p_one_sided"], "controls": f"{retest['controls']['B']['pass']}/{retest['controls']['n']}"})])
-        self.offer_fix(STORED_FIX / "try_2", True, {
-            "title": "Recorded result", "source": "campaign_dubai_v4, try 2, then the larger test written down in retest_2026-11-06/PLAN.md before it ran. No AI call was made now.",
-            "tables": [{"head": "Larger test, new held-back worlds", "rows": ab_rows(retest, (("fresh", "Held-back worlds"), ("controls", "Controls")))},
-                       {"head": "First test of the same patch", "rows": ab_rows(attempt["ab"], (("seen", "Seen worlds"), ("fresh", "Held-back worlds"), ("controls", "Controls")))}],
-            "failing_base": retest["baseline_failing_worlds"], "conclusion": conclusion,
-            "first_verdict": attempt["verdict"]["reasons"], "first_status": overall["status"],
-            "caveats": [f"The patch raises clean-phase suction to {floor['suction_clean']}. At that speed the lowest pressure estimate is {floor['lowest_estimate_pa']} Pa, and the guard fires only under {floor['guard_pa']} Pa. So the low-pressure guard can no longer fire in the clean phase.",
-                        *overall["notes"]],
-            "sandbox": {"validation": attempt["validation"] or ["AST check passed"], "limits_hit": fresh["limits_hit_B"], "replay_mismatch": fresh["replay_mismatch_B"], "held_back_shown_to_ai": overall["held_back_worlds_shown_to_llm"],
-                        "note": overall["limits"][1]},
-            "changed": changed, "limits": overall["limits"][0], "sim_recorded": "0e36d3bf", "sim_now": sim_hash()[:8],
-        }, "Recorded result. Accept writes a copy for this session only. controller.py does not change.")
+        payload, self.fix_summary, log_line = recorded_fix(sim_hash())
+        self.tool("fix_report", "Recorded result", [log_line])
+        self.offer_fix(STORED_FIX / "try_2", True, payload, "Recorded result. Accept writes a copy for this session only. controller.py does not change.")
         self.report()
 
     def fix_live(self):

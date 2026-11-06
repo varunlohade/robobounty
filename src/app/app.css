@@ -147,6 +147,8 @@ p { margin: 0; }
 
 /* Status line */
 .status { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 14px; background: var(--surface); border-top: 1px solid var(--line); font-size: var(--size-small); color: var(--text-2); white-space: nowrap; overflow: hidden; }
+.chat-mode { margin-left: auto; margin-right: 10px; color: var(--text-2); font-weight: 400; }
+.fix-plain { color: var(--text); }
 .status-end { margin-left: auto; display: flex; gap: 18px; }
 
 /* Mono agent log, from design/final/app/app-3-term.html, with a rounded input. */

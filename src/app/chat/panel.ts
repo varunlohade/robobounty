@@ -214,7 +214,7 @@ export class ChatPanel {
     accept.addEventListener('click', () => answer('Accepted'));
     reject.addEventListener('click', () => answer('Rejected'));
     const actions = el('div', 'diff-actions');
-    actions.append(reject, accept);
+    if (!event.readonly) actions.append(reject, accept);
     head.append(el('code', '', event.file), el('span', '', event.meta), actions);
     box.append(head);
     const mark = { add: '+ ', del: '- ', same: '  ' };

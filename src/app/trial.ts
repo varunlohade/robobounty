@@ -1,4 +1,6 @@
 // Reads one exported trial folder from public/trials/<id>/ (see policy/app_export.py).
+import type { Failures } from './worlds_page.ts';
+
 export interface Manifest {
   id: string; label: string; hz: number; nq: number; frames: number; python_mujoco: string;
   area: { x0: number; x1: number; z0: number; z1: number };
@@ -18,11 +20,16 @@ export interface Trial {
 export interface WorldRun {
   name: string; group: string; reason: string; seed: number; passed: boolean; failure: string | null;
   fired: Record<string, { t: number; value: number }>; time_s: number; coverage: number; min_pressure_pa: number;
-  thumb: string[]; end: [number, number]; trial: string | null; outcome?: string; index?: number; kind?: string;
+  thumb: string[]; end: [number, number]; trial?: string | null; outcome?: string; index?: number; kind?: string; flaky?: boolean;
 }
 export interface WorldsData {
   total: number; count_reason: string; groups: { name: string; reason: string }[];
   not_tested: { factor: string; reason: string; source: string }[]; worlds: WorldRun[];
+  chat: string; campaign: string; sim_sha256: string; campaign_seconds: number;
+  requirements: { id: string; rule: string; severity: string; text: string }[];
+  controls: { n: number; passed: number };
+  failures: Failures; fix: { plain: string; [key: string]: unknown }; fix_summary: string; fix_log: string;
+  fix_diff: { kind: 'add' | 'del' | 'same'; text: string }[];
 }
 export interface TrialEntry { id: string; label: string }
 

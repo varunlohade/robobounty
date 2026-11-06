@@ -1,14 +1,15 @@
 // The live app: chat on the left, and on the right whatever the run server's events say is true now.
 import { el, icon } from './dom.ts';
 import { ChatPanel } from './chat/panel.ts';
-import { LiveBackend, SERVER, health, type ServerEvent } from './chat/live.ts';
+import { LiveBackend, health, type ServerEvent } from './chat/live.ts';
+import { RecordedBackend } from './chat/recorded.ts';
 import { Replay, loadMujoco, wasmStats } from './replay.ts';
 import { SimView } from './view.ts';
 import { worldPage } from './world_page.ts';
 import { WorldsPage } from './worlds_page.ts';
 import { FixPage } from './fix_page.ts';
 import { BountyPage } from './bounty_page.ts';
-import { loadTrialFrom, type Trial, type WorldRun } from './trial.ts';
+import { loadTrialFrom, type Trial, type WorldRun, type WorldsData } from './trial.ts';
 
 const CHAPTERS = ['Brief', 'Worlds', 'Test', 'Find', 'Fix', 'Bounty'];
 
@@ -47,7 +48,7 @@ function codeText(page: HTMLElement, text: string, head: string) {
   page.replaceChildren(el('div', 'code-head', head), pre);
 }
 
-export async function liveApp(app: HTMLElement, title: HTMLElement) {
+export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: WorldsData | null = null) {
   const statusEnd = el('div', 'status-end');
   const counts = el('span');
   const simLine = el('span', '', 'sim unknown');
@@ -60,7 +61,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
   const worldEmpty = el('div', 'page-text');
   worldEmpty.append(el('h2', '', 'No world yet'), el('p', '', 'Describe your robot and where it works. The world builds here.'));
   worldHost.append(worldEmpty);
-  const worldsView = new WorldsPage(run => void openReplay(run), text => { counts.textContent = text; });
+  const worldsView = new WorldsPage(run => void openReplay(run), text => { counts.textContent = text; }, run => !recorded || !!run.trial);
   const reportPage = el('div', 'page page-text report');
   reportPage.append(el('h2', '', 'No report yet'), el('p', '', 'The report comes after the campaign.'));
   const codePage = el('div', 'page page-text');
@@ -155,7 +156,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
   }
 
   async function showTrial(tid: string, open: boolean) {
-    const trial = await loadTrialFrom(`${SERVER}/api/sessions/${backend.id}/trials/${tid}`);
+    const trial = await loadTrialFrom(backend.trialBase(tid));
     const statusRight = el('div');
     const world = worldPage(trial, statusRight);
     swap(world.page, () => world.stop());
@@ -180,7 +181,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
     }
     reportPage.replaceChildren(
       el('h2', '', 'Report'), numbers,
-      el('p', '', `The campaign and its diagnosis took ${e.seconds} s on this Mac. Stopped and held on: ${e.safe_holds}. Numerical divergence: ${e.diverged}.`),
+      el('p', '', `${e.recorded ? `Recorded run: nothing ran now. The campaign took ${e.seconds} s on this Mac, before its diagnosis.` : `The campaign and its diagnosis took ${e.seconds} s on this Mac.`} Stopped and held on: ${e.safe_holds}. Numerical divergence: ${e.diverged}.`),
       el('p', '', e.fixes),
       el('p', '', `Simulated. Hand-built physics, not checked against real hardware. Sim ${String(e.sim_recorded ?? 'unknown').slice(0, 8)} recorded these results.`),
     );
@@ -188,7 +189,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
   }
 
   void loadMujoco();
-  const backend = new LiveBackend(async e => {
+  const onEvent = async (e: ServerEvent) => {
     switch (e.type) {
       case 'chapter': bar.set(e.index, e.note); break;
       case 'world': await showWorld(e); break;
@@ -224,11 +225,14 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
       case 'report': report(e); break;
       case 'idle': app.dataset.idle = String(Number(app.dataset.idle ?? 0) + 1); break;
     }
-  });
+  };
+  const backend = recorded ? new RecordedBackend(onEvent, recorded) : new LiveBackend(onEvent);
 
   const chat = new ChatPanel(backend, tab => show(tab === 'worlds' ? TAB.worlds : TAB.code), 'Simulated');
   const chatHead = el('div', 'chat-head');
-  chatHead.append(el('span', '', 'Chat'));
+  const mode = el('a', 'chat-mode', recorded ? 'Live run' : 'Recorded run');
+  mode.href = recorded ? 'app.html' : '?recorded=1';
+  chatHead.append(el('span', '', 'Chat'), mode);
   const newChat = el('button', 'icon-btn');
   newChat.setAttribute('aria-label', 'New chat');
   newChat.title = 'New chat';
@@ -241,13 +245,19 @@ export async function liveApp(app: HTMLElement, title: HTMLElement) {
   app.classList.add('live');
   app.append(chatHead, el('div', 'head-rule'), tabs, chat.root, divider(), pane, bar.root, status);
 
+  if (recorded) {
+    title.textContent = 'Recorded run';
+    llmLine.textContent = 'Recorded run. No AI ran now.';
+    app.dataset.recorded = 'true';
+    return;
+  }
   try {
     const info = await health();
     simLine.textContent = `sim ${info.sim_sha.slice(0, 8)}`;
     llmLine.textContent = `LLM: ${info.llm}`;
     app.dataset.server = 'up';
   } catch {
-    chat.addEvent({ type: 'text', fail: true, text: 'The run server is not running. Start it: policy/.venv/bin/python policy/server/server.py' });
+    chat.addEvent({ type: 'text', fail: true, text: 'The run server is not running. Start it: policy/.venv/bin/python policy/server/server.py, or open the Recorded run.' });
     llmLine.textContent = 'Run server not connected';
   }
 }

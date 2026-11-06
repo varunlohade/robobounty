@@ -1,8 +1,8 @@
 """Exports recorded high-rise runs for the browser app. Run with policy/.venv/bin/python at low priority.
 
 app_export.py trial <run dir> <id> "<label>" [--out DIR]  one replay: public/trials/<id>/, or DIR with no change to the index
-app_export.py run-worlds <scenarios dir> <out>   runs every world in scenarios.json with run_trial
-app_export.py worlds <scenarios dir> <runs dir> [--trials a=id ...]  the worlds tab: public/trials/worlds.json
+app_export.py worlds <scenarios dir> <campaign dir> --trials world_007=id ...  the worlds tab and the Recorded run: public/trials/worlds.json
+The worlds file holds one finished campaign and its diagnosis, with the campaign's own seeds. A separate re-run with other seeds gives other outcomes.
 
 Reads policy/highrise and the given folders. Writes only under public/trials/ and the given <out>.
 Refuses a run whose model or code no longer matches what recorded it, or whose replay diverges.
@@ -11,6 +11,7 @@ import argparse
 import gzip
 import hashlib
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -20,9 +21,10 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "policy" / "highrise"))
+sys.path.insert(0, str(ROOT / "policy" / "server"))
 import replay as replay_module
-import run_trial
 import sim as S
+import stored_fix
 import world as W
 
 PUBLIC = ROOT / "public" / "trials"
@@ -114,17 +116,6 @@ def cmd_trial(a):
     print("exported", out, len(qpos["frames"]), "frames, replay MATCH")
 
 
-def cmd_run_worlds(a):
-    plan = json.loads((Path(a.scenarios) / "scenarios.json").read_text())
-    for n, w in enumerate(plan["worlds"]):
-        name = Path(w["file"]).stem
-        out = Path(a.out) / name
-        if (out / "result.json").exists():
-            continue
-        r = run_trial.run(W.load(Path(a.scenarios) / w["file"]), 1000 + n, out)
-        print(name, r["passed"], r["failure"], r["time_s"], flush=True)
-
-
 def thumb(run):
     with np.load(run / "dirt.npz") as z:
         dirt, mask = z["dirt"], z["mask"]
@@ -149,30 +140,72 @@ def thumb_and_end(run):
                                          (last[cols.index("z")] - area["z0"]) / (area["z1"] - area["z0"])]}
 
 
+def failure_view(diagnosis, trial_index, name_of):
+    """The diagnosis in the shape of the run server's failures event, so the recorded and live pages draw the same thing."""
+    types, other = [], []
+    for f in diagnosis["failure_types"]:
+        if not f["is_failure"]:
+            other.append({"type": f["type"], "count": f["count"]})
+            continue
+        worst = f["worst_world"]
+        types.append({"id": f"F{len(types) + 1}", "rule": f["type"], "requirement": f["requirement"], "severity": f["severity"], "count": f["count"],
+                      "worlds": [trial_index(t) for t in f["trials"] if t.startswith("t")], "worst": trial_index(worst["trial"]), "worst_name": name_of(worst["trial"]),
+                      "worst_measure": worst["measure"], "worst_value": worst["value"], "code_line": f["code_line"], "code": f.get("code")})
+    excluded = [{"index": trial_index(f["trial"]), "name": name_of(f["trial"]), "why": f"Failed once, then came back in {f['same_failure_runs']} of {f['of']} repeats."} for f in diagnosis["reproduce"]["flaky"]]
+    return {"types": types, "other": other, "excluded": excluded, "diverged": [], "known": True, "limits": "Code lines hold in this simulation only. Not checked against real hardware."}
+
+
 def cmd_worlds(a):
     plan = json.loads((Path(a.scenarios) / "scenarios.json").read_text())
+    campaign = Path(a.campaign)
     links = dict(t.split("=") for t in a.trials)
+    rows = {r["trial"]: r for r in map(json.loads, (campaign / "results.jsonl").read_text().splitlines())}
+    diagnosis = json.loads((campaign / "diagnosis.json").read_text())
+    flaky = {f["trial"] for f in diagnosis["reproduce"]["flaky"]}
     worlds = []
     codes = set()
-    for w in plan["worlds"]:
+    for n, w in enumerate(plan["worlds"]):
         name = Path(w["file"]).stem
-        run = Path(a.runs) / name
+        trial = f"t{n:04d}"
+        run = campaign / trial
         r = json.loads((run / "result.json").read_text())
         codes.add(r["code_sha256"]["sim.py"])
+        if W.load(Path(a.scenarios) / w["file"]) != rows[trial]["world"]:
+            sys.exit(f"{name}: the plan's world differs from the campaign's")
+        if trial in flaky and name in links:
+            sys.exit(f"{name} is flaky, so it cannot be a headline replay")
         worlds.append({
-            "name": name, "group": w["group"], "reason": w["reason"], "seed": r["seed"], "passed": r["passed"], "failure": r["failure"],
-            "fired": r["fired"], "time_s": r["time_s"], "coverage": r["coverage"], "min_pressure_pa": r["min_pressure_pa"],
+            "name": name, "index": n, "campaign_trial": trial, "group": w["group"], "reason": w["reason"], "seed": r["seed"], "passed": r["passed"], "failure": r["failure"], "outcome": r["outcome"],
+            "flaky": trial in flaky, "fired": r["fired"], "time_s": r["time_s"], "coverage": r["coverage"], "min_pressure_pa": r["min_pressure_pa"],
             **thumb_and_end(run),
             "trial": links.get(name), "kind": "elements" if w.get("has_elements") else "varied",
         })
     if len(codes) != 1:
         sys.exit("worlds were recorded with different sim code")
+    sim_sha = codes.pop()
+    index_of = lambda t: int(t[1:])
+    name_of = lambda t: worlds[index_of(t)]["name"]
+    chat = re.search(r'^CHAT="(.*)"$', (ROOT / "policy" / "crashlab" / "loop.sh").read_text(), re.M).group(1)
+    if hashlib.sha256(chat.encode()).hexdigest() != plan["chat_sha256"]:
+        sys.exit("the chat in loop.sh is not the one this plan came from")
+    fix, fix_summary, fix_log = stored_fix.recorded_fix(hashlib.sha256((ROOT / "policy" / "highrise" / "sim.py").read_bytes()).hexdigest())
+    lines = []
+    for line in (stored_fix.STORED_FIX / "try_2" / "patch.diff").read_text().splitlines()[:200]:
+        if not line.startswith(("---", "+++", "diff ", "index ")):
+            kind = "add" if line.startswith("+") else "del" if line.startswith("-") else "same"
+            lines.append({"kind": kind, "text": line[1:] if line[:1] in "+- " else line})
     (PUBLIC / "worlds.json").write_text(json.dumps({
-        "total": plan["total_worlds"], "count_reason": plan["count_reason"], "chat_sha256": plan["chat_sha256"],
+        "chat": chat, "total": plan["total_worlds"], "count_reason": plan["count_reason"], "chat_sha256": plan["chat_sha256"],
+        "campaign": campaign.name, "campaign_seed": json.loads((campaign / "campaign.json").read_text())["seed"],
+        "requirements": json.loads((campaign / "requirements.json").read_text())["requirements"],
+        "counts": diagnosis["counts"], "controls": {"n": diagnosis["counts"]["controls"], "passed": diagnosis["counts"]["controls_passed"]},
+        "failures": failure_view(diagnosis, index_of, name_of),
+        "fix": fix, "fix_summary": fix_summary, "fix_log": fix_log, "fix_diff": lines,
+        "campaign_seconds": a.seconds,
         "groups": [{"name": g["name"], "reason": g["reason"]} for g in plan["groups"]],
-        "not_tested": plan["not_tested"], "worlds": worlds, "sim_sha256": codes.pop(),
+        "not_tested": plan["not_tested"], "worlds": worlds, "sim_sha256": sim_sha,
     }, separators=(",", ":")))
-    print("worlds:", len(worlds), "failed:", sum(not w["passed"] for w in worlds))
+    print("worlds:", len(worlds), "failed:", sum(not w["passed"] and bool(w["failure"]) for w in worlds), "flaky:", sorted(flaky))
 
 
 def main():
@@ -184,14 +217,11 @@ def main():
     t.add_argument("label")
     t.add_argument("--out")
     t.set_defaults(fn=cmd_trial)
-    r = sub.add_parser("run-worlds")
-    r.add_argument("scenarios")
-    r.add_argument("out")
-    r.set_defaults(fn=cmd_run_worlds)
     w = sub.add_parser("worlds")
     w.add_argument("scenarios")
-    w.add_argument("runs")
+    w.add_argument("campaign")
     w.add_argument("--trials", nargs="*", default=[])
+    w.add_argument("--seconds", type=float, required=True, help="wall time of the campaign, from its table.txt")
     w.set_defaults(fn=cmd_worlds)
     a = ap.parse_args()
     a.fn(a)

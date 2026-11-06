@@ -1,0 +1,47 @@
+{
+ "outcome": "fail",
+ "hold_s": 2.25,
+ "hold_mean_wind_ms": 2.22,
+ "passed": false,
+ "failure": "detach",
+ "fired": {
+  "detach": {
+   "t": 30.35,
+   "value": 0.0542
+  },
+  "coverage": {
+   "t": 30.35,
+   "value": 0.0628
+  }
+ },
+ "coverage": 0.0628,
+ "reported_done": false,
+ "reported_coverage": 0.0402,
+ "slip_m": 0.0344,
+ "peak_tether_n": 0.0,
+ "peak_chassis_contact_n": 84.01,
+ "min_pressure_pa": 2.3,
+ "time_s": 30.35,
+ "end_battery": 0.9914,
+ "status": "ok",
+ "seed": 3100033,
+ "world_sha256": "779400356d6d0e52ff8d3e40a5e233a444f569fb8349597060e29d4dcf5a4270",
+ "model_sha256": "8080004faa82831ba4b0fb15662c77465667640435867e077fbbe21c4545d714",
+ "start_state_sha256": "863243196f1d623f2efc4ed7ab0172ccea206da80a598677ccc142033302a278",
+ "final_state_sha256": "73acd242bb5492abac919619d0a5292e83d083a82cfdc867cc38719e1c8c1d2c",
+ "action_chain_head": "18cd4094674990aa256c4eb43ecded294f9a205ee9fb14914b6a6d66675649f2",
+ "steps": 607,
+ "wall_s": 0.867,
+ "versions": {
+  "mujoco": "3.8.1",
+  "numpy": "2.2.6"
+ },
+ "code_sha256": {
+  "controller.py": "85e7220d4a09c7dd8c89ed5335542ede770d697c239e2d8ab9f5fd8a20f60ad6",
+  "sim.py": "0e36d3bf97fe99a5d96f3229a579d6fdd2748c4bccabb6b1c76eb2af6b5fe2ac",
+  "world.py": "0db7f46e3c01a156f29ead71846ddb964344a73c89b85264612a9bc8cc85d2db",
+  "elements.py": "906a8a7c2ce4bb939e5558dd2f8d3c38d8071282bde2c5b774af314430625179",
+  "judge.py": "135131fad8267778d0dc19b9f788d78fd5f9021e203bfaa6406da27b3fcfa702",
+  "run_trial.py": "03aef573b49464f37ab9aaa03012cb036441c6c3f7a9eb3e8d433d3d1ecedea5"
+ }
+}

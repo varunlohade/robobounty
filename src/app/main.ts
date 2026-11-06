@@ -71,6 +71,14 @@ async function main() {
     lights.append(el('i'), el('i'), el('i'));
     title.append(lights, el('div', 'brand', 'CrashLab'), label);
     app.append(title);
+    if (params.has('recorded')) {
+      try {
+        await liveApp(app, label, await loadWorlds());
+      } catch (err) {
+        fatal(app, 'Could not load the recorded run.', err);
+      }
+      return;
+    }
     await liveApp(app, label);
     return;
   }

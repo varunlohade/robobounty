@@ -86,7 +86,7 @@ await send('Page.enable');
 await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 
 // Replay against the recorded state.
-for (const id of ['nominal-seed1', 'dubai-world-013']) {
+for (const id of ['nominal-seed1', 'dubai-final-world-033']) {
   await open(`?trial=${id}`);
   const ref = JSON.parse(readFileSync(join(ROOT, 'public/trials', id, 'reference.json'), 'utf8'));
   let worst = 0;
@@ -167,7 +167,7 @@ await js(`[...document.querySelectorAll('.tab')].find(t => t.textContent.endsWit
 await wait(100);
 const worldsData = JSON.parse(readFileSync(join(ROOT, 'public/trials/worlds.json'), 'utf8'));
 check('worlds tab shows one square per recorded world', (await js(`document.querySelectorAll('.cell').length`)) === worldsData.worlds.length);
-check('worlds tab heading uses the recorded count', (await js(`document.querySelector('.worlds-head h1').textContent`)) === `${worldsData.worlds.filter(w => !w.passed && w.failure && w.failure !== 'sim_diverged').length} of ${worldsData.worlds.length} tested worlds failed`);
+check('worlds tab heading uses the recorded count', (await js(`document.querySelector('.worlds-head h1').textContent`)) === `${worldsData.worlds.filter(w => !w.passed && w.failure && w.failure !== 'sim_diverged' && !w.flaky).length} of ${worldsData.worlds.length} tested worlds failed`);
 await shot('tab-worlds.png');
 await js(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'World').click()`);
 await wait(200);
@@ -199,6 +199,7 @@ const layout = await js(`(() => { const out = [];
 check('no clipped or undersized text', layout.length === 0, layout.join(' | '));
 
 // Default width captures: the worlds tab, and the end of a failed run.
+// This older replay is not in the index. A campaign run stops at the detach, so no headline replay goes past the 0.5 m this tag needs.
 await open('?trial=dubai-world-009');
 const end = await js(`document.querySelector('.scrub input').max`);
 await scrubTo(Number(end));
@@ -207,6 +208,32 @@ check('failed run says the robot left the glass', !(await js(`document.querySele
 await js(`[...document.querySelectorAll('.tab')].find(t => t.textContent.endsWith(' worlds')).click()`);
 await wait(200);
 await shot('worlds-default.png');
+
+// Recorded run: the finished campaign from one file, with no run server, no AI and no simulation.
+const serverCalls = [];
+await send('Network.enable');
+ws.addEventListener('message', m => { const msg = JSON.parse(m.data); if (msg.method === 'Network.requestWillBeSent' && msg.params.request.url.includes(':5198')) serverCalls.push(msg.params.request.url); });
+const started = Date.now();
+await send('Page.navigate', { url: `${BASE}/app.html?recorded=1` });
+await wait(100);
+await until(`document.querySelector('.worlds-head h1')?.textContent.endsWith('tested worlds failed') && !!document.querySelector('.failure-row') && !!document.querySelector('.fix-conclusion') && document.querySelectorAll('.diff').length === 1 && !!document.querySelector('.report .big-number')`, 'recorded run ready');
+const loadSeconds = (Date.now() - started) / 1000;
+check('recorded run loads the finished campaign in under 5 s', loadSeconds < 5, `${loadSeconds} s`);
+const flaky = worldsData.worlds.filter(w => w.flaky), recordedFailed = worldsData.worlds.filter(w => !w.passed && w.failure && !w.flaky);
+check('recorded run is labelled Recorded run', (await js(`document.querySelector('.title-label').textContent`)) === 'Recorded run' && (await js(`document.querySelector('.status').textContent`)).includes('Recorded run. No AI ran now.'));
+check('recorded run heading uses the file', (await js(`document.querySelector('.worlds-head h1').textContent`)) === `${recordedFailed.length} of ${worldsData.worlds.length} tested worlds failed`);
+check('recorded run shows every world on the map', (await js(`document.querySelectorAll('.map-cell:not(.swatch)').length`)) === worldsData.worlds.length);
+check('recorded run lists each flaky world as excluded', flaky.length > 0 && (await js(`[...document.querySelectorAll('.failures .excluded-row')].map(e => e.textContent).join(' ')`)).split('Failed once').length - 1 === flaky.length);
+check('recorded run says what the fix did, in words', (await js(`document.querySelector('.fix-plain').textContent`)) === worldsData.fix.plain && worldsData.fix.plain.includes('battery') && worldsData.fix.plain.includes('not applied'));
+check('recorded diff has no Accept button', (await js(`document.querySelector('.diff').textContent.includes('SUCTION_CLEAN') && !document.querySelector('.diff .btn-primary')`)));
+check('recorded run calls no run server', serverCalls.length === 0, serverCalls.slice(0, 3).join(' '));
+await shot('recorded-run.png');
+const linked = worldsData.worlds.filter(w => w.trial);
+check('headline replays are all reproduced failures', linked.length >= 3 && linked.every(w => w.failure && !w.flaky), linked.map(w => w.name).join(' '));
+await js(`[...document.querySelectorAll('.card button, .card .btn')].find(b => b.textContent.startsWith('${linked[0].name}')).click()`);
+await until(`document.querySelector('.viewport')?.dataset.ready === 'true'`, 'recorded replay');
+check('a recorded replay opens', (await js(`document.querySelector('.sim-label').textContent`)) === 'Simulated. Replay of a recorded run.');
+await shot('recorded-replay.png');
 
 // Source rules.
 const files = [];

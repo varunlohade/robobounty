@@ -1,0 +1,26 @@
+{
+ "id": "dubai-final-world-016",
+ "label": "Dubai world_016: slip_distance, repeated 3 of 3",
+ "area": {
+  "x0": 0.0,
+  "x1": 2.4,
+  "z0": 135.2,
+  "z1": 138.2
+ },
+ "hz": 20,
+ "nq": 11,
+ "frames": 12001,
+ "python_mujoco": "3.8.1",
+ "friction": 0.4000173511174385,
+ "sim_sha256": "0e36d3bf97fe99a5d96f3229a579d6fdd2748c4bccabb6b1c76eb2af6b5fe2ac",
+ "elements": [],
+ "dirt": {
+  "nx": 48,
+  "nz": 60,
+  "every_steps": 20,
+  "scale": 200,
+  "clean_below": 0.1,
+  "count": 600
+ },
+ "replay_match": true
+}

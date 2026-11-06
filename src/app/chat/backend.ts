@@ -11,7 +11,7 @@ export type ChatEvent =
   | { type: 'requirements'; rows: { id: string; rule: string; severity: string; text: string }[]; note: string; limits: string }
   | { type: 'review'; title: string; sections: { head: string; lines: string[] }[]; actions: ChatAction[] }
   | { type: 'views'; title: string; note: string; images: { label: string; src: string }[] }
-  | { type: 'diff'; file: string; meta: string; lines: { kind: 'add' | 'del' | 'same'; text: string }[]; note: string; live?: boolean }
+  | { type: 'diff'; file: string; meta: string; lines: { kind: 'add' | 'del' | 'same'; text: string }[]; note: string; live?: boolean; readonly?: boolean }
   | { type: 'actions'; actions: ChatAction[]; note?: string }
   | { type: 'card'; title: string; body?: string; items?: string[]; actions?: ChatAction[]; note?: string }
   | { type: 'counts'; rows: { n: number; label: string; meta: string }[] };

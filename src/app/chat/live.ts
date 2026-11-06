@@ -31,6 +31,10 @@ export class LiveBackend implements ChatBackend {
 
   constructor(private onEvent: (e: ServerEvent) => void | Promise<void>) {}
 
+  trialBase(tid: string) {
+    return `${SERVER}/api/sessions/${this.id}/trials/${tid}`;
+  }
+
   private async session(): Promise<void> {
     const old = remembered();
     if (old && (await fetch(`${SERVER}/api/sessions/${old}/state`)).ok) { this.id = old; return; }

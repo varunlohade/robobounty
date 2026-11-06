@@ -1,0 +1,146 @@
+<mujoco model="highrise">
+  <option timestep="0.002" integrator="implicitfast" cone="elliptic" impratio="1" noslip_iterations="3" solver="Newton" iterations="20" ls_iterations="6"/>
+  <statistic extent="4" center="1.1999999999999997 -1 138.2"/>
+  <visual>
+    <global offwidth="1280" offheight="720" fovy="35"/>
+    <quality shadowsize="4096"/>
+    <map znear="0.01" zfar="500" fogstart="40" fogend="280"/>
+    <rgba fog="0.80 0.76 0.72 1" haze="0.92 0.80 0.68 1"/>
+  </visual>
+  <default>
+    <geom contype="0" conaffinity="0" density="0" group="1"/>
+    <default class="vis"><geom/></default>
+    <default class="joint"><geom conaffinity="1" priority="1" friction="0.6128699958002753 0.005 0.0001" material="alu"/></default>
+    <default class="roller">
+      <geom type="sphere" size="0.035" contype="1" density="400" material="rubber" solref="-20000 -300"/>
+    </default>
+  </default>
+  <asset>
+    <texture type="skybox" name="sky" builtin="gradient" rgb1="0.42 0.58 0.80" rgb2="0.95 0.82 0.70" width="256" height="512"/>
+    <material name="ground" rgba="0.34 0.33 0.32 1" specular="0"/>
+    <material name="glass" rgba="0.20 0.30 0.40 1" specular="0.8" shininess="0.9" reflectance="0.25"/>
+    <material name="alu" rgba="0.62 0.63 0.65 1" specular="0.6" shininess="0.6"/>
+    <material name="concrete" rgba="0.55 0.52 0.48 1" specular="0.1"/>
+    <material name="tower" rgba="0.26 0.31 0.37 1" specular="0.4" shininess="0.5"/>
+    <material name="city0" rgba="0.60 0.57 0.54 1" specular="0"/>
+    <material name="city1" rgba="0.46 0.48 0.52 1" specular="0"/>
+    <material name="cream" rgba="0.93 0.89 0.79 1" specular="0.5" shininess="0.6"/>
+    <material name="burgundy" rgba="0.42 0.07 0.13 1" specular="0.4" shininess="0.5"/>
+    <material name="rubber" rgba="0.04 0.04 0.04 1" specular="0.2"/>
+    <material name="tether" rgba="0.95 0.45 0.05 1"/>
+  </asset>
+  <worldbody>
+    <light name="sun" directional="true" pos="60 -80 240" dir="-0.45 0.6 -0.66" diffuse="0.9 0.85 0.78" specular="0.3 0.3 0.3" castshadow="true"/>
+    <geom name="glass" type="box" size="1.6679 0.05 9.733949999999993" pos="1.1999999999999997 0.05 128.93394999999998"
+          contype="0" conaffinity="1" priority="1" friction="0.6128699958002753 0.005 0.0001" material="glass"/>
+    <geom name="mullion0" class="joint" type="capsule" size="0.04 9.733949999999993" pos="0.45000 0.01160 128.9339"/>
+    <geom name="mullion1" class="joint" type="capsule" size="0.04 9.733949999999993" pos="2.05670 0.01160 128.9339"/>
+    <geom name="transom0" class="joint" type="capsule" size="0.04 1.6679" pos="1.2000 0.01160 122.40000" euler="0 90 0"/>
+    <geom name="transom1" class="joint" type="capsule" size="0.04 1.6679" pos="1.2000 0.01160 126.00000" euler="0 90 0"/>
+    <geom name="transom2" class="joint" type="capsule" size="0.04 1.6679" pos="1.2000 0.01160 129.60000" euler="0 90 0"/>
+    <geom name="transom3" class="joint" type="capsule" size="0.04 1.6679" pos="1.2000 0.01160 133.20000" euler="0 90 0"/>
+    <geom name="transom4" class="joint" type="capsule" size="0.04 1.6679" pos="1.2000 0.01160 136.80000" euler="0 90 0"/>
+    <geom name="ledge" type="box" size="3.82835 0.0847 0.06"
+          pos="0.2813 -0.0847 135.3251" conaffinity="1" friction="0.3 0.005 0.0001" material="concrete"/>
+    <body name="scenery">
+      <geom name="ground" class="vis" type="plane" size="900 900 1" pos="0 -300 0" material="ground"/>
+      <geom name="tower" class="vis" type="box" size="13.6679 14 80.0" pos="1.1999999999999997 14.2 80.0" material="tower"/>
+      <geom name="parapet" class="vis" type="box" size="13.6679 0.6 0.5" pos="1.1999999999999997 0 160.5" material="concrete"/>
+      <geom name="anchor_post" class="vis" type="box" size="0.08 0.3 0.08" pos="1.1999999999999997 -0.04999999999999999 160.0" material="alu"/>
+      <geom class="vis" type="box" size="28 28 11.5" pos="-570 -140 11.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 15.5" pos="-570 -250 15.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 19.5" pos="-570 -360 19.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 23.5" pos="-570 -470 23.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 27.5" pos="-570 -580 27.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 7.5" pos="-475 -140 7.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 11.5" pos="-475 -250 11.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 15.5" pos="-475 -360 15.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 19.5" pos="-475 -470 19.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 23.5" pos="-475 -580 23.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 26.0" pos="-380 -140 26.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 7.5" pos="-380 -250 7.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 11.5" pos="-380 -360 11.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 15.5" pos="-380 -470 15.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 19.5" pos="-380 -580 19.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 22.0" pos="-285 -140 22.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 26.0" pos="-285 -250 26.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 7.5" pos="-285 -360 7.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 11.5" pos="-285 -470 11.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 15.5" pos="-285 -580 15.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 18.0" pos="-190 -140 18.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 22.0" pos="-190 -250 22.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 26.0" pos="-190 -360 26.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 7.5" pos="-190 -470 7.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 11.5" pos="-190 -580 11.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 14.0" pos="-95 -140 14.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 18.0" pos="-95 -250 18.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 22.0" pos="-95 -360 22.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 26.0" pos="-95 -470 26.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 7.5" pos="-95 -580 7.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 10.0" pos="0 -140 10.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 14.0" pos="0 -250 14.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 18.0" pos="0 -360 18.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 22.0" pos="0 -470 22.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 26.0" pos="0 -580 26.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 6.0" pos="95 -140 6.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 10.0" pos="95 -250 10.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 14.0" pos="95 -360 14.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 18.0" pos="95 -470 18.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 22.0" pos="95 -580 22.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 24.5" pos="190 -140 24.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 6.0" pos="190 -250 6.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 10.0" pos="190 -360 10.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 14.0" pos="190 -470 14.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 18.0" pos="190 -580 18.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 20.5" pos="285 -140 20.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 24.5" pos="285 -250 24.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 6.0" pos="285 -360 6.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 10.0" pos="285 -470 10.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 14.0" pos="285 -580 14.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 16.5" pos="380 -140 16.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 20.5" pos="380 -250 20.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 24.5" pos="380 -360 24.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 6.0" pos="380 -470 6.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 10.0" pos="380 -580 10.0" material="city0"/>
+      <geom class="vis" type="box" size="28 28 12.5" pos="475 -140 12.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 16.5" pos="475 -250 16.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 20.5" pos="475 -360 20.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 24.5" pos="475 -470 24.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 6.0" pos="475 -580 6.0" material="city1"/>
+      <geom class="vis" type="box" size="28 28 8.5" pos="570 -140 8.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 12.5" pos="570 -250 12.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 16.5" pos="570 -360 16.5" material="city0"/>
+      <geom class="vis" type="box" size="28 28 20.5" pos="570 -470 20.5" material="city1"/>
+      <geom class="vis" type="box" size="28 28 24.5" pos="570 -580 24.5" material="city0"/>
+    </body>
+    <site name="anchor" pos="1.1999999999999997 -0.3 160.0" size="0.03"/>
+    <body name="robot" pos="0.15 0 138.32999999999998" quat="-0.5 -0.5 -0.5 0.5">
+      <freejoint name="robot_free"/>
+      <inertial pos="0 0 0.05" mass="4.0" diaginertia="0.045 0.045 0.086"/>
+      <geom name="chassis" type="box" size="0.18 0.18 0.04" pos="0 0 0.06" contype="1"
+            friction="0.3 0.005 0.0001" material="cream"/>
+      <geom class="vis" type="box" size="0.182 0.03 0.041" pos="0 0 0.06" material="burgundy"/>
+      <geom class="vis" type="cylinder" size="0.09 0.012" pos="0 0 0.11" material="alu"/>
+      <geom class="vis" type="capsule" size="0.03 0.15" pos="0 0.15 0.035" euler="0 90 0" material="rubber"/>
+      <geom class="vis" type="capsule" size="0.03 0.15" pos="0 -0.15 0.035" euler="0 90 0" material="rubber"/>
+      <geom class="vis" type="box" size="0.04 0.16 0.004" pos="-0.13 0 0.006" material="burgundy"/>
+      <site name="tether_point" pos="0 0 0.09" size="0.01"/>
+      <body name="roller_lf" pos="0.12 0.15 0.035"><joint name="drive_lf" type="hinge" axis="0 1 0" armature="0.01" damping="0.002"/><geom name="roller_lf" class="roller"/></body>
+      <body name="roller_lb" pos="-0.12 0.15 0.035"><joint name="drive_lb" type="hinge" axis="0 1 0" armature="0.01" damping="0.002"/><geom name="roller_lb" class="roller"/></body>
+      <body name="roller_rf" pos="0.12 -0.15 0.035"><joint name="drive_rf" type="hinge" axis="0 1 0" armature="0.01" damping="0.002"/><geom name="roller_rf" class="roller"/></body>
+      <body name="roller_rb" pos="-0.12 -0.15 0.035"><joint name="drive_rb" type="hinge" axis="0 1 0" armature="0.01" damping="0.002"/><geom name="roller_rb" class="roller"/></body>
+    </body>
+  </worldbody>
+  <tendon>
+    <spatial name="tether" limited="true" range="0 22.1975" width="0.004" material="tether"
+             solreflimit="-8000 -60" solimplimit="0.95 0.99 0.001">
+      <site site="anchor"/><site site="tether_point"/>
+    </spatial>
+  </tendon>
+  <actuator>
+    <velocity name="drive_lf" joint="drive_lf" kv="20" forcerange="-1.5 1.5" forcelimited="true"/>
+    <velocity name="drive_lb" joint="drive_lb" kv="20" forcerange="-1.5 1.5" forcelimited="true"/>
+    <velocity name="drive_rf" joint="drive_rf" kv="20" forcerange="-1.5 1.5" forcelimited="true"/>
+    <velocity name="drive_rb" joint="drive_rb" kv="20" forcerange="-1.5 1.5" forcelimited="true"/>
+  </actuator>
+</mujoco>

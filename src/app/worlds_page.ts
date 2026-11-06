@@ -60,7 +60,7 @@ export class WorldsPage {
   private selected: string | null = null;
   private showMap = false;
 
-  constructor(private onReplay: (run: WorldRun) => void, private onCounts: (text: string) => void = () => {}) {
+  constructor(private onReplay: (run: WorldRun) => void, private onCounts: (text: string) => void = () => {}, private canReplay: (run: WorldRun) => boolean = () => true) {
     const head = el('div', 'worlds-head');
     head.append(this.heading, this.sub);
     const bar = el('div', 'map-bar');
@@ -268,7 +268,7 @@ export class WorldsPage {
     const replay = el('button', 'btn btn-large', 'Replay the recorded run');
     replay.type = 'button';
     replay.addEventListener('click', () => this.onReplay(run));
-    actions.append(replay);
+    actions.append(this.canReplay(run) ? replay : el('p', 'detail-sub', 'This recorded run has no replay for this world.'));
     const events = Object.entries(run.fired).sort((a, b) => a[1].t - b[1].t).map(([rule, hit]) => {
       const row = el('div', 'event');
       row.append(el('span', '', fmtTime(hit.t)), el('span', '', `${rule}, value ${hit.value}`));
@@ -286,9 +286,10 @@ export class WorldsPage {
 
 // A finished recorded batch, from public/trials/worlds.json.
 export function worldsPage(data: WorldsData | null) {
-  const view = new WorldsPage(run => { if (run.trial) location.search = `?trial=${encodeURIComponent(run.trial)}`; });
+  const view = new WorldsPage(run => { if (run.trial) location.search = `?trial=${encodeURIComponent(run.trial)}`; }, () => {}, run => !!run.trial);
   if (!data) return view.page;
   view.setPlan({ groups: data.groups, not_tested: data.not_tested, worlds: data.worlds });
   for (const w of data.worlds) view.addResult(w);
+  view.setFailures(data.failures);
   return view.page;
 }
