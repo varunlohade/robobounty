@@ -115,7 +115,7 @@ CONFIRM: which partners to select, at most 3. Today only World has anything runn
 
 <!-- 21:00: ~/ethglobal-mumbai-research/03-ethglobal-mumbai.md. Commits: git log. -->
 
-CONFIRM: enter the Classic / From Scratch track, and confirm that no code or design asset in this repo existed before 21:00. The git history shows nothing earlier, but it cannot prove that alone.
+Track: Classic / From Scratch, confirmed by the owner. No code or design asset in this repo existed before 21:00. The git history shows nothing earlier, but it cannot prove that alone.
 
 ## Known limits
 
