@@ -7,7 +7,7 @@ export type Status = 'queued' | 'running' | 'passed' | 'failed' | 'stuck' | 'hel
 type Outline = { kind: 'area'; x0: number; x1: number; z0: number; z1: number } | { kind: 'route'; points: number[][] };
 // What this scenario changed, from its world: an object's outline in the outline's axes, or a changed setting.
 type Mark = { kind: 'shape'; what: string; name: string; text: string; points: number[][] } | { kind: 'value'; icon: string; text: string };
-interface Film { count: number; cols: number; w: number; h: number }
+interface Film { count: number; cols: number; w: number; h: number; run?: string }
 export interface Row {
   index: number; name: string; group: string; reason: string; status: Status; held_back: boolean;
   t: number | null; t_limit: number | null; x: number | null; y: number | null;
@@ -15,7 +15,7 @@ export interface Row {
   first?: { status: Status; verdict: string | null; verdict_reason: string | null };
 }
 export interface Played { page: HTMLElement; start: () => Promise<void>; stop: () => void; jump: (t: number) => void }
-interface Deps { base: string; statusRight: HTMLElement; play: (how: ServerEvent) => Promise<Played | null>; openFile?: (d: ServerEvent) => void; openWorld?: (d: ServerEvent) => void }
+interface Deps { base: string; statusRight: HTMLElement; play: (how: ServerEvent, say: (words: string) => void) => Promise<Played | null>; openFile?: (d: ServerEvent) => void; openWorld?: (d: ServerEvent) => void; bountyLink?: (verdict: string) => string | null }
 
 const GAP = 6;
 const PAD = 8;
@@ -121,7 +121,7 @@ class Square {
       this.root.dataset.picture = film ? 'film' : 'live';
     };
     image.onerror = () => { this.loading = false; };
-    image.src = `${this.base}/worlds/${row.index}/${film ? 'film.jpg' : `latest.jpg?n=${frames}`}`;
+    image.src = `${this.base}/worlds/${row.index}/${film ? `film.jpg${film.run ? `?run=${film.run}` : ''}` : `latest.jpg?n=${frames}`}`;
   }
 
   /** A film moves to its next frame on its own clock. */
@@ -757,7 +757,7 @@ export class Grid {
     this.closeReplay();
     const token = this.replayToken;
     this.playingIndex = index;
-    const loading = el('div', 'grid-replay-note', 'Loading the replay');
+    const loading = el('div', 'grid-replay-note', 'Checking the recorded run');
     this.replayHost.replaceChildren(loading);
     this.replayHost.hidden = false;
     this.board.hidden = true;
@@ -767,13 +767,15 @@ export class Grid {
       if (token !== this.replayToken) return;
       if (!how.ok) failure = how.status === 404 ? 'This run left no replay.' : `HTTP ${how.status}`;
       else {
-        const played = await this.deps.play(how.body);
+        const played = await this.deps.play(how.body, words => { loading.textContent = words; });
         if (token !== this.replayToken) { played?.stop(); return; }
         if (!played) failure = 'The replay did not load.';
         else {
-          this.replayHost.replaceChildren(played.page);
+          this.replayHost.replaceChildren(played.page, loading);
+          loading.textContent = 'Starting the 3D view';
           this.playing = played;
           await played.start();
+          loading.remove();
           return;
         }
       }
@@ -833,6 +835,32 @@ export class Grid {
     this.layout();
   }
 
+  // Downloads the run as a .rrd for the Rerun viewer. Nothing embeds here.
+  private rerunButton(d: ServerEvent) {
+    const b = el('button', 'grid-btn', 'Open in Rerun') as HTMLButtonElement;
+    b.type = 'button';
+    b.title = 'Downloads a .rrd file of this recorded run. Open it with the Rerun viewer. Simulated.';
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      b.textContent = 'Making the file';
+      try {
+        const res = await fetch(`${this.deps.base}/worlds/${d.index}/rerun.rrd`);
+        if (!res.ok) throw new Error(REPLAY_NONE);
+        const link = el('a') as HTMLAnchorElement;
+        link.href = URL.createObjectURL(await res.blob());
+        link.download = `crashlab-${this.campaign}-world-${d.index}.rrd`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
+        b.textContent = 'Downloaded. Open it in Rerun';
+        this.root.dataset.rerun = 'done';
+      } catch {
+        b.textContent = REPLAY_NONE;
+      }
+      b.disabled = false;
+    });
+    return b;
+  }
+
   private fillRail(head: HTMLElement[], body: HTMLElement[]) {
     this.rail.replaceChildren(...head, ...body);
     this.rail.scrollTop = 0;
@@ -876,7 +904,18 @@ export class Grid {
     world.type = 'button';
     world.addEventListener('click', () => this.deps.openWorld?.(d));
     file.append(open, world);
-    if (d.first) out.push(section('Old and new', [fact('First run', statusWord({ ...d, ...d.first } as unknown as Row)), fact('Latest run', statusWord(d as unknown as Row))]));
+    if (d.rerun) file.append(this.rerunButton(d));
+    const post = d.verdict && (d.status === 'failed' || d.status === 'stuck') ? this.deps.bountyLink?.(String(d.verdict)) : null;
+    if (post) {
+      const a = el('a', 'grid-btn grid-post', 'Post a bounty') as HTMLAnchorElement;
+      a.href = post;
+      file.append(a);
+    }
+    if (d.first) {
+      const before = d.first as { verdict_reason?: string | null };
+      out.push(section('Before and after', [fact('First run', statusWord({ ...d, ...d.first } as unknown as Row)), fact('Latest run', statusWord(d as unknown as Row)),
+        el('div', 'grid-text', `Before: ${before.verdict_reason ?? 'no reason recorded.'} After: ${d.verdict_reason ?? 'no reason recorded.'} Same world and seed, with your code. Simulated.`)]));
+    }
     const code = d.code as { file: string; line: number; traced: boolean; why?: string } | null;
     const parts: HTMLElement[] = [];
     if (code) {
@@ -894,6 +933,8 @@ export class Grid {
     return out;
   }
 }
+
+const REPLAY_NONE = 'This run has no Rerun file.';
 
 function section(title: string, body: HTMLElement[]) {
   const box = el('section', 'grid-section');

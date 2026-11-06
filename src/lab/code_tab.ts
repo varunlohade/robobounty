@@ -95,7 +95,7 @@ interface Deps {
   note: (text: string, fail?: boolean) => void;
 }
 interface Picked { campaign: string; d: ServerEvent }
-interface Source { pack: string; name: string; file: string; source: string; original: string; sha: string; original_sha: string; edited: boolean; scope: string; fix_scope: string; note: string; trace: boolean }
+interface Source { pack: string; name: string; file: string; source: string; original: string; sha: string; original_sha: string; edited: boolean; scope: string; fix_scope: string; note: string; trace: boolean; recorded?: boolean }
 
 class FileTab {
   readonly root = el('div', 'code-tab');
@@ -209,9 +209,11 @@ export class CodeTab {
       this.reset.disabled = same || this.busy;
     }
     const held = this.picked?.d.held_back;
-    this.runOne.disabled = this.busy || !this.picked || Boolean(held);
-    this.runOne.title = held ? 'A held-back world stays out of re-runs. It tests AI fixes.' : '';
-    this.runAll.disabled = this.busy || !this.rows.length;
+    const recorded = Boolean(src?.recorded);
+    this.runOne.disabled = this.busy || !this.picked || Boolean(held) || recorded;
+    this.runOne.title = recorded ? 'A recorded run cannot start a re-run.' : held ? 'A held-back world stays out of re-runs. It tests AI fixes.' : '';
+    this.runAll.disabled = this.busy || !this.rows.length || recorded;
+    this.runAll.title = recorded ? 'A recorded run cannot start a re-run.' : '';
     this.worldLink.hidden = !this.picked;
     const verdict = this.picked?.d.verdict;
     const n = verdict ? this.rows.filter(r => r.verdict === verdict && !r.held_back).length : 0;
@@ -445,13 +447,28 @@ export class CodeTab {
   }
 
   private cards = new Map<string, HTMLElement>();
+  private unsolved = new Set<string>();
+
+  /** The bounty page's address for a failure the AI could not fix. Null until an AI fix for it did not help or was rejected. */
+  bountyLink(campaign: string, verdict: string): string | null {
+    return this.unsolved.has(`${campaign}/${verdict}`) ? `/bounties.html?post=${this.deps.session()}/${campaign}/${verdict}` : null;
+  }
+
+  private offerBounty(e: ServerEvent) {
+    this.unsolved.add(`${e.campaign}/${e.group}`);
+    const box = el('div', 'code-fix-post');
+    const a = el('a', 'chat-option code-fix-bounty', 'Post a bounty') as HTMLAnchorElement;
+    a.href = this.bountyLink(String(e.campaign), String(e.group))!;
+    box.append(el('div', 'chat-card-note', 'The AI could not fix this. Engineers can try. Pay moves only after their fix passes on worlds nobody sees. Test units, not money.'), a);
+    return box;
+  }
 
   // The AI's fix in the chat: what it did to the numbers, then the diff, then Accept and Reject. A fix that did not help has nothing to accept.
   private fixCard(e: ServerEvent) {
     const card = el('div', 'chat-card code-fix');
     card.dataset.status = String(e.status);
     this.cards.set(String(e.fix), card);
-    card.append(el('div', 'chat-card-title', `AI fix for ${asRow({ status: 'failed', verdict: e.group })}`));
+    card.append(el('div', 'chat-card-title', `${e.recorded ? 'Recorded result: ' : ''}AI fix for ${asRow({ status: 'failed', verdict: e.group })}`));
     if (e.llm_note) card.append(el('div', 'chat-card-note', String(e.llm_note)));
     const helped = e.status === 'helped';
     card.append(el('div', helped ? 'code-fix-words' : 'code-fix-words code-fix-bad', String(e.words)));
@@ -480,6 +497,7 @@ export class CodeTab {
         for (const b of row.querySelectorAll('button')) b.disabled = true;
         const out = await this.post('/code_fix', { campaign: e.campaign, fix: e.fix, accept });
         if (out.status !== 200) { state.textContent = out.body.words ?? `It did not apply: ${out.body.error ?? out.status}.`; for (const b of row.querySelectorAll('button')) b.disabled = false; }
+        else if (!accept) card.append(this.offerBounty(e));
       };
       const yes = el('button', 'chat-option code-fix-accept', 'Accept');
       const no = el('button', 'chat-option code-fix-reject', 'Reject');
@@ -492,6 +510,7 @@ export class CodeTab {
     } else if (e.diff) {
       state.textContent = 'Not applied. Your code stays as it was.';
     }
+    if (['did_not_help', 'no_change', 'rejected'].includes(String(e.status))) card.append(this.offerBounty(e));
     if (e.sets) card.append(el('div', 'chat-card-note', `Small sample, in this simulation only. The AI saw ${e.held_back_worlds_shown_to_llm} held-back worlds. Only the controller copy changed, never the judge or the world.`));
     return card;
   }

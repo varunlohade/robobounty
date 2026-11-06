@@ -96,9 +96,10 @@ export function mountShell(opts: ShellOptions): Shell {
   setStatus(opts.status ?? SIM_NOTE, opts.statusRight);
   root.replaceChildren(nav, column, status);
 
+  const here = `${location.pathname.replace(/^\//, '')}${location.search}`; // Read now: a page may tidy its address while this waits.
   const who = whoIs();
   void who.then(w => {
-    if (w.kind === 'none') location.replace('login.html');
+    if (w.kind === 'none') location.replace(`login.html?next=${encodeURIComponent(here)}`);
     else whoRow(whoBox, w);
   });
   return { root, main, actions, setStatus, who };

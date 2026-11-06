@@ -3,8 +3,8 @@ import type { ChatAction, ChatBackend, ChatEvent } from './backend.ts';
 
 // ?server=PORT points the page at another local run server. Checks use it, so they never touch one that is already open.
 const ASKED_PORT = new URLSearchParams(location.search).get('server');
-export const SERVER = `http://127.0.0.1:${ASKED_PORT && /^\d{4,5}$/.test(ASKED_PORT) ? ASKED_PORT : 5198}`;
-const PORT = ASKED_PORT && /^\d{4,5}$/.test(ASKED_PORT) ? ASKED_PORT : '5198';
+const PORT = ASKED_PORT && /^\d{4,5}$/.test(ASKED_PORT) ? ASKED_PORT : import.meta.env.VITE_RUN_PORT ?? '5198';
+export const SERVER = `http://127.0.0.1:${PORT}`;
 const STORE_KEY = 'crashlab-session';
 const REPLY_DEADLINE_MS = 15_000; // A POST only starts a job, so it answers at once.
 const STREAM_STALE_MS = 15_000; // Three missed pings.

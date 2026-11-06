@@ -13,7 +13,7 @@ const NS = 'http://www.w3.org/2000/svg';
 export const fmtTime = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
 // A small line chart of one whole recorded series, with a cursor at the current frame.
-function sparkline(series: number[]) {
+function sparkline(series: number[], failAt: number | null) {
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('class', 'spark');
   svg.setAttribute('viewBox', '0 0 100 26');
@@ -31,6 +31,16 @@ function sparkline(series: number[]) {
   cursor.setAttribute('y1', '0');
   cursor.setAttribute('y2', '26');
   svg.append(line, cursor);
+  if (failAt !== null) {
+    const mark = document.createElementNS(NS, 'line');
+    const x = String(failAt * 100);
+    mark.setAttribute('class', 'spark-fail');
+    mark.setAttribute('x1', x);
+    mark.setAttribute('x2', x);
+    mark.setAttribute('y1', '0');
+    mark.setAttribute('y2', '26');
+    svg.append(mark);
+  }
   return { svg, seek: (fraction: number) => { const x = String(fraction * 100); cursor.setAttribute('x1', x); cursor.setAttribute('x2', x); } };
 }
 
@@ -73,12 +83,14 @@ export function worldPage(trial: Trial, statusRight: HTMLElement, onFix?: OnFix)
     ['Battery', 'V', { value: fixed(volts, 2), series: volts }],
     ['Cleaned', '%', { value: row => (coverage[row] * 100).toFixed(1), series: coverage }],
   ];
+  const fail = result.failure ? result.fired[result.failure] : null;
+  const failAt = fail && total > 0 ? Math.min(1, fail.t / total) : null;
   const rows = metrics.map(([name, unit, m]) => {
     const box = el('div', 'metric');
     const value = el('span', '', '');
     const line = el('div', 'metric-value');
     line.append(value, el('span', 'metric-unit', unit));
-    const spark = m.series ? sparkline(m.series) : null;
+    const spark = m.series ? sparkline(m.series, failAt) : null;
     box.append(el('div', 'metric-name', name), line);
     if (spark) box.append(spark.svg);
     return { box, value, m, spark };

@@ -231,3 +231,9 @@ button.lab-tab[hidden] { display: none; }
 .grid-nt-name { font-weight: 500; }
 .grid-nt-reason { color: var(--lab-text-2); }
 .grid-nt-source { color: var(--lab-muted); font-size: 11px; line-height: 16px; }
+.grid-replay { position: relative; }
+.grid-replay > .grid-replay-note:not(:only-child) { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); padding: 4px 10px; background: var(--lab-panel); border: 1px solid var(--lab-hair); border-radius: 6px; z-index: 5; }
+.grid-file { flex-wrap: wrap; }
+.grid-post { display: inline-flex; align-items: center; text-decoration: none; color: var(--lab-text); }
+.code-fix-post { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.code-fix-bounty { display: block; text-decoration: none; color: inherit; font-weight: 500; }
