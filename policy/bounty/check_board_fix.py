@@ -28,7 +28,7 @@ import budget
 
 F = X.F
 BASE = "http://127.0.0.1:5298"
-ORIGIN = "http://localhost:5299"
+ORIGIN = "http://localhost:5199"
 DEFAULT_CAMPAIGN = "5a8d63e3648b469a8142af56c0824119/c1"
 GOOD = (HERE / "fixtures" / "fix5" / "good_match_fan.py").read_text()
 STRONG = "if power > STRONG_FAN_W:"
@@ -181,7 +181,7 @@ def t2(session, cid):
     reader.write_text(f'open("{bounty / "hidden.json"}").read()\n' + base)
     trial = F.trial5("window", str(reader), {"index": 41, "name": "x", "world": info["public_worlds"][0]["world"], "seed": info["public_worlds"][0]["seed"]}, root / "reader_run", False)
     log = (root / "reader_run" / "job.log").read_text()
-    check("the sandbox denies a read of hidden.json", trial["verdict"] == "controller_crashed" and "PermissionError" in log or "Operation not permitted" in log, trial["reason"][:100])
+    check("the sandbox denies a read of hidden.json", trial["verdict"] == "controller_crashed" and ("PermissionError" in log or "Operation not permitted" in log), trial["reason"][:100])
 
     # The judge sha check, on a real copy of the code with one changed line in the judge.
     code_copy = root / "code_copy"
@@ -248,7 +248,7 @@ def t3(session, cid):
         def curl(*args):
             return subprocess.run(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "20", *args], capture_output=True, text=True).stdout
         paths = ["/api/bounties", f"/api/bounties/{bid}", f"/api/bounties/{bid}/source", f"/api/bounties/{bid}/fixes", "/api/fixable", "/api/budget", f"/api/bounties/{bid}/public/41/world.json"]
-        for label, extra in (("no Origin", []), ("wrong Origin", ["-H", "Origin: https://evil.example"]), ("vite 5199 Origin", ["-H", "Origin: http://localhost:5199"])):
+        for label, extra in (("no Origin", []), ("wrong Origin", ["-H", "Origin: https://evil.example"]), ("the app server Origin", ["-H", "Origin: http://localhost:5198"])):
             codes = [curl(*extra, BASE + p) for p in paths]
             check(f"curl GET gets 403 with {label}", set(codes) == {"403"}, str(codes))
             posted = [curl(*extra, "-X", "POST", "-H", "Content-Type: application/json", "-d", body, BASE + p) for p, body in (("/api/bounties/fix", "{}"), (f"/api/bounties/{bid}/fix", '{"tester":"a","source":"x"}'), ("/api/budget/stop", "{}"), (f"/api/bounties/{bid}/fixes/1/claim", '{"tester":"a"}'))]

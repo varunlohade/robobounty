@@ -222,8 +222,16 @@ def view(bounty_id, root=B.ROOT):
     money = book.bounty
     won = next((f for f in book.failures.values() if f["status"] != "Rejected"), None)
     return {**info, "status": won["status"].lower() if won else "open", "spec_hash": money["spec_hash"], "per_failure": money["per_failure"], "available": money["available"], "dispute_window_s": money["dispute_window_s"],
-            "unit": "test units", "failures": book.failures, "balance": B._balance(money, book.failures, [r for r in rows if r.get("payout")]), "submissions": len(rows), "now": time.time(),
-            "ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL, "sim_label": SIM_LABEL, "sandbox_label": SANDBOX_LABEL}
+            "unit": "test units", "failures": book.failures, "balance": B._balance(money, book.failures, [r for r in rows if r.get("payout")]), "submissions": len(rows), "checking": sum(r["state"] in ("queued", "running", "awaiting_company") for r in rows), "now": time.time(),
+            "ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL, "sim_label": SIM_LABEL, "sandbox_label": SANDBOX_LABEL, "chain_mirror": _mirror_of(folder)}
+
+
+def _mirror_of(folder):
+    path = folder / "chain_mirror.json"
+    if not path.is_file():
+        return None
+    saved = _read(path)
+    return {k: saved[k] for k in ("label", "chain_id", "txs", "fingerprint", "balances_after_claim")}
 
 
 def list_views(root=B.ROOT):

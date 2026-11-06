@@ -36,7 +36,7 @@ import gate as G
 
 HOST = "127.0.0.1"
 PORT = 5298
-PAGE_ORIGINS = {"http://localhost:5299", "http://127.0.0.1:5299"}
+PAGE_ORIGINS = {"http://localhost:5299", "http://127.0.0.1:5299", "http://localhost:5199", "http://127.0.0.1:5199"}  # 5199 serves the site that holds bounties.html
 QUEUE_CAP = 4
 MAX_WORLD_BYTES = G.MAX_SUBMISSION_BYTES
 MAX_SUBMIT_BODY = 3 * MAX_WORLD_BYTES  # JSON escapes make the body larger than the world, and the world has its own limit
