@@ -1,0 +1,20 @@
+<mujoco model="fixture">
+  <asset>
+    <material name="pane" rgba="0.2 0.3 0.4 1" specular="0.8"/>
+    <material name="metal" rgba="0.6 0.6 0.65 1"/>
+    <material name="stone" rgba="0.5 0.47 0.42 1"/>
+    <material name="ground_mat" rgba="0.3 0.3 0.3 1"/>
+  </asset>
+  <worldbody>
+    <light name="key" directional="true" pos="50 -80 200" dir="-0.4 0.6 -0.66" diffuse="0.8 0.8 0.75"/>
+    <camera name="front" pos="1.2 -25 137" xyaxes="1 0 0 0 0 1"/>
+    <geom name="ground" type="plane" size="300 300 1" material="ground_mat"/>
+    <geom name="glass" type="box" size="30 0.05 80" pos="1.2 0.05 80" material="pane"/>
+    <geom name="tower" type="box" size="30 10 80" pos="1.2 10.2 80" material="stone"/>
+    <geom name="mullion_a" type="box" size="0.03 0.0025 80" pos="0.75 -0.0025 80" conaffinity="1" material="metal"/>
+    <geom name="mullion_b" type="box" size="0.03 0.0025 80" pos="2.25 -0.0025 80" conaffinity="1" material="metal"/>
+    <body name="sill_group" pos="1.2 0 133">
+      <geom name="sill" type="box" size="3 0.05 0.05" pos="0 -0.05 0" conaffinity="1" material="stone"/>
+    </body>
+  </worldbody>
+</mujoco>
