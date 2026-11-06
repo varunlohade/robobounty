@@ -1,0 +1,96 @@
+/* One-window lab layout. Values follow design/claude/NOTES.md, round 5. tokens.css still supplies the --sim-* values that view.ts reads. */
+@font-face { font-family: Inter; src: url(../../design/shell/inter-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "JetBrains Mono"; src: url(../../design/shell/jetbrains-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 100 800; }
+
+:root {
+  --lab-app: #0B0C0E;
+  --lab-panel: #111317;
+  --lab-raised: #16191E;
+  --lab-hover: #1E2228;
+  --lab-hair: rgba(255, 255, 255, .07);
+  --lab-strong: rgba(255, 255, 255, .12);
+  --lab-text: #ECEEF1;
+  --lab-text-2: #A3A9B3;
+  --lab-muted: #737A85;
+  --lab-accent: #3E7BFA;
+  --lab-accent-hover: #5089FB;
+  --lab-ring: rgba(62, 123, 250, .45);
+  --lab-track: #2A2F37;
+  --lab-red: #E5534B;
+  --lab-red-text: #F27B73;
+  --lab-green-text: #5CC186;
+  --lab-tag: rgba(11, 12, 14, .78);
+  --lab-sans: Inter, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --lab-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #lab { height: 100%; margin: 0; }
+body { overflow: hidden; background: var(--lab-app); color: var(--lab-text); font: 400 13px/20px var(--lab-sans); font-variant-numeric: tabular-nums; }
+button, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--lab-ring); outline-offset: 1px; }
+
+#lab { display: grid; grid-template-rows: 36px minmax(0, 1fr) 24px; }
+.lab-title { position: relative; display: flex; align-items: center; padding: 0 12px; background: var(--lab-panel); border-bottom: 1px solid var(--lab-hair); }
+.lab-lights { display: flex; gap: 8px; }
+.lab-lights i { width: 12px; height: 12px; border-radius: 50%; background: #30343B; }
+.lab-name { position: absolute; left: 0; right: 0; text-align: center; color: var(--lab-text-2); font-size: 12px; line-height: 16px; pointer-events: none; }
+.lab-body { display: flex; min-height: 0; }
+
+.lab-activity { width: 44px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 8px; background: var(--lab-panel); }
+.lab-act { width: 32px; height: 32px; border-radius: 6px; display: grid; place-items: center; color: var(--lab-muted); }
+.lab-act.on { color: var(--lab-text); background: var(--lab-hover); }
+.lab-act svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Chat */
+.chat { width: 380px; flex: none; min-height: 0; display: flex; flex-direction: column; background: var(--lab-panel); border-right: 1px solid var(--lab-hair); }
+.chat-head { height: 36px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-weight: 500; }
+.chat-new { color: var(--lab-muted); font-weight: 400; }
+.chat-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 8px 12px; }
+.chat-me { background: var(--lab-hover); border-radius: 8px; padding: 8px 12px; }
+.chat-steps { display: flex; flex-direction: column; gap: 4px; color: var(--lab-text-2); }
+.chat-step::before { content: "✓"; color: var(--lab-green-text); margin-right: 8px; }
+.chat-box { flex: none; height: 92px; margin: 0 12px 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; background: var(--lab-raised); border: 1px solid var(--lab-strong); border-radius: 8px; color: var(--lab-muted); }
+.chat-box:focus-within { border-color: var(--lab-ring); }
+.chat-input { flex: 1; min-height: 0; width: 100%; padding: 0; background: none; border: 0; outline: 0; resize: none; color: var(--lab-text); }
+.chat-input::placeholder { color: var(--lab-muted); }
+.chat-foot { flex: none; display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 16px; }
+.chat-send { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; display: grid; place-items: center; background: var(--lab-accent); color: #fff; }
+.chat-send:hover { background: var(--lab-accent-hover); }
+.chat-send svg { width: 14px; height: 14px; }
+
+/* Main area */
+.lab-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lab-tabs { height: 36px; flex: none; display: flex; background: var(--lab-panel); border-bottom: 1px solid var(--lab-hair); }
+.lab-tab { display: flex; align-items: center; padding: 0 16px; background: var(--lab-app); border-right: 1px solid var(--lab-hair); font: 400 12px/16px var(--lab-mono); }
+
+/* Reused from world_page.ts. The lab has no metrics rail. */
+.page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.world-body { flex: 1; min-height: 0; display: flex; }
+.rail { display: none; }
+.viewport { flex: 1; min-width: 0; position: relative; background: var(--sim-sky); }
+.viewport canvas { position: absolute; inset: 0; display: block; }
+.sim-tag { position: absolute; padding: 2px 8px; border-radius: 6px; background: var(--lab-tag); font-size: 12px; line-height: 20px; pointer-events: none; }
+.sim-label { left: 12px; top: 12px; }
+.sim-key { left: 12px; bottom: 12px; color: var(--lab-text-2); }
+.sim-elements { left: 12px; bottom: 44px; color: var(--lab-text-2); }
+.sim-off { left: 12px; top: 48px; color: var(--lab-red-text); }
+.sim-off[hidden] { display: none; }
+.sim-error { position: absolute; inset: 0; padding: 24px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--lab-red-text); }
+
+.player { height: 40px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--lab-panel); border-top: 1px solid var(--lab-hair); }
+.icon-btn { width: 24px; height: 24px; flex: none; padding: 0; display: grid; place-items: center; background: none; border: 0; border-radius: 6px; color: var(--lab-text); }
+.icon-btn:hover { background: var(--lab-hover); }
+.icon-btn svg { width: 14px; height: 14px; }
+.scrub { flex: 1; min-width: 0; position: relative; display: flex; align-items: center; height: 24px; margin: 0 4px; }
+.scrub input { width: 100%; height: 12px; margin: 0; appearance: none; background: none; cursor: pointer; }
+.scrub input::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--lab-text) var(--done, 0%), var(--lab-track) var(--done, 0%)); }
+.scrub input::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: var(--lab-text); }
+.mark { position: absolute; top: 6px; bottom: 6px; width: 2px; background: var(--lab-red); pointer-events: none; }
+.time { white-space: nowrap; }
+.select { padding: 2px 4px; background: none; border: 0; border-radius: 6px; color: var(--lab-text-2); font-size: 12px; line-height: 16px; }
+.select:hover { background: var(--lab-hover); }
+
+.lab-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 12px; background: var(--lab-panel); border-top: 1px solid var(--lab-hair); color: var(--lab-text-2); font-size: 11px; line-height: 16px; white-space: nowrap; overflow: hidden; }
+.lab-status-end { display: flex; gap: 16px; }
