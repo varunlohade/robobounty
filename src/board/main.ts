@@ -424,12 +424,15 @@ function openPost(ref: string | null) {
   const send = button('pri', 'Post the bounty', null, async () => {
     const pick = rows.find(r => r.ref === select.value);
     if (!pick) { error.textContent = 'Pick a failure first.'; return; }
+    send.disabled = true;
+    send.textContent = 'Checking the stored runs';
+    error.textContent = '';
     try {
       const made = await api.post({ session: pick.session, campaign: pick.cid, group: pick.group, title: titleIn.value, company: company.value, pay: Number(pay.value), window: Number(windowS.value) });
       S.picked = made.id;
       close();
       await refresh();
-    } catch (e) { error.textContent = (e as Error).message; }
+    } catch (e) { error.textContent = (e as Error).message; send.disabled = false; send.textContent = 'Post the bounty'; }
   });
   const close = dialog('Post a bounty', false,
     h('div', 'body', field('Failure from a real campaign', select, 'full'), field('Title', titleIn, 'full'), field('Company', company, 'full'), field('Pay, test units', pay), field('Dispute window, seconds', windowS), h('div', 'full note2', 'One fix wins the pay. Held-back worlds stay hidden. Test units are not money.')),

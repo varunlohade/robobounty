@@ -91,19 +91,49 @@ def _hidden(folder):
     return _read(folder / "hidden.json")
 
 
-def _is_stale(folder, target, pack):
-    """A stored run from other judge or sim code says nothing about the code frozen now."""
+RUN_FILES = ("judge5.py", "sim5.py", "run_trial5.py")  # These decide a run's result by themselves, so they must match exactly. So must the controller.
+PHYSICS_CHECK_S = 120
+PHYSICS_CHECK = """
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import compile5 as C, world5 as W
+print("same" if all(C.physics_hash(W.validate(w["world"])) == w["physics"] for w in json.load(sys.stdin)) else "changed")
+"""
+
+
+def _is_stale(folder, worlds, pack, base_sha, code_root=POLICY):
+    """A stored run from other code or other physics says nothing about the code frozen now. It covers every world the bounty uses, public and hidden. Anything missing counts as stale.
+    The files that build a world may gain new kinds of object, so those are judged by each world's compiled physics hash, not by their own bytes."""
     if pack != "window":
         return False
-    now = frozen_shas(pack)
-    for w in target:
-        result = Path(F.latest_run5(folder, w["index"])) / "run" / "result.json"
-        if not result.is_file():
+    now = frozen_shas(pack, code_root)
+    checks = []
+    for w in worlds:
+        if not w.get("hash"):
             return True
-        code = _read(result)["code_sha256"]
-        if any(code[Path(name).name] != sha for name, sha in now.items() if Path(name).name in code):
+        checks.append({"world": w["world"], "physics": w["hash"]})
+        if w["held_back"]:  # A held-back world has no stored run. The proof runs it on both sides.
+            continue
+        run = Path(F.latest_run5(folder, w["index"]))
+        if not (run / "run" / "result.json").is_file():
             return True
-    return False
+        stored = _read(run / "run" / "result.json")
+        code = stored.get("code_sha256") or {}
+        if stored.get("physics_sha256") != w["hash"] or any(code.get(name) != now.get(f"highrise5/{name}") for name in RUN_FILES):
+            return True
+        job = _read(run / "job_result.json") if (run / "job_result.json").is_file() else {}
+        if (job.get("controller_sha256") or code.get("controller5.py")) != base_sha:
+            return True
+    return not _same_physics(checks, Path(code_root) / "highrise5")
+
+
+def _same_physics(worlds, code):
+    """In its own process, so it reads the code on disk now. Any error counts as changed."""
+    try:
+        done = subprocess.run([str(PYTHON), "-c", PHYSICS_CHECK, str(code)], input=json.dumps(worlds), capture_output=True, text=True, timeout=PHYSICS_CHECK_S)
+    except subprocess.TimeoutExpired:
+        return False
+    return done.returncode == 0 and done.stdout.strip() == "same"
 
 
 def _public_world(world, row, result):
@@ -142,11 +172,11 @@ def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DI
     other = [w for w in plan["worlds"] if not w["held_back"] and w not in target and w not in passed]
     if not held_back:
         raise B.BoardError("no_hidden_worlds", "This campaign has no held-back worlds, so a fix could not be proved on worlds it never saw.")
-    if _is_stale(source, target, pack):
-        raise B.BoardError("campaign_stale", "The sim or judge changed after this campaign ran. Run the campaign again before you post it.")
     session_copy = source.parent.parent / "code" / F.PACK5[pack]["file"].name
     base = session_copy if session_copy.is_file() else F.PACK5[pack]["file"]
     base_text = base.read_text()
+    if _is_stale(source, plan["worlds"], pack, hashlib.sha256(base_text.encode()).hexdigest()):
+        raise B.BoardError("campaign_stale", "A stored run no longer matches. The sim, the judge, this controller or a world's physics changed after it ran. Run those worlds again before you post it.")
 
     with B.locked(root / ".lock"):
         for p in root.glob("*/hidden.json"):

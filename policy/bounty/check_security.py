@@ -438,6 +438,53 @@ def full(root):
     print(f"full section: {time.time() - t0:.0f} s", flush=True)
 
 
+def stale_rule(root):
+    """A stored batch, in the shape of a campaign, against copies of the code. Only compiling runs here, no sim."""
+    import gzip
+    demo = X.POLICY / "runs" / "demo" / "window"
+    with gzip.open(demo / "scenarios.json.gz", "rt") as f:
+        worlds = json.load(f)["worlds"]
+    campaign = root / "stale_campaign"
+    for w in worlds:
+        stored = demo / f"w{w['index']:03d}" / "export" / "result.json.gz"
+        if not w["held_back"]:
+            (campaign / f"w{w['index']:03d}" / "run").mkdir(parents=True)
+            with gzip.open(stored, "rb") as f:
+                (campaign / f"w{w['index']:03d}" / "run" / "result.json").write_bytes(f.read())
+    base = hashlib.sha256(WINDOW.encode()).hexdigest()
+
+    def code(edit=None):
+        out = root / f"stale_code_{time.monotonic_ns()}"
+        shutil.copytree(X.POLICY / "highrise5", out / "highrise5", ignore=shutil.ignore_patterns("__pycache__"))
+        if edit:
+            edit(out / "highrise5")
+        return out
+    stale = lambda rows, code_root, sha=base: X._is_stale(campaign, rows, "window", sha, code_root)
+    append = lambda name, text: (lambda folder: (folder / name).write_text((folder / name).read_text() + text))
+    check("the stored batch is not stale on the code as it is", not stale(worlds, code()))
+    check("a world-building file that alters no compiled physics passes", not stale(worlds, code(append("world5.py", "\nNEW_KIND = 'generated'\n"))))
+    hidden = next(w for w in worlds if w["held_back"])
+    alter = f"""
+_real_compile = compile
+_hidden = json.dumps(W.validate(json.loads({json.dumps(hidden['world'])!r})), sort_keys=True)
+def compile(world):
+    physics, view, effects = _real_compile(world)
+    return (physics + "<!-- this world now differs -->" if json.dumps(world, sort_keys=True) == _hidden else physics), view, effects
+"""
+    altered = code(append("compile5.py", alter))
+    check("a change that alters only a hidden world's physics is refused", stale(worlds, altered))
+    check("the same change leaves every other world's physics alone", not stale([w for w in worlds if w is not hidden], altered))
+    check("a world with no physics hash is refused", stale([{k: v for k, v in w.items() if k != "hash"} if w is hidden else w for w in worlds], code()))
+    check("a held-back world whose stored hash differs is refused", stale([{**w, "hash": "0" * 64} if w is hidden else w for w in worlds], code()))
+    public = next(w for w in worlds if not w["held_back"])
+    check("a public world with no stored result is refused", stale([{**public, "index": 999}], code()))
+    for name in ("judge5.py", "sim5.py", "run_trial5.py"):
+        check(f"a change of a single byte in {name} is refused", stale(worlds, code(append(name, "\n# changed\n"))))
+    check("a stored run from another controller is refused", stale(worlds, code(), "0" * 64))
+    broken = code(append("compile5.py", "\nraise SystemExit(3)\n"))
+    check("a compile error counts as changed", stale(worlds, broken))
+
+
 def main():
     global ARGS
     ap = argparse.ArgumentParser()
@@ -447,6 +494,7 @@ def main():
     root = new_root()
     f1()
     f2()
+    stale_rule(root)
     f3_and_secret(root)
     if not ARGS.fast:
         full(root)

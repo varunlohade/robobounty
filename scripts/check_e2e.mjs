@@ -57,6 +57,22 @@ async function flow(mode) {
     const words = await text();
     check(`${mode}: ${where} says local guest, never verified`, words.includes('Local guest, not verified') && !words.includes('Verified human'));
   };
+  // The grid may still be settling, as its strip loads, so the click waits for a still square and is checked by the panel it opens.
+  const openSquare = async index => {
+    const sq = `.sq[data-index="${index}"]`;
+    for (let attempt = 1; ; attempt++) {
+      let at = '';
+      await c.until(`(() => { const r = document.querySelector(${JSON.stringify(sq)})?.getBoundingClientRect(); if (!r) return false; const now = r.left + ',' + r.top; const still = window.__at === now; window.__at = now; return still; })()`, 'the square to settle', 30);
+      await clickOn(sq);
+      try {
+        await c.until(`document.querySelector('.grid-rail')?.dataset.index === ${JSON.stringify(String(index))} && !!document.querySelector('.grid-file')`, 'the detail panel', attempt === 3 ? 60 : 15);
+        return;
+      } catch (err) {
+        console.log(`  the panel did not open, try ${attempt}: ${await c.js(`document.querySelector('.grid-rail')?.innerText.slice(0, 200) ?? 'no panel'`)}`);
+        if (attempt === 3) throw err;
+      }
+    }
+  };
   let number = 0;
   const step = async (name, run, settle = 500) => {
     const started = Date.now();
@@ -155,7 +171,7 @@ async function flow(mode) {
     check(`${mode}: a red Slipped square exists`, slip !== null);
     const replayOk = `document.querySelector('.grid-replay .viewport')?.dataset.ready === 'true' && Number(document.querySelector('.grid-replay .viewport').dataset.frame) > 0`;
     await step('red-square-detail-replay', async () => {
-      await clickOn(`.sq[data-index="${slip}"]`);
+      await openSquare(slip);
       await c.until(replayOk, 'the replay', 90);
       const rail = await c.js(`document.querySelector('.grid-rail').innerText`);
       check(`${mode}: the detail shows the judge and the log`, rail.includes('Judge') && rail.includes('Last log lines'));
@@ -168,6 +184,7 @@ async function flow(mode) {
       await c.until(`document.querySelector('.grid-page').dataset.rerun === 'done'`, 'the Rerun file', 300);
       await wait(800);
       check(`${mode}: a slip is not called off the glass`, await c.js(`document.querySelector('.sim-off').hidden`));
+      for (let i = 0; i < 100 && !readdirSync(downloads).some(f => f.endsWith('.rrd')); i++) await wait(200); // Chrome writes the file after the click.
       const file = readdirSync(downloads).find(f => f.endsWith('.rrd'));
       check(`${mode}: Open in Rerun downloads a real .rrd`, Boolean(file) && readFileSync(join(downloads, file)).subarray(0, 3).toString() === 'RRF', file);
     });
@@ -180,7 +197,7 @@ async function flow(mode) {
       await step('edit', async () => {
         await clickOn('.lab-tab-grid');
         await c.until(`!!document.querySelector('.grid-page')`, 'the grid again', 10);
-        await clickOn(`.sq[data-index="${coverage}"]`);
+        await openSquare(coverage);
         await clickText('Open file', '.grid-file');
         await c.until(`!!document.querySelector('.code-page .cm-editor')`, 'the editor', 30);
         await c.js(`(() => { const v = __lab.code().view; const s = v.state.doc.toString(); const at = s.indexOf('MAX_RETREATS_PER_LANE = 3'); v.dispatch({ changes: { from: at, to: at + 'MAX_RETREATS_PER_LANE = 3'.length, insert: 'MAX_RETREATS_PER_LANE = 2' } }); })()`);
@@ -194,7 +211,7 @@ async function flow(mode) {
         await clickOn('.lab-tab-grid');
         await c.until(`document.querySelector('.sq[data-index="${coverage}"]')?.dataset.picture === 'film'`, 'the re-run square film', 30);
         await c.until(`__lab.grid().squares.get(${Number(coverage)}).film?.run?.startsWith('r')`, "the re-run's own film", 30);
-        await clickOn(`.sq[data-index="${coverage}"]`);
+        await openSquare(coverage);
         await c.until(`document.querySelector('.grid-rail')?.innerText.includes('Before and after')`, 'before and after note', 30);
         check(`${mode}: the note says before and after`, /Before: .* After: /s.test(await c.js(`document.querySelector('.grid-rail').innerText`)));
       }, 1500);
@@ -203,8 +220,11 @@ async function flow(mode) {
         await c.until(`!!document.querySelector('.code-page .cm-editor')`, 'the editor', 30);
         await clickText('Reset to source', '.code-page');
         await c.until(`document.querySelector('.code-state').textContent.includes('Same as source')`, 'the reset', 20);
+        // A bounty refuses a stored run from another controller, so this world runs again on the source first.
+        await clickText('Run this world', '.code-page');
+        await c.until(`__lab.grid().squares.get(${Number(coverage)}).film?.run === 'r2'`, 'the run on the source', 300);
         await clickOn('.lab-tab-grid');
-        await clickOn(`.sq[data-index="${slip}"]`);
+        await openSquare(slip);
         await clickText('Open file', '.grid-file');
         await c.until(`!!document.querySelector('.code-page .cm-editor')`, 'the editor', 30);
       });
@@ -311,7 +331,7 @@ async function flow(mode) {
     check(`${mode}: no console errors`, c.problems.length === 0, [...new Set(c.problems)].slice(0, 6).join(' | '));
   } catch (err) {
     check(`${mode}: the flow finished`, false, String(err));
-    try { await c.shot(join(OUT, 'failure.png')); console.log('body:', (await text()).slice(0, 600)); } catch { /* the page is gone */ }
+    try { await c.shot(join(OUT, 'failure.png')); console.log('dialog or error:', await c.js(`document.querySelector('.overlay .bad')?.textContent ?? document.querySelector('.err')?.textContent ?? 'none'`)); console.log('body:', (await text()).slice(0, 600)); } catch { /* the page is gone */ }
   } finally {
     c.close();
   }
