@@ -72,7 +72,7 @@ async function flow(mode) {
   // Who is signed in changes during the flow, as it would for real people. --recorded uses the seeded demo accounts, labelled on screen. The other mode makes a real company account, and seeds one engineer, because a check has no World App.
   let companyMade = false;
   const asCompany = async next => {
-    await go(`login.html?switch=1&next=${encodeURIComponent(next)}`);
+    await go(`login.html?switch=1&seed=1&next=${encodeURIComponent(next)}`);
     if (!live) {
       await clickText('Demo company', '.lg-sheet');
     } else {
@@ -86,7 +86,7 @@ async function flow(mode) {
     check(`${mode}: the company is labelled`, /Tower Services|Demo company/.test(await text()) && /Email not verified|Demo account/.test(await text()));
   };
   const asEngineer = async next => {
-    await go(`login.html?switch=1&next=${encodeURIComponent(next)}`);
+    await go(`login.html?switch=1&seed=1&next=${encodeURIComponent(next)}`);
     if (!live) {
       await clickText('Demo engineer', '.lg-sheet');
     } else {

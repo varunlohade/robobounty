@@ -70,7 +70,8 @@ function startStep() {
     option('For robotics teams', 'Continue with work email', companyStep),
     option('For engineers', 'Continue with World ID', () => { void engineerStep(); }));
   show(h('div', 'lg-step', h('h1', '', 'Robots fall', h('br'), 'here first.'), opts));
-  void status.then(st => { if (st?.demo) { opts.append(demo('company', 'Demo company'), demo('engineer', 'Demo engineer')); place(); } });
+  // Seeded sign-in is for automated checks only. It stays off the real page.
+  if (new URLSearchParams(location.search).get('seed') === '1') void status.then(st => { if (st?.demo) { opts.append(demo('company', 'Demo company'), demo('engineer', 'Demo engineer')); place(); } });
 }
 
 type CompanyMode = 'signin' | 'create';
