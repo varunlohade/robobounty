@@ -1,0 +1,17 @@
+hull-scan.mp4 is a Blender Cycles render. It is not real footage.
+
+Every frame comes from a simulated scene: the robot, the hull plate, the fouling and the water. No camera filmed a real ship or a real robot. The video has no burned-in label, because a reconstruction tool would read a label as part of the scene. Keep this note with the video, and do not present the video as real.
+
+Made for: NVIDIA SimFoundry's video input (policy/simfoundry_lab/repo/scripts/pipeline/README.md, "Capturing an input video").
+Robot state: parked, from the recorded MuJoCo run policy/packs/hull/out/nominal.npz at t = 265.5 s. Drum and tracks stopped.
+Camera: one steady arc around the robot, 96 degrees, oblique to the hull, with sharp focus and no motion blur, grain or vignette.
+
+Rules followed:
+1. One flat surface: the hull plate. The bilge stays behind the camera.
+2. Angled at the surface: the camera's up points away from the hull, so the plate reads as a floor. In the real scene the robot hangs under the plate.
+3. Translate, do not rotate: the camera sweeps sideways around the robot.
+4. Keep objects in frame: the robot stays in every frame. The zinc anodes of the film are left out, because they would leave the frame.
+
+Differences from the film hull-film.mp4: water haze cut to 22%, caustics cut to 15% and frozen, no plume, no suspended particles, no god rays, no film grain, no burned-in label. Same lamps, hull, robot and paint.
+
+Known limit: the tether leaves the frame, since it must go somewhere. Not tested: this video has not been run through SimFoundry.

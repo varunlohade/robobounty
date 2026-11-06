@@ -28,6 +28,8 @@ WATER = {"scale": 1.0, "caustic": 1.0}
 BILGE_R = 1.8
 WATERLINE_Z = 6.0
 BARNACLE_MAX = 42000
+WELD_PLAN_WAVER_M = 0.001
+WELD_HEIGHT_WAVER_M = 0.0004
 
 
 def parse_args():
@@ -289,7 +291,7 @@ def build_hull(rec, image, coll):
 
 
 def build_seams(rec, image, coll):
-    """Weld beads at the recorded height, with the recorded section. A slight waver in plan and height is art, under 1 mm."""
+    """Weld beads at the recorded height, with the recorded section. A slight waver is art: at most 1 mm in plan and 0.4 mm in height."""
     h = rec.world["seam"]["height_m"]
     half = math.sqrt(max(0.0, R.SEAM_R ** 2 - (R.SEAM_R - h) ** 2))
     prof = np.linspace(-1, 1, 9)
@@ -303,8 +305,10 @@ def build_seams(rec, image, coll):
         start = len(v)
         wav = np.cumsum(rng.normal(0, 0.00012, n))
         wav -= np.linspace(wav[0], wav[-1], n)
+        wav *= WELD_PLAN_WAVER_M / max(np.abs(wav).max(), 1e-9)
         hv = np.cumsum(rng.normal(0, 0.00006, n))
         hv -= np.linspace(hv[0], hv[-1], n)
+        hv *= WELD_HEIGHT_WAVER_M / max(np.abs(hv).max(), 1e-9)
         for i in range(n):
             p = np.array(p0) + (np.array(p1) - np.array(p0)) * i / (n - 1)
             for u in prof:
@@ -1307,6 +1311,9 @@ def main():
     bpy.context.view_layer.update()
     if not a.no_blur and not scan:
         frames = list(enumerate(times)) if a.mode == "clip" else []
+        if frames:
+            # One recorded sample past each end, so that the first and last frames blur like the rest.
+            frames = [(-1, clamp(times[0] - 1 / a.fps))] + frames + [(n, clamp(times[-1] + 1 / a.fps))]
         for fi, t in frames:
             set_pose(rec, robot, t)
             for ob in robot.values():
