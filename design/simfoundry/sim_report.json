@@ -1,0 +1,132 @@
+{
+ "label": "SIMULATED. NVIDIA published example, not built here. Never claimed to match the real place.",
+ "objects": {
+  "yellow_pear_uckunr_0": {
+   "size_cm": [
+    8.8,
+    6.4,
+    6.3
+   ],
+   "mass_kg": 0.24,
+   "hulls": 10,
+   "start_gap_to_ground_mm": 0.2,
+   "start_pos": [
+    0.4737,
+    -0.0623,
+    0.0061
+   ],
+   "moved_after_3s_mm": 2.4,
+   "speed_at_3s_mm_s": 0.0,
+   "moved_total_cm": 0.2
+  },
+  "orange_square_plate_rfnrye_1": {
+   "size_cm": [
+    21.9,
+    20.1,
+    3.1
+   ],
+   "mass_kg": 0.4,
+   "hulls": 32,
+   "start_gap_to_ground_mm": 1.3,
+   "start_pos": [
+    0.5928,
+    -0.2106,
+    -0.0023
+   ],
+   "moved_after_3s_mm": 1.3,
+   "speed_at_3s_mm_s": 0.0,
+   "moved_total_cm": 11.5
+  },
+  "red_apple_zlgmzo_2": {
+   "size_cm": [
+    7.0,
+    6.9,
+    6.1
+   ],
+   "mass_kg": 0.13,
+   "hulls": 23,
+   "start_gap_to_ground_mm": 2.8,
+   "start_pos": [
+    0.6659,
+    -0.023,
+    0.0164
+   ],
+   "moved_after_3s_mm": 29.3,
+   "speed_at_3s_mm_s": 0.02,
+   "moved_total_cm": 2.9
+  },
+  "yellow_banana_yvjcfy_3": {
+   "size_cm": [
+    19.3,
+    12.6,
+    4.0
+   ],
+   "mass_kg": 0.12,
+   "hulls": 4,
+   "start_gap_to_ground_mm": -0.7,
+   "start_pos": [
+    0.4825,
+    0.0518,
+    0.0006
+   ],
+   "moved_after_3s_mm": 0.6,
+   "speed_at_3s_mm_s": 0.0,
+   "moved_total_cm": 2.4
+  },
+  "orange_fruit_rofqtq_4": {
+   "size_cm": [
+    6.9,
+    6.9,
+    6.1
+   ],
+   "mass_kg": 0.14,
+   "hulls": 2,
+   "start_gap_to_ground_mm": 2.4,
+   "start_pos": [
+    0.6569,
+    0.1347,
+    0.0155
+   ],
+   "moved_after_3s_mm": 22.8,
+   "speed_at_3s_mm_s": 0.0,
+   "moved_total_cm": 2.3
+  },
+  "teal_tray_tdxtsb_5": {
+   "size_cm": [
+    25.7,
+    17.9,
+    4.3
+   ],
+   "mass_kg": 0.5,
+   "hulls": 30,
+   "start_gap_to_ground_mm": -0.4,
+   "start_pos": [
+    0.5763,
+    0.2818,
+    0.0025
+   ],
+   "moved_after_3s_mm": 0.4,
+   "speed_at_3s_mm_s": 0.0,
+   "moved_total_cm": 25.1
+  }
+ },
+ "start_contacts": 18,
+ "start_worst_penetration_mm": -0.68,
+ "box_before_robot": [
+  0.591,
+  -0.21,
+  0.04
+ ],
+ "plate_moved_by_box_cm": 0.1,
+ "end_box_pos": [
+  0.485,
+  -0.206,
+  0.03
+ ],
+ "box_landed_on_plate_top_mm": -0.0,
+ "end_robot_pos": [
+  0.906,
+  0.057,
+  0.59
+ ]
+}

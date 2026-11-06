@@ -1,0 +1,14 @@
+repo/
+.venv*/
+weights/
+checkpoints/
+outputs/
+work/
+*.log
+*.mp4
+*.ply
+*.glb
+*.pt
+*.pth
+*.safetensors
+deps/
