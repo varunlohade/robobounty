@@ -17,6 +17,8 @@ PLAY_S = 40.0  # A long campaign plays faster than it ran.
 MAX_STEP_S = 1.0
 ENDED = ("passed", "failed", "stuck", "held")
 BANNER = "Recorded run. No AI and no sim run here. These are stored results from one earlier simulated campaign. The buttons work, and new words change nothing."
+NO_RERUN = "This is a recorded run, so no sim runs here and a re-run cannot start. Start the demo without --recorded to run your edit."
+STORED_FIX = "stored_fix.json"
 NO_CHAT = "This is a recorded run, so words cannot change the world. Press List test scenarios, then Run."
 
 
@@ -88,7 +90,8 @@ def run_campaign(s, folder):
                     filmed.add(row["index"])
                 row["film"] = films[row["index"]]
             if row["status"] in ENDED and not row["held_back"] and row["index"] not in copied and run.exists():
-                shutil.copytree(run, out / run.name, ignore=shutil.ignore_patterns("export"), dirs_exist_ok=True)
+                shutil.copytree(run, out / run.name, ignore=shutil.ignore_patterns("export", STORED_FIX), dirs_exist_ok=True)
+                _copy_gunzipped(run / "export" / "result.json.gz", out / run.name / "run" / "result.json")
                 copied.add(row["index"])
         grid = {"type": "grid", "campaign": cid, "pack": s.pack, "running": moment["running"], "elapsed_s": moment["elapsed_s"], "max_procs": moment["max_procs"], "recorded": True, "counts": pack_campaign.count_rows(rows), "rows": rows}
         _publish(s, out, grid)
@@ -98,6 +101,35 @@ def run_campaign(s, folder):
     counts = grid["counts"]
     s.emit(type="campaign_done", campaign=cid, counts=counts, wall_s=grid["elapsed_s"], max_procs=grid["max_procs"], label=f"{LABEL}, {moment['label']}", note=plan["note"])
     s.say(f"Recorded result, as it ran in {grid['elapsed_s']:.0f} s: {counts['passed']} passed, {counts['failed']} failed, {counts['stuck']} stuck, {counts['safe_hold']} safe holds, {counts['held']} held back. Simulated. {len(plan['not_tested'])} things stay not tested.")
+
+
+def _copy_gunzipped(source, target):
+    """The run's own result file, so a bounty can compare the code that ran with the code frozen now."""
+    if source.exists():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with gzip.open(source, "rb") as f:
+            target.write_bytes(f.read())
+
+
+def fill_run(out, folder, pack, index):
+    """The stored run's files in the shape of a run folder, for the Rerun export."""
+    stored = Path(folder) / pack / f"w{index:03d}" / "export"
+    run = Path(out) / f"w{index:03d}" / "run"
+    run.mkdir(parents=True, exist_ok=True)
+    _copy_gunzipped(stored / "result.json.gz", run / "result.json")
+    _copy_gunzipped(stored / "world.json.gz", run / "world.json")
+    for name in ("qpos.json.gz", "trace.json.gz"):
+        shutil.copyfile(stored / name, run / name)
+
+
+def stored_fix(s, cid, group, folder):
+    """The stored result of one real AI fix, from an earlier campaign on these same worlds. No AI call and no sim run. A group with no stored result says so."""
+    path = Path(folder) / s.pack / STORED_FIX
+    stored = json.loads(path.read_text()) if path.exists() else None
+    if not stored or stored["group"] != group:
+        s.say(f"This recorded run has no stored AI fix for this failure, so no AI fix shows here.{' It holds one for ' + stored['group'].replace('_', ' ') + '. Open a world with that failure.' if stored else ''}", fail=True)
+        return
+    s.emit(type="code_fix", fix="f1", campaign=cid, recorded=True, llm_note=f"{LABEL}. {stored['source']} No AI call and no sim ran now.", **{k: stored[k] for k in ("group", "status", "words", "diff", "flags", "sets", "validation", "limits", "held_back_worlds_shown_to_llm", "proof_wall_s")})
 
 
 def trial(s, cid, index, folder):

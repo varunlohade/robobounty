@@ -109,12 +109,32 @@ def record(port, pack, out, limit):
     return final["counts"]
 
 
+def store_fix(report_path, out):
+    """Keeps one real AI fix's report beside the batch, for the recorded demo. It must name the same worlds and verdicts as the batch's window timeline, or it would describe other runs."""
+    report_path = Path(report_path)
+    report = json.loads(report_path.read_text())
+    if report.get("llm", {}).get("error") or report["llm"].get("seconds") is None:
+        raise SystemExit("This report did not come from a real AI call.")
+    rows = {r["index"]: r for r in recorded_batch._read_gz(out / report["pack"] / "timeline.json.gz")[-1]["rows"]}
+    for pair in report["pairs"]:
+        if pair["set"] != "held_back" and rows[pair["index"]]["verdict"] != pair["old"]["verdict"]:
+            raise SystemExit(f"World {pair['index']} differs from the batch.")
+    keep = ("group", "status", "words", "diff", "flags", "sets", "validation", "limits", "held_back_worlds_shown_to_llm", "proof_wall_s", "llm", "base_sha256", "patched_sha256")
+    stored = {k: report.get(k) for k in keep}
+    stored["source"] = f"A real AI edit, tested in the sandbox on these same worlds in an earlier campaign, {time.strftime('%Y-%m-%d', time.localtime(report_path.stat().st_mtime))}."
+    (out / report["pack"] / recorded_batch.STORED_FIX).write_text(json.dumps(stored, indent=1) + "\n")
+    print(stored["status"], stored["sets"]["held_back"])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(HERE.parent / "runs" / "demo"))
     ap.add_argument("--pack", choices=sorted(pack_job.PACKS))
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--stored-fix", help="a real AI fix's report.json to keep beside the batch. Nothing else is recorded.")
     a = ap.parse_args()
+    if a.stored_fix:
+        return store_fix(a.stored_fix, Path(a.out))
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]

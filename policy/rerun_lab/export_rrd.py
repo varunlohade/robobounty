@@ -2,6 +2,7 @@
 
 From policy/rerun_lab: .venv/bin/python export_rrd.py [--out DIR]
 Writes window.rrd, inspection.rrd and compare.rrd.
+One run, for the lab's Open in Rerun button: export_rrd.py --window-run DIR --to FILE, or --inspection-run NPZ REPLAY --to FILE.
 """
 import argparse
 import ast
@@ -219,8 +220,8 @@ def log_window_run(rec, run, prefix="", tint=RED, facts_label=""):
                      columns=rr.Transform3D.columns(translation=frames[:, :3], quaternion=frames[:, [4, 5, 6, 3]]))
     rec.log(f"{world_root}/path", rr.LineStrips3D([frames[:, :3] + [0.0, -0.13, 0.0]], colors=[tint], radii=[0.008]), static=True)
 
-    dirt = np.load(run / "dirt.npz")
     area = W.area_rect(world)
+    dirt = np.load(run / "dirt.npz") if (run / "dirt.npz").exists() else {"mask": np.zeros((1, 1), bool), "dirt": np.zeros((1, 1))}  # A recorded batch stores no dirt grid.
     iz, ix = np.nonzero(dirt["mask"])
     cell = (area["x1"] - area["x0"]) / dirt["mask"].shape[1]
     level = np.clip(dirt["dirt"][iz, ix] / max(world["area"]["dirt_level"], 1e-6), 0, 1)
@@ -282,15 +283,15 @@ def window_blueprint(info):
         collapse_panels=False)
 
 
-def export_window(out):
-    source = (WINDOW_RUN / "result.json").read_bytes() + (WINDOW_RUN / "qpos.json.gz").read_bytes()
-    result = json.loads((WINDOW_RUN / "result.json").read_text())
-    world = W.load(WINDOW_RUN / "world.json")
+def export_window(out, run=WINDOW_RUN):
+    source = (run / "result.json").read_bytes() + (run / "qpos.json.gz").read_bytes()
+    result = json.loads((run / "result.json").read_text())
+    world = W.load(run / "world.json")
     if C.physics_hash(world) != result["physics_sha256"]:
         raise SystemExit("The compiler no longer builds this run's physics, so the scene would not match the run.")
-    rec = stream("crashlab_window", source, f"SIMULATED window run, {result['failure']} at {result['time_s']} s")
+    rec = stream("crashlab_window", source, f"SIMULATED window run, {result['failure'] or result['outcome']} at {result['time_s']} s")
     rec.save(out)
-    info = log_window_run(rec, WINDOW_RUN)
+    info = log_window_run(rec, run)
     rec.send_blueprint(window_blueprint(info), make_active=True, make_default=True)
     rec.flush()
     rec.disconnect()
@@ -331,11 +332,11 @@ def replay_shapes(items, alpha=None):
     return out
 
 
-def export_inspection(out):
-    replay = load_json(INSPECTION_REPLAY)
-    record = np.load(INSPECTION_RECORD)
+def export_inspection(out, record_file=INSPECTION_RECORD, replay_file=INSPECTION_REPLAY):
+    replay = load_json(replay_file)
+    record = np.load(record_file)
     result = replay["result"]
-    rec = stream("crashlab_inspection", INSPECTION_RECORD.read_bytes(), f"SIMULATED inspection run, {result['verdict']} at {result['fell_t_s']} s")
+    rec = stream("crashlab_inspection", record_file.read_bytes(), f"SIMULATED inspection run, {result['verdict']} at {result['fell_t_s']} s")
     rec.save(out)
     t = record["t"].astype(np.float64)
     rec.log("world", rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)
@@ -378,7 +379,7 @@ def export_inspection(out):
     events = [(float(x), "INFO", f"Reached waypoint {n + 1}") for n, x in enumerate(result["waypoint_t_s"])]
     events.append((fail_t, "CRITICAL", f"FAILURE: {result['reason']}"))
     send_events(rec, "events", events)
-    facts = {"run": str(INSPECTION_RECORD.relative_to(ROOT)), "robot": replay["robot"], "min_clearance_m": result["min_clearance_m"], "object_peak_N": result["object_peak_N"],
+    facts = {"run": str(record_file.relative_to(ROOT)), "robot": replay["robot"], "min_clearance_m": result["min_clearance_m"], "object_peak_N": result["object_peak_N"],
              "judge foot_slip_mps": result["foot_slip_mps"], "judge deviation_max_m": result["deviation_max_m"]}
     label_simulated(rec, "", replay["label"], replay["note"], result["reason"], facts)
 
@@ -438,7 +439,16 @@ def export_compare(out):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(HERE / "out"))
+    ap.add_argument("--window-run")
+    ap.add_argument("--inspection-run", nargs=2)
+    ap.add_argument("--to")
     args = ap.parse_args()
+    if args.to:
+        if args.window_run:
+            export_window(Path(args.to), Path(args.window_run).resolve())
+        else:
+            export_inspection(Path(args.to), *[Path(p).resolve() for p in args.inspection_run])
+        sys.exit(0)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     infos = {"window": export_window(out / "window.rrd"), "inspection": export_inspection(out / "inspection.rrd"), "compare": export_compare(out / "compare.rrd")}

@@ -36,7 +36,7 @@ import gate as G
 
 HOST = "127.0.0.1"
 PORT = 5298
-PAGE_ORIGINS = {"http://localhost:5299", "http://127.0.0.1:5299", "http://localhost:5199", "http://127.0.0.1:5199"}  # 5199 serves the site that holds bounties.html
+PAGE_ORIGINS = {f"http://{host}:{port}" for host in ("localhost", "127.0.0.1") for port in (5299, 5199, os.environ.get("CRASHLAB_WEB_PORT", 5199))}  # 5199 serves the site that holds bounties.html. scripts/demo.sh sets the port when vite runs on another one.
 QUEUE_CAP = 4
 MAX_WORLD_BYTES = G.MAX_SUBMISSION_BYTES
 MAX_SUBMIT_BODY = 3 * MAX_WORLD_BYTES  # JSON escapes make the body larger than the world, and the world has its own limit
@@ -229,11 +229,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global ROOT
+    global ROOT, PORT
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=str(B.ROOT))
+    ap.add_argument("--port", type=int, default=PORT)
     a = ap.parse_args()
-    ROOT = Path(a.root)
+    ROOT, PORT = Path(a.root), a.port
     ROOT.mkdir(parents=True, exist_ok=True)
     B.mark_interrupted(ROOT)
     threading.Thread(target=worker, daemon=True).start()

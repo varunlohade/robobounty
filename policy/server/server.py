@@ -45,7 +45,7 @@ CRASHLAB = POLICY / "crashlab"
 RUNS = POLICY / "runs" / "server"
 PYTHON = str(POLICY / ".venv" / "bin" / "python")
 HOST = "127.0.0.1"
-APP_ORIGINS = {"http://localhost:5199", "http://127.0.0.1:5199"}
+APP_ORIGINS = {f"http://{host}:{port}" for host in ("localhost", "127.0.0.1") for port in (5199, os.environ.get("CRASHLAB_WEB_PORT", 5199))}  # scripts/demo.sh sets the port when vite runs on another one.
 MAX_PROCS = 4
 MAX_BODY_BYTES = 8192
 MAX_SESSIONS = 32
@@ -1084,8 +1084,10 @@ class Session:
         with self.lock:
             if self.busy:
                 return 409, {"error": "busy", "words": "Another job is running. Press it again when it ends."}
-        status, out = code_lab.save(self, body.get("source"))
         run, cid = body.get("run"), body.get("campaign")
+        if BATCH and run in ("one", "all"):
+            return 409, {"error": "recorded", "words": recorded_batch.NO_RERUN}
+        status, out = code_lab.save(self, body.get("source"))
         if status != 200 or run not in ("one", "all"):
             return status, out
         if not (isinstance(cid, str) and _CID.match(cid) and (self.dir / "campaigns" / cid / "grid.json").exists()):
@@ -1106,6 +1108,8 @@ class Session:
             return code_lab.decide_fix(self, cid, fid, body.get("accept") is True)
         if not (isinstance(group, str) and re.fullmatch(r"[a-z_]{1,40}", group)):
             return 400, {"error": "no_group"}
+        if BATCH:
+            return self.start(recorded_batch.stored_fix, self, cid, group, BATCH)
         return self.start(code_lab.run_fix, self, cid, group)
 
     def world_replay(self, cid, index):
@@ -2128,8 +2132,17 @@ class Handler(BaseHTTPRequestHandler):
                 except StageHung:
                     replay = None
                 return self.reply(200, replay) if replay else self.reply(404, {"error": "no_replay"})
+            if rest[2] == "rerun.rrd":
+                path = code_lab.rerun_file(s, cid, index, detail)
+                if not path:
+                    return self.reply(404, {"error": "no_rerun"})
+                data = path.read_bytes()
+                self.head(200, "application/octet-stream", len(data), (("Content-Disposition", f'attachment; filename="crashlab-{cid}-world-{index}.rrd"'),))
+                return self.wfile.write(data)
             if rest[2] in ("latest.jpg", "film.jpg"):
-                path = folder / f"w{index:03d}" / rest[2]
+                # ?run=rN names a re-run's own film, drawn after its sandbox ended. Only the first run has a live frame.
+                run = parse_qs(urlsplit(self.path).query).get("run", [""])[0]
+                path = folder / "code_runs" / run / f"w{index:03d}" / "film.jpg" if rest[2] == "film.jpg" and re.fullmatch(r"r[0-9]{1,4}", run) else folder / f"w{index:03d}" / rest[2]
                 if not path.exists():
                     return self.reply(404, {"error": "no_frame"})
                 data = path.read_bytes()
@@ -2274,7 +2287,7 @@ def main():
     BATCH = RECORDED if RECORDED and recorded_batch.is_batch(RECORDED) else None
     if a.live_route:
         os.environ["CRASHLAB_LIVE_ROUTE"] = "1"
-    code_lab.T.__dict__.update(spawn=spawn, finish=finish, kill_group=kill_group, beat=beat, watched=watched, lock=CAMPAIGN_LOCK, slots=SLOTS, rule=DEADLINES["run"], max_procs=MAX_PROCS, recorded=lambda: RECORDED is not None and not a.live_fix, fix_patch=a.fix_patch)
+    code_lab.T.__dict__.update(spawn=spawn, finish=finish, kill_group=kill_group, beat=beat, watched=watched, lock=CAMPAIGN_LOCK, slots=SLOTS, rule=DEADLINES["run"], max_procs=MAX_PROCS, recorded=lambda: RECORDED is not None and not a.live_fix, fix_patch=a.fix_patch, batch=lambda: Path(BATCH) if BATCH else None)
     RUNS.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer((HOST, a.port), Handler)  # A port in use stops here, before anything below can touch another server's children.
     server.daemon_threads = True

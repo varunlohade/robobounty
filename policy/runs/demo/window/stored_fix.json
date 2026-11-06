@@ -1,0 +1,79 @@
+{
+ "group": "slip_distance",
+ "status": "did_not_help",
+ "words": "This fix did not help. It made no failed world better. Failed worlds in this group: 0 better, 0 worse, 6 same, of 6. Worlds that passed or held safely before: 15 kept, 0 worse. Held-back worlds it never saw: 1 better, 0 worse, 13 same, of 14. Other failed worlds: 1 better, 0 worse, 12 same, of 13. I did not apply it.",
+ "diff": "--- a/controller5.py\n+++ b/controller5.py\n@@ -23,7 +23,7 @@\n LANE_OVERRUN_M = 0.10  # drive this far past the area edge, for position error\n \n # Suction.\n-SUCTION_CLEAN = 0.85\n+SUCTION_CLEAN = 0.92\n SUCTION_MAX = 1.0\n \n # Pressure estimate from impeller current. Design numbers of the fan.\n",
+ "flags": [],
+ "sets": {
+  "target": {
+   "n": 6,
+   "better": 0,
+   "worse": 0,
+   "same": 6,
+   "passed_before": 0,
+   "passed_after": 0,
+   "worse_worlds": [],
+   "better_worlds": [],
+   "limits_hit": 0,
+   "replay_mismatch": 0
+  },
+  "passed_before": {
+   "n": 15,
+   "better": 0,
+   "worse": 0,
+   "same": 15,
+   "passed_before": 13,
+   "passed_after": 13,
+   "worse_worlds": [],
+   "better_worlds": [],
+   "limits_hit": 0,
+   "replay_mismatch": 0
+  },
+  "held_back": {
+   "n": 14,
+   "better": 1,
+   "worse": 0,
+   "same": 13,
+   "passed_before": 1,
+   "passed_after": 1,
+   "worse_worlds": [],
+   "better_worlds": [
+    43
+   ],
+   "limits_hit": 0,
+   "replay_mismatch": 0
+  },
+  "other_failed": {
+   "n": 13,
+   "better": 1,
+   "worse": 0,
+   "same": 12,
+   "passed_before": 0,
+   "passed_after": 1,
+   "worse_worlds": [],
+   "better_worlds": [
+    0
+   ],
+   "limits_hit": 0,
+   "replay_mismatch": 0
+  }
+ },
+ "validation": [],
+ "limits": [
+  "In this simulation only. The physics is uncalibrated.",
+  "sandbox-exec is not a VM. It shares the kernel with the host.",
+  "Only the controller copy changed. The judge and the worlds did not."
+ ],
+ "held_back_worlds_shown_to_llm": 0,
+ "proof_wall_s": 124.0,
+ "llm": {
+  "error": null,
+  "seconds": 13.3,
+  "cost_usd": 0.0483018,
+  "turns": 3,
+  "permission_denials": 0
+ },
+ "base_sha256": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705",
+ "patched_sha256": "1d8b9d74bf5293ce160f7d3fd0547d3734479d60dcdb8156b6c6b6bc2076b139",
+ "source": "A real AI edit, tested in the sandbox on these same worlds in an earlier campaign, 2026-11-06."
+}

@@ -28,8 +28,9 @@ DEMO = POLICY / "runs" / "demo"
 SERVER_RUNS = POLICY / "runs" / "server"
 BOARD = POLICY / "runs" / "board"
 PORT = 5297
-ORIGINS = {"http://localhost:5199", "http://127.0.0.1:5199"}
-HOSTS = {"localhost:5199", "127.0.0.1:5199", f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
+WEB_PORTS = {5199, int(os.environ.get("CRASHLAB_WEB_PORT", 5199))}  # scripts/demo.sh sets the port when vite runs on another one.
+ORIGINS = {f"http://{host}:{port}" for host in ("localhost", "127.0.0.1") for port in WEB_PORTS}
+HOSTS = {f"{host}:{port}" for host in ("localhost", "127.0.0.1") for port in WEB_PORTS | {PORT}}
 CACHE_S = 30
 MAX_BODY = 256 * 1024
 ROBOTS = {"window": "Window cleaning", "inspection": "Plant inspection"}
@@ -343,7 +344,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/site-api/providers":
             return self.reply(200, providers())
         if path == "/site-api/auth/me":
-            who = world.login_of(self.cookies().get("crashlab_login"))
+            who = world.login_of(self.cookies().get("crashlab_login")) if world.status()["on"] else None  # World ID off means nobody is verified, whatever an old sign-in says.
             return self.reply(200, {"verified": True, **who} if who else {"verified": False})
         if path == "/site-api/auth/world":
             state = world.status()
@@ -399,7 +400,9 @@ def main():
     load_env()
     if not shutil.which("node"):
         print("node is needed for World ID signing", file=sys.stderr)
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    port = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else PORT
+    HOSTS.update({f"127.0.0.1:{port}", f"localhost:{port}"})
+    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
 
 
 if __name__ == "__main__":

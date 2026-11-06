@@ -478,6 +478,7 @@ WORST_VERDICTS = {"detach", "tether_load", "fell"}
 LLM_WORLDS_SHOWN = 12
 INSPECTION_WALL_S = 600  # A run took 66 s under a load of 35. One that had to compile a kernel under that load passed 240 s before it took its first step.
 INSPECTION_CPU_S = 500
+FILM_WALL_S = 120
 
 
 def validate5(pack, text, base=None, constants_only=False):
@@ -490,7 +491,7 @@ def validate5(pack, text, base=None, constants_only=False):
 def sandbox_setup5(pack, run_dir):
     """Extra reads and env for one run. Warp writes to its kernel cache, so each inspection run gets a clone of it inside its run dir and the real cache stays out of reach."""
     reads = [POLICY / "packs", HIGHRISE5, POLICY / "server" / "pack_job.py", WORKER5]
-    env = {"CRASHLAB_NO_FRAMES": "1"}  # The sandbox has no graphics connection, so a re-run draws no frames for its square.
+    env = {"CRASHLAB_NO_FRAMES": "1"}  # A sandbox has no graphics connection, and drawing there crashes the run with a CGLError. This is the one place that turns frames off. film5 draws the square's picture afterwards.
     if pack == "inspection":
         caches = Path.home() / "Library" / "Caches"
         asset = next((caches / "newton").glob("newton-assets_anybotics_anymal_c_*")) / "anybotics_anymal_c"
@@ -521,6 +522,24 @@ def sandbox_run5(pack, controller, request, own_group=False):
     if code != 0 or not result_path.exists():
         result_path.write_text(json.dumps(limit_result(req, controller, why, code), indent=1) + "\n")
     return json.loads(result_path.read_text())
+
+
+def film5(pack, world, out):
+    """The square's picture for a sandbox run. It is drawn outside the sandbox, from recorded numbers, after the sandbox process has ended.
+    A window run must replay through sim5 with no controller loaded first, so a controller cannot forge what is drawn. No picture never changes a result."""
+    sys.path.insert(0, str(POLICY / "server"))
+    import pack_job
+    out = Path(out)
+    result_path = out / "job_result.json"
+    result = json.loads(result_path.read_text())
+    (out / "film.jpg").unlink(missing_ok=True)  # The sandbox could write here, so whatever it left goes before this process writes the name.
+    film = None
+    if result["verdict"] != "controller_crashed" and (pack != "window" or replay_ok5(out / "run")):
+        try:
+            film = pack_job.ask(pack, "film", {"world": world, "out": str(out)}, timeout=FILM_WALL_S)
+        except (RuntimeError, subprocess.TimeoutExpired, ValueError) as e:
+            print(f"no picture for this run: {type(e).__name__}", file=sys.stderr)
+    result_path.write_text(json.dumps({**result, "film": film}, indent=1) + "\n")
 
 
 def trace5(controller, run_folder, target):
@@ -815,7 +834,9 @@ def main():
     if a.cmd == "accept":
         return cmd_accept(a)
     if a.cmd == "sandbox5":
+        req = json.loads(Path(a.request).read_text())  # Read before the sandbox runs, since the run can write in its folder.
         sandbox_run5(a.pack, a.controller, a.request)
+        film5(a.pack, req["world"], req["out"])
         return 0
     if a.cmd == "check5":
         print(json.dumps({"reasons": validate5(a.pack, Path(a.file).read_text())}))
