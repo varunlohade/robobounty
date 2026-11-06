@@ -38,6 +38,10 @@ def read_log(path):
     return rows, prev
 
 
+# These build a world and may gain new kinds of object. The physics hash above and the replay of every state below judge them, as board_fix._is_stale does.
+WORLD_BUILD_FILES = {"compile5.py", "engine5.py", "world5.py", "parts5.py", "geoms5.py", "scene5.py"}
+
+
 def read_gz(path):
     with gzip.open(path, "rt") as f:
         return json.load(f)
@@ -57,7 +61,8 @@ def main():
     current = W.load(a.world) if a.world else world
     if C.physics_hash(current) != stored["physics_sha256"]:
         sys.exit("the current world's physics differ from the recorded run")
-    if R.code_hashes() != stored["code_sha256"]:
+    now = R.code_hashes()
+    if any(now.get(name) != stored["code_sha256"].get(name) for name in set(now) | set(stored["code_sha256"]) if name not in WORLD_BUILD_FILES):
         sys.exit("highrise5 code differs from the recorded run: record the trial again")
 
     rows, head = read_log(run / "actions.jsonl.gz")

@@ -230,10 +230,12 @@ def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DI
                             shutil.copyfile(stored.parent / "run" / name, campaign / f"w{w['index']:03d}" / "run" / name)
             (tmp / F.PACK5[pack]["file"].name).write_text(base_text)
             public = []
+            with ThreadPoolExecutor(MAX_PUBLIC_REPLAYS) as pool:
+                exported = list(pool.map(lambda w: _export_public(pack, source, w["index"], tmp / "public" / f"w{w['index']:03d}"), target[:MAX_PUBLIC_REPLAYS]))
             for n, w in enumerate(target):
                 stored = F.latest_run5(source, w["index"]) / "job_result.json"
                 entry = _public_world(w, rows[w["index"]], _read(stored) if stored.is_file() else {})
-                entry["replay"] = n < MAX_PUBLIC_REPLAYS and _export_public(pack, source, w["index"], tmp / "public" / f"w{w['index']:03d}")
+                entry["replay"] = n < MAX_PUBLIC_REPLAYS and exported[n]
                 public.append(entry)
             hidden = {"held_back": held_back, "passed_before": passed, "other_failed": other, "plan_sha256": hashlib.sha256((source / "scenarios.json").read_bytes()).hexdigest(), "source": [session, cid, group]}
             fd = os.open(tmp / "hidden.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)

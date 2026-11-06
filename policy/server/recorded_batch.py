@@ -92,6 +92,8 @@ def run_campaign(s, folder):
             if row["status"] in ENDED and not row["held_back"] and row["index"] not in copied and run.exists():
                 shutil.copytree(run, out / run.name, ignore=shutil.ignore_patterns("export", STORED_FIX), dirs_exist_ok=True)
                 _copy_gunzipped(run / "export" / "result.json.gz", out / run.name / "run" / "result.json")
+                if (run / "export" / "qpos.json.gz").exists():  # A posted bounty replays these, to show its public failing worlds.
+                    fill_run(out, folder, s.pack, row["index"])
                 copied.add(row["index"])
         grid = {"type": "grid", "campaign": cid, "pack": s.pack, "running": moment["running"], "elapsed_s": moment["elapsed_s"], "max_procs": moment["max_procs"], "recorded": True, "counts": pack_campaign.count_rows(rows), "rows": rows}
         _publish(s, out, grid)

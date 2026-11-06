@@ -167,6 +167,9 @@ try {
   // Post, then fund with each failure on the way.
   const postS = await postBounty('The robot stops short near the top', 'stalled', 1);
   check('a new bounty says it is not funded', (await text('.list')).includes('Not funded'));
+  const shownWorlds = await c.js(`fetch(${JSON.stringify(`${BOARD}/api/bounties/1`)}).then(r => r.json()).then(b => b.public_worlds.map(w => ({ index: w.index, replay: w.replay })))`);
+  const worldFile = await c.js(`fetch(${JSON.stringify(`${BOARD}/api/bounties/1/public/`)} + ${JSON.stringify(shownWorlds[0]?.index)} + '/world.json').then(r => r.status)`);
+  check('the posted bounty shows its public failing worlds, with replays', shownWorlds.length === 3 && shownWorlds.every(w => w.replay) && worldFile === 200, JSON.stringify(shownWorlds));
   await showChain();
   await shot('not-funded');
   await clearPopups();
