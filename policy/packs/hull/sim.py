@@ -25,19 +25,19 @@ GRID_EVERY = 5  # fouling frames per delta: 10 Hz
 CELL_M = 0.02
 GRID_X = W.PLATE_X
 GRID_Y = W.PLATE_Y
-# Friction, wheel on steel.
+# Friction, track shoe on steel.
 MU_PAINT = 0.55
 MU_SLIME = 0.25
 MU_BARNACLE = 0.40
 # Fouling thickness added to the magnet gap.
 SLIME_GAP_M = 0.001
 BARNACLE_GAP_M = 0.005
-# Bristles.
-BRISTLE_K = 4000.0  # N/m of tip compression, per disc
+# Bristles on the drum.
+BRISTLE_K = 8000.0  # N/m of tip compression, over the drum's width
 BRISTLE_MU = 0.25
-BRISTLE_LOAD_NM = (0.4, 1.8)  # dry-running torque and extra at full fouling, per disc
-SLIME_RATE = 8.0  # 1/s, exponential
-BARNACLE_RATE = 3.0  # level/s, linear
+BRISTLE_LOAD_NM = (1.0, 3.0)  # dry-running torque and extra at full fouling
+SLIME_RATE = 16.0  # 1/s, exponential
+BARNACLE_RATE = 7.0  # level/s, linear
 NOMINAL_COMPRESSION_M = 0.012
 CLEAN_LEVEL = 0.15
 # Tether.
@@ -46,12 +46,12 @@ TETHER_EXPOSED_M = 6.0
 TETHER_D_M = 0.016
 TETHER_CD = 1.2
 TETHER_ANCHOR = (3.0, -25.0, -6.0)
-TETHER_LOCAL = (-0.30, 0.0, -0.02)
+TETHER_LOCAL = (-0.31, 0.0, -0.03)
 # Sensors.
 FIX_HZ = 5
 FIX_NOISE_M = 0.02
 HEADING_NOISE_RAD = 0.005
-# Detach: every wheel this far from the plate, held.
+# Detach: every contact point this far from the plate, held.
 DETACH_GAP_M = 0.04
 DETACH_HOLD_S = 0.2
 AFTER_DETACH_S = 3.0
@@ -127,13 +127,14 @@ class Sim:
         geom = lambda n: mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_GEOM, n)
         joint = lambda n: mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_JOINT, n)
         self.chassis = body("chassis")
-        self.wheels = [body(n) for n in M.WHEELS]
-        self.wheel_geoms = [geom(n) for n in M.WHEELS]
-        self.brushes = [body(n) for n in M.BRUSHES]
+        self.rollers = [body(n) for n in (*M.LEFT, *M.RIGHT)]
+        self.roller_geoms = [geom(n) for n in (*M.LEFT, *M.RIGHT)]
+        self.drum = body(M.DRUM)
         self.bodies = [body(n) for n in M.BODIES]
-        self.wheel_dof = [self.m.jnt_dofadr[joint(n)] for n in M.WHEELS]
-        self.driven_dof = [self.m.jnt_dofadr[joint(n)] for n in M.DRIVEN]
-        self.brush_dof = [self.m.jnt_dofadr[joint(n)] for n in M.BRUSHES]
+        self.roller_dof = [self.m.jnt_dofadr[joint(n)] for n in (*M.LEFT, *M.RIGHT)]
+        self.roller_qpos = [self.m.jnt_qposadr[joint(n)] for n in (*M.LEFT, *M.RIGHT)]
+        self.spring_qpos = [self.m.jnt_qposadr[joint(n + "_s")] for n in (*M.LEFT, *M.RIGHT)]
+        self.drum_dof = self.m.jnt_dofadr[joint(M.DRUM)]
         self.buoyancy = world["water"]["density"] * M.VOLUME_M3 * GRAVITY
         c = world["current"]
         a = math.radians(c["dir_deg"])
@@ -142,11 +143,12 @@ class Sim:
         self.tether_q = 0.5 * world["water"]["density"] * TETHER_CD * TETHER_D_M * TETHER_EXPOSED_M
         self.mag = world["magnet"]
         self.controller = C.Lawnmower(world["patch"], M.start_pose(world))
-        self.gaps = np.zeros(4)
-        self.mag_n = np.zeros(4)
-        self.mu = np.full(4, MU_PAINT)
-        self.touch = np.zeros(2)
-        self.removed = np.zeros(2)
+        n = len(self.rollers)
+        self.gaps = np.zeros(n)
+        self.mag_n = np.zeros(n)
+        self.mu = np.full(n, MU_PAINT)
+        self.touch = 0.0
+        self.removed = 0.0
         self.fix = None
         self.steps = 0
         self.cmd = (0.0, 0.0, 0.0)
@@ -160,40 +162,40 @@ class Sim:
         d = self.d
         d.xfrc_applied[:] = 0.0
         d.qfrc_applied[:] = 0.0
-        # Magnets: along the hull normal at each wheel, with an air-gap falloff and the fouling under the wheel in the gap.
-        for i, b in enumerate(self.wheels):
+        # Magnets: each track's force shared along its contact points, with an air-gap falloff and the fouling under the point in the gap.
+        share = self.mag["force_n"] / M.ROLLERS
+        for i, b in enumerate(self.rollers):
             p = d.xpos[b]
             iy, ix = self._cell(p[0], p[1])
             s, br = float(self.slime[iy, ix]), float(self.barn[iy, ix])
-            gap = max(0.0, -(p[2] + M.WHEEL_R))
+            gap = max(0.0, -(p[2] + M.ROLLER_R))
             total = gap + SLIME_GAP_M * s + BARNACLE_GAP_M * br
-            f = self.mag["force_n"] * (1.0 if i < 2 else self.mag["rear_fraction"]) / (1.0 + total / self.mag["gap_scale_m"]) ** 2
+            f = share / (1.0 + total / self.mag["gap_scale_m"]) ** 2
             self.gaps[i], self.mag_n[i] = gap, f
             d.xfrc_applied[b, 2] += f
             mu = (MU_PAINT * (1 - s) + MU_SLIME * s) * (1 - br) + MU_BARNACLE * br
             self.mu[i] = mu
-            self.m.geom_friction[self.wheel_geoms[i], 0] = mu
-        # Bristle preload and drag, per disc.
-        for i, b in enumerate(self.brushes):
-            p, R = d.xpos[b], d.xmat[b].reshape(3, 3)
-            tip = p + R[:, 2] * (M.BRISTLE_TIP_Z - M.BRUSH_Z)
-            iy, ix = self._cell(p[0], p[1])
-            comp = max(0.0, tip[2] + self.seam_h[iy, ix])
-            f = BRISTLE_K * comp
-            self.touch[i] = comp
-            d.xfrc_applied[b, 2] -= f
-            vel = np.zeros(6)
-            mujoco.mj_objectVelocity(self.m, d, mujoco.mjtObj.mjOBJ_BODY, b, vel, 0)
-            speed = math.hypot(vel[3], vel[4])
-            if speed > 1e-3:
-                d.xfrc_applied[b, 0] -= BRISTLE_MU * f * vel[3] / speed
-                d.xfrc_applied[b, 1] -= BRISTLE_MU * f * vel[4] / speed
-            iy0, ix0 = iy, ix
-            win = int(M.BRUSH_R / CELL_M)
-            level = 0.5 * float(self.slime[iy0, ix0]) + 0.5 * float(self.barn[iy0, ix0])
-            load = BRISTLE_LOAD_NM[0] + BRISTLE_LOAD_NM[1] * level if comp > 0 else 0.0
-            w = d.qvel[self.brush_dof[i]]
-            d.qfrc_applied[self.brush_dof[i]] = -math.copysign(min(1.0, abs(w) / 0.5) * load, w)
+            self.m.geom_friction[self.roller_geoms[i], 0] = mu
+        # Bristle preload and drag, from the tip circle's reach at three points along the drum.
+        p, R_d = d.xpos[self.drum], d.xmat[self.chassis].reshape(3, 3)
+        comp_sum, level = 0.0, 0.0
+        for off in (-0.16, 0.0, 0.16):
+            q = p + R_d[:, 1] * off
+            iy, ix = self._cell(q[0], q[1])
+            comp_sum += max(0.0, q[2] + M.DRUM_TIP_R + float(self.seam_h[iy, ix]))
+            level += 0.5 * float(self.slime[iy, ix]) + 0.5 * float(self.barn[iy, ix])
+        comp = comp_sum / 3.0
+        f = BRISTLE_K * comp
+        self.touch = comp
+        d.xfrc_applied[self.drum, 2] -= f
+        w = d.qvel[self.drum_dof]
+        # The rim runs faster than the robot, so bristle friction on the plate pulls against the rim's direction.
+        drag = BRISTLE_MU * f * min(1.0, abs(w) / 2.0)
+        sign = math.copysign(1.0, w)
+        d.xfrc_applied[self.drum, 0] -= sign * drag * R_d[0, 0]
+        d.xfrc_applied[self.drum, 1] -= sign * drag * R_d[1, 0]
+        load = BRISTLE_LOAD_NM[0] + BRISTLE_LOAD_NM[1] * level / 3.0 + drag * M.DRUM_TIP_R if comp > 0 else 0.0
+        d.qfrc_applied[self.drum_dof] = -math.copysign(min(1.0, abs(w) / 0.5) * load, w)
         # Buoyancy at the centre of buoyancy; tether pull at the rear boot.
         R = d.xmat[self.chassis].reshape(3, 3)
         cob = d.xpos[self.chassis] + R @ np.array(M.BUOY_LOCAL)
@@ -206,34 +208,31 @@ class Sim:
         mujoco.mj_applyFT(self.m, d, pull, np.zeros(3), boot, self.chassis, d.qfrc_applied)
 
     def _clean(self, dt):
-        """Removes fouling only at cells whose bristle tips reach the steel, from each disc's tilted tip plane."""
+        """Removes fouling only at cells inside the drum's rectangle where the bristle circle reaches the steel."""
         d = self.d
-        self.removed[:] = 0.0
-        touched = []
-        for i, b in enumerate(self.brushes):
-            p, R = d.xpos[b], d.xmat[b].reshape(3, 3)
-            n = R[:, 2]
-            c = p + n * (M.BRISTLE_TIP_Z - M.BRUSH_Z)
-            ix0 = np.searchsorted(self.xs, c[0] - M.BRUSH_R)
-            ix1 = np.searchsorted(self.xs, c[0] + M.BRUSH_R)
-            iy0 = np.searchsorted(self.ys, c[1] - M.BRUSH_R)
-            iy1 = np.searchsorted(self.ys, c[1] + M.BRUSH_R)
-            if ix1 <= ix0 or iy1 <= iy0:
-                continue
-            xx = self.xs[ix0:ix1][None, :] - c[0]
-            yy = self.ys[iy0:iy1][:, None] - c[1]
-            inside = xx * xx + yy * yy <= M.BRUSH_R ** 2
-            tip_z = c[2] - (n[0] * xx + n[1] * yy) / max(n[2], 0.2)
-            comp = tip_z + self.seam_h[iy0:iy1, ix0:ix1]
-            rate = np.clip(comp / NOMINAL_COMPRESSION_M, 0, 1) * inside * min(1.0, abs(d.qvel[self.brush_dof[i]]) / C.BRUSH_RATE)
-            s, br = self.slime[iy0:iy1, ix0:ix1], self.barn[iy0:iy1, ix0:ix1]
-            ds = s * (1.0 - np.exp(-SLIME_RATE * rate * dt))
-            db = np.minimum(br, BARNACLE_RATE * rate * dt)
-            self.removed[i] = float(ds.sum() + db.sum())
-            s -= ds.astype(np.float32)
-            br -= db.astype(np.float32)
-            touched.append((iy0, iy1, ix0, ix1))
-        return touched
+        p, R_d = d.xpos[self.drum], d.xmat[self.chassis].reshape(3, 3)
+        fwd, axis, up = R_d[:, 0], R_d[:, 1], R_d[:, 2]
+        reach = math.hypot(M.DRUM_HALF_W, M.DRUM_TIP_R) + CELL_M
+        ix0, ix1 = np.searchsorted(self.xs, p[0] - reach), np.searchsorted(self.xs, p[0] + reach)
+        iy0, iy1 = np.searchsorted(self.ys, p[1] - reach), np.searchsorted(self.ys, p[1] + reach)
+        self.removed = 0.0
+        if ix1 <= ix0 or iy1 <= iy0:
+            return
+        h = self.seam_h[iy0:iy1, ix0:ix1]
+        dx = self.xs[ix0:ix1][None, :] - p[0]
+        dy = self.ys[iy0:iy1][:, None] - p[1]
+        dz = -h - p[2]
+        xd = fwd[0] * dx + fwd[1] * dy + fwd[2] * dz
+        yd = axis[0] * dx + axis[1] * dy + axis[2] * dz
+        zd = up[0] * dx + up[1] * dy + up[2] * dz
+        comp = M.DRUM_TIP_R - np.sqrt(xd * xd + zd * zd)
+        rate = np.clip(comp / NOMINAL_COMPRESSION_M, 0, 1) * (np.abs(yd) <= M.DRUM_HALF_W) * min(1.0, abs(d.qvel[self.drum_dof]) / C.BRUSH_RATE)
+        s, br = self.slime[iy0:iy1, ix0:ix1], self.barn[iy0:iy1, ix0:ix1]
+        ds = s * (1.0 - np.exp(-SLIME_RATE * rate * dt))
+        db = np.minimum(br, BARNACLE_RATE * rate * dt)
+        self.removed = float(ds.sum() + db.sum())
+        s -= ds.astype(np.float32)
+        br -= db.astype(np.float32)
 
     def _obs(self):
         d = self.d
@@ -242,14 +241,15 @@ class Sim:
         fix = None
         if self.steps % int(1 / (M.TIMESTEP * FIX_HZ)) == 0:
             fix = (d.xpos[self.chassis][0] + float(self.rng.normal(0, FIX_NOISE_M)), d.xpos[self.chassis][1] + float(self.rng.normal(0, FIX_NOISE_M)))
-        return {"heading": heading, "fix": fix, "wheel_rate": [float(d.qvel[a]) for a in self.driven_dof]}
+        return {"heading": heading, "fix": fix, "track_rate": [float(np.mean([d.qvel[a] for a in self.roller_dof[:M.ROLLERS]])), float(np.mean([d.qvel[a] for a in self.roller_dof[M.ROLLERS:]]))]}
 
     def control(self):
         dt = M.TIMESTEP * CONTROL_EVERY
         vl, vr, brush = self.controller.command(self._obs(), dt)
         self.cmd = (vl, vr, brush)
-        self.d.ctrl[0], self.d.ctrl[1] = vl / M.WHEEL_R, vr / M.WHEEL_R
-        self.d.ctrl[2], self.d.ctrl[3] = brush, -brush
+        self.d.ctrl[:M.ROLLERS] = vl / M.ROLLER_R
+        self.d.ctrl[M.ROLLERS:2 * M.ROLLERS] = vr / M.ROLLER_R
+        self.d.ctrl[2 * M.ROLLERS] = brush
 
     def step(self):
         if self.steps % CONTROL_EVERY == 0:
@@ -267,7 +267,7 @@ def run(world, *, seed=0, out=None):
     world = W.validate(world)
     sim = Sim(world, seed)
     d = sim.d
-    log = {k: [] for k in ("t", "body_q", "wheel_rate", "brush_rate", "gap", "magnet_n", "mu", "chassis_vel", "touch", "removed")}
+    log = {k: [] for k in ("t", "body_q", "track_speed", "track_travel", "spring", "drum_rate", "gap", "magnet_n", "mu", "chassis_vel", "touch", "removed")}
     q8 = lambda a: np.round(np.clip(a, 0, 1) * 255).astype(np.uint8)
     last_s, last_b = q8(sim.slime), q8(sim.barn)
     delta_frame, delta_cell, delta_s, delta_b, delta_t = [], [], [], [], []
@@ -301,14 +301,18 @@ def run(world, *, seed=0, out=None):
             q[:, :3] = d.xpos[sim.bodies]
             q[:, 3:6], q[:, 6] = d.xquat[sim.bodies][:, 1:], d.xquat[sim.bodies][:, 0]
             log["body_q"].append(q)
-            log["wheel_rate"].append([d.qvel[a] for a in sim.wheel_dof])
-            log["brush_rate"].append([d.qvel[a] for a in sim.brush_dof])
+            rates = np.array([d.qvel[a] for a in sim.roller_dof]) * M.ROLLER_R
+            angles = np.array([d.qpos[a] for a in sim.roller_qpos]) * M.ROLLER_R
+            log["track_speed"].append((rates[:M.ROLLERS].mean(), rates[M.ROLLERS:].mean()))
+            log["track_travel"].append((angles[:M.ROLLERS].mean(), angles[M.ROLLERS:].mean()))
+            log["spring"].append([d.qpos[a] for a in sim.spring_qpos])
+            log["drum_rate"].append(d.qvel[sim.drum_dof])
             log["gap"].append(sim.gaps.copy())
             log["magnet_n"].append(sim.mag_n.copy())
             log["mu"].append(sim.mu.copy())
             log["chassis_vel"].append(d.qvel[:6].copy())
-            log["touch"].append(sim.touch.copy())
-            log["removed"].append(sim.removed.copy())
+            log["touch"].append(sim.touch)
+            log["removed"].append(sim.removed)
         if (sim.gaps > DETACH_GAP_M).all():
             held_from = sim.t if held_from is None else held_from
             if detached_t is None and sim.t - held_from >= DETACH_HOLD_S:
@@ -322,6 +326,7 @@ def run(world, *, seed=0, out=None):
     wall = time.perf_counter() - started
     rec = {
         "t": np.asarray(log["t"], np.float64),
+        "track_travel": np.asarray(log["track_travel"], np.float64),
         "body_q": np.asarray(log["body_q"], np.float32),
         "sim_failed": np.array(sim_failed),
         "fouling0_slime": q8(sim.slime0),
@@ -331,7 +336,7 @@ def run(world, *, seed=0, out=None):
         "delta_cell": np.concatenate(delta_cell) if delta_cell else np.zeros(0, np.int32),
         "delta_slime": np.concatenate(delta_s) if delta_s else np.zeros(0, np.uint8),
         "delta_barnacle": np.concatenate(delta_b) if delta_b else np.zeros(0, np.uint8),
-        **{k: np.asarray(log[k], np.float32) for k in ("wheel_rate", "brush_rate", "gap", "magnet_n", "mu", "chassis_vel", "touch", "removed")},
+        **{k: np.asarray(log[k], np.float32) for k in ("track_speed", "spring", "drum_rate", "gap", "magnet_n", "mu", "chassis_vel", "touch", "removed")},
     }
     meta = {
         "label": code_label(), "note": NOTE, "robot": "hull_crawler", "world": world, "physics_hash": W.physics_hash(world), "seed": seed, "sim_failed": sim_failed, "body_labels": list(M.BODIES),

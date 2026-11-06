@@ -1,6 +1,7 @@
-"""A scripted lawnmower for the crawler. It sees Sim.obs only: a noisy position fix, a noisy heading and wheel encoders. It never sees the fouling.
+"""A scripted lawnmower for the crawler. It sees Sim.obs only: a noisy position fix, a noisy heading and track encoders. It never sees the fouling.
 
-Lanes run along x. At a lane's end the robot pivots, shifts one lane spacing, pivots, backs up so that the brushes start at the patch edge, then cleans.
+Lanes run along x. At a lane's end the robot pivots on its tracks, drives to the next lane, pivots, backs up so that the drum starts short of the patch edge, then cleans.
+A track pivot scrubs and slides, so each leg steers toward its target point rather than trusting the turn.
 """
 import math
 
@@ -19,7 +20,8 @@ ACCEL = 0.3  # m/s2
 POS_BLEND = 0.15  # weight of each position fix against odometry
 ARRIVE_M = 0.015
 PIVOT_DONE_RAD = 0.02
-BRUSH_RATE = 18.85  # rad/s, 180 rpm
+BRUSH_RATE = 31.4  # rad/s, 300 rpm
+BACKUP_LEAD_M = 0.45  # past the patch edge, so that the lane error settles before the drum arrives
 SETTLE_S = 2.0
 
 
@@ -29,7 +31,6 @@ def wrap(a):
 
 class Lawnmower:
     def __init__(self, patch, start):
-        self.reach = M.BRUSH_X + OVERRUN_M
         n = max(1, math.ceil((patch["y1"] - patch["y0"]) / LANE_SPACING - 1e-9))
         self.lanes = [patch["y0"] + 0.2 + i * LANE_SPACING for i in range(n)]
         self.x0, self.x1 = patch["x0"], patch["x1"]
@@ -40,12 +41,13 @@ class Lawnmower:
         self.v = 0.0
         self.t = 0.0
         self.done_t = None
+        self.turn_x = 0.0
 
     def _direction(self):
         return 1 if self.k % 2 == 0 else -1
 
     def _odometry(self, obs, dt):
-        v = sum(obs["wheel_rate"]) / 2 * M.WHEEL_R
+        v = sum(obs["track_rate"]) / 2 * M.ROLLER_R
         self.est[0] += v * math.cos(obs["heading"]) * dt
         self.est[1] += v * math.sin(obs["heading"]) * dt
         if obs["fix"] is not None:
@@ -63,7 +65,7 @@ class Lawnmower:
         return HEADING_GAIN * wrap(self.heading_ref + sign * steer - heading)
 
     def command(self, obs, dt):
-        """Returns (left wheel speed, right wheel speed, brush rate), speeds in m/s at the rim."""
+        """Returns (left track speed, right track speed, drum rate), speeds in m/s at the rim."""
         self.t += dt
         self._odometry(obs, dt)
         h = obs["heading"]
@@ -74,7 +76,7 @@ class Lawnmower:
         if self.state == "clean":
             self.heading_ref = 0.0 if d > 0 else math.pi
             lane = self.lanes[self.k]
-            end = self.x1 - M.BRUSH_X + OVERRUN_M + M.BRUSH_R if d > 0 else self.x0 + M.BRUSH_X - OVERRUN_M - M.BRUSH_R
+            end = self.x1 - M.DRUM_X + OVERRUN_M if d > 0 else self.x0 + M.DRUM_X - OVERRUN_M
             left = (end - x) * d
             target = min(CLEAN_SPEED, max(0.03, left * 1.2))
             v = self._ramp(target, dt)
@@ -87,6 +89,7 @@ class Lawnmower:
                 else:
                     self.state = "pivot1"
                     self.heading_ref = math.pi / 2
+                    self.turn_x = end
         elif self.state == "pivot1":
             e = wrap(self.heading_ref - h)
             w = max(-PIVOT_RATE, min(PIVOT_RATE, 2.0 * e))
@@ -96,7 +99,7 @@ class Lawnmower:
             lane = self.lanes[self.k + 1]
             left = lane - y
             v = self._ramp(min(SHIFT_SPEED, max(0.03, left * 1.2)), dt)
-            w = HEADING_GAIN * wrap(self.heading_ref - h)
+            w = HEADING_GAIN * wrap(math.pi / 2 + max(-LANE_STEER_LIMIT, min(LANE_STEER_LIMIT, LANE_GAIN * (self.turn_x - x))) - h)
             if left < ARRIVE_M:
                 self.v = 0.0
                 self.k += 1
@@ -109,16 +112,16 @@ class Lawnmower:
                 self.state = "backup"
         elif self.state == "backup":
             lane = self.lanes[self.k]
-            back_to = self.x0 - self.reach - M.BRUSH_R if d > 0 else self.x1 + self.reach + M.BRUSH_R
+            back_to = self.x0 - M.DRUM_X - BACKUP_LEAD_M if d > 0 else self.x1 + M.DRUM_X + BACKUP_LEAD_M
             left = (x - back_to) * d
             v = -self._ramp(min(BACKUP_SPEED, max(0.03, left * 1.2)), dt)
-            w = self._hold_line(h, x, (lane - y) * -d, -1)
+            w = self._hold_line(h, x, (lane - y) * -d, 1)
             if left < ARRIVE_M:
                 self.v = 0.0
                 self.state = "clean"
         else:
             brush = 0.0
-        half = M.WHEEL_Y
+        half = M.TRACK_Y
         return v - w * half, v + w * half, brush
 
     @property

@@ -7,7 +7,7 @@ from . import sim as S
 
 MIN_COVERAGE = 0.90
 MAX_LANE_ERROR_M = 0.15
-MAX_WHEEL_SLIP = 0.25  # 95th percentile on straight runs
+MAX_TRACK_SLIP = 0.25  # 95th percentile on straight runs
 STUCK_WINDOW_S = 10.0
 STUCK_TRAVEL_M = 0.02
 CRUISE_MIN_MS = 0.1
@@ -33,7 +33,7 @@ def judge(rec, world):
     vel = rec["chassis_vel"].astype(np.float64)
     along = vel[:, 0] * np.cos(heading) + vel[:, 1] * np.sin(heading)
     lateral = -vel[:, 0] * np.sin(heading) + vel[:, 1] * np.cos(heading)
-    rim = rec["wheel_rate"][:, :2].astype(np.float64) * M.WHEEL_R  # the driven pair
+    rim = rec["track_speed"].astype(np.float64)
     straight = (np.abs(vel[:, 5]) < 0.05) & (np.abs(rim).mean(axis=1) > CRUISE_MIN_MS)
     slip = np.abs(rim - along[:, None]) / np.maximum(np.abs(rim), 0.05)
     slip_p95 = float(np.percentile(slip[straight], 95)) if straight.any() else 1.0
@@ -56,10 +56,19 @@ def judge(rec, world):
     stuck_t = None
     if len(t) > window:
         moved = np.linalg.norm(xy[window:] - xy[:-window], axis=1)
-        spinning = np.abs(rec["wheel_rate"][window:, :2]).max(axis=1) * M.WHEEL_R > 0.05
+        spinning = np.abs(rec["track_speed"][window:]).max(axis=1) > 0.05
         hits = np.flatnonzero((moved < STUCK_TRAVEL_M) & spinning)
         if len(hits):
             stuck_t = float(t[hits[0]])
+
+    # Pivots: yaw without travel. How long each takes and how far the scrubbing tracks let the robot slide.
+    pivoting = (np.abs(vel[:, 5]) > 0.05) & (np.abs(rim.mean(axis=1)) < 0.02) & (np.abs(rim[:, 0] - rim[:, 1]) > 0.02)
+    edges = np.flatnonzero(np.diff(np.concatenate(([0], pivoting.astype(int), [0]))))
+    spans = [(a, b) for a, b in zip(edges[::2], edges[1::2]) if t[b - 1] - t[a] > 1.0]
+    pivot_s = [float(t[b - 1] - t[a]) for a, b in spans]
+    pivot_m = [float(np.linalg.norm(xy[b - 1] - xy[a])) for a, b in spans]
+    pivot_rate = [float(np.abs(vel[a:b, 5]).mean()) for a, b in spans]
+    ideal_rate = [float(np.abs(rim[a:b, 1] - rim[a:b, 0]).mean() / (2 * M.TRACK_Y)) for a, b in spans]
 
     cov = coverage(rec, world)
     limit = float(world["time_limit_s"])
@@ -68,21 +77,21 @@ def judge(rec, world):
     if sim_failed:
         verdict, reason = "sim_failed", "The physics blew up, so this run says nothing about the robot."
     elif detach_t is not None:
-        verdict, reason = "detached", f"All four wheels left the plate at {detach_t:.1f} s, at x {xy[int(detach_t / dt), 0]:.2f} m, y {xy[int(detach_t / dt), 1]:.2f} m. Coverage reached {cov:.0%}."
+        verdict, reason = "detached", f"Both tracks left the plate at {detach_t:.1f} s, at x {xy[int(detach_t / dt), 0]:.2f} m, y {xy[int(detach_t / dt), 1]:.2f} m. Coverage reached {cov:.0%}."
     elif stuck_t is not None:
-        verdict, reason = "stuck", f"The wheels turned but the robot stopped moving at {stuck_t:.1f} s, at x {xy[int(stuck_t / dt), 0]:.2f} m. Coverage reached {cov:.0%}."
+        verdict, reason = "stuck", f"The tracks turned but the robot stopped moving at {stuck_t:.1f} s, at x {xy[int(stuck_t / dt), 0]:.2f} m. Coverage reached {cov:.0%}."
     elif not finished:
         verdict, reason = "timed_out", f"The lanes were not done after {limit:.0f} s. Coverage reached {cov:.0%}."
     elif lane_max > MAX_LANE_ERROR_M:
         verdict, reason = "off_lane", f"The robot strayed {lane_max:.2f} m off its lane. The limit is {MAX_LANE_ERROR_M:.2f} m. Coverage reached {cov:.0%}."
-    elif slip_p95 > MAX_WHEEL_SLIP:
-        verdict, reason = "slipping", f"Wheel slip on straight runs reached {slip_p95:.0%} at the 95th percentile. The limit is {MAX_WHEEL_SLIP:.0%}."
+    elif slip_p95 > MAX_TRACK_SLIP:
+        verdict, reason = "slipping", f"Track slip on straight runs reached {slip_p95:.0%} at the 95th percentile. The limit is {MAX_TRACK_SLIP:.0%}."
     elif cov < MIN_COVERAGE:
         verdict, reason = "low_coverage", f"Coverage was {cov:.1%}. The limit is {MIN_COVERAGE:.0%}."
     else:
-        verdict, reason = "passed", f"The robot cleaned {cov:.1%} of the patch in {float(t[-1]):.0f} s and kept all wheels on the plate."
+        verdict, reason = "passed", f"The robot cleaned {cov:.1%} of the patch in {float(t[-1]):.0f} s and kept both tracks on the plate."
     return {
-        "verdict": verdict, "passed": verdict == "passed", "reason": reason, "coverage": round(cov, 4), "wheel_slip_mean": round(slip_mean, 4), "wheel_slip_p95": round(slip_p95, 4),
-        "crab_p95_ms": round(crab, 4), "detached": detach_t is not None, "detach_t_s": detach_t, "stuck_t_s": stuck_t, "lane_error_max_m": round(lane_max, 4), "gap_max_m": round(float(gaps.max()), 4),
+        "verdict": verdict, "passed": verdict == "passed", "reason": reason, "coverage": round(cov, 4), "track_slip_mean": round(slip_mean, 4), "track_slip_p95": round(slip_p95, 4),
+        "crab_p95_ms": round(crab, 4), "detached": detach_t is not None, "detach_t_s": detach_t, "stuck_t_s": stuck_t, "lane_error_max_m": round(lane_max, 4), "gap_max_m": round(float(gaps.max()), 4), "pivots": len(spans), "pivot_s_mean": round(float(np.mean(pivot_s)), 2) if spans else None, "pivot_slide_m_mean": round(float(np.mean(pivot_m)), 3) if spans else None, "pivot_slide_m_max": round(float(np.max(pivot_m)), 3) if spans else None, "pivot_yaw_rate_mean": round(float(np.mean(pivot_rate)), 3) if spans else None, "pivot_yaw_rate_no_scrub": round(float(np.mean(ideal_rate)), 3) if spans else None,
         "magnet_min_total_n": round(float(rec["magnet_n"].sum(axis=1).min()), 1), "time_s": round(float(t[-1]), 2), "simulated": True,
     }
