@@ -74,7 +74,7 @@ Stored in the event list, like any event.
 
 ## `grid` event
 
-It arrives on the normal event stream as a plain `data:` message with `"type": "grid"`, at 1 Hz. **It has no `id:` line** and stays out of the stored event list, so a reconnect gets only the latest grid, and `?after=` is unaffected. Each one is the full state, so a missed one costs nothing.
+It arrives on the normal event stream as a plain `data:` message with `"type": "grid"`, at 1 Hz. **It has no `id:` line** and stays out of the stored event list, so a reconnect gets only the latest grid, and `?after=` is unaffected. Each one is the full state, so a missed one costs nothing. Check `type === 'grid'` before you read `lastEventId`: `src/app/chat/live.ts` turns an empty one into 0, which is wrong if a grid were the first message on a stream.
 
 ```json
 {"type": "grid", "campaign": "c1", "pack": "window", "running": true, "elapsed_s": 41.2, "max_procs": 8,

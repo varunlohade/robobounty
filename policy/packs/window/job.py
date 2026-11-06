@@ -62,7 +62,7 @@ def code_line(result, folder):
     phase = rows[min(int(first["t"] * P.R.S.CONTROL_HZ), len(rows) - 1)][trace["columns"].index("phase")]
     path = Path(P.controller_files()[0])
     for number, line in enumerate(path.read_text().splitlines(), 1):
-        if re.search(rf'self\.phase (==|in) .*"{phase}"', line):
+        if re.fullmatch(rf'\s*(el)?if self\.phase == "{phase}":', line):
             return {"file": f"policy/highrise5/{path.name}", "line": number, "why": f"The controller was in its {phase} phase when the judge fired.", "traced": False}
     return None
 
