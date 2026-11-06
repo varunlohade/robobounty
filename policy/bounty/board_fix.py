@@ -170,6 +170,8 @@ def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DI
     held_back = [w for w in plan["worlds"] if w["held_back"]]
     passed = [w for w in plan["worlds"] if not w["held_back"] and rows[w["index"]]["status"] in ("passed", "held")]
     other = [w for w in plan["worlds"] if not w["held_back"] and w not in target and w not in passed]
+    if (source / "zg_evidence.json").is_file():
+        raise B.BoardError("campaign_published", "This campaign's passed worlds are already public on 0G Storage, so they cannot stay hidden in a bounty. Post the bounty first, then upload.")
     if not held_back:
         raise B.BoardError("no_hidden_worlds", "This campaign has no held-back worlds, so a fix could not be proved on worlds it never saw.")
     session_copy = source.parent.parent / "code" / F.PACK5[pack]["file"].name
@@ -253,7 +255,7 @@ def view(bounty_id, root=B.ROOT):
     won = next((f for f in book.failures.values() if f["status"] != "Rejected"), None)
     return {**info, "status": won["status"].lower() if won else "open", "spec_hash": money["spec_hash"], "per_failure": money["per_failure"], "available": money["available"], "dispute_window_s": money["dispute_window_s"],
             "unit": "test units", "failures": book.failures, "balance": B._balance(money, book.failures, [r for r in rows if r.get("payout")]), "submissions": len(rows), "checking": sum(r["state"] in ("queued", "running", "awaiting_company") for r in rows), "now": time.time(),
-            "ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL, "sim_label": SIM_LABEL, "sandbox_label": SANDBOX_LABEL, "chain_mirror": _mirror_of(folder)}
+            "ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL, "sim_label": SIM_LABEL, "sandbox_label": SANDBOX_LABEL, "chain_mirror": _mirror_of(folder), "evidence": _evidence_of(folder)}
 
 
 def _mirror_of(folder):
@@ -261,7 +263,13 @@ def _mirror_of(folder):
     if not path.is_file():
         return None
     saved = _read(path)
-    return {k: saved[k] for k in ("label", "chain_id", "txs", "fingerprint", "balances_after_claim")}
+    return {k: saved.get(k) for k in ("label", "chain_id", "txs", "tx_links", "fingerprint", "balances_after_claim", "contract", "chain_bounty", "state", "paid", "message", "dispute_ends_at", "pay_base_units")}
+
+
+def _evidence_of(folder):
+    """The root hash of this bounty's public evidence on 0G Storage, if someone uploaded it. policy/crashlab/zg_storage.py writes the file."""
+    path = folder / "zg_evidence.json"
+    return _read(path) if path.is_file() else None
 
 
 def list_views(root=B.ROOT):

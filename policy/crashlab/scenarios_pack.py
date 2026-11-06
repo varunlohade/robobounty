@@ -230,8 +230,7 @@ def run(req):
             if os.environ.get("CRASHLAB_RECORDED_REPLIES") and not os.environ.get("CRASHLAB_LIVE_ROUTE"):
                 raw = stored_reply(pack)
             else:
-                os.environ["CRASHLAB_LLM"] = "claude"
-                os.environ["CRASHLAB_LLM_MODEL"] = MODEL
+                llm.use_model(MODEL)
                 llm.TIMEOUT_S, llm.MAX_BUDGET_USD = AI_TIMEOUT_S, AI_BUDGET_USD
                 raw = llm.complete_json(prompt(info, req["world"], req.get("words"), limits), reply_schema([row["name"] for row in _physics_functions(info["catalog"])]))
         report["llm_reply"] = raw

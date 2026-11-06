@@ -107,8 +107,7 @@ def agent(req):
             return {"ok": False, "rejection": "llm_no_stored_reply", "seconds": 0.0}
         rounds = stored[req["text"]]
         return {"ok": True, "reply": rounds[req["round"] - 1] if req["round"] <= len(rounds) else {"calls": [], "say": ""}, "seconds": 0.0}
-    os.environ["CRASHLAB_LLM"] = "claude"
-    os.environ["CRASHLAB_LLM_MODEL"] = req["model"]
+    llm.use_model(req["model"])
     llm.TIMEOUT_S = AGENT_TIMEOUT_S
     try:
         raw = llm.complete_json(req["prompt"], req["schema"])
@@ -172,6 +171,8 @@ def main():
             llm.BACKENDS["recorded"] = _recorded
             os.environ["CRASHLAB_LLM"] = "recorded"
         reply = {"plan": plan, "build": build, "scenarios": propose, "route": route, "agent": agent, "scenarios_pack": scenarios_pack.run}[sys.argv[1]](req)
+        if llm.CALLS and isinstance(reply, dict):
+            reply["llm_calls"] = llm.CALLS
     json.dump(reply, sys.stdout, allow_nan=False)
 
 

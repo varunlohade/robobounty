@@ -98,8 +98,7 @@ def reply_schema():
 
 
 def _complete(prompt, schema):
-    os.environ["CRASHLAB_LLM"] = "claude"
-    os.environ["CRASHLAB_LLM_MODEL"] = MODEL
+    llm.use_model(MODEL)
     return llm.complete_json(prompt, schema)
 
 

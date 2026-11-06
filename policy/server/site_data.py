@@ -143,7 +143,7 @@ def demo_campaign(pack):
                      "replay": (f"lab.html?trial=demo-window-{name}" if pack == "window" and (folder / name / "export" / "manifest.json.gz").exists() else
                                 f"lab.html?poses=/site-api/replay/inspection/{name}" if pack == "inspection" and (folder / name / "replay.json.gz").exists() else None)})
     return {"id": f"demo-{pack}", "label": f"{ROBOTS[pack]} batch", "robot": ROBOTS[pack], "pack": pack, "sim": short(last.get("label")), "source": f"policy/runs/demo/{pack}", "kind": "rows",
-            "note": NOTES[pack], "held_back": plan.get("held_back", 0), "recorded": True, "at": (folder / "timeline.json.gz").stat().st_mtime, **tally(rows), "worlds": rows, "coverage": coverage_of(pack, plan, last["rows"])}
+            "note": NOTES[pack], "held_back": plan.get("held_back", 0), "recorded": True, "at": (folder / "timeline.json.gz").stat().st_mtime, "evidence": json_or(folder / "zg_evidence.json"), **tally(rows), "worlds": rows, "coverage": coverage_of(pack, plan, last["rows"])}
 
 
 def evidence_campaigns():
@@ -202,7 +202,7 @@ def session_campaigns():
             continue
         job = next(iter(sorted(path.parent.glob("w*/job_result.json"))), None)
         out.append({"id": f"{path.parts[-4][:8]}-{path.parts[-2]}", "label": f"Lab run {path.parts[-4][:8]}", "robot": ROBOTS[grid["pack"]], "pack": grid["pack"], "sim": short((json_or(job) or {}).get("label")) if job else None, "source": f"policy/runs/server/{path.parts[-4]}", "kind": "totals",
-                    "note": NOTES[grid["pack"]], "held_back": c.get("held", 0), "recorded": False, "at": path.stat().st_mtime, "total": ran, "passed": c.get("passed", 0), "failed": c.get("failed", 0) + c.get("stuck", 0), "holds": c.get("safe_hold", 0), "worlds": [],
+                    "note": NOTES[grid["pack"]], "held_back": c.get("held", 0), "recorded": False, "at": path.stat().st_mtime, "evidence": json_or(path.parent / "zg_evidence.json"), "total": ran, "passed": c.get("passed", 0), "failed": c.get("failed", 0) + c.get("stuck", 0), "holds": c.get("safe_hold", 0), "worlds": [],
                     "names": [r.get("name") for r in rows[:3]], "coverage": coverage_of(grid["pack"], json_or(path.parent / "scenarios.json", {}), grid.get("rows", [])) if (path.parent / "scenarios.json").exists() else None})
     out.sort(key=lambda c: c["at"], reverse=True)
     return out[:6]

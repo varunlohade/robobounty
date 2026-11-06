@@ -1,0 +1,11 @@
+{
+  "name": "crashlab-zg",
+  "private": true,
+  "type": "module",
+  "description": "Only for 0G: the TEE signature check and the evidence upload. Install it when you switch 0G on: docs/SWITCH-ON.md.",
+  "dependencies": {
+    "@0gfoundation/0g-compute-ts-sdk": "0.9.0",
+    "@0gfoundation/0g-storage-ts-sdk": "1.2.13",
+    "ethers": "6.13.1"
+  }
+}

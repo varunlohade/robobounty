@@ -96,9 +96,9 @@ The full list with licenses is in `docs/THIRD-PARTY.md`. `AI-USE.md` lists who w
 
 World ID: a real scan with World App passed on production on 7 Nov 2026, using the device credential. It proves a device, not a unique human. A company account and this engineer account exist in policy/runs/site/auth.sqlite (not committed).
 
-**Arc.** Not deployed. Deployment code sits on the unmerged `sponsors-switch-on` branch and has run on local anvil only.
+**Arc.** Not deployed. `policy/bounty/arc_mirror.py` can deploy and pay on Arc testnet once the owner makes wallets. It has run on local anvil only.
 
-**0G.** Not connected. Code for it sits on the same unmerged branch and has run on mocks only.
+**0G.** Not connected. The AI backend and the evidence upload are in the code, off by default, and have run on local mocks only.
 
 **Local chain.** `contracts/src/FailureBounty.sol` has 41 passing tests under `forge test`. `policy/bounty/anvil_mirror.py` mirrors one accepted fix on a local anvil chain with public dev accounts and a test token. No human or outside firm has audited the contract.
 
