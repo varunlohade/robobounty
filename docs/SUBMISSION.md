@@ -94,7 +94,7 @@ The full list with licenses is in `docs/THIRD-PARTY.md`. `AI-USE.md` lists who w
 
 **World.** The login page uses `@worldcoin/idkit-core`. The server verifies proofs in `policy/server/site_world.py`. The repo's `.env` sets `WORLD_ENVIRONMENT=staging`, and the page says so. The checks use mock replies. No result file in the repo shows a real scan. The bounty board does not read World ID: its page says "World ID is not connected", and its per-human cap trusts numbers from the caller.
 
-CONFIRM: has a real World ID scan worked on staging? If yes, add the date and the result, and change this section and the table above.
+World ID: a real scan with World App passed on production on 7 Nov 2026, using the device credential. It proves a device, not a unique human. A company account and this engineer account exist in policy/runs/site/auth.sqlite (not committed).
 
 **Arc.** Not deployed. Deployment code sits on the unmerged `sponsors-switch-on` branch and has run on local anvil only.
 
