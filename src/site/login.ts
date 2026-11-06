@@ -33,65 +33,29 @@ const panel = h('section', 'lg-panel', h('div', 'lg-mark', 'CrashLab'),
 panel.setAttribute('aria-label', 'Sign in to CrashLab');
 const face = (f: Face) => { panel.dataset.state = f; };
 
-// The wall. One video holds every run, so the browser decodes one stream and the labels are plain text on top.
-interface Fix { who: string; from: string; minus: string; plus: string }
-interface Tile { robot: string; world: string; name: string; phase: number; fix?: Fix; states: { at: number; s: string; words: string }[] }
-interface Wall { cols: number; rows: number; loop_s: number; poster_t: number; tiles: Tile[] }
-const FPS = 15;
-const POSTER = new URL('./assets/login-wall.jpg', import.meta.url).href;
-const FILM = new URL('./assets/login-wall.mp4', import.meta.url).href;
-const WALL_DATA = new URL('./assets/login-wall.json', import.meta.url).href;
-const still = matchMedia('(prefers-reduced-motion: reduce)');
-const film = Object.assign(h('video', 'lg-film'), { muted: true, loop: true, playsInline: true, poster: POSTER, preload: 'metadata' });
+// The background is one recorded film with its labels baked in. The page plays it and does nothing else: no canvas, no per-tile elements, no timers.
+const film = Object.assign(document.createElement('video'), { className: 'lg-film', muted: true, loop: true, playsInline: true, autoplay: false, preload: 'none', poster: '/login/film-poster.jpg', disablePictureInPicture: true });
 film.setAttribute('muted', '');
+film.setAttribute('playsinline', '');
 film.setAttribute('aria-hidden', 'true');
-const cells = h('div', 'lg-cells');
-const scrim = h('div', 'lg-scrim');
-const wallBox = h('div', 'lg-wall', film, cells, scrim);
+const still = matchMedia('(prefers-reduced-motion: reduce)');
 const pauseBtn = button('', 'Pause', () => setPlaying(film.paused));
 pauseBtn.className = '';
-const caption = h('div', 'lg-cap', h('p', '', 'Recorded simulated runs, replayed. Window runs sped up. Fixes come from recorded checks.'), pauseBtn);
-root.append(h('div', 'lg', wallBox, caption, panel));
-
-let wall: Wall | null = null;
-const painted: { tile: Tile; box: HTMLElement; word: HTMLElement; last: string }[] = [];
-function buildWall(w: Wall) {
-  wall = w;
-  for (const tile of w.tiles) {
-    const word = h('span', 't-word');
-    const diff = tile.fix ? h('div', 't-diff', h('i', 'm', `- ${tile.fix.minus}`), h('i', 'p', `+ ${tile.fix.plus}`)) : null;
-    const box = h('div', 't', h('div', 't-tint'), h('div', 't-chip', h('span', 't-name', tile.name), word, diff));
-    cells.append(box);
-    painted.push({ tile, box, word, last: '' });
-  }
-}
-function paintWall(t: number) {
-  if (!wall) return;
-  for (const p of painted) {
-    const local = (t - p.tile.phase / FPS + wall.loop_s * 2) % wall.loop_s;
-    let now = p.tile.states[0];
-    for (const s of p.tile.states) if (s.at <= local) now = s;
-    if (now.words !== p.last) { p.last = now.words; p.box.dataset.s = now.s; p.word.textContent = now.words; }
-  }
-}
+const caption = h('div', 'lg-cap', h('p', '', 'Recorded simulated runs.'), pauseBtn);
+root.append(h('div', 'lg', h('div', 'lg-back', film), caption, panel));
 function setPlaying(on: boolean) {
   if (on) {
-    if (!film.src) film.src = FILM;
+    if (!film.getAttribute('src')) { film.preload = 'auto'; film.src = '/login/film-1080.mp4'; }
     void film.play().catch(() => { pauseBtn.textContent = 'Play'; });
   } else film.pause();
   pauseBtn.textContent = on ? 'Pause' : 'Play';
 }
-setInterval(() => { if (wall && !film.paused) paintWall(film.currentTime); }, 200);
-film.addEventListener('pause', () => { pauseBtn.textContent = 'Play'; paintWall(film.currentTime); });
-film.addEventListener('seeked', () => paintWall(film.currentTime));
+film.addEventListener('pause', () => { pauseBtn.textContent = 'Play'; });
 film.addEventListener('playing', () => { pauseBtn.textContent = 'Pause'; });
+film.addEventListener('error', () => { pauseBtn.hidden = true; });
 still.addEventListener('change', () => { if (still.matches) setPlaying(false); });
-getJson<Wall>(WALL_DATA).then(w => {
-  buildWall(w);
-  paintWall(w.poster_t);
-  if (still.matches) pauseBtn.textContent = 'Play';
-  else setPlaying(true);
-}).catch(() => { pauseBtn.hidden = true; });
+if (still.matches) pauseBtn.textContent = 'Play';
+else setPlaying(true);
 
 // Small proof, read from the site's own data, never written here.
 interface Batch { id: string; total: number; passed: number; failed: number; holds: number }

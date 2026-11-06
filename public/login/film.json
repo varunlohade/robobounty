@@ -1,0 +1,190 @@
+{
+ "note": "Simulated. Each tile is a window of one recorded run, rendered in Cycles. Words come from that run's result.",
+ "loop_s": 6.5,
+ "grid": [
+  4,
+  3
+ ],
+ "tiles": [
+  {
+   "slot": 0,
+   "run": "w032",
+   "robot": "inspection",
+   "name": "Wet steel ramp",
+   "verdict": "fell",
+   "words": "Fell at 4.9 s",
+   "speed": 1,
+   "windows_s": [
+    [
+     1.2,
+     6.2
+    ]
+   ]
+  },
+  {
+   "slot": 1,
+   "run": "t0010",
+   "robot": "window",
+   "name": "Gusts to 35 m/s",
+   "verdict": "slip_distance",
+   "words": "Slid 0.97 m",
+   "speed": 1,
+   "windows_s": [
+    [
+     0,
+     0
+    ]
+   ]
+  },
+  {
+   "slot": 2,
+   "run": "w046",
+   "robot": "inspection",
+   "name": "Hairpin on oily floor",
+   "verdict": "passed",
+   "words": "Passed, 5 of 5 waypoints",
+   "speed": 1,
+   "windows_s": [
+    [
+     23.9,
+     28.9
+    ]
+   ]
+  },
+  {
+   "slot": 3,
+   "run": "nominal-seed1",
+   "robot": "window",
+   "name": "Nominal wind",
+   "verdict": "passed",
+   "words": "Passed, 95% cleaned",
+   "speed": 1,
+   "windows_s": [
+    [
+     0,
+     0
+    ]
+   ]
+  },
+  {
+   "slot": 4,
+   "run": "low_pipe",
+   "robot": "inspection",
+   "name": "Low pipe",
+   "verdict": "fell",
+   "words": "Fell at 5.2 s",
+   "speed": 1,
+   "windows_s": [
+    [
+     0,
+     0
+    ]
+   ]
+  },
+  {
+   "slot": 5,
+   "run": "w029",
+   "robot": "inspection",
+   "name": "Cable ramp about 20 degrees",
+   "verdict": "passed",
+   "words": "Passed, 3 of 3 waypoints",
+   "speed": 1,
+   "windows_s": [
+    [
+     21.02,
+     26.02
+    ]
+   ]
+  },
+  {
+   "slot": 6,
+   "run": "w040",
+   "robot": "inspection",
+   "name": "Medium valve off centre",
+   "verdict": "fell",
+   "words": "Fell at 7.7 s",
+   "speed": 1,
+   "windows_s": [
+    [
+     4.0,
+     9.0
+    ]
+   ]
+  },
+  {
+   "slot": 7,
+   "run": "w016",
+   "robot": "inspection",
+   "name": "Pipe at knee height",
+   "verdict": "stuck",
+   "words": "Stuck at 8.9 s",
+   "speed": 1,
+   "windows_s": [
+    [
+     5.2,
+     10.2
+    ]
+   ]
+  },
+  {
+   "slot": 8,
+   "run": "t0014",
+   "robot": "window",
+   "name": "Gusts to 27 m/s",
+   "verdict": "passed",
+   "words": "Passed, 94% cleaned",
+   "speed": 1,
+   "windows_s": [
+    [
+     0,
+     0
+    ]
+   ]
+  },
+  {
+   "slot": 9,
+   "run": "w021",
+   "robot": "inspection",
+   "name": "Crossover shallow steps",
+   "verdict": "fell",
+   "words": "Fell at 7.0 s",
+   "speed": 1,
+   "windows_s": [
+    [
+     3.3,
+     8.3
+    ]
+   ]
+  },
+  {
+   "slot": 10,
+   "run": "plant",
+   "robot": "inspection",
+   "name": "Plant route",
+   "verdict": "passed",
+   "words": "Passed, 3 of 3 waypoints",
+   "speed": 1,
+   "windows_s": [
+    [
+     0,
+     0
+    ]
+   ]
+  },
+  {
+   "slot": 11,
+   "run": "w043",
+   "robot": "inspection",
+   "name": "Heavy sensor box",
+   "verdict": "fell",
+   "words": "Fell at 11.2 s",
+   "speed": 1,
+   "windows_s": [
+    [
+     7.5,
+     12.5
+    ]
+   ]
+  }
+ ]
+}

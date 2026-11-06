@@ -15,14 +15,13 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "design" / "render" / "login_film"
-FPS, LOOP = 30, 210  # Seven seconds. Every tile repeats exactly on this length, so the whole frame does.
-COLS, ROWS = 6, 4
-DISSOLVE, FADE = 10, 4
+FPS, LOOP = 30, 195  # Six and a half seconds. Every tile repeats exactly on this length, so the whole frame does.
+COLS, ROWS = 4, 3
+DIP = 5
 # Reading order. The sign-in panel covers the right side, so the left four columns carry the failures and the fixes.
-LAYOUT = ["insp-w015", "win-w001", "insp-w046", "fix041", "insp-w032", "win-w009",
-          "win-w004", "insp-w019", "code000", "insp-w043", "win-w023", "insp-w045",
-          "insp-w021", "fix042", "insp-w016", "win-w007", "insp-w037", "insp-w005",
-          "insp-w029", "insp-w040", "win-w020", "insp-w009", "insp-w026", "insp-w035"]
+LAYOUT = ["insp-w032", "re-t0010", "insp-w046", "re-nominal",
+          "re-low_pipe", "insp-w029", "insp-w040", "insp-w016",
+          "re-t0014", "insp-w021", "re-plant", "insp-w043"]
 PHASE = {t: (i * 0.618034) % 1 for i, t in enumerate(LAYOUT)}
 INK, RED_CHIP, RED, BLUE, GREEN, DIM = (11, 12, 14), (181, 48, 42), (229, 83, 75), (79, 134, 255), (110, 216, 146), (176, 180, 188)
 RED_T, GREEN_T, BLUE_T = (255, 152, 145), (110, 216, 146), (145, 184, 255)
@@ -83,16 +82,29 @@ def states(t, ty, tw, th):
         return [(0, chip(tw, th, ty, [nm], INK)), (at, late)]
     n_before = round(seg[0]["seconds"] * seg[0]["fps"])
     at = min(round(seg[0]["verdict_at"] * FPS), n_before - 8)
-    fix_at = n_before + 12
-    after_at = fix_at + 42
+    n_after = round(seg[1]["seconds"] * seg[1]["fps"])
+    fix_at = n_before + 6
+    after_at = fix_at + 54
     return [(0, chip(tw, th, ty, [nm, ("Before the fix", DIM, "word")], INK)),
             (at, chip(tw, th, ty, [(name + speed, (251, 227, 225), "name"), (t["words"], (255, 255, 255), "word")], RED_CHIP, RED)),
             (fix_at, chip(tw, th, ty, [(f"{t['who']} applied", BLUE_T, "word"), (f"- {t['minus']}", RED_T, "mono"), (f"+ {t['plus']}", GREEN_T, "mono")], INK, BLUE)),
             (after_at, chip(tw, th, ty, [nm, ("After the fix", DIM, "word")], INK)),
-            (LOOP - 30, chip(tw, th, ty, [nm, (t["after_words"], GREEN_T, "word")], INK))]
+            (n_before + 30 + n_after, chip(tw, th, ty, [nm, (t["after_words"], GREEN_T, "word")], INK))]
 
 
 def load(work, seg, tw, th):
+    if "reuse" in seg:  # A 24 fps clip on the film's 30 fps clock: the nearest recorded frame.
+        d = ROOT / seg["reuse"]
+        x0, y0, x1, y1 = seg["crop"]
+        idx = [seg["first"] + int(i * 24 / FPS + 0.5) for i in range(round(seg["seconds"] * FPS))]
+        def one(i):
+            im = cv2.imread(str(d / f"frame_{i:04d}.png"))
+            return None if im is None else cv2.resize(im[y0:y1, x0:x1], (tw, th), interpolation=cv2.INTER_AREA)[:, :, ::-1]
+        cache = {}
+        with ThreadPoolExecutor(8) as ex:
+            for i, f in zip(sorted(set(idx)), ex.map(one, sorted(set(idx)))):
+                cache[i] = f
+        return [cache[i] for i in idx if cache[i] is not None]
     n = round(seg["seconds"] * seg["fps"])
     d = work / seg["key"] / "jpg"
 
@@ -100,38 +112,31 @@ def load(work, seg, tw, th):
         p = d / f"{i:04d}.jpg"
         if not p.exists():
             return None
-        return cv2.resize(cv2.imread(str(p)), (tw, th), interpolation=cv2.INTER_AREA)[:, :, ::-1]
+        im = cv2.imread(str(p))
+        h, w = im.shape[:2]
+        keep = round(w * th / tw)  # The frame's middle band holds the robot.
+        y = (h - keep) // 2
+        return cv2.resize(im[y:y + keep], (tw, th), interpolation=cv2.INTER_AREA)[:, :, ::-1]
     with ThreadPoolExecutor(8) as ex:
         out = list(ex.map(one, range(n)))
     return [f for f in out if f is not None]
 
 
 def timeline(t, clips):
-    """LOOP frames for one tile: motion, a hold on the last recorded frame, a dissolve back to the first. Each entry is (a, b, u): u of frame b over frame a."""
-    tl = []
-    if len(clips) == 1:
+    """LOOP frames for one tile: (frame, gain). Motion, a hold on the last recorded frame, then a short dip to dark, as when a monitor changes feed. Runs never double-expose."""
+    out, n = [], len(clips)
+    if n == 1:
         c = clips[0]
-        for f in range(LOOP):
-            i = min(f, len(c) - 1)
-            if f >= LOOP - DISSOLVE:
-                tl.append((c[i], c[0], (f - (LOOP - DISSOLVE) + 1) / DISSOLVE))
-            else:
-                tl.append((c[i], None, 0))
-        return tl
+        return [(c[min(f, len(c) - 1)], min(1.0, (f + 1) / DIP, (LOOP - f) / DIP)) for f in range(LOOP)]
     a, b = clips
-    gap = 30
+    switch = len(a) + 30
     for f in range(LOOP):
-        if f < len(a) + gap:
-            i = min(f, len(a) - 1)
-            u = max(0, f - (len(a) + gap - DISSOLVE) + 1) / DISSOLVE
-            tl.append((a[i], b[0], u) if u > 0 else (a[i], None, 0))
+        if f < switch:
+            out.append((a[min(f, len(a) - 1)], min(1.0, (f + 1) / DIP, (switch - f) / DIP)))
         else:
-            i = min(f - len(a) - gap, len(b) - 1)
-            if f >= LOOP - DISSOLVE:
-                tl.append((b[i], a[0], (f - (LOOP - DISSOLVE) + 1) / DISSOLVE))
-            else:
-                tl.append((b[i], None, 0))
-    return tl
+            g = f - switch
+            out.append((b[min(g, len(b) - 1)], min(1.0, (g + 1) / DIP, (LOOP - f) / DIP)))
+    return out
 
 
 def main():
@@ -144,6 +149,7 @@ def main():
     ap.add_argument("--inter", default="/tmp/lf/Inter.ttf")
     ap.add_argument("--mono", default="/tmp/lf/Mono.ttf")
     ap.add_argument("--grain", type=float, default=1.5)
+    ap.add_argument("--draft", action="store_true", help="Fill frames not rendered yet with the last one there, for a look test only.")
     a = ap.parse_args()
     W, H = map(int, a.size.split("x"))
     tw, th = W // COLS, H // ROWS
@@ -155,8 +161,11 @@ def main():
     for slot, tid in enumerate(LAYOUT):
         t = plan[tid]
         clips = [load(Path(a.work), s, tw, th) for s in t["segments"]]
-        if not all(len(c) == round(s["seconds"] * s["fps"]) for c, s in zip(clips, t["segments"])):
-            raise SystemExit(f"{tid}: frames missing, {[len(c) for c in clips]}")
+        if not all(len(c) == round(s["seconds"] * (FPS if "reuse" in s else s["fps"])) for c, s in zip(clips, t["segments"])):
+            if not a.draft:
+                raise SystemExit(f"{tid}: frames missing, {[len(c) for c in clips]}")
+            blank = np.zeros((th, tw, 3), np.uint8)
+            clips = [(c + [c[-1] if c else blank] * round(s["seconds"] * s["fps"]))[:round(s["seconds"] * s["fps"])] for c, s in zip(clips, t["segments"])]
         st = states(t, ty, tw, th)
         tiles.append({"t": t, "tl": timeline(t, clips), "st": st, "phase": round(PHASE[tid] * LOOP), "x": (slot % COLS) * W // COLS, "y": (slot // COLS) * H // ROWS})
         print(tid, "loaded", flush=True)
@@ -175,7 +184,7 @@ def main():
             s = state_at(tl, (f + tl["phase"]) % LOOP)
             k = tl["st"].index(s)
             weight = 2 if tl["t"]["kind"] == "fix" and k == 2 else 1 if (tl["t"]["kind"] == "fail" and k == 1) or (tl["t"]["kind"] == "fix" and k == 1) else 0
-            if i % COLS < 4:
+            if i % COLS < 3:
                 weight *= 2
             n += weight
         if n > best:
@@ -184,7 +193,7 @@ def main():
 
     rng = np.random.default_rng(7)
     grains = []
-    for _ in range(30):  # 30 divides the loop, so the grain repeats with it.
+    for _ in range(15):  # 15 divides the loop, so the grain repeats with it.
         g = rng.normal(0, 1, (H // 2 + 1, W // 2 + 1)).astype(np.float32)
         g = cv2.resize(g, (W, H), interpolation=cv2.INTER_LINEAR) * 0.7 + rng.normal(0, 0.5, (H, W)).astype(np.float32)
         grains.append(g[..., None] * a.grain)
@@ -198,19 +207,12 @@ def main():
         layers = []
         for tl in tiles:
             lf = (f + tl["phase"]) % LOOP
-            a_img, b_img, u = tl["tl"][lf]
-            im = a_img.astype(np.float32) if b_img is None else a_img.astype(np.float32) * (1 - u) + b_img.astype(np.float32) * u
+            img, gain = tl["tl"][lf]
+            im = img.astype(np.float32) * gain
             x, y = tl["x"], tl["y"]
             frame[y:y + th - sep, x:x + tw - sep] = im[:th - sep, :tw - sep]
             s = state_at(tl, lf)
-            k = tl["st"].index(s)
-            mix = min(1.0, (lf - s[0] + 1) / FADE) if k > 0 else 1.0
-            if k == 0 and lf < FADE:  # The loop's seam: from the last label back to the first.
-                mix = (lf + 1) / FADE
-                prev = tl["st"][-1][1]
-            else:
-                prev = tl["st"][k - 1][1] if k > 0 else tl["st"][0][1]
-            layer = s[1] * mix + prev * (1 - mix) if mix < 1 else s[1]
+            layer = s[1]  # Labels change on one frame, like an instrument, so two sets of words never overlap.
             layers.append((x, y, layer))
         frame += grains[f % len(grains)] * (0.35 + 0.65 * np.clip(frame.mean(axis=2, keepdims=True) / 110, 0, 1))
         for x, y, layer in layers:
@@ -224,7 +226,8 @@ def main():
     enc.wait()
     manifest = {"note": "Simulated. Each tile is a window of one recorded run, rendered in Cycles. Words come from that run's result.", "loop_s": LOOP / FPS, "grid": [COLS, ROWS],
                 "tiles": [{"slot": i, "run": plan[t]["run"], "robot": plan[t]["robot"], "name": plan[t]["name"], "verdict": plan[t]["verdict"], "words": plan[t]["words"], "speed": plan[t]["speed"], "windows_s": [[round(s["t0"], 2), round(s["t1"], 2)] for s in plan[t]["segments"]], **({"fix": {"who": plan[t]["who"], "minus": plan[t]["minus"], "plus": plan[t]["plus"], "after": plan[t]["after_words"]}} if plan[t]["kind"] == "fix" else {})} for i, t in enumerate(LAYOUT)]}
-    (Path(a.out).parent / "film.json").write_text(json.dumps(manifest, indent=1) + "\n")
+    if not a.draft:
+        (Path(a.out).parent / "film.json").write_text(json.dumps(manifest, indent=1) + "\n")
     print(a.out, Path(a.out).stat().st_size / 1e6, "MB")
 
 

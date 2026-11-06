@@ -1,4 +1,4 @@
-"""Blender entry for login film tiles. It runs an existing scene script unchanged, with two allowances. --fps may be a fraction, because a clip's time step is seconds of record per frame. scene.py's device comes from LOGIN_FILM_DEVICE, because it asks for Metal by name."""
+"""Blender entry for login film tiles. It runs an existing scene script unchanged (inspection_scene.py, or the wide-look scene.py), with two allowances. --fps may be a fraction, because a clip's time step is seconds of record per frame. scene.py's device comes from LOGIN_FILM_DEVICE, because it asks for Metal by name."""
 import os
 import sys
 import types
@@ -21,7 +21,9 @@ def load(name, device=None):
 
 
 if os.environ["LOGIN_FILM_SCENE"] == "window":
-    load("scene", os.environ.get("LOGIN_FILM_DEVICE", "METAL"))
-    load("scene_v2").main()
+    import json
+    import shots
+    shots.SHOTS["login"] = json.loads(os.environ["LOGIN_FILM_SHOT"])
+    load("scene", os.environ.get("LOGIN_FILM_DEVICE", "METAL")).main()
 else:
     load("inspection_scene").main()
