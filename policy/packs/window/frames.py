@@ -8,7 +8,7 @@ from PIL import Image
 from . import pack as P
 
 WIDTH, HEIGHT = 200, 150
-DISTANCE_M = 5.2
+FRAME_MARGIN = 1.3  # Camera distance per metre of the larger side of the work area.
 AZIMUTH_DEG, ELEVATION_DEG = 90.0, -4.0
 
 
@@ -22,7 +22,7 @@ class Camera:
         self.view = mujoco.MjvCamera()
         self.view.type = mujoco.mjtCamera.mjCAMERA_FREE
         self.view.lookat[:] = [(a["x0"] + a["x1"]) / 2, 0.0, (a["z0"] + a["z1"]) / 2]
-        self.view.distance, self.view.azimuth, self.view.elevation = DISTANCE_M, AZIMUTH_DEG, ELEVATION_DEG
+        self.view.distance, self.view.azimuth, self.view.elevation = FRAME_MARGIN * max(a["x1"] - a["x0"], a["z1"] - a["z0"]), AZIMUTH_DEG, ELEVATION_DEG
 
     def _draw(self, qpos, mocap):
         self.d.qpos[:] = qpos

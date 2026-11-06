@@ -157,7 +157,7 @@ try {
     const lostLines = await t.lines('I lost the connection');
     const start = Date.now();
     execFileSync('kill', [signal, String(pid)]);
-    await t.until(`document.querySelector('.chat-list').innerText.includes(${JSON.stringify(words)})`, `${signal} line`, 60);
+    await t.until(`document.querySelector('.chat-list')?.innerText.includes(${JSON.stringify(words)})`, `${signal} line`, 60);
     check(`kill ${signal}: the page reconnects by itself and says so`, (await health()).pid !== pid, `${((Date.now() - start) / 1000).toFixed(1)} s`);
     check(`kill ${signal}: one line, not two`, (await t.lines(words)) === 1 && (await t.lines('I lost the connection')) === lostLines);
     check(`kill ${signal}: the replay kept playing`, (await t.moving()).ok);

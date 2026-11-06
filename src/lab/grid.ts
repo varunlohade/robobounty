@@ -34,8 +34,8 @@ const MARK_MIN_PX = 2;
 const FILM_MS = 250; // Each frame of a run's loop.
 const FILM_HOLD = 6; // The last frame waits this many steps, so the end of the run reads before the loop restarts.
 const FILM_STAGGER_MS = 137; // Squares do not step on the same beat.
-const SCRIM = 'rgba(10,12,15,.72)';
-const INSET_W = 0.42, INSET_H = 0.48;
+const SCRIM = 'rgba(10,12,15,.52)'; // A robot under the words or the map still shows.
+const INSET_W = 0.34, INSET_H = 0.4;
 const VALUE_ROW = 14;
 const VALUE_ROWS_MAX = 2;
 const ICON = 10;
@@ -145,8 +145,8 @@ class Square {
     const scale = Math.max(w / fw, h / fh), cw = w / scale, ch = h / scale;
     c.drawImage(shown, sx + (fw - cw) / 2, sy + (fh - ch) / 2, cw, ch, 0, 0, w, h);
     const { row } = this;
-    if (row.status === 'failed' || row.status === 'stuck') { c.fillStyle = 'rgba(229,83,75,.2)'; c.fillRect(0, 0, w, h); }
-    else if (row.status === 'held') { c.fillStyle = 'rgba(214,154,45,.14)'; c.fillRect(0, 0, w, h); }
+    if (row.status === 'failed' || row.status === 'stuck') { c.fillStyle = 'rgba(229,83,75,.12)'; c.fillRect(0, 0, w, h); }
+    else if (row.status === 'held') { c.fillStyle = 'rgba(214,154,45,.1)'; c.fillRect(0, 0, w, h); }
     return true;
   }
 

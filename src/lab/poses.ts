@@ -201,6 +201,8 @@ export class PosesView {
   private camera: THREE.PerspectiveCamera;
   private controls: OrbitControls;
   private bodies: THREE.Group[] = [];
+  /** Settles when the robot is drawn, or when its meshes failed and the page says so. */
+  robotReady: Promise<void> = Promise.resolve();
   private chase: THREE.Vector2[] = [];
   private disposers: (() => void)[] = [];
   private observer: ResizeObserver;
@@ -358,8 +360,8 @@ export class PosesView {
       this.scene.add(group);
       this.bodies.push(group);
     }
-    loadRobotModel(robot).then(model => {
-      if (!this.stopped) this.dressRobot(model);
+    this.robotReady = loadRobotModel(robot).then(model => {
+      if (!this.stopped) return this.dressRobot(model);
     }).catch(err => {
       if (!this.stopped) this.host.append(el('div', 'sim-tag sim-key sim-bad', `The robot's meshes did not load, so the robot is not drawn. ${String(err)}`));
     });
@@ -372,6 +374,7 @@ export class PosesView {
     const uvs = new THREE.BufferAttribute(new Float32Array(model.bin, uv, model.vertices * 2), 2);
     const indices = new THREE.BufferAttribute(new Uint32Array(model.bin, index, model.indices), 1);
     const paints = new Map<string, THREE.MeshStandardMaterial>();
+    const painted: Promise<void>[] = [];
     const loader = new THREE.TextureLoader();
     const anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     const paint = (colour: number[], texture: string | null) => {
@@ -380,7 +383,9 @@ export class PosesView {
       if (!material) {
         material = new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(colour[0], colour[1], colour[2]), roughness: ROBOT_ROUGH });
         if (texture) {
-          const map = loader.load(`${model.base}/textures/${encodeURIComponent(texture)}`, () => { this.dirty = true; });
+          let settled = () => {};
+          painted.push(new Promise(done => { settled = done; }));
+          const map = loader.load(`${model.base}/textures/${encodeURIComponent(texture)}`, () => { this.dirty = true; settled(); }, undefined, () => settled());
           map.colorSpace = THREE.SRGBColorSpace;
           map.anisotropy = anisotropy;
           material.map = map;
@@ -412,6 +417,7 @@ export class PosesView {
     }
     this.host.dataset.robotParts = String(model.parts.length);
     this.dirty = true;
+    return Promise.all(painted).then(() => {});
   }
 
   private buildChase() {
@@ -681,10 +687,18 @@ export function posesPage(replay: PoseReplay, statusRight: HTMLElement, onFix?: 
     page, viewport,
     start() {
       build();
-      setPlaying(true);
+      setPlaying(false);
       show(0);
-      viewport.dataset.ready = 'true';
-      runTick();
+      // The clock starts with the robot on screen, so a first replay does not walk an empty scene.
+      const loading = el('div', 'sim-tag sim-key', 'Loading the robot');
+      viewport.append(loading);
+      void view!.robotReady.then(() => {
+        loading.remove();
+        if (stopped) return;
+        setPlaying(true);
+        viewport.dataset.ready = 'true';
+        runTick();
+      });
     },
     stop() {
       stopped = true;

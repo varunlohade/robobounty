@@ -14,6 +14,8 @@ from . import render as R
 WIDTH, HEIGHT = 200, 150
 CHASE_WINDOW = 75
 FOV_DEG = 45.0
+EYE_M = (-1.5, -2.8, 1.9)  # Nearer than the replay's chase, since a square is small.
+AIM_M = (0.15, 0.2, 0.45)
 
 
 class Camera:
@@ -34,7 +36,7 @@ class Camera:
 
     def _draw(self, x, y):
         self.model.bvh_refit_shapes(self.state)
-        self.at.assign([R._look_at(np.array([x - 2.2, y - 4.0, 2.7]), (x + 0.2, y + 0.5, 0.55))])
+        self.at.assign([R._look_at(np.array([x + EYE_M[0], y + EYE_M[1], EYE_M[2]]), (x + AIM_M[0], y + AIM_M[1], AIM_M[2]))])
         self.camera.update(self.state, self.at, self.rays, color_image=self.image, normal_image=self.normals)
         rgba = self.image.numpy()[0].view(np.uint8).reshape(HEIGHT, WIDTH, 4)
         return Image.fromarray(R._fill_holes(rgba[..., :3], self.normals.numpy()[0].reshape(HEIGHT, WIDTH, 3)))
