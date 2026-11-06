@@ -56,7 +56,7 @@ export function outcomeBar(t: Tally, large = false): HTMLElement {
 
 export function resultWords(t: Tally): string {
   const parts = [`${t.passed} passed`, `${t.failed} failed`];
-  if (t.holds) parts.push(`${t.holds} safe holds`);
+  if (t.holds) parts.push(`${t.holds} safe ${t.holds === 1 ? 'hold' : 'holds'}`);
   return parts.join(', ');
 }
 

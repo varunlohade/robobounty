@@ -8,7 +8,7 @@ import { openChrome, wait } from '../../lab/tools/browser.mjs';
 const BASE = `http://localhost:${process.env.CRASHLAB_WEB_PORT ?? 5199}`; // scripts/demo.sh's --ports picks another.
 const OUT = process.argv[2] ?? 'design/site2';
 mkdirSync(OUT, { recursive: true });
-const PAGES = ['home', 'simulation', 'data', 'providers'];
+const PAGES = ['home', 'simulation', 'failures', 'data', 'settings', 'providers'];
 const STRONG = 'correct horse battery';
 let failed = 0;
 const say = (ok, what, extra = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${what}${extra ? `: ${extra}` : ''}`); if (!ok) failed += 1; };

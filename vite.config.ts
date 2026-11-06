@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-const pages = ['index', 'toy', 'app', 'lab', 'bounties', 'home', 'crashlab', 'simulation', 'screener', 'data', 'providers', 'login'];
+const pages = ['index', 'toy', 'app', 'lab', 'bounties', 'home', 'failures', 'settings', 'crashlab', 'simulation', 'screener', 'data', 'providers', 'login'];
 // scripts/demo.sh sets the site server's port when 5297 is taken.
 const site = `http://127.0.0.1:${process.env.CRASHLAB_SITE_PORT ?? 5297}`;
 export default defineConfig({

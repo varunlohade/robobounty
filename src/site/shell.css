@@ -7,7 +7,7 @@ html,body{height:100%;margin:0;background:#0B0C0E;overflow:hidden}
   font:400 14px/20px Inter,system-ui,sans-serif;color:var(--sh-t1);font-feature-settings:"tnum","cv11";font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;background:#0B0C0E}
 .sh-app *{box-sizing:border-box}
 .sh-nav{display:flex;flex-direction:column;gap:2px;padding:12px 8px 0;border-right:1px solid var(--sh-line);min-height:0}
-.sh-brand{display:flex;align-items:center;height:32px;padding:0 8px;margin-bottom:12px;font-size:15px;font-weight:500;letter-spacing:-.01em;color:var(--sh-t1);text-decoration:none}
+.sh-brand{display:flex;align-items:center;gap:9px;height:32px;padding:0 8px;margin-bottom:12px;font-size:15px;font-weight:500;letter-spacing:-.01em;color:var(--sh-t1);text-decoration:none}
 .sh-item{display:flex;align-items:center;gap:10px;height:34px;padding:0 8px;border-radius:6px;color:var(--sh-t2);text-decoration:none;transition:background-color 120ms var(--sh-ease),color 120ms var(--sh-ease)}
 .sh-item:hover{background:var(--sh-raised);color:var(--sh-t1)}
 .sh-item[aria-current]{background:var(--sh-hover);color:var(--sh-t1)}
@@ -32,3 +32,31 @@ html,body{height:100%;margin:0;background:#0B0C0E;overflow:hidden}
 .sh-status-l{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .sh-status-r{margin-left:auto;display:flex;gap:20px;flex:none}
 @media (prefers-reduced-motion:reduce){.sh-app *{transition-duration:1ms!important;animation-duration:1ms!important}}
+
+/* The light pages: Overview, Failures, Settings. */
+html:has(.sh-light),body:has(.sh-light){background:#fff}
+.sh-app.sh-light{--sh-line:#E7E7EA;--sh-t1:#0B0B0C;--sh-t2:#63656A;--sh-raised:#F7F7F8;--sh-hover:#F2F2F3;
+  --line:#E7E7EA;--line2:#D4D4D8;--t1:#0B0B0C;--t2:#63656A;--t3:#63656A;--raised:#F7F7F8;--hover:#F2F2F3;--ring:rgba(11,11,12,.45);
+  grid-template-columns:224px minmax(0,1fr);background:#fff;color:var(--sh-t1)}
+.sh-light .sh-nav{padding:20px 12px 0}
+.sh-light .sh-brand{font-size:17px;font-weight:600;letter-spacing:-.02em;padding:0 10px;margin-bottom:18px}
+.sh-light .sh-item{padding:0 10px}
+.sh-light .sh-who{margin:auto -12px 0;padding:10px 12px 10px 22px}
+.sh-light .sh-who-name span{font-size:14px;font-weight:550}
+.sh-light .sh-who-name small{font-size:13px;line-height:18px}
+.sh-light .sh-head{min-height:78px;padding:0 32px}
+.sh-light .sh-title{font-size:22px;font-weight:600;letter-spacing:-.02em}
+.sh-light .sh-sub{font-size:12px;overflow:visible}
+@media (max-width:720px){
+  .sh-app.sh-light{display:flex;flex-direction:column;height:100dvh}
+  .sh-light .sh-nav{flex:none;flex-direction:row;flex-wrap:wrap;align-items:center;gap:2px;padding:10px 12px 8px;border-right:0;border-bottom:1px solid var(--sh-line)}
+  .sh-light .sh-brand{flex:1;margin:0 0 4px}
+  .sh-light .sh-item{order:2;flex:1 1 30%;min-width:0;height:44px}
+  .sh-light .sh-who{order:1;margin:0 0 4px;min-height:32px;padding:0;border:0;max-width:62%}
+  .sh-light .sh-who-name span{font-size:13px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sh-light .sh-who-name small{font-size:12px;line-height:14px}
+  .sh-light .sh-out{width:44px;height:44px}
+  .sh-light .sh-column{flex:1}
+  .sh-light .sh-head{min-height:60px;padding:0 16px}
+  .sh-light .sh-status{flex:none;height:28px}
+}

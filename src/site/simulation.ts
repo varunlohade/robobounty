@@ -16,7 +16,7 @@ const ROBOTS = [
 ] as const;
 type Pack = typeof ROBOTS[number]['pack'];
 
-const { main, setStatus } = mountShell({ page: 'simulation', title: 'Simulation', subtitle: 'Say the job. The AI builds the world, lists what could go wrong and runs it all.' });
+const { main, setStatus, who } = mountShell({ page: 'simulation', title: 'Simulation', subtitle: 'Say the job. The AI builds the world, lists what could go wrong and runs it all.' });
 let data: Recent | null = null;
 let down = false;
 let chosen: Pack = 'window';
@@ -81,4 +81,7 @@ function paint() {
 }
 
 paint();
-getJson<Recent>('/site-api/recent').then(d => { data = d; paint(); }).catch(() => { down = true; paint(); });
+void who.then(w => { // The server refuses this list to an engineer, whom the shell is sending to Bounties.
+  if (w.kind === 'none' || w.kind === 'engineer') return;
+  getJson<Recent>('/site-api/recent').then(d => { data = d; paint(); }).catch(() => { down = true; paint(); });
+});

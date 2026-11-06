@@ -6,15 +6,17 @@ import { icon, type IconName } from './icons.ts';
 import { ENGINEER_HOME, loginHref, onAuthChange, savePayout } from './auth.ts';
 import { signOut, whoIs, type Who } from './session.ts';
 
-export type PageName = 'home' | 'simulation' | 'bounties' | 'data' | 'providers';
+export type PageName = 'home' | 'simulation' | 'failures' | 'bounties' | 'data' | 'settings' | 'providers';
+const MARK = '<svg viewBox="0 0 28 28" width="22" height="22" aria-hidden="true"><g fill="currentColor"><path d="M3 20.2A11 11 0 0 1 18.6 4.6z"/><path d="M25 7.8A11 11 0 0 1 9.4 23.4z"/></g></svg>';
 export const SIM_NOTE = 'Simulated. Hand-built physics, not checked against real hardware.';
 
 const NAV: { page: PageName; label: string; href: string; icon: IconName }[] = [
-  { page: 'home', label: 'Home', href: 'home.html', icon: 'home' },
-  { page: 'simulation', label: 'Simulation', href: 'simulation.html', icon: 'box' },
-  { page: 'bounties', label: 'Bounties', href: 'bounties.html', icon: 'target' },
-  { page: 'data', label: 'Data', href: 'data.html', icon: 'chart' },
-  { page: 'providers', label: 'Providers', href: 'providers.html', icon: 'layers' },
+  { page: 'home', label: 'Overview', href: 'home.html', icon: 'overview' },
+  { page: 'simulation', label: 'Simulation', href: 'simulation.html', icon: 'play' },
+  { page: 'failures', label: 'Failures', href: 'failures.html', icon: 'alert' },
+  { page: 'bounties', label: 'Bounties', href: 'bounties.html', icon: 'coins' },
+  { page: 'data', label: 'Data', href: 'data.html', icon: 'database' },
+  { page: 'settings', label: 'Settings', href: 'settings.html', icon: 'settings' },
 ];
 
 export interface ShellOptions {
@@ -23,6 +25,7 @@ export interface ShellOptions {
   subtitle?: string;
   status?: string;
   statusRight?: string[];
+  light?: boolean;
 }
 
 export interface Shell {
@@ -72,10 +75,12 @@ function whoRow(box: HTMLElement, who: Who) {
 export function mountShell(opts: ShellOptions): Shell {
   const root = document.getElementById('site') ?? document.body.appendChild(make('div', ''));
   root.classList.add('sh-app');
+  root.classList.toggle('sh-light', opts.light === true);
   const nav = make('nav', 'sh-nav');
   nav.setAttribute('aria-label', 'Main');
   const brand = make('a', 'sh-brand', 'CrashLab') as HTMLAnchorElement;
   brand.href = 'home.html';
+  brand.insertAdjacentHTML('afterbegin', MARK);
   nav.append(brand);
   for (const item of NAV) {
     const a = make('a', 'sh-item') as HTMLAnchorElement;

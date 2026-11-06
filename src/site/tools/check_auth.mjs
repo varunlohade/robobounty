@@ -122,7 +122,7 @@ try {
   const key = JSON.parse(execFileSync(PY, ['policy/server/screener.py', 'key'], { cwd: ROOT, encoding: 'utf8' }));
   const links = await js(`[...document.querySelectorAll('nav a.sh-item')].filter(a => !a.hidden).map(a => a.textContent)`);
   say(links.length === 1 && links[0] === 'Bounties', 'an engineer sees only Bounties in the sidebar', links.join());
-  for (const page of ['home.html', 'simulation.html', 'crashlab.html', 'data.html', 'providers.html', 'lab.html']) {
+  for (const page of ['home.html', 'simulation.html', 'failures.html', 'settings.html', 'crashlab.html', 'data.html', 'providers.html', 'lab.html']) {
     await go(page);
     await at('bounties.html', `${page} to Bounties`);
     await until(`document.body.innerText.includes('Engineers work from Bounties')`, 'the plain message', 15);

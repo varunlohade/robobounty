@@ -51,7 +51,14 @@ async function flow(mode) {
   const clickText = async (label, within = 'body') => {
     const find = `[...(document.querySelector(${JSON.stringify(within)})?.querySelectorAll('button, a') ?? [])].find(n => n.textContent.trim().startsWith(${JSON.stringify(label)}))`;
     await c.until(`!!${find}`, `the control "${label}"`, 30);
-    const b = await rect(find);
+    let b = await rect(find);
+    for (let i = 0; i < 40; i++) { // A sheet may still be sliding in: click only where the control has stopped.
+      await wait(100);
+      const now = await rect(find);
+      const still = Math.abs(now.x - b.x) < 1 && Math.abs(now.y - b.y) < 1;
+      b = now;
+      if (still) break;
+    }
     await c.click(b.x, b.y);
   };
   // The guest way in sits on the World ID step. The clicks wait out the sheet's 300 ms rise.
@@ -388,8 +395,10 @@ async function flow(mode) {
     await step('data-shows-runs', async () => {
       await asEngineer('bounties.html');
       check(`${mode}: an engineer sees only Bounties`, await c.js(`[...document.querySelectorAll('nav a.sh-item')].filter(a => !a.hidden).length === 1`));
+      const seen = [...c.problems];
       await go('simulation.html');
       await c.until(`location.pathname === '/bounties.html' && document.body.innerText.includes('Engineers work from Bounties')`, 'the plain message', 30);
+      c.problems.splice(0, c.problems.length, ...seen); // The server refused that page's data, as this step asks. The browser logs each refusal.
       await asCompany('home.html');
       await clickOn('nav a.sh-item[href="data.html"]');
       await c.until(`location.pathname === '/data.html' && !!document.querySelector('.campaigns')?.children.length`, 'the data page', 30);
