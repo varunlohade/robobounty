@@ -111,3 +111,10 @@ Flow: a red failure the AI could not fix gets "Post a bounty": the failure pack 
 ### The agent pays people (owner, 2026-11-06)
 His words: "our AI agent can actually pay operators or pay people, pay people to try out test cases and pay it if it works well."
 The company funds a capped budget. The agent posts bounties from it. Code and the contract decide each payout from the gate result; the agent never does. Later: pay operators with real robots to run a test and upload logs, as real data for comparison with the simulator.
+
+## Ideas to adapt from self-driving testing (owner, 2026-11-06)
+His words: "automated driving companies doing this, right? Can we adapt some implementation". Steve's order:
+1. Operating limits: the company states where the robot must work (wind up to X, wet glass, height). Scenarios and bounties stay inside them, and results report coverage of them.
+2. Scenario families with ranges, plus a boundary search: after a failure, search nearby values to report "fails above 11 m/s with wet glass", not only pass or fail.
+3. Regression suite: every failure found is saved and re-run on each code change.
+4. Later: replay real logs into simulation, then compare, which is how a company comes to trust a simulator.
