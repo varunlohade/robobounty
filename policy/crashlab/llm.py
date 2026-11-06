@@ -110,8 +110,8 @@ def _zg_own_check(provider, chat_id):
     env = {k: os.environ[k] for k in ZG_CHECK_KEPT if k in os.environ}
     try:
         done = subprocess.run(["node", str(ZG_CHECK)], input=json.dumps({"provider": provider, "chat_id": chat_id}).encode(), capture_output=True, timeout=ZG_CHECK_TIMEOUT_S, env=env)
-        result = json.loads(done.stdout)["result"]
-    except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError):
+        result = json.loads(done.stdout.splitlines()[-1])["result"]  # The SDK prints its own lines first.
+    except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError, IndexError):
         return "unavailable"
     return result if result in (True, False, None) else "unavailable"
 
