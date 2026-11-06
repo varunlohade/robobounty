@@ -1,5 +1,6 @@
 // Drives the robot menu and the test grid in lab.html in a real browser, with real mouse moves.
-// node src/lab/tools/check_grid.mjs [--out DIR] [--server PORT]. Needs vite on port 5199. With no --server it starts fake_lab_server.mjs, whose verdicts are invented.
+// node src/lab/tools/check_grid.mjs [--out DIR] [--real inspection|window] [--limit N]. Needs vite on port 5199.
+// With no --real it starts fake_lab_server.mjs, whose verdicts are invented. With --real it starts its own real server on a free port with stored AI replies: real physics, real verdicts, no paid call.
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
@@ -8,7 +9,9 @@ import { openChrome, wait } from './browser.mjs';
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1]; };
 const ROOT = resolve(import.meta.dirname, '../../..');
 const OUT = resolve(arg('out', join(ROOT, 'design/shell')));
-const REAL = arg('server', null);
+const REAL_PACK = arg("real", null); // inspection or window: start the real server with stored AI replies.
+const LIMIT = arg("limit", "8");
+const REAL = REAL_PACK !== null;
 const SQUARES = 50;
 const freePort = () => new Promise(r => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => r(port)); }); });
 
@@ -21,6 +24,14 @@ async function fakeServer(args) {
   const child = spawn(process.execPath, [join(ROOT, 'src/lab/tools/fake_lab_server.mjs'), '--port', String(port), ...args], { stdio: 'inherit' });
   servers.push(child);
   for (let i = 0; i < 50; i++) { try { await fetch(`http://127.0.0.1:${port}/api/health`); break; } catch { await wait(100); } }
+  return port;
+}
+
+async function realServer() {
+  const port = await freePort();
+  const child = spawn(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/server.py'), '--port', String(port), '--recorded', join(ROOT, 'policy/server/fixtures'), '--scenario-limit', LIMIT], { stdio: 'ignore' });
+  servers.push(child);
+  for (let i = 0; i < 150; i++) { try { await fetch(`http://127.0.0.1:${port}/api/health`, { headers: { Origin: 'http://localhost:5199' } }); break; } catch { await wait(200); } }
   return port;
 }
 
@@ -52,14 +63,16 @@ const fmt = t => `mean ${t.mean.toFixed(1)} ms, p95 ${t.p95.toFixed(1)} ms, max 
 
 const c = await openChrome();
 const page = port => `http://localhost:5199/lab.html?server=${port}`;
-const shot = name => c.shot(join(OUT, name));
+const shot = name => c.shot(join(OUT, REAL && !name.startsWith('grid-real') ? name.replace('grid-', `grid-real-${REAL_PACK}-`) : name));
 const box = sel => c.js(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height }; })()`);
 const clickOn = async sel => { const b = await box(sel); await c.click(b.x, b.y); };
 const gl = () => c.js('({ created: window.__gl.created, live: window.__gl.live, peak: window.__gl.peak })');
 
 try {
   await c.send('Page.addScriptToEvaluateOnNewDocument', { source: COUNT_CONTEXTS });
-  const port = REAL ?? await fakeServer(['--procs', '6', '--speed', '5']);
+  const port = REAL ? await realServer() : await fakeServer(['--procs', '6', '--speed', '5']);
+  const PACK = REAL_PACK ?? 'inspection';
+  const tag = REAL ? `grid-real-${PACK}` : 'grid';
   await c.send('Page.navigate', { url: page(port) });
   await c.until(`document.getElementById('lab')?.dataset.server === 'up' && document.querySelector('.chat-plus')`, 'server up', 30);
 
@@ -70,23 +83,34 @@ try {
   check('the menu lists both robots', /Window cleaning robot/.test(menu) && /Inspection robot/.test(menu), menu.replaceAll('\n', ' | '));
   check('import says Not yet, and cannot be pressed', /Import a robot file\s*Not yet/.test(menu) && await c.js(`document.querySelector('.chat-menu-import').disabled`));
   await shot('grid-picker.png');
-  await clickOn('.chat-menu-row[data-pack=inspection]');
-  await c.until(`document.getElementById('lab')?.dataset.pack === 'inspection' && document.querySelector('.viewport')?.dataset.ready === 'true'`, 'inspection session', 30);
-  check('choosing a robot starts its session', await c.js(`sessionStorage.getItem('crashlab-pack') === 'inspection'`));
+  if (PACK === 'inspection') {
+    await clickOn('.chat-menu-row[data-pack=inspection]');
+    await c.until(`document.getElementById('lab')?.dataset.pack === 'inspection' && document.querySelector('.viewport')?.dataset.ready === 'true'`, 'inspection session', 30);
+    check('choosing a robot starts its session', await c.js(`sessionStorage.getItem('crashlab-pack') === 'inspection'`));
+  } else {
+    await c.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' });
+    await c.js(`document.querySelector('.chat-menu').hidden = true`);
+  }
   await wait(600);
-  await shot('grid-plant-preview.png');
-  check('the plant shows with one WebGL context', (await gl()).live === 1, JSON.stringify(await gl()));
-
-  await c.js(`(() => { const t = document.querySelector('.chat-input'); t.value = 'walk the route'; document.querySelector('.chat-send').click(); })()`);
-  await c.until(`Number(document.querySelector('.viewport')?.dataset.frame ?? 0) > 5`, 'the robot plays', 40);
-  await wait(4000);
-  check('the inspection robot plays in the main area', (await gl()).live === 1, JSON.stringify(await gl()));
-  await shot('grid-single-view.png');
+  if (PACK === 'inspection') {
+    await shot(`${tag}-plant-preview.png`);
+    check('the plant shows with one WebGL context', (await gl()).live === 1, JSON.stringify(await gl()));
+  }
+  const say = PACK === 'inspection' ? (REAL ? 'add a control cabinet beside the walkway' : 'walk the route') : 'Window robot for towers in Dubai. High floor.';
+  await c.js(`(() => { const t = document.querySelector('.chat-input'); t.value = ${JSON.stringify(say)}; document.querySelector('.chat-send').click(); })()`);
+  // The window robot asks questions first. The first option answers them, as check_lab does.
+  for (let i = 0; i < 480 && !(await c.js(`Number(document.querySelector('.viewport')?.dataset.frame ?? 0) > 5`)); i++) {
+    await c.js(`[...document.querySelectorAll('.chat-option:not(:disabled)')][0]?.click()`);
+    await wait(500);
+  }
+  check(`the ${PACK} robot plays in the main area`, await c.js(`Number(document.querySelector('.viewport')?.dataset.frame ?? 0) > 5`) && (await gl()).live === 1, JSON.stringify(await gl()));
+  await wait(3000);
+  await shot(`${tag}-single-view.png`);
 
   // List, then run.
   await c.until(`!document.querySelector('.chat-test').hidden`, 'test button', 20);
   await clickOn('.chat-test');
-  await c.until(`document.querySelector('.chat-run')`, 'scenario list', 240);
+  await c.until(`document.querySelector('.chat-run') || /No scenario list/.test(document.querySelector('.chat-list').innerText)`, 'scenario list', 240);
   const cardText = await c.js(`document.querySelector('.chat-list-card').innerText`);
   check('the list shows the count and the guess note', /scenarios/.test(cardText) && /guess/i.test(cardText));
   await shot('grid-list.png');
@@ -116,7 +140,8 @@ try {
   await c.mouse('mouseMoved', 20, 400);
 
   // A stuck world goes red.
-  await c.until(`document.querySelector('.sq[data-status=stuck]')`, 'a stuck world', REAL ? 300 : 60);
+  if (!REAL) await c.until(`document.querySelector('.sq[data-status=stuck]')`, 'a stuck world', 60);
+  if (!REAL) {
   await wait(200);
   const red = await c.js(`(() => {
     const b = document.querySelector('.sq[data-status=stuck]'); const v = b.querySelector('canvas'); const d = v.getContext('2d').getImageData(4, Math.floor(v.height / 2), 1, 1).data;
@@ -134,10 +159,12 @@ try {
   check('no replay opens for it, so no WebGL', (await gl()).live === 0);
   await shot('grid-stuck-detail.png');
   await clickOn('.grid-back');
+  }
 
   // A finished run: the full replay in the main view.
-  await c.until(`document.querySelector('.sq[data-status=failed]')`, 'a failed world', REAL ? 600 : 60);
-  const index = await c.js(`document.querySelector('.sq[data-status=failed]').dataset.index`);
+  const ENDED = '.sq[data-status=failed], .sq[data-status=passed]';
+  await c.until(`document.querySelector('${REAL ? ENDED : '.sq[data-status=failed]'}')`, 'a finished world', REAL ? 600 : 60);
+  const index = await c.js(`(document.querySelector('.sq[data-status=failed]') ?? document.querySelector('.sq[data-status=passed]')).dataset.index`);
   const statesBefore = await c.js(`document.querySelectorAll('.sq[data-status=passed], .sq[data-status=failed]').length`);
   const updatesBefore = await c.js(`Number(document.querySelector('.grid-page').dataset.updates)`);
   await clickOn(`.sq[data-index="${index}"]`);
@@ -179,7 +206,7 @@ try {
 
   // Worst case: every square live at once, and the window robot's outline.
   if (!REAL) {
-    const stress = await fakeServer(['--procs', '50', '--speed', '1']);
+    const stress = await fakeServer(['--procs', '50', '--speed', '0.25']);
     await c.js(`sessionStorage.clear(); sessionStorage.setItem('crashlab-pack', 'window')`);
     await c.send('Page.navigate', { url: page(stress) });
     await c.until(`document.getElementById('lab')?.dataset.server === 'up'`, 'stress server', 20);

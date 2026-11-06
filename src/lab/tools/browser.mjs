@@ -32,13 +32,20 @@ export async function openChrome({ width = 1440, height = 900 } = {}) {
   const send = (method, params = {}) => new Promise(r => { const n = nextId++; pending.set(n, r); ws.send(JSON.stringify({ id: n, method, params })); });
   const js = async expr => {
     const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
+    if (r.error) throw new Error(`${expr.slice(0, 200)}: ${r.error.message}`);
     if (r.result.exceptionDetails) throw new Error(`${expr.slice(0, 300)}: ${JSON.stringify(r.result.exceptionDetails).slice(0, 500)}`);
     return r.result.result.value;
   };
   const shot = async path => { const r = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(path, Buffer.from(r.result.data, 'base64')); console.log('PNG', path); };
   const until = async (expr, what, seconds) => {
     const t0 = Date.now();
-    while (Date.now() - t0 < seconds * 1000) { if (await js(expr)) return (Date.now() - t0) / 1000; await wait(100); }
+    while (Date.now() - t0 < seconds * 1000) {
+      // A page that is loading has no context to ask, so it counts as not yet.
+      let met = false;
+      try { met = await js(expr); } catch (err) { if (!/context|navigat|collected/i.test(String(err))) throw err; }
+      if (met) return (Date.now() - t0) / 1000;
+      await wait(100);
+    }
     throw new Error(`timed out: ${what}`);
   };
   const mouse = (type, x, y, extra = {}) => send('Input.dispatchMouseEvent', { type, x, y, button: 'none', ...extra });

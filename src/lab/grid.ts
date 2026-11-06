@@ -127,11 +127,13 @@ class Square {
     let x = PAD;
     x += this.glyph(row, x, h - 11) ? 12 : 0;
     c.fillText(word, x, h - 11);
-    if (row.t !== null) {
+    const wordEnd = x + c.measureText(word).width;
+    c.font = `400 10.5px ${SANS}`;
+    const time = row.t === null ? '' : `${Math.round(row.t)} s`;
+    if (time && wordEnd + 6 + c.measureText(time).width <= w - PAD) {
       c.textAlign = 'right';
       c.fillStyle = red ? INK.redText : INK.muted;
-      c.font = `400 10.5px ${SANS}`;
-      c.fillText(`${Math.round(row.t)} s`, w - PAD, h - 11);
+      c.fillText(time, w - PAD, h - 11);
       c.textAlign = 'left';
     }
     if (row.t !== null && row.t_limit) {
