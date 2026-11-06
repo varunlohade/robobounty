@@ -103,3 +103,7 @@ Facts: window run 3-28 s; campaigns 34-74 trials/min on 4 procs. Inspection run 
 8. AI fix: fix.py gets --base controller5.py; held-back worlds are the fresh set; flag diff lines touching LOW_PRESSURE_PA, RESUME, TETHER, HOLD. Inspection: RouteFollower constants only. D.
 9. Recorded fallback: stored replies in policy/server/fixtures, one recorded batch each in policy/runs/demo, played by --recorded. C.
 Demo is safe after 1, 2, 5, 6, 9. Cut in order: ONNX upload, import, inspection AI fix, live inspection grid, code tab run. Bounty board: latest start 05:30 Sat.
+
+## Bounty board: solve what the company cannot (owner, 2026-11-06)
+His words: "we can have the bounty board to solve issues company are facing". Earlier: the AI tries a fix first; if it fails, the company posts a bounty for experienced engineers.
+Flow: a red failure the AI could not fix gets "Post a bounty": the failure pack and pay. Engineers read it and submit a controller change. Code runs it in the sandbox on the same worlds and on hidden held-back worlds, with the frozen judge and no regressions. A pass goes to the dispute window, then payment. Finding new failures stays as a second bounty type.
