@@ -39,22 +39,15 @@ film.setAttribute('muted', '');
 film.setAttribute('playsinline', '');
 film.setAttribute('aria-hidden', 'true');
 const still = matchMedia('(prefers-reduced-motion: reduce)');
-const pauseBtn = button('', 'Pause', () => setPlaying(film.paused));
-pauseBtn.className = '';
-const caption = h('div', 'lg-cap', h('p', '', 'Recorded simulated runs.'), pauseBtn);
+const caption = h('div', 'lg-cap', h('p', '', 'Simulated'));
 root.append(h('div', 'lg', h('div', 'lg-back', film), caption, panel));
 function setPlaying(on: boolean) {
   if (on) {
     if (!film.getAttribute('src')) { film.preload = 'auto'; film.src = '/login/film-1080.mp4'; }
-    void film.play().catch(() => { pauseBtn.textContent = 'Play'; });
+    void film.play().catch(() => {});
   } else film.pause();
-  pauseBtn.textContent = on ? 'Pause' : 'Play';
 }
-film.addEventListener('pause', () => { pauseBtn.textContent = 'Play'; });
-film.addEventListener('playing', () => { pauseBtn.textContent = 'Pause'; });
-film.addEventListener('error', () => { pauseBtn.hidden = true; });
 still.addEventListener('change', () => { if (still.matches) setPlaying(false); });
-if (still.matches) pauseBtn.textContent = 'Play';
 else setPlaying(true);
 
 // Small proof, read from the site's own data, never written here.
