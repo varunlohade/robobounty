@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Bounty board, layout 2</title>
+<style>
+@font-face{font-family:Inter;src:url(assets/inter-latin-wght-normal.woff2) format("woff2");font-weight:100 900}
+@font-face{font-family:"JetBrains Mono";src:url(assets/jetbrains-mono-latin-wght-normal.woff2) format("woff2");font-weight:100 800}
+:root{--app:#0B0C0E;--panel:#111317;--raised:#16191E;--hover:#1E2228;--active:#262B32;
+--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+--t1:#ECEEF1;--t2:#A3A9B3;--t3:#737A85;--t4:#4B515B;
+--ac:#3E7BFA;--ac-t:#7DA7FF;--ac-bg:rgba(62,123,250,.14);
+--red:#E5534B;--red-t:#F27B73;--red-bg:rgba(229,83,75,.13);--amb:#D69A2D;--amb-t:#E3B04F;--amb-bg:rgba(214,154,45,.13);--grn:#3FA66A;--grn-t:#5CC186;--grn-bg:rgba(63,166,106,.13);
+--f-slip:#D3A017;--neutral:#C9CED6;
+--sans:Inter,-apple-system,system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden;background:var(--app)}
+body{font:400 13px/20px var(--sans);color:var(--t1);font-feature-settings:"tnum","cv11";font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
+svg{display:block;flex:none}
+.t11{font-size:11px;line-height:16px}.t12{font-size:12px;line-height:16px}.t14{font-size:14px;line-height:20px}.t16{font-size:16px;line-height:24px}.t20{font-size:20px;line-height:28px}
+.m{font-weight:500}.c2{color:var(--t2)}.c3{color:var(--t3)}.mono{font-family:var(--mono);font-size:12px;line-height:16px}
+.row{display:flex;align-items:center}.gap4{gap:4px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.grow{flex:1;min-width:0}.nowrap{white-space:nowrap}.right{text-align:right}
+.title{height:40px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line)}
+.lights{display:flex;gap:8px;margin-right:8px}.lights i{width:12px;height:12px;border-radius:6px;background:#32363D}
+.status{height:24px;flex:none;border-top:1px solid var(--line);display:flex;align-items:center;padding:0 12px;gap:16px;font-size:12px;line-height:16px;color:var(--t3)}
+.status .row{gap:4px}.status .sp{flex:1}
+.btn{height:28px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 12px;border-radius:6px;font:500 13px/20px var(--sans);white-space:nowrap;color:var(--t1);border:0}
+.btn-p{background:var(--ac);color:#fff}.btn-s{background:var(--hover)}.btn-g{background:transparent;color:var(--t2);padding:0 8px}.btn-d{background:var(--raised);color:var(--t4)}
+.bdg{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 8px 0 4px;border-radius:4px;font:500 12px/16px var(--sans);white-space:nowrap}
+.bdg.plain{padding:0 8px}
+.b-n{background:var(--hover);color:var(--t2)}.b-r{background:var(--red-bg);color:var(--red-t)}.b-a{background:var(--amb-bg);color:var(--amb-t)}.b-g{background:var(--grn-bg);color:var(--grn-t)}
+.smp{font-size:11px;line-height:16px;color:var(--t3);font-weight:400}
+.inp{height:28px;background:var(--raised);border-radius:6px;display:flex;align-items:center;padding:0 8px;color:var(--t1);white-space:nowrap}
+.lab{font-size:12px;line-height:16px;color:var(--t3);margin-bottom:4px}
+.ph{height:32px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line);font-size:12px;line-height:16px;font-weight:500;color:var(--t2)}
+.ph .sp{flex:1}.ph .smp{font-weight:400}
+.tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+.tbl th{height:28px;font-weight:500;font-size:12px;line-height:16px;color:var(--t3);text-align:left;padding:0 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{height:32px;padding:0 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;color:var(--t2)}
+.tbl td.p{color:var(--t1)}
+.tbl th:first-child,.tbl td:first-child{padding-left:12px}
+.tbl th:last-child,.tbl td:last-child{padding-right:12px}
+.tbl tr.sel-r td{background:var(--ac-bg);color:var(--t1)}
+.tbl .num{text-align:right}
+.paste{background:var(--raised);border-radius:6px;padding:8px;font:400 12px/16px var(--mono);color:var(--t2);white-space:pre;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.ok{color:var(--grn-t)}.bad{color:var(--red-t)}.skip{color:var(--t4)}
+.kv{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:24px}
+.kv>:first-child{color:var(--t2);display:flex;align-items:center;gap:8px}
+.kv>:last-child{white-space:nowrap}
+.sw{width:8px;height:8px;border-radius:2px;display:inline-block;flex:none}
+
+.board{flex:none;background:var(--panel);border-bottom:1px solid var(--line)}
+.mid{flex:1;display:flex;min-height:0;background:var(--panel)}
+.pa{width:420px;flex:none;border-right:1px solid var(--line);display:flex;flex-direction:column}
+.fit{flex:1;min-width:0;display:flex;flex-direction:column}
+.bars{flex:1;padding:4px 12px 8px;display:flex;flex-direction:column}
+.bar{display:grid;grid-template-columns:152px 1fr 64px 104px;gap:12px;align-items:center;height:32px}
+.bar .nm{color:var(--t2)}
+.bar .val{text-align:right}
+.bar .lim{color:var(--t3);font-size:12px;line-height:16px;text-align:right}
+.track{position:relative;height:8px;background:var(--hover);border-radius:4px}
+.band{position:absolute;top:0;bottom:0;background:var(--t4);border-radius:4px}
+.mk{position:absolute;top:-4px;width:2px;height:16px;background:var(--t1);border-radius:1px}
+.bar.out .nm,.bar.out .val{color:var(--red-t)}
+.bar.out .mk{background:var(--red);width:4px;margin-left:-1px}
+.flow{flex:none;display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--line);background:var(--raised)}
+.seg{padding:8px 12px 12px;min-height:172px}.seg+.seg{border-left:1px solid var(--line)}
+.seg .h{display:flex;align-items:center;gap:8px;height:28px;font-weight:500}
+.seg .h .num{width:20px;height:20px;border-radius:4px;background:var(--hover);color:var(--t2);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px}
+.seg .sp{flex:1}
+.why{margin-top:8px;color:var(--t2)}
+.legend{display:flex;gap:16px;align-items:center;font-size:12px;line-height:16px;color:var(--t3)}
+.legend span{display:flex;gap:4px;align-items:center}
+.lg-b{width:16px;height:8px;border-radius:4px;background:var(--t4)}.lg-t{width:16px;height:8px;border-radius:4px;background:var(--hover)}.lg-m{width:2px;height:12px;background:var(--t1)}
+</style></head><body>
+<div class="title"><div class="lights"><i></i><i></i><i></i></div>
+<span class="m">CrashLab</span><span class="c3">/</span><span class="c2">Bounty board</span><span class="grow"></span>
+<span class="bdg plain b-n">Simulated</span>
+<span class="bdg b-a"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22" /><line x1="6" x2="6" y1="18" y2="11" /><line x1="10" x2="10" y1="18" y2="11" /><line x1="14" x2="14" y1="18" y2="11" /><line x1="18" x2="18" y1="18" y2="11" /><polygon points="12 2 20 7 4 7" /></svg>Local ledger. Not on chain.</span>
+<span class="bdg b-a"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="17" x2="22" y1="8" y2="13" /><line x1="22" x2="17" y1="8" y2="13" /></svg>World ID is not connected</span>
+<button class="btn btn-s" style="margin-left:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="M12 5v14" /></svg>Post a bounty</button>
+</div>
+<div class="board">
+ <table class="tbl"><colgroup><col style="width:48px"><col style="width:220px"><col style="width:180px"><col><col style="width:104px"><col style="width:120px"><col style="width:188px"><col style="width:88px"></colgroup>
+  <tr><th>No.</th><th>Open bounty</th><th>Company</th><th>Allowed by the company</th><th class="num">Per failure</th><th class="num">Left of cap</th><th>Ledger</th><th>Status</th></tr>
+  <tr><td>1</td><td class="p">Wide limits</td><td>Sample company</td><td>Steady wind and gusts 0 to 25 m/s</td><td class="num">10</td><td class="num">90 of 100</td><td><span class="bdg b-a"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22h14" /><path d="M5 2h14" /><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></svg>1 Pending, 10 held</span></td><td><span class="bdg b-g"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="1" /></svg>Open</span></td></tr>
+  <tr class="sel-r"><td>2</td><td>Dry glass only</td><td>Sample company</td><td>Wetness 0 to 0.5</td><td class="num">10</td><td class="num">100 of 100</td><td class="c3">Nothing held</td><td><span class="bdg b-g"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="1" /></svg>Open</span></td></tr>
+  <tr><td>3</td><td class="p">Cold mornings <span class="smp">Sample row</span></td><td>Sample company</td><td>Temperature -20 to 30 C</td><td class="num">25</td><td class="num">50 of 50</td><td class="c3">Nothing held</td><td><span class="bdg b-g"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="1" /></svg>Open</span></td></tr>
+ </table>
+</div>
+<div class="mid">
+ <div class="pa">
+  <div class="ph">Paste a world for bounty 2</div>
+  <div style="padding:12px;display:flex;flex-direction:column;gap:8px;flex:1;min-height:0">
+   <div class="row gap12">
+    <div class="grow"><div class="lab">Tester name</div><div class="inp">ana</div></div>
+    <div class="grow"><div class="lab">Seed</div><div class="inp">3100024</div></div>
+   </div>
+   <div class="paste" style="flex:1;min-height:0">{
+ "schema": "highrise.world.v3",
+ "steady_wind_ms": 2.0,
+ "gust_speed_ms": 5.0,
+ "gust_start_s": 30.0,
+ "gust_duration_s": 6.0,
+ "gust_count": 2,
+ "gust_period_s": 60.0,
+ "wind_dir_deg": 20.0,
+ "wetness": 0.8118,
+ "mullion_depth_m": 0.005,
+ "mullion_spacing_m": 1.5,
+ "mullion_offset_m": 0.75,
+ "joint_gap_m": 0.004,
+ "edge_margin_m": 1.0,
+ "area_width_m": 2.4,
+ "area_height_m": 3.0,
+ "drop_below_roof_m": 21.8,
+ "suction_pa": 2800.0,
+ "seal_leak_mm2": 200.0,
+ "battery_start_frac": 1.0,
+ … 11 more lines</div>
+   <div class="row gap8"><button class="btn btn-p"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3" /></svg>Run check, then simulation</button><span class="grow"></span><span class="t12 c3">1 of 5 used</span></div>
+  </div>
+ </div>
+ <div class="fit">
+  <div class="ph">This world against the limits<span class="sp"></span>
+   <span class="legend" style="font-weight:400"><span><i class="lg-t"></i>Schema range</span><span><i class="lg-b"></i>Allowed</span><span><i class="lg-m"></i>This world</span></span></div>
+  <div class="bars">
+   <div class="bar out"><span class="nm row gap4"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>Wetness</span><div class="track"><div class="band" style="left:0;width:50%"></div><div class="mk" style="left:81.18%"></div></div><span class="val">0.8118</span><span class="lim">0 to 0.5, company</span></div>
+   <div class="bar"><span class="nm">Steady wind, m/s</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:8%"></div></div><span class="val">2</span><span class="lim">0 to 25</span></div>
+   <div class="bar"><span class="nm">Gust speed, m/s</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:8.33%"></div></div><span class="val">5</span><span class="lim">0 to 60</span></div>
+   <div class="bar"><span class="nm">Fan suction, Pa</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:51.11%"></div></div><span class="val">2800</span><span class="lim">500 to 5000</span></div>
+   <div class="bar"><span class="nm">Pad force, N</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:18.77%"></div></div><span class="val">20.95</span><span class="lim">5 to 90</span></div>
+   <div class="bar"><span class="nm">Temperature, C</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:78.32%"></div></div><span class="val">34.82</span><span class="lim">-20 to 50</span></div>
+   <div class="bar"><span class="nm">Humidity, %</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:84.31%"></div></div><span class="val">84.31</span><span class="lim">0 to 100</span></div>
+   <div class="bar"><span class="nm">Wind direction, deg</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:55.56%"></div></div><span class="val">20</span><span class="lim">-180 to 180</span></div>
+   <div class="bar"><span class="nm">Mullion depth, m</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:12.50%"></div></div><span class="val">0.005</span><span class="lim">0 to 0.04</span></div>
+   <div class="bar"><span class="nm">Joint gap, m</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:13.33%"></div></div><span class="val">0.004</span><span class="lim">0 to 0.03</span></div>
+   <div class="bar"><span class="nm">Seal leak, mm2</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:9.09%"></div></div><span class="val">200</span><span class="lim">20 to 2000</span></div>
+   <div class="bar"><span class="nm">Battery at start</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:100.00%"></div></div><span class="val">1</span><span class="lim">0.02 to 1</span></div>
+   <div class="bar"><span class="nm">Dirt level</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:26.32%"></div></div><span class="val">0.6</span><span class="lim">0.1 to 2</span></div>
+   <div class="bar"><span class="nm">Dust, g/m2</span><div class="track"><div class="band" style="left:0;width:100%"></div><div class="mk" style="left:1.67%"></div></div><span class="val">1</span><span class="lim">0 to 60</span></div>
+   <div class="row" style="height:32px;justify-content:space-between"><span class="c3 t12">15 more fields keep the schema range</span><span class="c3 t12">The company chose these limits. Inside them is not shown to be physically possible.</span></div>
+  </div>
+ </div>
+</div>
+<div class="flow">
+ <div class="seg"><div class="h"><span class="num">1</span>Check<span class="sp"></span><span class="bdg b-r"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>Rejected</span></div>
+  <div class="kv"><span><span class="ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span>World file</span><span class="c2">Strict, all fields</span></div>
+  <div class="kv"><span><span class="bad"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></span>Company limits</span><span class="mono bad">outside_limits</span></div>
+  <div class="why">wetness=0.8118 is outside the company limits [0, 0.5].</div>
+  <div class="t12 c3" style="margin-top:4px">Real gate output, 0.1 s. The fixture is a known failing world.</div>
+ </div>
+ <div class="seg"><div class="h"><span class="num">2</span>Simulation<span class="sp"></span><span class="bdg plain b-n">Did not run</span></div>
+  <div class="kv"><span><span class="skip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /></svg></span>Sim runs</span><span class="c2">0 of up to 10</span></div>
+  <div class="kv"><span><span class="skip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.143" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /></svg></span>Same failure on re-runs</span><span class="c3">Needs 7 of 8</span></div>
+  <div class="why">A world outside the limits stops at the check, so it costs no sim time.</div>
+  <div class="t12 c3" style="margin-top:4px">Simulated with hand-built physics when it runs.</div>
+ </div>
+ <div class="seg"><div class="h"><span class="num">3</span>Payout<span class="sp"></span><span class="bdg plain b-n">Nothing held</span></div>
+  <div class="kv"><span>This world earns</span><span>0 test units</span></div>
+  <div class="kv"><span>Bounty 2 still has</span><span>100 of 100</span></div>
+  <div class="why">On acceptance, 10 test units go to Pending for a 60 s dispute window, as on bounty 1.</div>
+  <div class="t12 c3" style="margin-top:4px">Local ledger. Not on chain. No real money.</div>
+ </div>
+</div>
+<div class="status"><span class="row"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>Simulated</span><span>Hand-built physics, not checked against real hardware</span><span class="sp"></span><span class="row"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="17" x2="22" y1="8" y2="13" /><line x1="22" x2="17" y1="8" y2="13" /></svg>World ID is not connected, so the cap of 5 counts names, not people</span><span class="row"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22" /><line x1="6" x2="6" y1="18" y2="11" /><line x1="10" x2="10" y1="18" y2="11" /><line x1="14" x2="14" y1="18" y2="11" /><line x1="18" x2="18" y1="18" y2="11" /><polygon points="12 2 20 7 4 7" /></svg>Local ledger. Not on chain.</span></div>
+</body></html>
