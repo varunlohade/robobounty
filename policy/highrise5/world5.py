@@ -54,6 +54,8 @@ ROBOT_GEOMS = 10
 FIXED_VIEW_GEOMS = 4  # ground, tower, parapet, anchor post
 
 NUM, INT = "num", "int"
+DEFAULT_CLEAN_SPEED_MS = 0.15
+MAX_CLEAN_SPEED_MS = 0.20  # the fastest speed tried that passed nominal on every seed. See check_engine5.py
 
 # Each block: field -> (kind, min, max).
 BLOCKS = {
@@ -64,7 +66,8 @@ BLOCKS = {
     "weather": {"wetness": (NUM, 0.0, 1.0), "temperature_c": (NUM, -20.0, 50.0), "humidity_pct": (NUM, 0.0, 100.0), "dust_gm2": (NUM, 0.0, 60.0)},
     "wind": {"steady_ms": (NUM, 0.0, 25.0), "gust_ms": (NUM, 0.0, 60.0), "gust_start_s": (NUM, 0.0, 500.0), "gust_duration_s": (NUM, 0.5, 60.0),
              "gust_count": (INT, 0, 6), "gust_period_s": (NUM, 5.0, 200.0), "dir_deg": (NUM, -180.0, 180.0)},
-    "robot": {"suction_pa": (NUM, 500.0, 5000.0), "seal_leak_mm2": (NUM, 20.0, 2000.0), "battery_start_frac": (NUM, 0.02, 1.0), "pad_force_n": (NUM, 5.0, 90.0)},
+    "robot": {"suction_pa": (NUM, 500.0, 5000.0), "seal_leak_mm2": (NUM, 20.0, 2000.0), "battery_start_frac": (NUM, 0.02, 1.0), "pad_force_n": (NUM, 5.0, 90.0),
+              "clean_speed_ms": (NUM, 0.05, MAX_CLEAN_SPEED_MS)},
     "robot_start": {"x_m": (NUM, -6.0, 9.0), "above_top_m": (NUM, -14.0, 6.0)},
     "light": {"sun_level": (NUM, 0.2, 1.0), "azimuth_deg": (NUM, -180.0, 180.0), "haze": (NUM, 0.0, 1.0)},
     "surroundings": {"city_seed": (INT, 0, 1000000), "density": (NUM, 0.0, 1.0), "radius_m": (NUM, 100.0, 640.0)},
@@ -564,6 +567,7 @@ def upgrade(raw):
         else:
             objects.append(_upgrade_element(e, i))
     world["objects"] = objects
+    world["robot"]["clean_speed_ms"] = DEFAULT_CLEAN_SPEED_MS
     world["robot_start"] = {"x_m": BODY_SIDE / 2 - 0.03, "above_top_m": 0.13}
     world["tower"] = {"height_m": LEGACY_ROOF_M, "width_m": 0.0, "floor_m": LEGACY_FLOOR_M, "shape": "flat", "corner": corner, "setback": setback}
     glass = glass_rect(world)
