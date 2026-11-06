@@ -12,6 +12,8 @@ See what is on at any time. This prints no secret and opens no connection:
 
 ## Arc testnet: payouts in test USDC
 
+To film real wallet popups, use docs/ARC-DEMO.md. It is the newer path, in which the server holds only the resolver and arbiter keys. The steps below are the older path, in which the server holds all four.
+
 **1. Make four new wallets.** One command, once. Each `cast wallet new` asks for a password. Use the same one for all four.
 
     mkdir -m 700 ~/.crashlab-arc

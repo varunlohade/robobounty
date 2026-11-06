@@ -399,8 +399,9 @@ function fixDetail(b: Bounty, inner: HTMLElement) {
   const c = b.hidden_counts!;
   const total = hiddenTotal(b);
   inner.append(h('div', 'dh', h('div', 'top', h('h1', '', b.title), statusTag(b)), h('p', 'req', `${b.company}. ${cap1(words(b.group!))} on the ${b.robot.toLowerCase()}: ${worlds[0].reason}`)),
-    h('div', 'facts', fact('Pay', arc ? `${b.pay} test USDC` : `${b.pay} test units`), fact('Failure', cap1(words(b.group!))), fact('Base file', code(b.controller!.file)), fact('Dispute window', `${b.dispute_window_s} s`)),
-    sect('Public failing worlds', String(worlds.length)));
+    h('div', 'facts', fact('Pay', arc ? `${b.pay} test USDC` : `${b.pay} test units`), fact('Failure', cap1(words(b.group!))), fact('Base file', code(b.controller!.file)), fact('Dispute window', `${b.dispute_window_s} s`)));
+  if (arc) inner.append(...chainPanel(b, S.fixes.find(x => x.n === S.focus) ?? S.fixes[S.fixes.length - 1]));
+  inner.append(sect('Public failing worlds', String(worlds.length)));
   const table = h('table');
   table.append(h('thead', '', h('tr', '', h('th', '', 'World'), h('th', 'num', 'Fails at'), h('th', '', 'Judge'), h('th', '', 'Seed'))));
   const body = h('tbody');
@@ -439,7 +440,6 @@ function fixDetail(b: Bounty, inner: HTMLElement) {
     subs.append(rows);
     inner.append(subs);
   } else inner.append(h('div', 'words small', 'No fix yet. A fix runs on the public worlds, then on the hidden worlds.'));
-  if (arc) inner.append(...chainPanel(b, f));
   if (f) inner.append(...fixResult(b, f));
   inner.append(sect('Frozen judge and sim'));
   for (const [k, v] of Object.entries(b.frozen!).filter(([name]) => /judge|sim/.test(name))) inner.append(h('div', 'kv', h('span', '', code(k.split('/').pop()!)), h('span', '', code(short(v)))));

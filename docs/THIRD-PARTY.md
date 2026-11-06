@@ -21,6 +21,7 @@ The repo itself has no license file yet.
 | CodeMirror 6 (`state`, `view`, `commands`, `language`, `lang-json`, `lang-python`), `@lezer/highlight` | see `package.json` | MIT | package.json | Code tab |
 | `@worldcoin/idkit-core` | 4.6.0 | MIT | package.json | World ID sign-in |
 | `qrcode-generator` | 2.0.4 | MIT | package.json | Sign-in QR code |
+| `viem` | 2.21.55 | MIT | package.json | Encodes wallet transactions on the bounty page |
 | Vite, esbuild | 7.1.12, 0.25.12 | MIT | package.json | Dev server, build |
 | TypeScript | 5.9.3 | Apache-2.0 | package.json | Language |
 | NumPy | 2.2.6 | BSD | package metadata | Python numbers |
