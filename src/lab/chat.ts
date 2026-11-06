@@ -235,6 +235,16 @@ export class LabChat {
       case 'text':
         this.note(event.text, event.fail);
         break;
+      case 'picture': {
+        const figure = el('figure', 'chat-picture');
+        const image = document.createElement('img');
+        image.src = event.url;
+        image.alt = event.caption;
+        image.style.maxWidth = '100%';
+        figure.append(image, el('figcaption', 'chat-note', event.caption));
+        this.append(figure);
+        break;
+      }
       case 'working':
         this.working(event.text);
         break;

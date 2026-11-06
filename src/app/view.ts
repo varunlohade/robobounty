@@ -10,6 +10,7 @@ import { AIR, CITIES, FOG_THICKNESS, TIMES, lookOf, luminance, parseLook, tintOf
 import { compositeMaterial } from '../view/real/post.ts';
 import { buildRobot } from '../view/real/robot.ts';
 import { Weather } from '../view/real/weather.ts';
+import { generatedModel } from '../view/real/generated.ts';
 import type { Replay } from './replay.ts';
 import { isV5, worldFacts, type Trial } from './trial.ts';
 
@@ -641,6 +642,7 @@ export class SimView {
     const robot = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY.value, 'robot');
     const rootOf = (b: number) => m.body_rootid[b];
     const cityMats = new Set(['city0', 'city1'].map(n => mj.mj_name2id(m, mj.mjtObj.mjOBJ_MATERIAL.value, n)));
+    const hulls: { name: string; mesh: THREE.Mesh }[] = [];
     const skip = new Set<number>([geomId('glass'), geomId('ground')]);
     for (const p of ['mullion', 'transom']) for (let k = 0; ; k++) { const id = geomId(`${p}${k}`); if (id < 0) break; skip.add(id); }
     for (let i = 0; i < m.ngeom; i++) {
@@ -652,6 +654,7 @@ export class SimView {
       else if (type === 3) { g = new THREE.CapsuleGeometry(s[0], s[1] * 2, 8, 16); g.rotateX(Math.PI / 2); }
       else if (type === 5) { g = new THREE.CylinderGeometry(s[0], s[0], s[1] * 2, 32); g.rotateX(Math.PI / 2); }
       else if (type === 6) g = new THREE.BoxGeometry(s[0] * 2, s[1] * 2, s[2] * 2);
+      else if (type === 7) g = this.hullGeometry(m.geom_dataid[i]);
       else throw new Error(`geom ${i}: type ${type} has no drawing code`);
       const mat = m.geom_matid[i];
       const c = mat >= 0 ? m.mat_rgba : m.geom_rgba, o = (mat >= 0 ? mat : i) * 4;
@@ -673,6 +676,39 @@ export class SimView {
       this.built.add(mesh);
       this.drawn.push({ mesh, geom: i });
       this.builtDisposers.push(() => { g.dispose(); material.dispose(); });
+      if (type === 7) hulls.push({ name: mj.mj_id2name(m, mj.mjtObj.mjOBJ_GEOM.value, i) ?? '', mesh });
+    }
+    this.drawGenerated(hulls);
+  }
+
+  // A convex collision shape of a generated object, from the compiled model.
+  private hullGeometry(id: number) {
+    const { model: m } = this.replay;
+    const v = m.mesh_vertadr[id], nv = m.mesh_vertnum[id], f = m.mesh_faceadr[id], nf = m.mesh_facenum[id];
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(m.mesh_vert.subarray(v * 3, (v + nv) * 3)), 3));
+    g.setIndex(Array.from(m.mesh_face.subarray(f * 3, (f + nf) * 3) as Int32Array));
+    g.computeVertexNormals();
+    return g;
+  }
+
+  // A generated object's picture is its GLB, from the world file. Its collision shapes stay hidden unless the GLB does not load, and then the page says so.
+  private drawGenerated(hulls: { name: string; mesh: THREE.Mesh }[]) {
+    const world = this.trial.world as Record<string, any> | undefined;
+    for (const { mesh } of hulls) mesh.visible = false;
+    const objects = isV5(world) ? (world!.objects as Record<string, any>[]).filter(o => o.kind === 'generated') : [];
+    if (!objects.length) return;
+    const area = this.trial.manifest.area;
+    const built = this.built;
+    for (const o of objects) {
+      generatedModel(o.props.asset, o.props.real_size_m).then(model => {
+        model.position.set(area.x0 + o.pos.x_m, -o.pos.out_m, area.z1 - o.pos.below_top_m);
+        model.rotation.set(o.euler_deg[0] * Math.PI / 180, o.euler_deg[1] * Math.PI / 180, o.euler_deg[2] * Math.PI / 180, 'XYZ');
+        model.name = `generated:${o.name}`;
+        built.add(model);
+      }).catch(() => {
+        for (const { name, mesh } of hulls) if (name.startsWith(`obj_${o.name}.h`)) mesh.visible = true;
+      });
     }
   }
 

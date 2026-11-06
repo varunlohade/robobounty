@@ -7,6 +7,7 @@ export type ChatEvent =
   | { type: 'text'; text: string; fail?: boolean }
   | { type: 'tool'; title: string; meta?: string; lines: string[]; id?: string | null }
   | { type: 'working'; text: string | null }
+  | { type: 'picture'; url: string; caption: string }
   | { type: 'retire' }
   | { type: 'requirements'; rows: { id: string; rule: string; severity: string; text: string }[]; note: string; limits: string }
   | { type: 'review'; title: string; sections: { head: string; lines: string[] }[]; actions: ChatAction[] }

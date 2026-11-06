@@ -2,7 +2,7 @@
 
 call(world, fn, args) checks the arguments, builds a new world and never changes the old one. It returns
 {"result", "rerun", "world"}. The result is "ok", "picture only, no re-run" or "cannot_build:<code>". A code comes from
-CODES, so no text from the call reaches the result. A world is data only: no code, no file paths, no mesh.
+CODES, so no text from the call reaches the result. A world is data only: no code and no file paths. A generated object names a cached model by its sha.
 
 Axes: z up, metres. The robot starts at the origin and faces +x. Each object has a local +x, its walking direction,
 and yaw_deg turns that about the object's x, y. primitives() is the one place that turns objects into solids, and the
@@ -14,6 +14,8 @@ import hashlib
 import json
 import math
 import re
+import sys
+from pathlib import Path
 
 SCHEMA = 1
 OK = "ok"
@@ -25,15 +27,20 @@ START_CLEAR_M = 0.9  # half the box around the start that must stay empty. ANYma
 MIN_LEG_M = 0.5
 MAX_WAYPOINTS = 16
 MAX_OBJECTS = 40
+MAX_HULLS = 16
+MAX_HULL_POINTS = 64
+GENERATED_SIZE_M = (0.05, 12.0)
 MAX_SCENERY = 120
 MAX_PRIMITIVES = 300
 MAX_SCENERY_PRIMITIVES = 2500
 MAX_RAMP_DEG = 35.0
 WET_PATCH_THICK_M = 0.005
 GRATING_BAR_WIDTH_M = 0.03
+NEAR_ROUTE_M = 1.7  # half the 3.4 m walkway. A solid further from the route than this cannot touch the robot, so it stays picture only
+GENERATED_COLOUR = [0.42, 0.4, 0.37]
 
 CODES = frozenset({
-    "bad_args", "bad_name", "blocks_start", "invalid_world", "name_taken", "out_of_range", "outside_world", "route_leg_too_short",
+    "bad_args", "bad_name", "blocks_start", "invalid_world", "name_taken", "not_generated", "out_of_range", "outside_world", "route_leg_too_short",
     "too_many_objects", "too_many_shapes", "too_many_waypoints", "too_steep", "unknown_function",
 })
 NAME_RE = re.compile(r"[a-z][a-z0-9_]{0,31}")
@@ -73,6 +80,10 @@ def _object_schema(props, required):
 
 def _check_value(rule, value):
     kind = rule["type"]
+    if kind == "boolean":
+        if not isinstance(value, bool):
+            raise Refuse("bad_args")
+        return value
     if kind in ("number", "integer"):
         if isinstance(value, bool) or not isinstance(value, (int, float)) or (kind == "integer" and not isinstance(value, int)):
             raise Refuse("bad_args")
@@ -126,6 +137,68 @@ def _adder(kind):
         if len(primitives(world)) > MAX_PRIMITIVES:
             raise Refuse("too_many_shapes")
     return add
+
+
+def _cache():
+    sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "crashlab"))
+    import generate_object
+    return generate_object
+
+
+def _generate(world, a):
+    """Reads the cache only. The chat layer makes a missing model first, so this edit stays quick, and a missing model refuses.
+    Size, hulls and mass go into the world as numbers, so a run in the sandbox reads no other file. The cache import stays here for that reason."""
+    GO = _cache()
+    entry = GO.find(a["description"])
+    if entry is None:
+        raise Refuse("not_generated")
+    asset = GO.load(entry["sha256"])
+    real = a.get("real_size_m", asset.get("suggested_size_m", 1.0))
+    hulls = [{"v": points, "f": hull["f"]} for points, hull in zip(GO.scaled_hulls(asset, real), asset["hulls"])]
+    _adder("generated")(world, {**a, "real_size_m": real, "asset": entry["sha256"], "size": GO.size_of(asset, real), "mass_kg": GO.mass_kg(asset, real), "hulls": hulls})
+
+
+def _stored_generated(world, obj):
+    """A generated object in a stored world. Its numbers stay as they are, after the same bounds a new one gets. Only a world file reaches this, never the AI's call."""
+    keys = {"kind", "name", "description", "real_size_m", "x", "y", "yaw_deg", "solid", "asset", "size", "mass_kg", "hulls"}
+    if set(obj) - keys or keys - set(obj) - {"yaw_deg"}:
+        raise Refuse("invalid_world")
+    size, hulls = obj["size"], obj["hulls"]
+    numbers = [obj["real_size_m"], obj["x"], obj["y"], obj.get("yaw_deg", 0.0), obj["mass_kg"]] + (size if isinstance(size, list) else [])
+    if not isinstance(size, list) or len(size) != 3 or not isinstance(hulls, list) or not 1 <= len(hulls) <= MAX_HULLS or any(isinstance(n, bool) or not isinstance(n, (int, float)) or not math.isfinite(n) for n in numbers):
+        raise Refuse("invalid_world")
+    if not isinstance(obj["asset"], str) or not re.fullmatch(r"[0-9a-f]{64}", obj["asset"]) or not isinstance(obj["solid"], bool) or not NAME_RE.fullmatch(str(obj["name"])):
+        raise Refuse("invalid_world")
+    for hull in hulls:
+        points, faces = hull.get("v"), hull.get("f") if isinstance(hull, dict) else (None, None)
+        if not isinstance(points, list) or not 4 <= len(points) <= MAX_HULL_POINTS or not isinstance(faces, list):
+            raise Refuse("invalid_world")
+        for p in points:
+            if not isinstance(p, list) or len(p) != 3 or any(isinstance(c, bool) or not isinstance(c, (int, float)) or not abs(c) <= size[i] / 2 + 0.01 for i, c in enumerate(p)):
+                raise Refuse("invalid_world")
+        if any(not isinstance(f, list) or len(f) != 3 or any(type(i) is not int or not 0 <= i < len(points) for i in f) for f in faces):
+            raise Refuse("invalid_world")
+    world["objects"].append(copy.deepcopy(obj))
+
+
+def _distance_to_route(world, x, y):
+    points = [(0.0, 0.0)] + [(p["x"], p["y"]) for p in world["route"]["waypoints"]]
+    best = math.inf
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        dx, dy = x1 - x0, y1 - y0
+        t = max(0.0, min(1.0, ((x - x0) * dx + (y - y0) * dy) / max(dx * dx + dy * dy, 1e-9)))
+        best = min(best, math.hypot(x - x0 - t * dx, y - y0 - t * dy))
+    return best
+
+
+def is_physics(world, obj):
+    """Every object but a generated one. A generated one needs solid true and its bounding circle within NEAR_ROUTE_M of the route, the same idea as add_object's near-glass rule in world5."""
+    if obj["kind"] != "generated":
+        return True
+    if not obj["solid"]:
+        return False
+    x0, x1, half_y = _local_extent(obj)
+    return _distance_to_route(world, obj["x"], obj["y"]) - math.hypot(max(abs(x0), abs(x1)), half_y) <= NEAR_ROUTE_M
 
 
 def _high_above_start(obj):
@@ -189,6 +262,9 @@ REGISTRY = {
     "add_grating": {"args": _object_schema({"length": _num(0.2, 10.0), "width": _num(0.2, 10.0), "bar_height": _num(0.005, 0.1), "pitch": _num(0.05, 0.5), "friction": FRICTION},
                                            {"length", "width"}),
                     "edit": _adder("grating"), "rerun": True, "note": "Raised steel bars across the walkway. x, y is the middle of the first edge."},
+    "generate_object": {"args": _schema({"name": NAME, "description": {"type": "string", "pattern": r"[A-Za-z0-9 ,.'-]{3,200}"}, "real_size_m": _num(*GENERATED_SIZE_M), "x": XY, "y": XY, "yaw_deg": YAW, "solid": {"type": "boolean"}}, {"name", "description", "x", "y", "solid"}),
+                         "edit": _generate, "rerun": False, "note": "A textured model from a description, made on the GPU, with convex collision shapes, standing on the floor. real_size_m is its longest side, and leaving it out uses the size picked when the model was made. x, y is its centre. "
+                         f"It is solid only if solid is true and it is within {NEAR_ROUTE_M:g} m of the route. Otherwise it is picture only. It stays fixed. Mass is a guess from a table. Saved models cost no GPU time, and their list comes with the catalog."},
     "set_route": {"args": _schema({"waypoints": {"type": "array", "items": POINT, "minItems": 1, "maxItems": MAX_WAYPOINTS}, "time_limit_s": _num(5.0, 300.0)}, {"waypoints"}),
                   "edit": _set_route, "rerun": True, "note": "Waypoints in order, from the start at the origin."},
     "set_payload": {"args": _schema({"mass_kg": _num(0.0, 40.0)}, {"mass_kg"}), "edit": _set_payload, "rerun": True,
@@ -206,12 +282,16 @@ REGISTRY = {
     "add_gauge": _picture({"x": XY, "y": XY}, {"x", "y"}, "gauge", "Pressure gauge on a post: what the robot comes to read."),
     "add_pump": _picture({"x": XY, "y": XY, "yaw_deg": YAW}, {"x", "y"}, "pump", "Pump and motor on a base."),
 }
-OBJECT_FN = {k: f"add_{k}" for k in ("box", "ramp", "steps", "pipe", "wet_patch", "grating", "cable_tray", "valve")}
+OBJECT_FN = {**{k: f"add_{k}" for k in ("box", "ramp", "steps", "pipe", "wet_patch", "grating", "cable_tray", "valve")}, "generated": "generate_object"}
 SCENERY_FN = {k: f"add_{k}" for k in ("wall", "tank", "pipe_rack", "railing", "column", "beam", "light", "floor_line", "gauge", "pump")}
 
 
 def catalog():
-    return [{"name": name, "args": copy.deepcopy(row["args"]), "rerun": row["rerun"], "note": row["note"]} for name, row in REGISTRY.items()]
+    rows = [{"name": name, "args": copy.deepcopy(row["args"]), "rerun": row["rerun"], "note": row["note"]} for name, row in REGISTRY.items()]
+    for row in rows:
+        if row["name"] == "generate_object":
+            row["note"] += " Saved: " + ("; ".join(_cache().library()) or "none yet") + "."
+    return rows
 
 
 def new_world():
@@ -270,6 +350,9 @@ def validate(world):
             for obj in items:
                 if not isinstance(obj, dict) or not isinstance(obj.get("kind"), str) or obj["kind"] not in table:
                     raise Refuse("invalid_world")
+                if obj["kind"] == "generated":
+                    _stored_generated(out, obj)
+                    continue
                 out = _apply(out, table[obj["kind"]], {k: v for k, v in obj.items() if k != "kind"})
         return out
     except Refuse as refused:
@@ -278,7 +361,7 @@ def validate(world):
 
 def physics_inputs(world):
     """All that the physics reads. A picture edit leaves this unchanged."""
-    return {k: world[k] for k in ("floor", "gravity", "payload", "route", "objects")}
+    return {**{k: world[k] for k in ("floor", "gravity", "payload", "route")}, "objects": [o for o in world["objects"] if is_physics(world, o)]}
 
 
 def physics_hash(world):
@@ -289,6 +372,9 @@ def physics_hash(world):
 def _local_extent(obj):
     """(x0, x1, half_y) in the object's own frame, with x, y at its local origin."""
     kind = obj["kind"]
+    if kind == "generated":
+        sx, sy, _ = obj["size"]
+        return -sx / 2, sx / 2, sy / 2
     if kind == "box" or kind == "wet_patch":
         return -obj["sx"] / 2, obj["sx"] / 2, obj["sy"] / 2
     if kind == "ramp":
@@ -415,10 +501,23 @@ def _object_parts(obj):
     return [("box", (GRATING_BAR_WIDTH_M / 2 + pitch * i, 0.0, bar / 2), NO_TURN, (GRATING_BAR_WIDTH_M / 2, obj["width"] / 2, bar / 2), "galvanised") for i in range(count)]
 
 
+def _generated_prim(obj, world_friction):
+    """What a browser or Blender needs to draw the model. pos is its centre, and its base stands on the floor."""
+    size = obj["size"]
+    half_yaw = math.radians(obj.get("yaw_deg", 0.0)) / 2
+    return {"object": obj["name"], "pos": [obj["x"], obj["y"], size[2] / 2], "quat": [0.0, 0.0, math.sin(half_yaw), math.cos(half_yaw)], "size": size, "friction": world_friction,
+                   "material": "generated", "colour": GENERATED_COLOUR, "glb": obj["asset"], "real_size_m": obj["real_size_m"]}
+
+
 def primitives(world):
     """Every physical solid, in world axes. Plain JSON data, read by the model loader and sent in the replay."""
     out = []
     for obj in world["objects"]:
+        if obj["kind"] == "generated":
+            if is_physics(world, obj):
+                prim = _generated_prim(obj, world["floor"]["friction"])
+                out.extend({**prim, "name": f"{obj['name']}_{i}", "type": "hull", "verts": hull["v"], "faces": hull["f"]} for i, hull in enumerate(obj["hulls"]))
+            continue
         c, s = _cos_sin(obj)
         yaw = _axis_quat((0.0, 0.0, 1.0), math.radians(obj.get("yaw_deg", 0.0)))
         for i, (shape, centre, quat, size, material) in enumerate(_object_parts(obj)):
@@ -557,7 +656,7 @@ SCENERY_PARTS = {"wall": _wall_parts, "tank": _tank_parts, "pipe_rack": _pipe_ra
 
 def scenery_primitives(world):
     """Picture-only solids, for the picture and the replay. The physics model never reads this."""
-    out = []
+    out = [{**_generated_prim(o, world["floor"]["friction"]), "name": o["name"], "type": "glb", "picture_only": True} for o in world["objects"] if o["kind"] == "generated" and not is_physics(world, o)]
     for obj in world["scenery"]:
         for i, prim in enumerate(SCENERY_PARTS[obj["kind"]](obj)):
             out.append({"name": f"{obj['name']}_{i}", "object": obj["name"], **prim})
@@ -572,7 +671,7 @@ def surface_height(world, x, y):
     """Height of the walkable surface under a point, for the fall check. Pipes do not count: nothing stands on them."""
     top = 0.0
     for obj in world["objects"]:
-        if obj["kind"] in ("pipe", "cable_tray", "valve"):
+        if obj["kind"] in ("pipe", "cable_tray", "valve") or not is_physics(world, obj):
             continue
         c, s = _cos_sin(obj)
         lx = c * (x - obj["x"]) + s * (y - obj["y"])
@@ -581,7 +680,9 @@ def surface_height(world, x, y):
         if abs(ly) > hy or not x0 <= lx <= x1:
             continue
         kind = obj["kind"]
-        if kind == "box":
+        if kind == "generated":
+            top = max(top, obj["size"][2])
+        elif kind == "box":
             top = max(top, obj["sz"])
         elif kind == "wet_patch":
             top = max(top, WET_PATCH_THICK_M)

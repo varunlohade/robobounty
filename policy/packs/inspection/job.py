@@ -58,7 +58,8 @@ def _corners(obj):
 def _object_words(o):
     return {"pipe": lambda: f"pipe {o.get('clearance', 0.05):g} m up, r {o['radius']:g}", "wet_patch": lambda: f"wet, grip {o.get('friction', 0.05):g}", "steps": lambda: f"{o.get('count', 3)} steps {o['rise']:g} m",
             "ramp": lambda: f"ramp {o['height']:g} m", "cable_tray": lambda: f"tray {o.get('height', 0.08):g} m", "valve": lambda: f"valve {o.get('size', 0.08):g} m",
-            "grating": lambda: f"bars {o.get('bar_height', 0.02):g} m", "box": lambda: f"box {o['sz']:g} m"}[o["kind"]]()
+            "grating": lambda: f"bars {o.get('bar_height', 0.02):g} m", "box": lambda: f"box {o['sz']:g} m",
+            "generated": lambda: f"model {o['real_size_m']:g} m"}[o["kind"]]()
 
 
 def marks(base, world):

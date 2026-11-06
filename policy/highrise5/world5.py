@@ -9,6 +9,7 @@ import math
 import os
 import re
 import stat
+from pathlib import Path
 
 SCHEMA = "highrise.world.v5"
 SCHEMA_V3 = "highrise.world.v3"
@@ -86,6 +87,12 @@ TOWER_DEPTH_M = 28.0  # the picture's tower box, front to back
 POS_FIELDS = {"x_m": (NUM, -200.0, 200.0), "below_top_m": (NUM, -200.0, 300.0), "out_m": (NUM, -TOWER_DEPTH_M, 300.0)}  # a negative out_m stands on the roof, see _check_geometry
 
 SHAPES = {"box": 3, "cyl": 2, "sphere": 1, "capsule": 2}  # size entries: box w,out,h; cyl and capsule radius,length; sphere radius
+MESH = "mesh"  # a generated object: size is its bounding box, its shapes come from its asset, and props hold the asset sha and the longest side
+GENERATED_SIZE_M = (0.05, 12.0)
+MAX_HULLS = 16
+MAX_HULL_POINTS = 64
+HULL_SLACK_M = 0.01
+SHA_RE = re.compile(r"[0-9a-f]{64}")
 SIZE_RANGE = (0.0005, 100.0)
 PATCH_THICK_M = 0.0006
 # kind -> (solid, extra numeric fields). "object" is free-form. The others are unrotated boxes at a fixed distance from the glass.
@@ -298,11 +305,45 @@ def _air(raw):
     return out
 
 
+def _hulls(raw, size, where):
+    """A generated object's collision shapes live in the world file as plain numbers, so a run reads no other file. Each hull is a list of points about the object's centre, in metres."""
+    if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_HULLS:
+        raise WorldError(f"{where}.hulls does not fit")
+    out = []
+    for hull in raw:
+        if not isinstance(hull, list) or not 4 <= len(hull) <= MAX_HULL_POINTS:
+            raise WorldError(f"{where}.hulls does not fit")
+        points = [_vector(p, 3, -100.0, 100.0, f"{where}.hulls") for p in hull]
+        if any(abs(c) > size[i] / 2 + HULL_SLACK_M for p in points for i, c in enumerate(p)):
+            raise WorldError(f"{where}.hulls does not fit")
+        out.append(points)
+    return out
+
+
+def _generated(raw, where, name, materials):
+    props = raw["props"]
+    if not isinstance(props, dict) or set(props) != {"asset", "real_size_m", "mass_kg", "hulls"} or raw["shape"] != MESH:
+        raise WorldError(f"{where} is not a generated object")
+    if not isinstance(props["asset"], str) or not SHA_RE.fullmatch(props["asset"]):
+        raise WorldError(f"{where} is not a generated object")
+    material = _name(raw["material"], f"{where}.material")
+    if material not in materials:
+        raise WorldError(f"{where}.material does not exist")
+    if not isinstance(raw["solid"], bool):
+        raise WorldError(f"{where}.solid must be true or false")
+    numbers = _fields({"real_size_m": props["real_size_m"], "mass_kg": props["mass_kg"]}, {"real_size_m": (NUM, *GENERATED_SIZE_M), "mass_kg": (NUM, 0.0, 1e6)}, f"{where}.props")
+    size = _vector(raw["size"], 3, *SIZE_RANGE, f"{where}.size")
+    return {"name": name, "kind": "generated", "shape": MESH, "solid": raw["solid"], "material": material, "props": {"asset": props["asset"], **numbers, "hulls": _hulls(props["hulls"], size, where)},
+            "size": size, "pos": _fields(raw["pos"], POS_FIELDS, f"{where}.pos"), "euler_deg": _vector(raw["euler_deg"], 3, -180.0, 180.0, f"{where}.euler_deg")}
+
+
 def _object(raw, i, materials):
     where = f"objects[{i}]"
     _keys(raw, OBJECT_FIELDS, where)
     name = _name(raw["name"], f"{where}.name")
     kind = raw["kind"]
+    if kind == "generated":
+        return _generated(raw, where, name, materials)
     if not isinstance(kind, str) or kind not in KINDS:
         raise WorldError(f"{where}.kind is unknown")
     shape = raw["shape"]
@@ -347,7 +388,7 @@ def half_extents(obj):
     """World-axis half widths of the shape's bounding box, x, y, z."""
     R = _rotation(obj["euler_deg"])
     s = obj["size"]
-    if obj["shape"] == "box":
+    if obj["shape"] in ("box", MESH):
         h = (s[0] / 2, s[1] / 2, s[2] / 2)
         return tuple(sum(abs(R[i][j]) * h[j] for j in range(3)) for i in range(3))
     if obj["shape"] == "sphere":
@@ -472,7 +513,7 @@ def floating(world):
         on_parapet = roof < lo[2] <= roof + PARAPET_TOP_M + TOUCH_M and over_tower and lo[1] < PARAPET_OUT_M and hi[1] > -PARAPET_OUT_M
         return on_wall or on_roof or on_parapet
 
-    held = {o["name"] for o in world["objects"] if o["kind"] != "object" or held_by_building(o)}
+    held = {o["name"] for o in world["objects"] if o["kind"] not in ("object", "generated") or held_by_building(o)}
     waiting = [o["name"] for o in world["objects"] if o["name"] not in held]
     grew = True
     while grew and waiting:
@@ -497,6 +538,8 @@ def geom_counts(world):
     """(all geoms in the view model, solid geoms). Picture solids count as solids, so moving one cannot pass a cap."""
     joints = len(mullion_xs(world)) + len(transom_zs(world))
     solids = 1 + joints + sum(o["solid"] for o in world["objects"])
+    hulls = sum(len(o["props"]["hulls"]) - 1 for o in world["objects"] if o["kind"] == "generated")  # beyond the one each object counts below
+    solids += hulls
     geoms = 1 + joints + ROBOT_GEOMS + FIXED_VIEW_GEOMS + len(city_blocks(world))
     if world["tower"]["setback"]:
         geoms += 2
@@ -505,7 +548,7 @@ def geom_counts(world):
             geoms += 1 + vent_bar_count(o)
         else:
             geoms += {"balcony": 4, "cradle": 2, "dirt_patch": 0}.get(o["kind"], 1)
-    return geoms, solids
+    return geoms + hulls, solids
 
 
 def _check_geometry(world):

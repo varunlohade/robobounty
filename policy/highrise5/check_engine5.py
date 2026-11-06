@@ -53,6 +53,8 @@ SEEDED = [("add_object", BOX)]  # calls that need an object first
 
 # Function: good calls. Each one changes something from the nominal world plus SEEDED.
 GOOD = {
+    "generate_object": [{"name": "gen", "description": "a rusty industrial valve with a handwheel", "real_size_m": 0.8, "x_m": 1.0, "below_top_m": 1.0, "out_m": 0.2, "solid": True},
+                        {"name": "gen", "description": "a rusty industrial valve with a handwheel", "real_size_m": 0.8, "x_m": 1.0, "below_top_m": 1.0, "out_m": 0.2, "solid": False, "euler_deg": [0.0, 0.0, 30.0]}],
     "set_tower": [{"height": 170.0}, {"width": 60.0}, {"floor_m": 4.0}, {"height": 200.0, "width": 40.0, "floor_m": 3.0}],
     "set_panes": [{"w": 1.2}, {"h": 3.0}, {"offx": 0.3}, {"offz": 1.0}, {"joint_depth": 0.015}, {"joint_gap": 0.02}, {"skip": 2}],
     "set_work_area": [{"w": 2.0}, {"h": 2.5}, {"drop": 30.0}, {"margin": 0.5}],
@@ -92,7 +94,7 @@ GOOD = {
     "focus": [{"target": "robot"}, {"target": "overview"}, {"target": "box"}],
     "read_world": [{}], "read_result": [{}], "undo": [{}], "list_parts": [{}], "explain_limits": [{}],
 }
-PICTURE_ONLY = {"set_tower": [{"width": 60.0}], "add_object": [GOOD["add_object"][0], GOOD["add_object"][3]], "group": GOOD["group"], "set_look": GOOD["set_look"], "add_part": GOOD["add_part"][1:]}
+PICTURE_ONLY = {"set_tower": [{"width": 60.0}], "generate_object": GOOD["generate_object"][1:], "add_object": [GOOD["add_object"][0], GOOD["add_object"][3]], "group": GOOD["group"], "set_look": GOOD["set_look"], "add_part": GOOD["add_part"][1:]}
 READS = {"focus", "read_world", "read_result", "list_parts", "explain_limits", "undo"}
 
 
@@ -112,7 +114,8 @@ def outward(out):
 
 def part1_good():
     check("every function in the registry has a good call", set(GOOD) == set(G.REGISTRY), sorted(set(G.REGISTRY) ^ set(GOOD)))
-    check("generate_object is not in the registry", "generate_object" not in G.REGISTRY)
+    made = G.call(G.new_state(nominal()), "generate_object", {**GOOD["generate_object"][0], "description": "a model nobody has generated"})
+    check("generate_object refuses a model that is not cached", made["result"] == "cannot_build:not_generated", made["result"])
     json.dumps(G.catalog())
     rows = G.catalog()
     check("the registry holds name, schema and re-run, as JSON", all(set(r) - {"note"} == {"name", "args", "rerun"} and r["rerun"] in ("yes", "no", "if_physics") for r in rows), f"{len(rows)} functions")

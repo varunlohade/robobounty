@@ -71,6 +71,21 @@ def _object_extras(world, obj):
     return out
 
 
+def _generated(world, obj, view, effect):
+    """Mesh assets and geoms of a generated object. Only what the robot can reach gets shapes. The browser and Blender draw its GLB from the world file. MuJoCo builds each convex hull from the vertices."""
+    if effect != "physics":
+        return [], []
+    x, y, z = W.object_center(world, obj)
+    euler = obj["euler_deg"]
+    rot = f' euler="{_f(euler[0])} {_f(euler[1])} {_f(euler[2])}"' if any(euler) else ""
+    meshes, geoms = [], []
+    for i, points in enumerate(obj["props"]["hulls"]):
+        vertex = " ".join(_f(c) for p in points for c in p)
+        meshes.append(f'<mesh name="gen_{obj["name"]}_{i}" vertex="{vertex}"/>')
+        geoms.append(f'<geom name="obj_{obj["name"]}.h{i}" type="mesh" mesh="gen_{obj["name"]}_{i}" pos="{_f(x)} {_f(y)} {_f(z)}"{rot} {_solid(view, obj["material"])}/>')
+    return meshes, geoms
+
+
 def _cradle(world, obj, view):
     x, y, z = W.object_center(world, obj)
     w, d, h = obj["size"]
@@ -160,12 +175,16 @@ def _build(world, view):
     start_len = math.sqrt((sx - cx) ** 2 + W.ANCHOR_Y ** 2 + (roof - sz) ** 2) + 0.5
     mu = W.friction(world)
 
-    solids, pictures, moving, effects = [], [], [], []
+    solids, pictures, moving, effects, meshes = [], [], [], [], []
     patches = False
     for o in world["objects"]:
         effect = W.effect_of(o)
         effects.append({"name": o["name"], "kind": o["kind"], "effect": effect, "gap_m": round(W.gap_m(o), 6)})
-        if o["kind"] in W.SURFACE_KINDS:
+        if o["kind"] == "generated":
+            made, geoms = _generated(world, o, view, effect)
+            meshes.extend(made)
+            solids.extend(geoms)
+        elif o["kind"] in W.SURFACE_KINDS:
             patches = True
             if view and o["kind"] == "wet_patch":
                 pictures.append(_object_geom(world, o, _vis(o["material"])))
@@ -204,8 +223,10 @@ def _build(world, view):
     head, asset, sun, scenery = "", "", "", ""
     if view:
         head, sky, sun = _view_settings(world, cx, a)
-        asset = f"<asset>\n    {sky}\n    {_assets(world)}\n  </asset>"
+        asset = f"<asset>\n    {sky}\n    {_assets(world)}\n    {chr(10).join(meshes)}\n  </asset>"
         scenery = f'<body name="scenery">\n      {_picture_world(world, g, a)}\n    </body>'
+    elif meshes:
+        asset = "<asset>\n    " + "\n    ".join(meshes) + "\n  </asset>"
     pictures_xml = "\n    ".join(pictures)
     solids_xml = "\n    ".join(solids)
     moving_xml = "\n    ".join(moving)

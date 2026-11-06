@@ -1,0 +1,34 @@
+{
+ "barnacle covered hull sea chest": {
+  "check": "good:quality",
+  "description": "a barnacle covered hull sea chest",
+  "hulls": 16,
+  "sha256": "89e9761d98aa81eaa6afe51d9ae5a78bd7665179f3334fe1e72de99524f8cdbe",
+  "unit_size": [
+   1.0,
+   0.649775,
+   0.667267
+  ]
+ },
+ "rooftop ac unit": {
+  "check": "good:quality",
+  "description": "a rooftop AC unit",
+  "hulls": 16,
+  "sha256": "f15d6cfdc6bfbf94daa0ba608adad2ec881b90da2042717b1baca7b6d2eb8a3d",
+  "unit_size": [
+   0.527695,
+   1.0,
+   0.609806
+  ]
+ },
+ "rusty industrial valve handwheel": {
+  "description": "a rusty industrial valve with a handwheel",
+  "hulls": 16,
+  "sha256": "085c28aaf6829f36be5ed1d67b0d31153708b7ddd30a007cd1fe0cbda1343ccb",
+  "unit_size": [
+   0.473189,
+   0.722189,
+   1.0
+  ]
+ }
+}

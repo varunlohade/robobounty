@@ -205,7 +205,7 @@ HOSTILE_REPLIES = {
 }
 HOSTILE_CALLS = (
     ({"fn": "exec", "args": {"code": "import os"}}, "unknown_function"), ({"fn": "__import__", "args": {"name": "os"}}, "unknown_function"), ({"fn": "add_part", "args": {}}, "bad_args"),
-    ({"fn": "generate_object", "args": {}}, "unknown_function"), ({"fn": ["set_wind"], "args": {}}, "unknown_function"), ({"fn": None}, "unknown_function"),
+    ({"fn": "generate_object", "args": {}}, "bad_args"), ({"fn": ["set_wind"], "args": {}}, "unknown_function"), ({"fn": None}, "unknown_function"),
     ({"fn": "set_wind", "args": {"steady_ms": "12; import os"}}, "bad_args"), ({"fn": "set_wind", "args": {"steady_ms": float("nan")}}, "out_of_range"), ({"fn": "set_wind", "args": {"python": "x"}}, "bad_args"),
     ({"fn": "add_object", "args": {**lane_box(), "name": "<geom/>../x"}}, "bad_name"), ({"fn": "set_wind", "args": "steady_ms=12"}, "bad_args"),
 )

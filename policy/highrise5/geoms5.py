@@ -14,6 +14,9 @@ import world5 as W
 def bounds(m, d, i):
     """World-axis bounds from the geom's own axes and size, so they owe nothing to the view."""
     s, R, p, kind = m.geom_size[i], d.geom_xmat[i].reshape(3, 3), d.geom_xpos[i], m.geom_type[i]
+    if kind == mujoco.mjtGeom.mjGEOM_MESH:
+        c, half = R @ m.geom_aabb[i, :3], np.abs(R) @ m.geom_aabb[i, 3:]
+        return [*(p + c - half).tolist(), *(p + c + half).tolist()]
     if kind == mujoco.mjtGeom.mjGEOM_BOX:
         half = np.abs(R) @ s
     elif kind == mujoco.mjtGeom.mjGEOM_SPHERE:

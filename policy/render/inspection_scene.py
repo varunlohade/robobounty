@@ -16,6 +16,7 @@ from mathutils import Matrix, Quaternion, Vector
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import generated_glb  # noqa: E402
 import inspection_record as R  # noqa: E402
 
 TEX = HERE.parents[1] / "design" / "render" / "_cache" / "tex"
@@ -726,6 +727,11 @@ class Plant:
         for s in self.rec.solids:
             if s["material"] == "wet":
                 continue  # A water film drawn in the floor shader, from these same circles.
+            if s.get("glb"):
+                if s["object"] not in self.placed_glbs:  # one model for all its collision shapes
+                    self.placed_glbs.add(s["object"])
+                    generated_glb.place_prim(s)
+                continue
             b = self.S(s["material"])
             n0 = len(b.v)
             q, pos, size = s["quat"], s["pos"], s["size"]
@@ -745,6 +751,8 @@ class Plant:
 
     def object_detail(self):
         for o in self.rec.world["objects"]:
+            if o["kind"] == "generated":
+                continue
             if o["kind"] == "grating":
                 self.grating(o)
             elif o["kind"] == "ramp":
@@ -1271,7 +1279,11 @@ class Plant:
             lathe(self.V("water"), (x, y, 1.265), (0, 0, 1), [(0.0, -0.015), (0.006, -0.008), (0.003, 0.0)], 12, caps=False)
 
     def build(self):
+        self.placed_glbs = set()
         self.solids()
+        for s in self.rec.scenery:
+            if s.get("glb"):
+                generated_glb.place_prim(s)
         self.object_detail()
         self.scenery()
         self.extras()

@@ -4,11 +4,13 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { el, icon } from '../app/dom.ts';
 import { fmtTime } from '../app/world_page.ts';
+import { generatedModel } from '../view/real/generated.ts';
 
 export interface Primitive {
-  name?: string; object?: string; type: 'box' | 'cylinder' | 'capsule';
+  name?: string; object?: string; type: 'box' | 'cylinder' | 'capsule' | 'hull' | 'glb';
   pos: number[]; quat: number[]; size: number[];
   material?: string; colour: number[]; friction?: number; picture_only?: boolean;
+  glb?: string; real_size_m?: number; verts?: number[][]; faces?: number[][];
 }
 export interface PoseResult {
   verdict: string; passed: boolean; reason: string;
@@ -169,6 +171,17 @@ function drawSheet(c: CanvasRenderingContext2D, r: () => number) {
   }
 }
 
+function hullMesh(p: Primitive): THREE.Mesh {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(p.verts!.flat(), 3));
+  g.setIndex(p.faces!.flat());
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(p.colour[0], p.colour[1], p.colour[2]), roughness: 0.8 }));
+  mesh.position.set(p.pos[0], p.pos[1], p.pos[2]);
+  mesh.quaternion.set(p.quat[0], p.quat[1], p.quat[2], p.quat[3]);
+  return mesh;
+}
+
 function primitiveGeometry(p: Primitive): THREE.BufferGeometry {
   let g: THREE.BufferGeometry;
   if (p.type === 'box') g = new THREE.BoxGeometry(p.size[0] * 2, p.size[1] * 2, p.size[2] * 2);
@@ -197,7 +210,7 @@ function worldUv(g: THREE.BufferGeometry) {
 
 export class PosesView {
   private renderer: THREE.WebGLRenderer;
-  private scene = new THREE.Scene();
+  readonly scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
   private controls: OrbitControls;
   private bodies: THREE.Group[] = [];
@@ -290,7 +303,10 @@ export class PosesView {
     this.disposers.push(() => { floorGeometry.dispose(); floorMaterial.dispose(); });
 
     const groups = new Map<string, Primitive[]>();
-    for (const p of [...this.replay.scenery, ...this.replay.solids]) {
+    const all = [...this.replay.scenery, ...this.replay.solids];
+    this.drawGenerated(all);
+    for (const p of all) {
+      if (p.glb) continue;
       const key = `${p.material ?? 'plain'}|${p.colour.join(',')}`;
       const list = groups.get(key);
       if (list) list.push(p); else groups.set(key, [p]);
@@ -315,6 +331,26 @@ export class PosesView {
       mesh.name = name;
       this.scene.add(mesh);
       this.disposers.push(() => { geometry.dispose(); material.dispose(); });
+    }
+  }
+
+  // One GLB per generated object. If its file does not load, the page says so and draws the collision shapes the physics uses instead.
+  private drawGenerated(all: Primitive[]) {
+    const objects = new Map<string, Primitive[]>();
+    for (const p of all) if (p.glb) { const list = objects.get(p.object ?? p.glb); if (list) list.push(p); else objects.set(p.object ?? p.glb, [p]); }
+    for (const [object, parts] of objects) {
+      const p = parts[0];
+      generatedModel(p.glb!, p.real_size_m!).then(model => {
+        if (this.stopped) return;
+        model.position.set(p.pos[0], p.pos[1], p.pos[2]);
+        model.quaternion.set(p.quat[0], p.quat[1], p.quat[2], p.quat[3]);
+        model.name = `generated:${object}`;
+        this.scene.add(model);
+      }).catch(err => {
+        if (this.stopped) return;
+        this.host.append(el('div', 'sim-tag sim-key sim-bad', `The model of ${object} did not load, so its collision shapes are drawn. ${String(err)}`));
+        for (const part of parts) if (part.verts && part.faces) this.scene.add(hullMesh(part));
+      });
     }
   }
 

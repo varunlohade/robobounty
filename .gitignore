@@ -44,3 +44,4 @@ design/ui-refs
 .claude/
 MUJOCO_LOG.TXT
 status/
+policy/.venv-gen

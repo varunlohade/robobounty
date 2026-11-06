@@ -68,7 +68,10 @@ def _add_prim(b, prim, cfg, label, attrs):
     xform = wp.transform(wp.vec3(*prim["pos"]), wp.quat(*prim["quat"]))
     size = prim["size"]
     color = tuple(prim["colour"])
-    if prim["type"] == "box":
+    if prim["type"] == "hull":
+        mesh = newton.Mesh(prim["verts"], [i for face in prim["faces"] for i in face], compute_inertia=False)
+        b.add_shape_convex_hull(-1, xform=xform, mesh=mesh, cfg=cfg, label=label, color=color, custom_attributes=attrs)
+    elif prim["type"] == "box":
         b.add_shape_box(-1, xform=xform, hx=size[0], hy=size[1], hz=size[2], cfg=cfg, label=label, color=color, custom_attributes=attrs)
     elif prim["type"] == "capsule":
         b.add_shape_capsule(-1, xform=xform, radius=size[0], half_height=size[1], cfg=cfg, label=label, color=color, custom_attributes=attrs)
@@ -97,7 +100,8 @@ def load_model(world, *, picture=False):
     if picture:
         ghost = newton.ModelBuilder.ShapeConfig(has_shape_collision=False, has_particle_collision=False)
         for prim in W.scenery_primitives(world):
-            _add_prim(b, prim, ghost, _label("scenery", prim), priority)
+            if prim["type"] != "glb":  # a picture-only model has no shape. The browser and Blender draw its GLB.
+                _add_prim(b, prim, ghost, _label("scenery", prim), priority)
         for i, point in enumerate(world["route"]["waypoints"]):
             marker = {"type": "cylinder", "pos": [point["x"], point["y"], 0.001], "quat": [0.0, 0.0, 0.0, 1.0], "size": [0.1, 0.001], "colour": list(W.MATERIALS["route_mark"]), "name": f"waypoint_{i}", "material": "route_mark"}
             _add_prim(b, marker, ghost, _label("scenery", marker), priority)

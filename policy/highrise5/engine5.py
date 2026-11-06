@@ -12,6 +12,8 @@ Groups live in the engine state and not in the world file, because the v5 schema
 """
 import copy
 import re
+import sys
+from pathlib import Path
 
 import compile5 as C
 import parts5 as P
@@ -27,13 +29,13 @@ MAX_DELTA_M = 300.0
 
 CODES = frozenset({
     "bad_args", "bad_name", "bad_shape", "fixed_by_kind", "floating", "wrong_place", "glass_below_ground", "glass_wider_than_tower", "invalid_world",
-    "must_stand_on_roof", "name_taken", "no_glass_to_clean", "no_such_material", "no_such_object", "nothing_to_undo", "one_cradle_only", "out_of_range",
+    "must_stand_on_roof", "name_taken", "no_glass_to_clean", "no_such_material", "no_such_object", "not_generated", "nothing_to_undo", "one_cradle_only", "out_of_range",
     "reserved_material", "setback_above_roof", "start_blocked", "start_not_on_glass", "too_many_geoms", "too_many_groups",
     "too_many_materials", "too_many_objects", "too_many_solids", "unknown_function",
 })
 LIMITS = {
     "cannot_build": ["curved glass", "fluids", "cloth", "moving machinery, except the cradle", "people"],
-    "not_built_yet": ["generate_object"],
+    "not_built_yet": [],
     "caps": {"objects": W.MAX_OBJECTS, "solids": W.MAX_SOLIDS, "geoms": W.MAX_GEOMS, "materials": W.MAX_MATERIALS, "cradles": 1},
     "note": "Results are simulated with hand-built physics. The robot heading stays fixed.",
 }
@@ -51,6 +53,8 @@ WORLD_ERRORS = (
     ("must sit at the fixed distance", "fixed_by_kind"), ("must be an unrotated box", "fixed_by_kind"), ("must be -1 or 1", "out_of_range"),
     ("is outside", "out_of_range"), ("no glass to clean", "no_glass_to_clean"),
 )
+GENERATE_NOTE = ("A textured model from a description, made on the GPU, with convex collision shapes. real_size_m is its longest side, and leaving it out uses the size picked when the model was made. x_m, below_top_m and out_m place its centre, and it needs a support like add_object. "
+                 "solid counts only within the same distance from the glass as add_object. Mass is a guess from a table, and the object stays fixed. Saved models cost no GPU time, and the AI's list of them comes with the catalog.")
 # Measured in check_engine5.py.
 EDGE_NOTE = ("A margin or setback may change nothing. It moves only the glass edge, and the run changes only if a nose sensor or the body reaches that edge. "
              "On the nominal world neither does, at the smallest margin or the lowest setback. With strong suction on dry glass the robot climbs past the area top, and then both matter.")
@@ -87,6 +91,7 @@ def _rule(rule):
 
 
 NAME = {"type": "string", "pattern": W.NAME_RE.pattern}
+DESCRIPTION = {"type": "string", "pattern": r"[A-Za-z0-9 ,.'-]{3,200}"}
 BOOL = {"type": "boolean"}
 
 
@@ -119,6 +124,9 @@ def _check_value(rule, v):
                 raise Refuse("bad_args")
         elif "enum" in rule:
             if v not in rule["enum"]:
+                raise Refuse("bad_args")
+        elif rule is DESCRIPTION:
+            if not re.fullmatch(rule["pattern"], v):
                 raise Refuse("bad_args")
         elif not W.NAME_RE.fullmatch(v):
             raise Refuse("bad_name")
@@ -249,6 +257,29 @@ def add_object(w, a, groups):
         "name": a["name"], "kind": "object", "shape": a["shape"], "size": a["size"],
         "pos": {"x_m": a["x_m"], "below_top_m": a["below_top_m"], "out_m": a["out_m"]},
         "euler_deg": a.get("euler_deg", [0.0, 0.0, 0.0]), "material": _material(w, a.get("material", "weathered_concrete")), "solid": a["solid"], "props": {}})
+
+
+def _cache():
+    sys.path.append(str(Path(__file__).resolve().parent.parent / "crashlab"))
+    import generate_object
+    return generate_object
+
+
+def generate_object(w, a, groups):
+    """Reads the cache only. The chat layer makes a missing model first, so this edit stays quick, and a missing model refuses.
+    The hulls and mass go into the world file as numbers, so a run in the sandbox reads no other file. The cache import stays here for that reason."""
+    GO = _cache()
+    _name_free(w, groups, a["name"])
+    entry = GO.find(a["description"])
+    if entry is None:
+        raise Refuse("not_generated")
+    asset = GO.load(entry["sha256"])
+    real = a.get("real_size_m", asset.get("suggested_size_m", 1.0))
+    w["objects"].append({
+        "name": a["name"], "kind": "generated", "shape": W.MESH, "size": GO.size_of(asset, real),
+        "pos": {"x_m": a["x_m"], "below_top_m": a["below_top_m"], "out_m": a["out_m"]}, "euler_deg": a.get("euler_deg", [0.0, 0.0, 0.0]),
+        "material": _material(w, "painted_steel"), "solid": a["solid"],
+        "props": {"asset": entry["sha256"], "real_size_m": real, "mass_kg": GO.mass_kg(asset, real), "hulls": GO.scaled_hulls(asset, real)}})
 
 
 def add_part(w, a, groups):
@@ -462,6 +493,10 @@ def _registry():
         "x_m": _rule(pos["x_m"]), "below_top_m": _rule(pos["below_top_m"]), "out_m": _rule(pos["out_m"]),
         "euler_deg": _vec(3, -180.0, 180.0), "material": NAME, "solid": BOOL,
     }, {"name", "shape", "size", "x_m", "below_top_m", "out_m", "solid"}), "if_physics", add_object)
+    row("generate_object", _schema({
+        "name": NAME, "description": DESCRIPTION, "real_size_m": _num(*W.GENERATED_SIZE_M), "x_m": _rule(pos["x_m"]), "below_top_m": _rule(pos["below_top_m"]), "out_m": _rule(pos["out_m"]),
+        "euler_deg": _vec(3, -180.0, 180.0), "solid": BOOL,
+    }, {"name", "description", "x_m", "below_top_m", "out_m", "solid"}), "if_physics", generate_object, note=GENERATE_NOTE)
     row("add_part", _schema({"name": NAME, "part": {"type": "string", "enum": sorted(P.PARTS)}, "x_m": _rule(pos["x_m"]), "below_top_m": _rule(pos["below_top_m"]),
                              "place": {"type": "string", "enum": [P.FACADE, P.ROOF]}, "scale": _num(0.5, 2.0), "material": NAME}, {"name", "part", "x_m"}), "if_physics", add_part, note=PART_NOTE)
     row("group", _schema({"name": NAME, "members": {"type": "array", "items": NAME, "minItems": 1, "maxItems": W.MAX_OBJECTS}}, {"name", "members"}), "if_physics", group)
@@ -498,7 +533,11 @@ REGISTRY = _registry()
 
 def catalog():
     """The registry as plain JSON data, for the AI loop."""
-    return [{"name": name, "args": copy.deepcopy(r["args"]), "rerun": r["rerun"], **({"note": r["note"]} if r["note"] else {})} for name, r in REGISTRY.items()]
+    rows = [{"name": name, "args": copy.deepcopy(r["args"]), "rerun": r["rerun"], **({"note": r["note"]} if r["note"] else {})} for name, r in REGISTRY.items()]
+    for row in rows:
+        if row["name"] == "generate_object":
+            row["note"] += " Saved: " + ("; ".join(_cache().library()) or "none yet") + "."
+    return rows
 
 
 def new_state(world):
