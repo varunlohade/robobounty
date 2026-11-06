@@ -1,12 +1,13 @@
 import { mountShell } from './shell.ts';
 import { icon } from './icons.ts';
 import { filmStrip, getJson, h, link, outcomeBar, resultWords, serverDown, type Tally } from './ui.ts';
+import { coverageTable, suiteTables, type Coverage, type Suites } from './data_testing.ts';
 
 interface World {
   id: string; group: string; name: string; kind: string; kind_name: string; outcome: 'pass' | 'fail' | 'hold'; at: number | null; reading: string; line: string; repeat: string; flaky: boolean;
   reason: string; changes: string[]; seed: number | null; film: string | null; replay: string | null; bounds?: Record<string, number | null>;
 }
-interface Campaign extends Tally { id: string; label: string; robot: string; pack: string; sim: string | null; source: string; kind: 'rows' | 'totals'; note: string; held_back: number; worlds: World[] }
+interface Campaign extends Tally { id: string; label: string; robot: string; pack: string; sim: string | null; source: string; kind: 'rows' | 'totals'; note: string; held_back: number; worlds: World[]; coverage?: Coverage | null }
 type SortKey = 'id' | 'group' | 'kind_name' | 'at' | 'reading' | 'repeat' | 'line';
 
 const { main, setStatus } = mountShell({ page: 'data', title: 'Data', subtitle: 'Campaign results. All simulated.' });
@@ -40,7 +41,10 @@ const key = h('kbd', '', '/');
 const field = h('label', 'field', icon('search'), input, count, key);
 const chips = h('div', 'chips');
 libHead.append(h('h2', '', 'Failure library'), chips, field);
-page.append(campaignBox, summary, charts, libHead, libBody);
+const coverageBox = h('div', 'coverage');
+const suiteBox = h('div', 'suites');
+let suites: Suites | null = null;
+page.append(campaignBox, summary, charts, coverageBox, libHead, libBody, suiteBox);
 
 const swatch = (w: World) => (w.outcome === 'pass' ? 'c-pass' : w.outcome === 'hold' ? 'c-hold' : `c-${w.kind} c-fail`);
 
@@ -276,6 +280,10 @@ function openRun(id: string) {
   drawer.classList.add('on');
 }
 
+function paintSuites() {
+  suiteBox.replaceChildren(...(suites?.[current.pack] ? suiteTables(suites[current.pack]) : []));
+}
+
 function pick(c: Campaign) {
   current = c;
   outcome = 'all';
@@ -290,6 +298,8 @@ function pick(c: Campaign) {
   campaignBox.querySelector('tr[aria-selected=true]')?.scrollIntoView({ block: 'nearest' });
   paintSummary();
   paintCharts();
+  coverageBox.replaceChildren(...(c.coverage ? [coverageTable(c.coverage)] : []));
+  paintSuites();
   paintLibrary();
   setStatus(c.note, c.sim ? [`sim ${c.sim}`, resultWords(c)] : [resultWords(c)]);
 }
@@ -310,3 +320,4 @@ getJson<{ campaigns: Campaign[] }>('/site-api/data').then(d => {
   if (!campaigns.length) { page.replaceChildren(h('div', 'empty', h('p', '', 'No campaigns on disk yet.'), h('p', 'quiet', 'Open CrashLab and run a batch.'))); return; }
   pick(campaigns.find(c => c.id === params.get('c')) ?? campaigns[0]);
 }).catch(() => { page.replaceChildren(serverDown('This page')); });
+getJson<Suites>('/site-api/regressions').then(d => { suites = d; if (current) paintSuites(); }).catch(() => {});

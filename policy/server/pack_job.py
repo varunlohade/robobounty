@@ -1,6 +1,6 @@
 """One pack step in its own process, under that pack's own Python: <python> -m packs.<pack>.job <command>, with a JSON request on stdin and a JSON reply on stdout.
 
-Commands: catalog, start, call, describe, replay_calls, run, judge, film. The server imports only this file's table and ask(). A pack's job.py calls serve() with its hooks.
+Commands: catalog, start, call, describe, validate, replay_calls, run, judge, film. The server imports only this file's table and ask(). A pack's job.py calls serve() with its hooks.
 A pack may need a Python the server does not have, so nothing here imports a pack. Worlds and calls are data, and each pack checks them itself.
 run writes progress.json about once a second while the sim steps: t, x, y, status. It is also the run's heartbeat, and it stops when the sim stops. Results are simulated.
 """
@@ -166,6 +166,7 @@ def serve(hooks):
         "call": lambda: (lambda o: {"result": o["result"], "rerun": o["rerun"], "world": o["world"], "hash": hooks.physics_hash(o["world"]), "scene": hooks.scene(o["world"])})(hooks.call(req["world"], req["fn"], req.get("args"))),
         "replay_calls": lambda: replay_calls(hooks, req),
         "describe": lambda: {"hash": hooks.physics_hash(req["world"]), "scene": hooks.scene(req["world"])},
+        "validate": lambda: (lambda w: {"world": w, "hash": hooks.physics_hash(w), "outline": hooks.outline(w), "t_limit": hooks.t_limit(w)})(hooks.validate(req["world"])),
         "run": lambda: run(hooks, req),
         "judge": lambda: hooks.judge_again(Path(req["out"])),
         "film": lambda: hooks.film(req["world"], Path(req["out"])),

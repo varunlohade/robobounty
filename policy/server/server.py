@@ -37,6 +37,7 @@ import code_lab
 import pack_campaign
 import pack_job
 import recorded_batch
+import testing_lab
 from stored_fix import STORED_FIX, ab_rows, recorded_fix
 
 POLICY = HERE.parent
@@ -806,6 +807,8 @@ class Session:
                 return self.start(self.list_scenarios, text)
             if self.pack and self.pending_campaign and said in RUN_WORDS:
                 return self.start(self.run_campaign)
+            if self.pack and testing_lab.asks_limits(said):
+                return self.start(testing_lab.limits_turn, self, text)
             if BATCH:
                 return self.start(recorded_batch.no_chat, self)
             return self.start(self.turn5 if self.v5 else self.turn_pack, text)
@@ -998,12 +1001,12 @@ class Session:
         cid = f"c{self.campaign_n}"
         folder = self.dir / "campaigns" / cid
         base_hash = self.world["hash"]
-        reply = job(HERE / "plan_job.py", {"pack": self.pack, "world": world, "words": words, "out": str(folder), "limit": SCENARIO_LIMIT}, "scenarios_pack")
+        reply = job(HERE / "plan_job.py", {"pack": self.pack, "world": world, "words": words, "out": str(folder), "limit": SCENARIO_LIMIT, "limits": testing_lab.L.load(self.dir, self.pack)}, "scenarios_pack")
         self.working()
         if reply is None:
             self.say("The scenario agent stopped with an error, so there is no list. Try again.", fail=True)
             return
-        public = {k: v for k, v in reply.items() if k not in ("llm_reply", "ai_seconds")}
+        public = {k: v for k, v in reply.items() if k not in ("llm_reply", "ai_seconds", "base_world")}
         public["worlds"] = [{k: w[k] for k in ("index", "name", "group", "reason", "held_back", "seed", "changes")} for w in reply["worlds"]]
         self.emit(type="scenarios", campaign=cid, **public)
         self.tool("scenario_agent", f"{reply['ai_seconds']} s", [json.dumps({"count": reply["count"], "dropped": reply["dropped"], "rejection": reply["rejection"]})])
@@ -1011,7 +1014,7 @@ class Session:
             self.say(f"The scenario agent gave no usable list ({reply['rejection'] or 'every scenario was refused'}). Nothing will run.", fail=True)
             return
         self.pending_campaign, self.pending_base = cid, base_hash
-        self.say(f"I listed {reply['count']} worlds in {len(reply['groups'])} groups. {reply['to_run']} will run, and {reply['held_back']} stay held back to test a fix. The reasons are my reasoned guesses. {len(reply['not_tested'])} things stay not tested.")
+        self.say(f"I listed {reply['count']} worlds in {len(reply['groups'])} groups. {reply['to_run']} will run, and {reply['held_back']} stay held back to test a fix. The reasons are my reasoned guesses. {len(reply['not_tested'])} things stay not tested. {len(reply.get('off_limits', []))} worlds were dropped for being outside the limits.")
         self.emit(type="card", title=f"Run {reply['to_run']} worlds", body=reply["note"], actions=[{"label": f"Run {reply['to_run']} worlds", "action": "run_campaign", "primary": True}])
 
     def current_pack_world(self):
@@ -1078,6 +1081,7 @@ class Session:
         label = next((r["label"] for r in results if r), None)
         self.emit(type="campaign_done", campaign=cid, counts=counts, wall_s=grid["elapsed_s"], max_procs=limit, label=label, note=plan["note"])
         self.say(f"Done in {grid['elapsed_s']:.0f} s: {counts['passed']} passed, {counts['failed']} failed, {counts['stuck']} stuck, {counts['safe_hold']} safe holds, {counts['held']} held back. Simulated. {len(plan['not_tested'])} things stay not tested.")
+        testing_lab.after_campaign(self, cid, plan, grid, label)
 
     def code_post(self, body):
         """Save the session copy. With run one or all, also re-run that world or every world. A refused source neither saves nor runs."""
@@ -2109,9 +2113,11 @@ class Handler(BaseHTTPRequestHandler):
         if rest == ["grid"]:
             grid = s.grid if s.grid and s.grid["campaign"] == cid else pack_campaign.read_json(folder / "grid.json")
             return self.reply(200, grid) if grid else self.reply(404, {"error": "no_grid"})
+        if len(rest) == 1 and rest[0] in ("limits", "boundary", "regressions") and s.pack:
+            return self.reply(200, testing_lab.get(s, cid, rest[0]))
         if rest == ["scenarios"]:
             plan = pack_campaign.read_json(folder / "scenarios.json")
-            return self.reply(200, {"campaign": cid, **{k: v for k, v in plan.items() if k not in ("llm_reply", "ai_seconds")}, "worlds": [{k: w[k] for k in ("index", "name", "group", "reason", "held_back", "seed", "changes")} for w in plan["worlds"]]})
+            return self.reply(200, {"campaign": cid, **{k: v for k, v in plan.items() if k not in ("llm_reply", "ai_seconds", "base_world")}, "worlds": [{k: w[k] for k in ("index", "name", "group", "reason", "held_back", "seed", "changes")} for w in plan["worlds"]]})
         if len(rest) in (2, 3) and rest[0] == "worlds" and re.fullmatch(r"[0-9]{1,3}", rest[1]):
             index = int(rest[1])
             detail = pack_campaign.world_detail(folder, index)
@@ -2254,6 +2260,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(*s.code_post(body))
             if parts[3] == "code_fix" and s.pack:
                 return self.reply(*s.code_fix(body))
+            if parts[3] == "testing" and s.pack:
+                return self.reply(*testing_lab.post(s, body))
         self.reply(404, {"error": "not_found"})
 
 
@@ -2287,7 +2295,7 @@ def main():
     BATCH = RECORDED if RECORDED and recorded_batch.is_batch(RECORDED) else None
     if a.live_route:
         os.environ["CRASHLAB_LIVE_ROUTE"] = "1"
-    code_lab.T.__dict__.update(spawn=spawn, finish=finish, kill_group=kill_group, beat=beat, watched=watched, lock=CAMPAIGN_LOCK, slots=SLOTS, rule=DEADLINES["run"], max_procs=MAX_PROCS, recorded=lambda: RECORDED is not None and not a.live_fix, fix_patch=a.fix_patch, batch=lambda: Path(BATCH) if BATCH else None)
+    code_lab.T.__dict__.update(job=job, after_rerun=testing_lab.after_rerun, spawn=spawn, finish=finish, kill_group=kill_group, beat=beat, watched=watched, lock=CAMPAIGN_LOCK, slots=SLOTS, rule=DEADLINES["run"], max_procs=MAX_PROCS, recorded=lambda: RECORDED is not None and not a.live_fix, fix_patch=a.fix_patch, batch=lambda: Path(BATCH) if BATCH else None)
     RUNS.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer((HOST, a.port), Handler)  # A port in use stops here, before anything below can touch another server's children.
     server.daemon_threads = True

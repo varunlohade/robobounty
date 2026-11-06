@@ -118,6 +118,7 @@ His words: "automated driving companies doing this, right? Can we adapt some imp
 2. Scenario families with ranges, plus a boundary search: after a failure, search nearby values to report "fails above 11 m/s with wet glass", not only pass or fail.
 3. Regression suite: every failure found is saved and re-run on each code change.
 4. Later: replay real logs into simulation, then compare, which is how a company comes to trust a simulator.
+Built: 1, 2 and 3. docs/LAB-EVENTS.md has the routes, and policy/crashlab/check_testing.py is the check.
 
 ### Bounty build plan (Fri 18:40 IST)
 Kinds: fix_failure, find_failure. Folder policy/runs/board/<id>/: pack.json (pack, controller copy and sha, frozen shas of judge and sim, public failing worlds, replays, judge reason, pay, cap, window, status), hidden.json 0600 (held-back and passed-before worlds, never served), campaign/ copy, ledger.json.

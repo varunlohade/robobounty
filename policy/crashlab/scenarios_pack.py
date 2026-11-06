@@ -14,6 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "server"))
+import limits as LIMITS
 import llm
 import pack_job
 from scenarios import _text
@@ -78,7 +79,7 @@ def _world_text(pack, world):
     return json.dumps(keep, separators=(",", ":"))
 
 
-def prompt(info, world, words):
+def prompt(info, world, words, limits=None):
     notes = "\n".join(f"- {n}" for n in info["notes"])
     return f"""You plan a simulated test list for one robot, {info['robot']}, on {info['backend']} physics. Work out what could go wrong for this robot in this world, then fill the JSON schema and nothing else.
 
@@ -87,6 +88,7 @@ Each scenario is one world: the current world below, changed by a few function c
 
 About this world:
 {notes}
+{LIMITS.prompt_text(info['name'], limits) if limits else ''}
 
 Rules:
 - Each scenario tests one idea and must change the physics. "group" names the failure idea and "reason" says in one plain sentence why this might break the robot. Use the same group name for all scenarios of one idea, with 3 to 8 per group. Vary the places within a group.
@@ -217,7 +219,7 @@ def empty_report(req, info, rejection):
 
 def run(req):
     """req: pack, world, words, out, limit (optional: fewer worlds, from each group in turn), reply (optional: a stored reply)."""
-    pack, out = req["pack"], Path(req["out"])
+    pack, out, limits = req["pack"], Path(req["out"]), req.get("limits")
     out.mkdir(parents=True, exist_ok=True)
     info = pack_job.ask(pack, "catalog", {})
     report = empty_report(req, info, None)
@@ -231,7 +233,7 @@ def run(req):
                 os.environ["CRASHLAB_LLM"] = "claude"
                 os.environ["CRASHLAB_LLM_MODEL"] = MODEL
                 llm.TIMEOUT_S, llm.MAX_BUDGET_USD = AI_TIMEOUT_S, AI_BUDGET_USD
-                raw = llm.complete_json(prompt(info, req["world"], req.get("words")), reply_schema([row["name"] for row in _physics_functions(info["catalog"])]))
+                raw = llm.complete_json(prompt(info, req["world"], req.get("words"), limits), reply_schema([row["name"] for row in _physics_functions(info["catalog"])]))
         report["llm_reply"] = raw
         report["ai_seconds"] = round(time.perf_counter() - t0, 1)
         kept, count_reason, agent_items, dropped = check_reply(pack, raw)
@@ -244,10 +246,14 @@ def run(req):
         return report
     replayed = pack_job.ask(pack, "replay_calls", {"world": req["world"], "scenarios": kept})["worlds"]
     seen = set()
-    rows = []
+    rows, off_limits = [], []
     for scenario, world in zip(kept, replayed):
+        off = LIMITS.outside(pack, world["world"], limits) if limits and world["ok"] else []
         if not world["ok"]:
             _count(dropped, f"refused:{world['refused']['code']}")
+        elif off:
+            _count(dropped, f"outside_limits:{off[0]['factor']}")
+            off_limits.append({"name": scenario["name"], "group": scenario["group"], "reason": " ".join(o["words"] for o in off), "factors": [o["factor"] for o in off]})
         elif not world["physics_changed"]:
             _count(dropped, "no_physics_change")
         elif world["hash"] in seen:
@@ -266,7 +272,7 @@ def run(req):
     groups = {}
     for r in rows:
         groups.setdefault(r["group"], {"name": r["group"], "reason": r["reason"], "count": 0})["count"] += 1
-    report.update(count=len(worlds), to_run=len(worlds) - len(held), held_back=len(held), count_reason=count_reason, groups=list(groups.values()), worlds=worlds, dropped=dropped,
+    report.update(count=len(worlds), to_run=len(worlds) - len(held), held_back=len(held), count_reason=count_reason, groups=list(groups.values()), worlds=worlds, dropped=dropped, off_limits=off_limits, limits=limits, base_world=req["world"],
                   not_tested=agent_items + code_not_tested(info, agent_items, worlds, rows))
     (out / "scenarios.json").write_text(json.dumps(report, indent=1, allow_nan=False))
     return report

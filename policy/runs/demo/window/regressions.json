@@ -1,0 +1,326 @@
+{
+ "kind": "regressions",
+ "pack": "window",
+ "running": false,
+ "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705",
+ "edited": false,
+ "note": "Same world, same seed, each time. Only a code change that stops the failure counts as fixed. Simulated.",
+ "rows": [
+  {
+   "id": "964d66efd31dd246-3100",
+   "name": "suction_slightly_reduced",
+   "group": "Suction loss",
+   "seed": 3100,
+   "status": "failed",
+   "verdict": "false_done",
+   "was": {
+    "status": "failed",
+    "verdict": "false_done",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot reported done at 371.8 s, with 12 points more coverage than it had.",
+   "words": "Still failing"
+  },
+  {
+   "id": "2dcd7fa4f38296c8-3101",
+   "name": "suction_moderately_reduced",
+   "group": "Suction loss",
+   "seed": 3101,
+   "status": "failed",
+   "verdict": "slip_distance",
+   "was": {
+    "status": "failed",
+    "verdict": "slip_distance",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot slid 0.302 m in one slide at 102.8 s. The limit is 0.30 m.",
+   "words": "Still failing"
+  },
+  {
+   "id": "8bc8c0f87e405997-3104",
+   "name": "seal_leak_worn_skirt",
+   "group": "Seal leak",
+   "seed": 3104,
+   "status": "failed",
+   "verdict": "coverage",
+   "was": {
+    "status": "failed",
+    "verdict": "coverage",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot cleaned 27.4% of the glass. The job needs 90%.",
+   "words": "Still failing"
+  },
+  {
+   "id": "d3a4ca4d235eb98b-3107",
+   "name": "local_wet_runoff_patch",
+   "group": "Wet glass",
+   "seed": 3107,
+   "status": "failed",
+   "verdict": "slip_distance",
+   "was": {
+    "status": "failed",
+    "verdict": "slip_distance",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot slid 0.301 m in one slide at 347.4 s. The limit is 0.30 m.",
+   "words": "Still failing"
+  },
+  {
+   "id": "37c25ed30fabd63e-3117",
+   "name": "work_area_much_larger",
+   "group": "Larger work area",
+   "seed": 3117,
+   "status": "failed",
+   "verdict": "time_limit",
+   "was": {
+    "status": "failed",
+    "verdict": "time_limit",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot did not finish in 600 s.",
+   "words": "Still failing"
+  },
+  {
+   "id": "518503835ee8532d-3120",
+   "name": "local_grime_patch",
+   "group": "Heavy dirt",
+   "seed": 3120,
+   "status": "failed",
+   "verdict": "slip_distance",
+   "was": {
+    "status": "failed",
+    "verdict": "slip_distance",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot slid 0.304 m in one slide at 146.4 s. The limit is 0.30 m.",
+   "words": "Still failing"
+  },
+  {
+   "id": "d0047e4cf633cc6d-3126",
+   "name": "joints_moderately_deep_shifted",
+   "group": "Pane joints",
+   "seed": 3126,
+   "status": "failed",
+   "verdict": "detach",
+   "was": {
+    "status": "failed",
+    "verdict": "detach",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot came off the glass at 62.0 s.",
+   "words": "Still failing"
+  },
+  {
+   "id": "613e69be254c42f9-3130",
+   "name": "metal_window_sill",
+   "group": "Low step across lane",
+   "seed": 3130,
+   "status": "failed",
+   "verdict": "coverage",
+   "was": {
+    "status": "failed",
+    "verdict": "coverage",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot cleaned 65.0% of the glass. The job needs 90%.",
+   "words": "Still failing"
+  },
+  {
+   "id": "de109a3b59140df4-3132",
+   "name": "small_tenant_nameplate",
+   "group": "Wall mounted obstacle",
+   "seed": 3132,
+   "status": "failed",
+   "verdict": "coverage",
+   "was": {
+    "status": "failed",
+    "verdict": "coverage",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot cleaned 81.3% of the glass. The job needs 90%.",
+   "words": "Still failing"
+  },
+  {
+   "id": "4639f0062ba21311-3133",
+   "name": "vertical_shading_fin",
+   "group": "Wall mounted obstacle",
+   "seed": 3133,
+   "status": "failed",
+   "verdict": "coverage",
+   "was": {
+    "status": "failed",
+    "verdict": "coverage",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot cleaned 79.5% of the glass. The job needs 90%.",
+   "words": "Still failing"
+  },
+  {
+   "id": "cb16df2416457135-3134",
+   "name": "window_air_conditioner",
+   "group": "Wall mounted obstacle",
+   "seed": 3134,
+   "status": "failed",
+   "verdict": "coverage",
+   "was": {
+    "status": "failed",
+    "verdict": "coverage",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot cleaned 48.7% of the glass. The job needs 90%.",
+   "words": "Still failing"
+  },
+  {
+   "id": "c32958676c515cac-3136",
+   "name": "small_exhaust_louvre",
+   "group": "Vent opening in glass",
+   "seed": 3136,
+   "status": "failed",
+   "verdict": "detach",
+   "was": {
+    "status": "failed",
+    "verdict": "detach",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot came off the glass at 295.4 s.",
+   "words": "Still failing"
+  },
+  {
+   "id": "1847d035b653582f-3137",
+   "name": "medium_air_intake_grille",
+   "group": "Vent opening in glass",
+   "seed": 3137,
+   "status": "failed",
+   "verdict": "slip_distance",
+   "was": {
+    "status": "failed",
+    "verdict": "slip_distance",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot slid 0.301 m in one slide at 58.2 s. The limit is 0.30 m.",
+   "words": "Still failing"
+  },
+  {
+   "id": "8e33db89a0a75621-3139",
+   "name": "parked_cradle_near_edge",
+   "group": "Maintenance cradle in the way",
+   "seed": 3139,
+   "status": "failed",
+   "verdict": "slip_distance",
+   "was": {
+    "status": "failed",
+    "verdict": "slip_distance",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot slid 0.304 m in one slide at 338.2 s. The limit is 0.30 m.",
+   "words": "Still failing"
+  },
+  {
+   "id": "7c310a76b08ff7cf-3140",
+   "name": "slow_moving_cradle",
+   "group": "Maintenance cradle in the way",
+   "seed": 3140,
+   "status": "failed",
+   "verdict": "slip_distance",
+   "was": {
+    "status": "failed",
+    "verdict": "slip_distance",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot slid 0.300 m in one slide at 94.0 s. The limit is 0.30 m.",
+   "words": "Still failing"
+  },
+  {
+   "id": "53abf321d9001a24-3142",
+   "name": "corner_left_of_start",
+   "group": "Building corner near lanes",
+   "seed": 3142,
+   "status": "failed",
+   "verdict": "false_done",
+   "was": {
+    "status": "failed",
+    "verdict": "false_done",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot reported done at 351.9 s, with 19 points more coverage than it had.",
+   "words": "Still failing"
+  },
+  {
+   "id": "53b9785bd77e025b-3144",
+   "name": "top_margin_slightly_smaller",
+   "group": "Glass ends above climbing robot",
+   "seed": 3144,
+   "status": "failed",
+   "verdict": "stalled",
+   "was": {
+    "status": "failed",
+    "verdict": "stalled",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot stayed still on the glass for 396 s at the end, with no wind or battery reason.",
+   "words": "Still failing"
+  },
+  {
+   "id": "03be29d47c0d1314-3145",
+   "name": "high_setback_above_area",
+   "group": "Glass ends above climbing robot",
+   "seed": 3145,
+   "status": "failed",
+   "verdict": "stalled",
+   "was": {
+    "status": "failed",
+    "verdict": "stalled",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot stayed still on the glass for 432 s at the end, with no wind or battery reason.",
+   "words": "Still failing"
+  },
+  {
+   "id": "11e5a30e87af9a06-3146",
+   "name": "top_margin_half_size",
+   "group": "Glass ends above climbing robot",
+   "seed": 3146,
+   "status": "failed",
+   "verdict": "stalled",
+   "was": {
+    "status": "failed",
+    "verdict": "stalled",
+    "code_sha": "d403d9ff6ba106dea692c1d33cbf9b8607505176e22e14cb12132411e0138705"
+   },
+   "change": "still_failing",
+   "reason": "The robot stayed still on the glass for 444 s at the end, with no wind or battery reason.",
+   "words": "Still failing"
+  }
+ ],
+ "counts": {
+  "fixed": 0,
+  "still_failing": 19,
+  "new_failure": 0,
+  "still_passing": 0,
+  "passes_same_code": 0,
+  "world_changed": 0,
+  "could_not_run": 0
+ },
+ "run": 1,
+ "at": 1793980444.3637068,
+ "words": "Run 1, 19 worlds: 0 fixed, 19 still failing, 0 new failures. Simulated."
+}

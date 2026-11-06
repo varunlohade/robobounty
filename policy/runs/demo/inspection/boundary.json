@@ -1,0 +1,773 @@
+{
+ "kind": "boundary",
+ "pack": "inspection",
+ "running": false,
+ "note": "Simulated with hand-built worlds and upstream's walking policy. Not calibrated, and not checked against a real robot.",
+ "groups": [
+  {
+   "verdict": "fell",
+   "verdict_name": "fell",
+   "count": 10,
+   "world": "water_pipe_on_floor",
+   "index": 9,
+   "seed": 3109,
+   "searches": [
+    {
+     "factor": "obstacle",
+     "label": "Obstacle height",
+     "unit": "m",
+     "words": "No clean boundary for obstacle height. The seeds disagree near 0.06 to 0.07 m. Seed 3109 failed at 0.07 m and not at 0.06. Of 3 more seeds, 3 failed at 0.07 m and 2 failed at 0.06.",
+     "clean": false,
+     "status": "done",
+     "runs": [
+      {
+       "value": 0.16,
+       "seed": 3109,
+       "role": "failing end",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 9.0 s, at x 3.4 m, y -0.5 m, after 0 of 3 waypoints, near water_pipe_on_floor."
+      },
+      {
+       "value": 0.02,
+       "seed": 3109,
+       "role": "passing end",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.25 m of the route."
+      },
+      {
+       "value": 0.09,
+       "seed": 3109,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 9.1 s, at x 3.6 m, y -0.3 m, after 0 of 3 waypoints, near water_pipe_on_floor."
+      },
+      {
+       "value": 0.055,
+       "seed": 3109,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.2 s, and stayed within 0.19 m of the route."
+      },
+      {
+       "value": 0.07,
+       "seed": 3109,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "timed_out",
+       "reason": "The robot reached 2 of 3 waypoints in 30 s and ran out of time. Its longest stall was 15.7 s."
+      },
+      {
+       "value": 0.06,
+       "seed": 3109,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.0 s, and stayed within 0.26 m of the route."
+      },
+      {
+       "value": 0.07,
+       "seed": 4109,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 7.0 s, at x 3.7 m, y -0.4 m, after 0 of 3 waypoints, near water_pipe_on_floor."
+      },
+      {
+       "value": 0.07,
+       "seed": 5109,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "timed_out",
+       "reason": "The robot reached 2 of 3 waypoints in 30 s and ran out of time. Its longest stall was 13.5 s."
+      },
+      {
+       "value": 0.07,
+       "seed": 6109,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 8.0 s, at x 3.6 m, y -0.3 m, after 0 of 3 waypoints, near water_pipe_on_floor."
+      },
+      {
+       "value": 0.06,
+       "seed": 4109,
+       "role": "seed, passing side",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 7.2 s, at x 3.7 m, y -0.3 m, after 0 of 3 waypoints, near water_pipe_on_floor."
+      },
+      {
+       "value": 0.06,
+       "seed": 5109,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.23 m of the route."
+      },
+      {
+       "value": 0.06,
+       "seed": 6109,
+       "role": "seed, passing side",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 6.9 s, at x 3.7 m, y -0.3 m, after 0 of 3 waypoints, near water_pipe_on_floor."
+      }
+     ],
+     "pass_value": 0.06,
+     "fail_value": 0.07,
+     "at_seed": 3109,
+     "fail_seeds": [
+      3,
+      3
+     ],
+     "pass_seeds": [
+      1,
+      3
+     ],
+     "verdict": "fell",
+     "far_verdict": "fell"
+    }
+   ],
+   "words": null
+  },
+  {
+   "verdict": "stuck",
+   "verdict_name": "stuck",
+   "count": 6,
+   "world": "small_drain_pipe_on_floor",
+   "index": 8,
+   "seed": 3108,
+   "searches": [
+    {
+     "factor": "obstacle",
+     "label": "Obstacle height",
+     "unit": "m",
+     "words": "No clean boundary for obstacle height. The seeds disagree near 0.065 to 0.07 m. Seed 3108 failed at 0.07 m and not at 0.065. Of 3 more seeds, 2 failed at 0.07 m and 2 failed at 0.065.",
+     "clean": false,
+     "status": "done",
+     "runs": [
+      {
+       "value": 0.08,
+       "seed": 3108,
+       "role": "failing end",
+       "status": "stuck",
+       "verdict": "stuck",
+       "reason": "The robot stopped making progress at 4.5 s, after 0 of 3 waypoints, near small_drain_pipe_on_floor."
+      },
+      {
+       "value": 0.02,
+       "seed": 3108,
+       "role": "passing end",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.2 s, and stayed within 0.23 m of the route."
+      },
+      {
+       "value": 0.05,
+       "seed": 3108,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.24 m of the route."
+      },
+      {
+       "value": 0.065,
+       "seed": 3108,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.27 m of the route."
+      },
+      {
+       "value": 0.075,
+       "seed": 3108,
+       "role": "bisect",
+       "status": "stuck",
+       "verdict": "stuck",
+       "reason": "The robot stopped making progress at 4.4 s, after 0 of 3 waypoints, near small_drain_pipe_on_floor."
+      },
+      {
+       "value": 0.07,
+       "seed": 3108,
+       "role": "bisect",
+       "status": "stuck",
+       "verdict": "stuck",
+       "reason": "The robot stopped making progress at 4.3 s, after 0 of 3 waypoints, near small_drain_pipe_on_floor."
+      },
+      {
+       "value": 0.07,
+       "seed": 4108,
+       "role": "seed, failing side",
+       "status": "stuck",
+       "verdict": "stuck",
+       "reason": "The robot stopped making progress at 4.3 s, after 0 of 3 waypoints, near small_drain_pipe_on_floor."
+      },
+      {
+       "value": 0.07,
+       "seed": 5108,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "timed_out",
+       "reason": "The robot reached 1 of 3 waypoints in 30 s and ran out of time. Its longest stall was 20.0 s."
+      },
+      {
+       "value": 0.07,
+       "seed": 6108,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.5 s, and stayed within 0.30 m of the route."
+      },
+      {
+       "value": 0.065,
+       "seed": 4108,
+       "role": "seed, passing side",
+       "status": "failed",
+       "verdict": "timed_out",
+       "reason": "The robot reached 0 of 3 waypoints in 30 s and ran out of time. Its longest stall was 25.2 s."
+      },
+      {
+       "value": 0.065,
+       "seed": 5108,
+       "role": "seed, passing side",
+       "status": "failed",
+       "verdict": "timed_out",
+       "reason": "The robot reached 1 of 3 waypoints in 30 s and ran out of time. Its longest stall was 20.6 s."
+      },
+      {
+       "value": 0.065,
+       "seed": 6108,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.4 s, and stayed within 0.28 m of the route."
+      }
+     ],
+     "pass_value": 0.065,
+     "fail_value": 0.07,
+     "at_seed": 3108,
+     "fail_seeds": [
+      2,
+      3
+     ],
+     "pass_seeds": [
+      1,
+      3
+     ],
+     "verdict": "stuck",
+     "far_verdict": "stuck"
+    }
+   ],
+   "words": null
+  },
+  {
+   "verdict": "timed_out",
+   "verdict_name": "timed out",
+   "count": 2,
+   "world": "narrow_low_dropped_tray",
+   "index": 18,
+   "seed": 3118,
+   "searches": [
+    {
+     "factor": "obstacle",
+     "label": "Obstacle height",
+     "unit": "m",
+     "words": "No clean boundary for obstacle height. The seeds disagree near 0.035 to 0.04 m. Seed 3118 failed at 0.04 m and not at 0.035. Of 3 more seeds, 2 failed at 0.04 m and 0 failed at 0.035.",
+     "clean": false,
+     "status": "done",
+     "runs": [
+      {
+       "value": 0.05,
+       "seed": 3118,
+       "role": "failing end",
+       "status": "failed",
+       "verdict": "timed_out",
+       "reason": "The robot reached 0 of 3 waypoints in 30 s and ran out of time. Its longest stall was 17.4 s."
+      },
+      {
+       "value": 0.03,
+       "seed": 3118,
+       "role": "passing end",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.28 m of the route."
+      },
+      {
+       "value": 0.04,
+       "seed": 3118,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 5.2 s, at x 3.5 m, y 0.3 m, after 0 of 3 waypoints, near dropped_ladder_cable_tray_small."
+      },
+      {
+       "value": 0.035,
+       "seed": 3118,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.8 s, and stayed within 0.22 m of the route."
+      },
+      {
+       "value": 0.04,
+       "seed": 4118,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.23 m of the route."
+      },
+      {
+       "value": 0.04,
+       "seed": 5118,
+       "role": "seed, failing side",
+       "status": "stuck",
+       "verdict": "stuck",
+       "reason": "The robot stopped making progress at 4.6 s, after 0 of 3 waypoints, near dropped_ladder_cable_tray_small."
+      },
+      {
+       "value": 0.04,
+       "seed": 6118,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 5.6 s, at x 3.4 m, y 0.4 m, after 0 of 3 waypoints, near dropped_ladder_cable_tray_small."
+      },
+      {
+       "value": 0.035,
+       "seed": 4118,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.24 m of the route."
+      },
+      {
+       "value": 0.035,
+       "seed": 5118,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.1 s, and stayed within 0.25 m of the route."
+      },
+      {
+       "value": 0.035,
+       "seed": 6118,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 21.1 s, and stayed within 0.21 m of the route."
+      }
+     ],
+     "pass_value": 0.035,
+     "fail_value": 0.04,
+     "at_seed": 3118,
+     "fail_seeds": [
+      2,
+      3
+     ],
+     "pass_seeds": [
+      3,
+      3
+     ],
+     "verdict": "fell",
+     "far_verdict": "timed_out"
+    }
+   ],
+   "words": null
+  },
+  {
+   "verdict": "fell",
+   "verdict_name": "fell",
+   "count": 10,
+   "world": "crossover_shallow_steps",
+   "index": 21,
+   "seed": 3121,
+   "searches": [
+    {
+     "factor": "step",
+     "label": "Step height",
+     "unit": "m",
+     "words": "No clean boundary for step height. The seeds disagree near 0.035 to 0.04 m. Seed 3121 failed at 0.04 m and not at 0.035. Of 3 more seeds, 0 failed at 0.04 m and 0 failed at 0.035.",
+     "clean": false,
+     "status": "done",
+     "runs": [
+      {
+       "value": 0.08,
+       "seed": 3121,
+       "role": "failing end",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 7.0 s, at x 1.6 m, y 0.7 m, after 0 of 3 waypoints, near steel_crossover_shallow."
+      },
+      {
+       "value": 0.01,
+       "seed": 3121,
+       "role": "passing end",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.1 s, and stayed within 0.24 m of the route."
+      },
+      {
+       "value": 0.045,
+       "seed": 3121,
+       "role": "bisect",
+       "status": "stuck",
+       "verdict": "stuck",
+       "reason": "The robot stopped making progress at 4.8 s, after 0 of 3 waypoints, near steel_crossover_shallow."
+      },
+      {
+       "value": 0.03,
+       "seed": 3121,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.23 m of the route."
+      },
+      {
+       "value": 0.04,
+       "seed": 3121,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 4.2 s, at x 2.0 m, y 0.5 m, after 0 of 3 waypoints, near steel_crossover_shallow."
+      },
+      {
+       "value": 0.035,
+       "seed": 3121,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.23 m of the route."
+      },
+      {
+       "value": 0.04,
+       "seed": 4121,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.8 s, and stayed within 0.27 m of the route."
+      },
+      {
+       "value": 0.04,
+       "seed": 5121,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.7 s, and stayed within 0.21 m of the route."
+      },
+      {
+       "value": 0.04,
+       "seed": 6121,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.5 s, and stayed within 0.24 m of the route."
+      },
+      {
+       "value": 0.035,
+       "seed": 4121,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.22 m of the route."
+      },
+      {
+       "value": 0.035,
+       "seed": 5121,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.4 s, and stayed within 0.25 m of the route."
+      },
+      {
+       "value": 0.035,
+       "seed": 6121,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.4 s, and stayed within 0.26 m of the route."
+      }
+     ],
+     "pass_value": 0.035,
+     "fail_value": 0.04,
+     "at_seed": 3121,
+     "fail_seeds": [
+      0,
+      3
+     ],
+     "pass_seeds": [
+      3,
+      3
+     ],
+     "verdict": "fell",
+     "far_verdict": "fell"
+    }
+   ],
+   "words": null
+  },
+  {
+   "verdict": "fell",
+   "verdict_name": "fell",
+   "count": 10,
+   "world": "wet_steel_ramp",
+   "index": 32,
+   "seed": 3132,
+   "searches": [
+    {
+     "factor": "friction",
+     "label": "Floor grip",
+     "unit": "",
+     "words": "No clean boundary for floor grip. The seeds disagree near 0.38 to 0.34. Seed 3132 failed at 0.34 and not at 0.38. Of 3 more seeds, 2 failed at 0.34 and 1 failed at 0.38.",
+     "clean": false,
+     "status": "done",
+     "runs": [
+      {
+       "value": 0.2,
+       "seed": 3132,
+       "role": "failing end",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 4.9 s, at x 1.9 m, y 0.1 m, after 0 of 3 waypoints, near wet_steel_cable_ramp."
+      },
+      {
+       "value": 0.75,
+       "seed": 3132,
+       "role": "passing end",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 21.1 s, and stayed within 0.24 m of the route."
+      },
+      {
+       "value": 0.48,
+       "seed": 3132,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 22.4 s, and stayed within 0.23 m of the route."
+      },
+      {
+       "value": 0.34,
+       "seed": 3132,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 15.7 s, at x 1.9 m, y 0.4 m, after 0 of 3 waypoints, near wet_steel_cable_ramp."
+      },
+      {
+       "value": 0.41,
+       "seed": 3132,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 23.3 s, and stayed within 0.26 m of the route."
+      },
+      {
+       "value": 0.38,
+       "seed": 3132,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 24.5 s, and stayed within 0.27 m of the route."
+      },
+      {
+       "value": 0.34,
+       "seed": 4132,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 13.5 s, at x 1.8 m, y 0.3 m, after 0 of 3 waypoints, near wet_steel_cable_ramp."
+      },
+      {
+       "value": 0.34,
+       "seed": 5132,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 29.2 s, and stayed within 0.22 m of the route."
+      },
+      {
+       "value": 0.34,
+       "seed": 6132,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 9.0 s, at x 1.9 m, y 0.5 m, after 0 of 3 waypoints, near wet_steel_cable_ramp."
+      },
+      {
+       "value": 0.38,
+       "seed": 4132,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 26.9 s, and stayed within 0.23 m of the route."
+      },
+      {
+       "value": 0.38,
+       "seed": 5132,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 24.8 s, and stayed within 0.27 m of the route."
+      },
+      {
+       "value": 0.38,
+       "seed": 6132,
+       "role": "seed, passing side",
+       "status": "failed",
+       "verdict": "timed_out",
+       "reason": "The robot reached 2 of 3 waypoints in 30 s and ran out of time. Its longest stall was 8.2 s."
+      }
+     ],
+     "pass_value": 0.38,
+     "fail_value": 0.34,
+     "at_seed": 3132,
+     "fail_seeds": [
+      2,
+      3
+     ],
+     "pass_seeds": [
+      2,
+      3
+     ],
+     "verdict": "fell",
+     "far_verdict": "fell"
+    }
+   ],
+   "words": null
+  },
+  {
+   "verdict": "fell",
+   "verdict_name": "fell",
+   "count": 10,
+   "world": "heavy_sensor_box",
+   "index": 43,
+   "seed": 3143,
+   "searches": [
+    {
+     "factor": "payload",
+     "label": "Payload",
+     "unit": "kg",
+     "words": "No clean boundary for payload. The seeds disagree near 7 to 8 kg. Seed 3143 failed at 8 kg and not at 7. Of 3 more seeds, 0 failed at 8 kg and 1 failed at 7.",
+     "clean": false,
+     "status": "done",
+     "runs": [
+      {
+       "value": 18.0,
+       "seed": 3143,
+       "role": "failing end",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 11.2 s, at x 5.3 m, y 1.0 m, after 1 of 3 waypoints, near floor_grating."
+      },
+      {
+       "value": 0.0,
+       "seed": 3143,
+       "role": "passing end",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.0 s, and stayed within 0.22 m of the route."
+      },
+      {
+       "value": 9.0,
+       "seed": 3143,
+       "role": "bisect",
+       "status": "stuck",
+       "verdict": "stuck",
+       "reason": "The robot stopped making progress at 7.5 s, after 1 of 3 waypoints, near floor_grating."
+      },
+      {
+       "value": 4.5,
+       "seed": 3143,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.4 s, and stayed within 0.24 m of the route."
+      },
+      {
+       "value": 7.0,
+       "seed": 3143,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.5 s, and stayed within 0.24 m of the route."
+      },
+      {
+       "value": 8.0,
+       "seed": 3143,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 8.9 s, at x 5.4 m, y 0.3 m, after 1 of 3 waypoints, near floor_grating."
+      },
+      {
+       "value": 8.0,
+       "seed": 4143,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.7 s, and stayed within 0.23 m of the route."
+      },
+      {
+       "value": 8.0,
+       "seed": 5143,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.7 s, and stayed within 0.19 m of the route."
+      },
+      {
+       "value": 8.0,
+       "seed": 6143,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.6 s, and stayed within 0.23 m of the route."
+      },
+      {
+       "value": 7.0,
+       "seed": 4143,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.5 s, and stayed within 0.23 m of the route."
+      },
+      {
+       "value": 7.0,
+       "seed": 5143,
+       "role": "seed, passing side",
+       "status": "failed",
+       "verdict": "fell",
+       "reason": "The robot fell at 10.5 s, at x 5.5 m, y 1.3 m, after 1 of 3 waypoints, near floor_grating."
+      },
+      {
+       "value": 7.0,
+       "seed": 6143,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot reached all 3 waypoints in 20.2 s, and stayed within 0.23 m of the route."
+      }
+     ],
+     "pass_value": 7.0,
+     "fail_value": 8.0,
+     "at_seed": 3143,
+     "fail_seeds": [
+      0,
+      3
+     ],
+     "pass_seeds": [
+      2,
+      3
+     ],
+     "verdict": "fell",
+     "far_verdict": "fell"
+    }
+   ],
+   "words": null
+  }
+ ],
+ "limits_stored": false
+}

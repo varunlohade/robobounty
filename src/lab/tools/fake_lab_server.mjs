@@ -170,6 +170,7 @@ const server = createServer((req, res) => {
     if (rest === 'action') { res.writeHead(202); res.end('{}'); act(s, body.action); return undefined; }
     if (rest === 'pose_runs/plant/replay') return replayFile(res, 'plant');
     if (parts[3] === 'campaigns') {
+      if (['limits', 'boundary', 'regressions'].includes(parts[5])) return json(res, 200, parts[5] === 'limits' ? { error: 'not_in_fake' } : { empty: true, groups: [], size: 0, last: null });
       const tail = parts.slice(5).join('/');
       if (tail === 'grid') return s.campaign ? json(res, 200, s.campaign.final ?? gridOf(s, Date.now())) : json(res, 404, { error: 'no_campaign' });
       if (tail === 'scenarios') return json(res, 200, s.scenarios);

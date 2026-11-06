@@ -1,0 +1,655 @@
+{
+ "pack": "inspection",
+ "entries": [
+  {
+   "id": "bad5a79bf87fc1af-3108",
+   "name": "small_drain_pipe_on_floor",
+   "group": "floor pipe trip",
+   "seed": 3108,
+   "first": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 4.5 s, after 0 of 3 waypoints, near small_drain_pipe_on_floor.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 4.5 s, after 0 of 3 waypoints, near small_drain_pipe_on_floor.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "stuck",
+     "verdict": "stuck",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "8ae89a8b204647dd-3109",
+   "name": "water_pipe_on_floor",
+   "group": "floor pipe trip",
+   "seed": 3109,
+   "first": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 9.0 s, at x 3.4 m, y -0.5 m, after 0 of 3 waypoints, near water_pipe_on_floor.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 9.0 s, at x 3.4 m, y -0.5 m, after 0 of 3 waypoints, near water_pipe_on_floor.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "fell",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "936706d1d799f9af-3110",
+   "name": "process_pipe_on_floor_second_leg",
+   "group": "floor pipe trip",
+   "seed": 3110,
+   "first": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 19.8 s, after 1 of 3 waypoints, near floor_grating.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 19.8 s, after 1 of 3 waypoints, near floor_grating.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "stuck",
+     "verdict": "stuck",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "85f69cd3af19b01a-3113",
+   "name": "pipe_at_top_of_body",
+   "group": "low pipe body strike",
+   "seed": 3113,
+   "first": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 13.8 s, after 0 of 3 waypoints, near low_air_pipe_on_saddles.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 13.8 s, after 0 of 3 waypoints, near low_air_pipe_on_saddles.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "stuck",
+     "verdict": "stuck",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "bb81ce54bafd0f3d-3115",
+   "name": "pipe_at_shin_height",
+   "group": "raised pipe leg snag",
+   "seed": 3115,
+   "first": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 6.2 s, at x 3.1 m, y 0.3 m, after 0 of 3 waypoints, near shin_height_pipe_on_saddles.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 6.2 s, at x 3.1 m, y 0.3 m, after 0 of 3 waypoints, near shin_height_pipe_on_saddles.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "fell",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "3a51e8ded90865d2-3116",
+   "name": "pipe_at_knee_height",
+   "group": "raised pipe leg snag",
+   "seed": 3116,
+   "first": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 8.9 s, after 0 of 3 waypoints, near knee_height_pipe_on_saddles.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 8.9 s, after 0 of 3 waypoints, near knee_height_pipe_on_saddles.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "stuck",
+     "verdict": "stuck",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "6b3649869ad56026-3118",
+   "name": "narrow_low_dropped_tray",
+   "group": "dropped cable tray",
+   "seed": 3118,
+   "first": {
+    "status": "failed",
+    "verdict": "timed_out",
+    "reason": "The robot reached 0 of 3 waypoints in 30 s and ran out of time. Its longest stall was 17.4 s.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "timed_out",
+    "reason": "The robot reached 0 of 3 waypoints in 30 s and ran out of time. Its longest stall was 17.4 s.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "timed_out",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "3be90857c184a0d5-3119",
+   "name": "medium_dropped_tray",
+   "group": "dropped cable tray",
+   "seed": 3119,
+   "first": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 6.0 s, at x 3.8 m, y -0.4 m, after 0 of 3 waypoints, near dropped_ladder_cable_tray_medium.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 6.0 s, at x 3.8 m, y -0.4 m, after 0 of 3 waypoints, near dropped_ladder_cable_tray_medium.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "fell",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "94816a284a562d2f-3121",
+   "name": "crossover_shallow_steps",
+   "group": "crossover stair climb",
+   "seed": 3121,
+   "first": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 7.0 s, at x 1.6 m, y 0.7 m, after 0 of 3 waypoints, near steel_crossover_shallow.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 7.0 s, at x 1.6 m, y 0.7 m, after 0 of 3 waypoints, near steel_crossover_shallow.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "fell",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "8dde13571f8bbed5-3122",
+   "name": "crossover_typical_steps",
+   "group": "crossover stair climb",
+   "seed": 3122,
+   "first": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 17.0 s, at x 1.8 m, y 0.8 m, after 0 of 3 waypoints, near steel_crossover_typical.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 17.0 s, at x 1.8 m, y 0.8 m, after 0 of 3 waypoints, near steel_crossover_typical.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "fell",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "cde57e2c2c1cbf7e-3123",
+   "name": "crossover_steep_steps",
+   "group": "crossover stair climb",
+   "seed": 3123,
+   "first": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 7.8 s, after 0 of 3 waypoints, near steel_crossover_steep.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 7.8 s, after 0 of 3 waypoints, near steel_crossover_steep.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "stuck",
+     "verdict": "stuck",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "a1e8767ed038fdb8-3125",
+   "name": "crossover_barely_wider_than_robot",
+   "group": "narrow crossover handrails",
+   "seed": 3125,
+   "first": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 14.5 s, at x 1.6 m, y -0.1 m, after 0 of 3 waypoints, near narrow_steel_crossover_tight.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 14.5 s, at x 1.6 m, y -0.1 m, after 0 of 3 waypoints, near narrow_steel_crossover_tight.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "fell",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "dde21dda1f2f2a35-3126",
+   "name": "crossover_tight_passage",
+   "group": "narrow crossover handrails",
+   "seed": 3126,
+   "first": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 7.4 s, at x 1.6 m, y -0.1 m, after 0 of 3 waypoints, near narrow_steel_crossover_medium.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 7.4 s, at x 1.6 m, y -0.1 m, after 0 of 3 waypoints, near narrow_steel_crossover_medium.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "fell",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "02c4acd3d23d2969-3132",
+   "name": "wet_steel_ramp",
+   "group": "slick ramp slide",
+   "seed": 3132,
+   "first": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 4.9 s, at x 1.9 m, y 0.1 m, after 0 of 3 waypoints, near wet_steel_cable_ramp.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 4.9 s, at x 1.9 m, y 0.1 m, after 0 of 3 waypoints, near wet_steel_cable_ramp.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "fell",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "f4911b6e79c4b18c-3135",
+   "name": "foot_sized_bar_gaps",
+   "group": "raised grating bars",
+   "seed": 3135,
+   "first": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 3.9 s, after 0 of 3 waypoints, near medium_steel_floor_grating.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "stuck",
+    "verdict": "stuck",
+    "reason": "The robot stopped making progress at 3.9 s, after 0 of 3 waypoints, near medium_steel_floor_grating.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "stuck",
+     "verdict": "stuck",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "bff1e632e68fffc7-3138",
+   "name": "cabinet_blocks_route",
+   "group": "cabinet in the path",
+   "seed": 3138,
+   "first": {
+    "status": "failed",
+    "verdict": "timed_out",
+    "reason": "The robot reached 0 of 3 waypoints in 30 s and ran out of time. Its longest stall was 25.7 s.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "timed_out",
+    "reason": "The robot reached 0 of 3 waypoints in 30 s and ran out of time. Its longest stall was 25.7 s.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "timed_out",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "fc4b0514cf94b391-3140",
+   "name": "medium_valve_off_centre",
+   "group": "valve on the route",
+   "seed": 3140,
+   "first": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 7.7 s, at x 2.8 m, y -0.4 m, after 0 of 3 waypoints, near medium_gate_valve_on_spool.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 7.7 s, at x 2.8 m, y -0.4 m, after 0 of 3 waypoints, near medium_gate_valve_on_spool.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "fell",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  },
+  {
+   "id": "bbfedf0da57ef12d-3143",
+   "name": "heavy_sensor_box",
+   "group": "untrained back payload",
+   "seed": 3143,
+   "first": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 11.2 s, at x 5.3 m, y 1.0 m, after 1 of 3 waypoints, near floor_grating.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982736.488707,
+    "run": null
+   },
+   "last": {
+    "status": "failed",
+    "verdict": "fell",
+    "reason": "The robot fell at 11.2 s, at x 5.3 m, y 1.0 m, after 1 of 3 waypoints, near floor_grating.",
+    "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+    "at": 1793982835.4743512,
+    "run": 1
+   },
+   "history": [
+    {
+     "run": 1,
+     "status": "failed",
+     "verdict": "fell",
+     "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+     "change": "still_failing"
+    }
+   ],
+   "source": {
+    "session": "check",
+    "campaign": "inspection"
+   }
+  }
+ ],
+ "runs": [
+  {
+   "run": 1,
+   "at": 1793982835.4743512,
+   "code_sha": "c77863d5a9e0bb3b6cd0b9a20045ad6775f9a6d615c918c485165ae735cccc38",
+   "edited": false,
+   "label": null,
+   "counts": {
+    "fixed": 0,
+    "still_failing": 18,
+    "new_failure": 0,
+    "still_passing": 0,
+    "passes_same_code": 0,
+    "world_changed": 0,
+    "could_not_run": 0
+   },
+   "worlds": 18
+  }
+ ],
+ "note": "Same world, same seed, each time. Only a code change that stops the failure counts as fixed. Simulated."
+}

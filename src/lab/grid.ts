@@ -2,6 +2,7 @@
 import { el } from '../app/dom.ts';
 import type { ServerEvent } from '../app/chat/live.ts';
 import { fmtTime } from '../app/world_page.ts';
+import { Testing } from './testing.ts';
 
 export type Status = 'queued' | 'running' | 'passed' | 'failed' | 'stuck' | 'held';
 type Outline = { kind: 'area'; x0: number; x1: number; z0: number; z1: number } | { kind: 'route'; points: number[][] };
@@ -501,6 +502,7 @@ export class Grid {
   private board = el('div', 'grid-board');
   private replayHost = el('div', 'grid-replay');
   private rail = el('aside', 'grid-rail');
+  readonly testing: Testing;
   private hover = el('div', 'grid-hover');
   private squares = new Map<number, Square>();
   private counts: Partial<Record<keyof Counts, HTMLElement>> = {};
@@ -537,7 +539,8 @@ export class Grid {
     this.notTestedBtn.addEventListener('click', () => this.toggleNotTested());
     const end = el('div', 'grid-bar-end');
     this.recorded.hidden = true;
-    end.append(this.recorded, this.clock, this.notTestedBtn);
+    this.testing = new Testing({ base: deps.base, verdictWord: (verdict, status) => statusWord({ verdict, status, held_back: false } as Row), showPanel: (mode, title, body) => this.showPanel(mode, title, body), panelMode: () => this.rail.dataset.mode });
+    end.append(this.recorded, this.clock, this.notTestedBtn, this.testing.limitsBtn, this.testing.rerunBtn);
     this.bar.append(this.back, this.countsBox, end);
 
     this.replayHost.hidden = true;
@@ -545,7 +548,7 @@ export class Grid {
     this.rail.hidden = true;
     this.hover.hidden = true;
     this.main.append(this.stage, this.rail);
-    this.root.append(this.bar, this.main, this.hover);
+    this.root.append(this.bar, this.testing.strip, this.main, this.hover);
 
     this.board.addEventListener('pointerover', e => { const s = this.squareAt(e.target); if (s) this.showHover(s); });
     this.board.addEventListener('pointerleave', () => { this.hover.hidden = true; });
@@ -591,6 +594,7 @@ export class Grid {
     if (!this.done_) this.clock.textContent = e.running ? `${fmtTime(Number(e.elapsed_s))}, ${e.max_procs} at once` : `Finished in ${fmtTime(Number(e.elapsed_s))}`;
     this.root.dataset.running = String(Boolean(e.running));
     this.root.dataset.updates = String(Number(this.root.dataset.updates ?? 0) + 1);
+    this.testing.onGrid(e);
     if (added) this.layout();
   }
 
@@ -812,6 +816,22 @@ export class Grid {
     this.layout();
   }
 
+  // A side panel beside the board: limits, a boundary search or the regression suite. An empty mode closes it. A live panel keeps its scroll place.
+  private showPanel(mode: string, title: string, body: HTMLElement[]) {
+    if (!mode) { this.closeRail(); this.layout(); return; }
+    const same = this.rail.dataset.mode === mode, scroll = this.rail.scrollTop;
+    if (!same) {
+      this.closeReplay();
+      this.closeRail();
+      this.rail.hidden = false;
+      this.rail.dataset.mode = mode;
+      this.back.hidden = false;
+    }
+    this.fillRail([el('h3', 'grid-rail-title', title)], body);
+    if (same) this.rail.scrollTop = scroll;
+    else this.layout();
+  }
+
   private toggleNotTested() {
     if (this.rail.dataset.mode === 'not_tested') { this.closeRail(); this.layout(); return; }
     this.closeReplay();
@@ -906,6 +926,13 @@ export class Grid {
     file.append(open, world);
     if (d.rerun) file.append(this.rerunButton(d));
     const post = d.verdict && (d.status === 'failed' || d.status === 'stuck') ? this.deps.bountyLink?.(String(d.verdict)) : null;
+    if (bad && !d.held_back && d.verdict) {
+      const find = el('button', 'grid-btn grid-find', 'Find the limit');
+      find.type = 'button';
+      find.title = 'Varies one factor of this world to find where failure starts. At most 12 runs per factor.';
+      find.addEventListener('click', () => void this.testing.findLimit(String(d.verdict), Number(d.index)));
+      file.append(find);
+    }
     if (post) {
       const a = el('a', 'grid-btn grid-post', 'Post a bounty') as HTMLAnchorElement;
       a.href = post;

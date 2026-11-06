@@ -191,6 +191,7 @@ def run_worlds(session, cid, indexes, scope):
     (runs / "index.json").write_text(json.dumps(index))
     session.working()
     report_run(session, cid, run, scope, compared(before, grid["rows"], run), sha(source))
+    T.after_rerun(session, cid, {**plan, "worlds": worlds}, grid, sha(source))
 
 
 def fix_words(pack):

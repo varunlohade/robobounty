@@ -16,7 +16,7 @@ from . import world as W
 
 NAME, ROBOT, BACKEND = "inspection", "anymal_c", "newton"
 NOTE = "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated."
-catalog, physics_hash = W.catalog, W.physics_hash
+catalog, physics_hash, validate = W.catalog, W.physics_hash, W.validate
 HERE = Path(__file__).resolve().parent
 NOTES = [
     "Axes: z up, metres. The robot starts at the origin and faces +x. The default route goes to (5, 0), then (5, 4), then (11, 4), inside a 3.4 m walkway. Put a thing on the route for it to matter.",

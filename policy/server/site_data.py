@@ -18,6 +18,10 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "crashlab"))
+import limits as LIMITS
+import pack_job
+import regressions as REGRESSIONS
 import site_world as world
 
 HERE = Path(__file__).resolve().parent
@@ -82,6 +86,30 @@ def reading_of(numbers, kind):
     return ""
 
 
+_starts = {}
+
+
+def coverage_of(pack, plan, rows):
+    """A campaign's coverage of its operating limits. A plan from before limits has no base world, so it reads the pack's start, once. None if that fails: the page leaves the table out."""
+    try:
+        if not plan.get("base_world") and pack not in _starts:
+            _starts[pack] = pack_job.ask(pack, "start", {}, timeout=60)["world"]
+        return LIMITS.coverage(pack, plan, rows, base=plan.get("base_world") or _starts[pack])
+    except (RuntimeError, OSError, KeyError, ValueError, TypeError) as e:
+        print(f"coverage: {pack}: {e}", file=sys.stderr, flush=True)
+        return None
+
+
+def suite_of(pack):
+    """This machine's regression suite, or the one stored with the recorded batch, labelled recorded."""
+    suite = REGRESSIONS.public(pack)
+    if not suite["entries"]:
+        stored = json_or(DEMO / pack / "suite.json")
+        if stored:
+            suite = {**stored, "recorded": True}
+    return {"robot": ROBOTS[pack], **suite}
+
+
 def demo_campaign(pack):
     folder = DEMO / pack
     if not (folder / "timeline.json.gz").exists():
@@ -105,7 +133,7 @@ def demo_campaign(pack):
                      "replay": (f"lab.html?trial=demo-window-{name}" if pack == "window" and (folder / name / "export" / "manifest.json.gz").exists() else
                                 f"lab.html?poses=/site-api/replay/inspection/{name}" if pack == "inspection" and (folder / name / "replay.json.gz").exists() else None)})
     return {"id": f"demo-{pack}", "label": f"{ROBOTS[pack]} batch", "robot": ROBOTS[pack], "pack": pack, "sim": short(last.get("label")), "source": f"policy/runs/demo/{pack}", "kind": "rows",
-            "note": NOTES[pack], "held_back": plan.get("held_back", 0), "recorded": True, "at": (folder / "timeline.json.gz").stat().st_mtime, **tally(rows), "worlds": rows}
+            "note": NOTES[pack], "held_back": plan.get("held_back", 0), "recorded": True, "at": (folder / "timeline.json.gz").stat().st_mtime, **tally(rows), "worlds": rows, "coverage": coverage_of(pack, plan, last["rows"])}
 
 
 def evidence_campaigns():
@@ -165,7 +193,7 @@ def session_campaigns():
         job = next(iter(sorted(path.parent.glob("w*/job_result.json"))), None)
         out.append({"id": f"{path.parts[-4][:8]}-{path.parts[-2]}", "label": f"Lab run {path.parts[-4][:8]}", "robot": ROBOTS[grid["pack"]], "pack": grid["pack"], "sim": short((json_or(job) or {}).get("label")) if job else None, "source": f"policy/runs/server/{path.parts[-4]}", "kind": "totals",
                     "note": NOTES[grid["pack"]], "held_back": c.get("held", 0), "recorded": False, "at": path.stat().st_mtime, "total": ran, "passed": c.get("passed", 0), "failed": c.get("failed", 0) + c.get("stuck", 0), "holds": c.get("safe_hold", 0), "worlds": [],
-                    "names": [r.get("name") for r in rows[:3]]})
+                    "names": [r.get("name") for r in rows[:3]], "coverage": coverage_of(grid["pack"], json_or(path.parent / "scenarios.json", {}), grid.get("rows", [])) if (path.parent / "scenarios.json").exists() else None})
     out.sort(key=lambda c: c["at"], reverse=True)
     return out[:6]
 
@@ -339,6 +367,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"ok": True})
         if path == "/site-api/data":
             return self.reply(200, build_cached())
+        if path == "/site-api/regressions":
+            return self.reply(200, {pack: suite_of(pack) for pack in ROBOTS})
         if path == "/site-api/recent":
             return self.reply(200, recent())
         if path == "/site-api/providers":

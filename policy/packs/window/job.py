@@ -15,7 +15,7 @@ import scene5 as SCENE
 
 R, W, J = P.R, P.W, P.J
 NAME, ROBOT, BACKEND, NOTE = P.NAME, P.ROBOT, P.BACKEND, P.SIMULATED_NOTE
-catalog, call, physics_hash, controller_files = P.catalog, P.call, P.physics_hash, P.controller_files
+catalog, call, physics_hash, controller_files, validate = P.catalog, P.call, P.physics_hash, P.controller_files, P.validate
 NOTES = [
     "x_m is along the glass from the left edge of the work area. below_top_m is down from the top of the work area, and a negative value is above it. out_m is outward from the glass plane.",
     "The robot cleans vertical lanes across the whole work area, from above its top to below its bottom. Its heading is fixed. It knows nothing about objects on the glass.",

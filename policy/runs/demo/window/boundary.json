@@ -1,0 +1,427 @@
+{
+ "kind": "boundary",
+ "pack": "window",
+ "running": false,
+ "note": "Simulated with hand-built physics. Not checked against real hardware.",
+ "groups": [
+  {
+   "verdict": "slip_distance",
+   "verdict_name": "slip distance",
+   "count": 6,
+   "world": "suction_moderately_reduced",
+   "index": 1,
+   "seed": 3101,
+   "searches": [
+    {
+     "factor": "suction",
+     "label": "Suction",
+     "unit": "Pa",
+     "words": "No clean boundary for suction. The seeds disagree near 2600 to 2500 Pa. Seed 3101 failed at 2500 Pa and not at 2600. Of 3 more seeds, 1 failed at 2500 Pa and 0 failed at 2600.",
+     "clean": false,
+     "status": "done",
+     "runs": [
+      {
+       "value": 1700.0,
+       "seed": 3101,
+       "role": "failing end",
+       "status": "failed",
+       "verdict": "slip_distance",
+       "reason": "The robot slid 0.302 m in one slide at 102.8 s. The limit is 0.30 m."
+      },
+      {
+       "value": 2800.0,
+       "seed": 3101,
+       "role": "passing end",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 94.7% of the glass in 344 s."
+      },
+      {
+       "value": 2250.0,
+       "seed": 3101,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "slip_distance",
+       "reason": "The robot slid 0.302 m in one slide at 358.2 s. The limit is 0.30 m."
+      },
+      {
+       "value": 2500.0,
+       "seed": 3101,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "false_done",
+       "reason": "The robot reported done at 353.9 s, with 11 points more coverage than it had."
+      },
+      {
+       "value": 2650.0,
+       "seed": 3101,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 92.3% of the glass in 343 s."
+      },
+      {
+       "value": 2600.0,
+       "seed": 3101,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 93.8% of the glass in 341 s."
+      },
+      {
+       "value": 2500.0,
+       "seed": 4101,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 90.7% of the glass in 353 s."
+      },
+      {
+       "value": 2500.0,
+       "seed": 5101,
+       "role": "seed, failing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 91.3% of the glass in 342 s."
+      },
+      {
+       "value": 2500.0,
+       "seed": 6101,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "false_done",
+       "reason": "The robot reported done at 359.4 s, with 15 points more coverage than it had."
+      },
+      {
+       "value": 2600.0,
+       "seed": 4101,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 94.4% of the glass in 342 s."
+      },
+      {
+       "value": 2600.0,
+       "seed": 5101,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 94.0% of the glass in 341 s."
+      },
+      {
+       "value": 2600.0,
+       "seed": 6101,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 94.0% of the glass in 342 s."
+      }
+     ],
+     "pass_value": 2600.0,
+     "fail_value": 2500.0,
+     "at_seed": 3101,
+     "fail_seeds": [
+      1,
+      3
+     ],
+     "pass_seeds": [
+      3,
+      3
+     ],
+     "verdict": "false_done",
+     "far_verdict": "slip_distance"
+    }
+   ],
+   "words": null
+  },
+  {
+   "verdict": "coverage",
+   "verdict_name": "low coverage",
+   "count": 5,
+   "world": "seal_leak_worn_skirt",
+   "index": 4,
+   "seed": 3104,
+   "searches": [
+    {
+     "factor": "leak",
+     "label": "Seal leak",
+     "unit": "mm2",
+     "words": "In this world, this robot starts failing between seal leak 240 and 280 mm2: low coverage. 3 of 3 seeds. Just on the other side, 3 of 3 seeds did not fail.",
+     "clean": true,
+     "status": "done",
+     "runs": [
+      {
+       "value": 600.0,
+       "seed": 3104,
+       "role": "failing end",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 27.4% of the glass. The job needs 90%."
+      },
+      {
+       "value": 200.0,
+       "seed": 3104,
+       "role": "passing end",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 94.4% of the glass in 344 s."
+      },
+      {
+       "value": 400.0,
+       "seed": 3104,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 31.5% of the glass. The job needs 90%."
+      },
+      {
+       "value": 300.0,
+       "seed": 3104,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 74.3% of the glass. The job needs 90%."
+      },
+      {
+       "value": 240.0,
+       "seed": 3104,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 92.8% of the glass in 344 s."
+      },
+      {
+       "value": 280.0,
+       "seed": 3104,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 75.5% of the glass. The job needs 90%."
+      },
+      {
+       "value": 280.0,
+       "seed": 4104,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 76.6% of the glass. The job needs 90%."
+      },
+      {
+       "value": 280.0,
+       "seed": 5104,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 85.9% of the glass. The job needs 90%."
+      },
+      {
+       "value": 280.0,
+       "seed": 6104,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 75.9% of the glass. The job needs 90%."
+      },
+      {
+       "value": 240.0,
+       "seed": 4104,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 93.3% of the glass in 344 s."
+      },
+      {
+       "value": 240.0,
+       "seed": 5104,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 93.3% of the glass in 344 s."
+      },
+      {
+       "value": 240.0,
+       "seed": 6104,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 93.4% of the glass in 344 s."
+      }
+     ],
+     "pass_value": 240.0,
+     "fail_value": 280.0,
+     "at_seed": 3104,
+     "fail_seeds": [
+      3,
+      3
+     ],
+     "pass_seeds": [
+      3,
+      3
+     ],
+     "verdict": "coverage",
+     "far_verdict": "coverage"
+    }
+   ],
+   "words": null
+  },
+  {
+   "verdict": "stalled",
+   "verdict_name": "stalled",
+   "count": 3,
+   "world": "top_margin_slightly_smaller",
+   "index": 44,
+   "seed": 3144,
+   "searches": [
+    {
+     "factor": "suction",
+     "label": "Suction",
+     "unit": "Pa",
+     "words": "With wet glass 0 and this world's other changes, this robot starts failing between suction 3100 and 3200 Pa: low coverage. 3 of 3 seeds. Just on the other side, 3 of 3 seeds did not fail. Further out, at 4500 Pa, the failure was stalled.",
+     "clean": true,
+     "status": "done",
+     "runs": [
+      {
+       "value": 4500.0,
+       "seed": 3144,
+       "role": "failing end",
+       "status": "failed",
+       "verdict": "stalled",
+       "reason": "The robot stayed still on the glass for 396 s at the end, with no wind or battery reason."
+      },
+      {
+       "value": 2800.0,
+       "seed": 3144,
+       "role": "passing end",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 95.3% of the glass in 360 s."
+      },
+      {
+       "value": 3650.0,
+       "seed": 3144,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 26.7% of the glass. The job needs 90%."
+      },
+      {
+       "value": 3200.0,
+       "seed": 3144,
+       "role": "bisect",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 77.3% of the glass. The job needs 90%."
+      },
+      {
+       "value": 3000.0,
+       "seed": 3144,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 97.5% of the glass in 354 s."
+      },
+      {
+       "value": 3100.0,
+       "seed": 3144,
+       "role": "bisect",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 97.3% of the glass in 349 s."
+      },
+      {
+       "value": 3200.0,
+       "seed": 4144,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 74.8% of the glass. The job needs 90%."
+      },
+      {
+       "value": 3200.0,
+       "seed": 5144,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 87.9% of the glass. The job needs 90%."
+      },
+      {
+       "value": 3200.0,
+       "seed": 6144,
+       "role": "seed, failing side",
+       "status": "failed",
+       "verdict": "coverage",
+       "reason": "The robot cleaned 87.4% of the glass. The job needs 90%."
+      },
+      {
+       "value": 3100.0,
+       "seed": 4144,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 97.4% of the glass in 347 s."
+      },
+      {
+       "value": 3100.0,
+       "seed": 5144,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 97.4% of the glass in 361 s."
+      },
+      {
+       "value": 3100.0,
+       "seed": 6144,
+       "role": "seed, passing side",
+       "status": "passed",
+       "verdict": "passed",
+       "reason": "The robot cleaned 97.6% of the glass in 348 s."
+      }
+     ],
+     "pass_value": 3100.0,
+     "fail_value": 3200.0,
+     "at_seed": 3144,
+     "fail_seeds": [
+      3,
+      3
+     ],
+     "pass_seeds": [
+      3,
+      3
+     ],
+     "verdict": "coverage",
+     "far_verdict": "stalled"
+    },
+    {
+     "factor": "wetness",
+     "label": "Wet glass",
+     "unit": "",
+     "words": "No clean boundary for wet glass: this world still fails at the start value, 0.2, with stalled. So wet glass alone does not explain this failure.",
+     "clean": false,
+     "status": "done",
+     "runs": [
+      {
+       "value": 0.0,
+       "seed": 3144,
+       "role": "failing end",
+       "status": "failed",
+       "verdict": "stalled",
+       "reason": "The robot stayed still on the glass for 396 s at the end, with no wind or battery reason."
+      },
+      {
+       "value": 0.2,
+       "seed": 3144,
+       "role": "passing end",
+       "status": "failed",
+       "verdict": "stalled",
+       "reason": "The robot stayed still on the glass for 360 s at the end, with no wind or battery reason."
+      }
+     ],
+     "pass_value": null,
+     "fail_value": 0.0
+    }
+   ],
+   "words": null
+  }
+ ],
+ "limits_stored": false
+}

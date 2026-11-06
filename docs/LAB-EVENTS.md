@@ -187,6 +187,30 @@ Stored events: `code_run {campaign, run, scope, sha, rows: [{index, name, change
 
 `status`: `helped`, `did_not_help`, `no_change`, `rejected` (the edit broke the code rules, so it never ran) or `cannot_fix` (no AI call ran). Inspection: only the RouteFollower constants, and a fall is `cannot_fix`, since the policy is a fixed ONNX file. A new verdict can arrive here: `controller_crashed`, when the session copy raised or hit a sandbox limit.
 
+## Limits, boundary search and regression suite
+
+The logic is in `policy/crashlab/limits.py`, `boundary.py` and `regressions.py`. `policy/server/testing_lab.py` joins them to a session. Tested never means safe.
+
+**Limits.** A chat message that names limits calls the typed function `set_limits {factor, low, high}`, checked by code, for example "wind limit 0 to 12". `cannot_set:<code>` refuses: `unknown_factor`, `bad_args`, `low_above_high`, `out_of_range`. Limits apply to the next list. The `scenarios` event gets `limits` and `off_limits: [{name, group, reason, factors}]`, and `dropped` gets `outside_limits:<factor>`. `scenarios.json` also keeps `base_world`.
+
+| Route | Reply |
+|---|---|
+| `GET .../campaigns/<c>/limits` | `{factors: [{key, label, unit, low, high, base, tested_low, tested_high, values, bands_touched, bands, band_rows: [{runs, failed, moved}], worlds_moved, runs, outside, words}], runs, bands_touched, bands_total, limits_stored, limits, dropped, limits_words, note}` |
+| `GET .../campaigns/<c>/boundary` | The latest search, below. `{empty: true, groups: []}` before one. |
+| `GET .../campaigns/<c>/regressions` | `{size, last, note}`: this robot's suite size and last run. |
+| `POST /api/sessions/<sid>/testing` with `{what: "boundary", campaign, group?, index?}` | `202`. With no group, the 3 largest failure groups. `index` picks the starting world if it moved a factor. |
+| `POST /api/sessions/<sid>/testing` with `{what: "regressions", campaign}` | `202`. Runs the suite on the session's code. |
+
+Both POSTs reply `409 {error: "busy", words}` during another job. A recorded server plays the stored real result from `policy/runs/demo/<pack>/`, with `recorded: true`, and replies `200`.
+
+**Live state** comes in the `grid` event's `testing` field, not as a stored event.
+
+`{"kind": "boundary", "running": true, "note": "...", "code_sha": "...", "groups": [{"verdict", "verdict_name", "count", "world", "index", "seed", "words", "searches": [{"factor", "label", "unit", "status", "clean", "words", "pass_value", "fail_value", "fail_seeds", "pass_seeds", "verdict", "far_verdict", "runs": [{"value", "seed", "role", "status", "verdict"}]}]}]}`. `clean` is null while running, and `words` is the sentence to show. `role` is `failing end`, `passing end`, `bisect`, `seed, failing side` or `seed, passing side`. `status` uses the squares' values.
+
+`{"kind": "regressions", "running": true, "code_sha", "edited", "note", "words", "run", "counts": {"fixed", "still_failing", "new_failure", "still_passing", "passes_same_code", "world_changed", "could_not_run"}, "rows": [{"id", "name", "group", "seed", "status", "verdict", "was": {"status", "verdict", "code_sha"}, "change", "words"}]}`.
+
+Fixed needs the same world hash, the same seed, a different code sha and a run that no longer fails. The site server has `GET /site-api/regressions`, and each campaign in `/site-api/data` may have `coverage`.
+
 ## Not in this contract yet
 
 Running held-back worlds outside the fix proof.
