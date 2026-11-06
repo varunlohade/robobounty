@@ -1,0 +1,9 @@
+run seed 3137
+t 0 s, x 0.15, y 138.33
+t 10 s, x 0.13, y 137.14
+t 20 s, x 0.13, y 136.15
+t 30 s, x 0.09, y 134.87
+t 40 s, x 0.36, y 134.75
+t 50 s, x 0.36, y 136.21
+t 60 s, x 0.36, y 136.61
+verdict slip_distance: The robot slid 0.301 m in one slide at 58.2 s. The limit is 0.30 m.

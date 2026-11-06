@@ -1,0 +1,9 @@
+run seed 3126
+t 0 s, x 0.15, y 138.33
+t 10 s, x 0.13, y 137.14
+t 20 s, x 0.14, y 135.29
+t 30 s, x 0.11, y 133.99
+t 40 s, x 0.37, y 133.82
+t 50 s, x 0.37, y 135.27
+t 60 s, x 0.37, y 136.63
+verdict detach: The robot came off the glass at 62.0 s.

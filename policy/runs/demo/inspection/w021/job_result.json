@@ -1,0 +1,47 @@
+{
+ "verdict": "fell",
+ "passed": false,
+ "reason": "The robot fell at 7.0 s, at x 1.6 m, y 0.7 m, after 0 of 3 waypoints, near steel_crossover_shallow.",
+ "numbers": {
+  "waypoints_reached": 0,
+  "waypoints": 3,
+  "fell_t_s": 6.96,
+  "longest_stall_s": 26.0,
+  "deviation_max_m": 0.696,
+  "deviation_mean_m": 0.37,
+  "min_up_z": 0.836,
+  "min_clearance_m": 0.228,
+  "object_peak_N": 2536.2,
+  "object_contact_s": 27.14,
+  "foot_slip_mps": 0.032,
+  "body_on_ground_peak_N": 838.7
+ },
+ "events": [
+  {
+   "name": "fell",
+   "t": 6.96,
+   "value": 6.96
+  }
+ ],
+ "code": {
+  "file": "policy/packs/inspection/controller.py",
+  "line": 37,
+  "why": "RouteFollower picks every walking command here, and it cannot see objects.",
+  "traced": false
+ },
+ "label": "sim packs/inspection b1c89c64f172",
+ "note": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.",
+ "safe_hold": false,
+ "record_sha256": "a7f3d9e01cd1df37ee26a55d986e364abb36b9ed9471dd6639b99da1a15cba21",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3121,
+ "wall_s": 26.08,
+ "end_t": 30.0,
+ "end_x": 1.585,
+ "end_y": 0.563
+}

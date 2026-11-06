@@ -18,6 +18,7 @@
     "@lezer/highlight": "1.2.5",
     "@mujoco/mujoco": "3.16.0",
     "@worldcoin/idkit-core": "4.6.0",
+    "qrcode-generator": "2.0.4",
     "three": "0.180.0"
   },
   "devDependencies": {

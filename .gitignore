@@ -5,7 +5,8 @@ dist
 !.env.example
 .DS_Store
 policy/.venv
-policy/runs
+policy/runs/*
+!policy/runs/demo
 policy/.libero
 design/astra/_brief/inspiration
 design/inspiration

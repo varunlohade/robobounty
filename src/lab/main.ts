@@ -47,7 +47,10 @@ function titleBar(name: HTMLElement): HTMLElement {
   const lights = el('div', 'lab-lights');
   lights.setAttribute('aria-hidden', 'true');
   lights.append(el('i'), el('i'), el('i'));
-  bar.append(lights, name);
+  const home = el('a', '', 'Home');
+  home.href = 'home.html';
+  home.style.cssText = 'margin-left:auto;font-size:12px;color:inherit;text-decoration:none';
+  bar.append(lights, name, home);
   return bar;
 }
 

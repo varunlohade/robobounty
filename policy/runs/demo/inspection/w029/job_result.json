@@ -1,0 +1,52 @@
+{
+ "verdict": "passed",
+ "passed": true,
+ "reason": "The robot reached all 3 waypoints in 25.4 s, and stayed within 0.39 m of the route.",
+ "numbers": {
+  "waypoints_reached": 3,
+  "waypoints": 3,
+  "time_s": 25.42,
+  "longest_stall_s": 2.8,
+  "deviation_max_m": 0.389,
+  "deviation_mean_m": 0.089,
+  "min_up_z": 0.921,
+  "min_clearance_m": 0.501,
+  "object_peak_N": 3147.9,
+  "object_contact_s": 18.56,
+  "foot_slip_mps": 0.182,
+  "body_on_ground_peak_N": 0.0
+ },
+ "events": [
+  {
+   "name": "waypoint 1",
+   "t": 10.82,
+   "value": 1
+  },
+  {
+   "name": "waypoint 2",
+   "t": 16.92,
+   "value": 2
+  },
+  {
+   "name": "waypoint 3",
+   "t": 25.42,
+   "value": 3
+  }
+ ],
+ "code": null,
+ "label": "sim packs/inspection b1c89c64f172",
+ "note": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.",
+ "safe_hold": false,
+ "record_sha256": "aae9741880f2c0cc7c180f6ea41af846b226cce22907e7242b5a7d4fbf98f348",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3129,
+ "wall_s": 23.97,
+ "end_t": 27.58,
+ "end_x": 10.621,
+ "end_y": 4.014
+}

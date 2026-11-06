@@ -1,0 +1,55 @@
+{
+ "verdict": "slip_distance",
+ "passed": false,
+ "reason": "The robot slid 0.304 m in one slide at 338.2 s. The limit is 0.30 m.",
+ "numbers": {
+  "coverage": 0.7943,
+  "time_s": 341.7,
+  "slip_m": 0.7997,
+  "peak_tether_n": 389.56,
+  "peak_chassis_contact_n": 140.23,
+  "min_pressure_pa": 1820.8,
+  "end_battery": 0.9033,
+  "hold_s": 3.8,
+  "hold_mean_wind_ms": 2.02
+ },
+ "events": [
+  {
+   "name": "slip_distance",
+   "t": 338.2,
+   "value": 0.3039
+  },
+  {
+   "name": "false_done",
+   "t": 341.7,
+   "value": 0.2057
+  },
+  {
+   "name": "coverage",
+   "t": 341.7,
+   "value": 0.7943
+  }
+ ],
+ "code": {
+  "file": "policy/highrise5/controller5.py",
+  "line": 228,
+  "why": "The controller was in its clean phase when the judge fired.",
+  "traced": false
+ },
+ "label": "sim highrise5 e8b4aad263da",
+ "note": "Simulated with hand-built physics. Not checked against real hardware.",
+ "safe_hold": false,
+ "final_state_sha256": "b030720708cc801e6dbe06a7fa4fd3546404346a491b7c211b0d0d94a86a8e13",
+ "action_chain_head": "41ab4eb23fc6317f58ff39d5a0322170550d35cdf6adbb6bc61f58ad5df759c4",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3139,
+ "wall_s": 5.18,
+ "end_t": 341.65,
+ "end_x": 1.777,
+ "end_y": 136.03
+}

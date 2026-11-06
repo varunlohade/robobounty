@@ -1,0 +1,34 @@
+{
+ "verdict": "passed",
+ "passed": true,
+ "reason": "The robot cleaned 94.1% of the glass in 281 s.",
+ "numbers": {
+  "coverage": 0.9412,
+  "time_s": 281.35,
+  "slip_m": 0.0,
+  "peak_tether_n": 0.0,
+  "peak_chassis_contact_n": 0.0,
+  "min_pressure_pa": 1819.2,
+  "end_battery": 0.9185,
+  "hold_s": 3.8,
+  "hold_mean_wind_ms": 1.98
+ },
+ "events": [],
+ "code": null,
+ "label": "sim highrise5 e8b4aad263da",
+ "note": "Simulated with hand-built physics. Not checked against real hardware.",
+ "safe_hold": false,
+ "final_state_sha256": "49913897363e956824eb2c3bbb973e2502480710311734f0639b7f0a8ed4ecab",
+ "action_chain_head": "0d43b1757d55b8b37b6190f6dd686257c51dee7cbc5b1382240dc673e7b5c435",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3123,
+ "wall_s": 3.14,
+ "end_t": 281.3,
+ "end_x": 2.416,
+ "end_y": 134.424
+}

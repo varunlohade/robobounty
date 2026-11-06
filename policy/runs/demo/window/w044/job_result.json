@@ -1,0 +1,50 @@
+{
+ "verdict": "stalled",
+ "passed": false,
+ "reason": "The robot stayed still on the glass for 396 s at the end, with no wind or battery reason.",
+ "numbers": {
+  "coverage": 0.1097,
+  "time_s": 600.0,
+  "slip_m": 0.0,
+  "peak_tether_n": 0.0,
+  "peak_chassis_contact_n": 0.0,
+  "min_pressure_pa": 2879.4,
+  "end_battery": 0.6942,
+  "hold_s": 479.55,
+  "hold_mean_wind_ms": 2.02
+ },
+ "events": [
+  {
+   "name": "stalled",
+   "t": 600.0,
+   "value": 396.15
+  },
+  {
+   "name": "coverage",
+   "t": 600.0,
+   "value": 0.1097
+  }
+ ],
+ "code": {
+  "file": "policy/highrise5/controller5.py",
+  "line": 209,
+  "why": "The controller was in its hold phase when the judge fired.",
+  "traced": false
+ },
+ "label": "sim highrise5 e8b4aad263da",
+ "note": "Simulated with hand-built physics. Not checked against real hardware.",
+ "safe_hold": false,
+ "final_state_sha256": "6b565dca3475d94cf35a94f69e5b44355c5bd5d87ab470c667543a4a5b68457b",
+ "action_chain_head": "3f23c12f1f327f02723e32bacb44297171e203635d6c63abfdfb200f725a02ea",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3144,
+ "wall_s": 8.69,
+ "end_t": 599.95,
+ "end_x": 0.841,
+ "end_y": 136.849
+}

@@ -1,0 +1,50 @@
+{
+ "verdict": "detach",
+ "passed": false,
+ "reason": "The robot came off the glass at 295.4 s.",
+ "numbers": {
+  "coverage": 0.8357,
+  "time_s": 295.4,
+  "slip_m": 0.1436,
+  "peak_tether_n": 455.35,
+  "peak_chassis_contact_n": 12.03,
+  "min_pressure_pa": 1.1,
+  "end_battery": 0.9168,
+  "hold_s": 3.5,
+  "hold_mean_wind_ms": 2.06
+ },
+ "events": [
+  {
+   "name": "detach",
+   "t": 295.4,
+   "value": 0.0584
+  },
+  {
+   "name": "coverage",
+   "t": 295.4,
+   "value": 0.8357
+  }
+ ],
+ "code": {
+  "file": "policy/highrise5/controller5.py",
+  "line": 228,
+  "why": "The controller was in its clean phase when the judge fired.",
+  "traced": false
+ },
+ "label": "sim highrise5 e8b4aad263da",
+ "note": "Simulated with hand-built physics. Not checked against real hardware.",
+ "safe_hold": false,
+ "final_state_sha256": "837ee48c2e66c55d644dad8b09aa8db842d48cf531f1e9351c1f2c5d4425a7c4",
+ "action_chain_head": "3c8d714c67339817de7b1ae1bab2cef062e8b496aa19687e30b2d8cd1b43a2d3",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3136,
+ "wall_s": 3.38,
+ "end_t": 295.35,
+ "end_x": 2.034,
+ "end_y": 135.606
+}

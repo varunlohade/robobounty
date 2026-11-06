@@ -14,7 +14,7 @@ html,body{height:100%;margin:0;background:#0B0C0E;overflow:hidden}
 .sh-item:focus-visible,.sh-out:focus-visible,.sh-brand:focus-visible{outline:2px solid rgba(62,123,250,.6);outline-offset:1px}
 .sh-who{margin:auto -8px 0;display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 12px 8px 16px;border-top:1px solid var(--sh-line);line-height:18px}
 .sh-who-name{min-width:0;flex:1}
-.sh-who-name span{display:block}
+.sh-who-name span{display:block;font-size:13px}
 .sh-who-name small{display:block;font-size:12px;line-height:16px;color:var(--sh-t2)}
 .sh-mono{font-family:"JetBrains Mono",ui-monospace,monospace}
 .sh-ok{color:#5CC186;flex:none}

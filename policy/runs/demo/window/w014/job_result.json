@@ -1,0 +1,34 @@
+{
+ "verdict": "battery_stop",
+ "passed": false,
+ "reason": "The robot stopped on low battery and kept its grip. It cleaned 0.7%. The job did not finish.",
+ "numbers": {
+  "coverage": 0.0071,
+  "time_s": 600.0,
+  "slip_m": 0.0,
+  "peak_tether_n": 0.0,
+  "peak_chassis_contact_n": 0.0,
+  "min_pressure_pa": 1904.0,
+  "end_battery": 0.1996,
+  "hold_s": 600.0,
+  "hold_mean_wind_ms": 2.03
+ },
+ "events": [],
+ "code": null,
+ "label": "sim highrise5 e8b4aad263da",
+ "note": "Simulated with hand-built physics. Not checked against real hardware.",
+ "safe_hold": true,
+ "final_state_sha256": "319f5caf8a8511b3e0f663227de1c2bbf11eb6e76194b6a89266479f1156aa1a",
+ "action_chain_head": "47b7da150fbb18724cd17cd0c161130e83e62ca74863657c08f37f4a5f89dd61",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3114,
+ "wall_s": 5.52,
+ "end_t": 599.95,
+ "end_x": 0.107,
+ "end_y": 137.979
+}

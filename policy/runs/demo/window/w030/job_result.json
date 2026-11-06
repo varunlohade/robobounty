@@ -1,0 +1,45 @@
+{
+ "verdict": "coverage",
+ "passed": false,
+ "reason": "The robot cleaned 65.0% of the glass. The job needs 90%.",
+ "numbers": {
+  "coverage": 0.6501,
+  "time_s": 269.85,
+  "slip_m": 0.0195,
+  "peak_tether_n": 0.0,
+  "peak_chassis_contact_n": 79.3,
+  "min_pressure_pa": 469.8,
+  "end_battery": 0.9222,
+  "hold_s": 3.8,
+  "hold_mean_wind_ms": 2.15
+ },
+ "events": [
+  {
+   "name": "coverage",
+   "t": 269.85,
+   "value": 0.6501
+  }
+ ],
+ "code": {
+  "file": "policy/highrise5/controller5.py",
+  "line": 265,
+  "why": "The controller was in its finished phase when the judge fired.",
+  "traced": false
+ },
+ "label": "sim highrise5 e8b4aad263da",
+ "note": "Simulated with hand-built physics. Not checked against real hardware.",
+ "safe_hold": false,
+ "final_state_sha256": "36081c0d203fa2e9553a6fc25af372a0d0416e20430e242e6563f87cd8c18ec2",
+ "action_chain_head": "1537ad461370c3e49d891762310940bdf09aa1f4b6446869a79527855ced4f70",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3130,
+ "wall_s": 3.26,
+ "end_t": 269.8,
+ "end_x": 2.002,
+ "end_y": 134.13
+}

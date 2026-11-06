@@ -1,0 +1,50 @@
+{
+ "verdict": "time_limit",
+ "passed": false,
+ "reason": "The robot did not finish in 600 s.",
+ "numbers": {
+  "coverage": 0.8443,
+  "time_s": 600.0,
+  "slip_m": 0.0,
+  "peak_tether_n": 0.0,
+  "peak_chassis_contact_n": 0.0,
+  "min_pressure_pa": 1767.4,
+  "end_battery": 0.8295,
+  "hold_s": 4.3,
+  "hold_mean_wind_ms": 2.03
+ },
+ "events": [
+  {
+   "name": "time_limit",
+   "t": 600.0,
+   "value": 600.0
+  },
+  {
+   "name": "coverage",
+   "t": 600.0,
+   "value": 0.8443
+  }
+ ],
+ "code": {
+  "file": "policy/highrise5/controller5.py",
+  "line": 228,
+  "why": "The controller was in its clean phase when the judge fired.",
+  "traced": false
+ },
+ "label": "sim highrise5 e8b4aad263da",
+ "note": "Simulated with hand-built physics. Not checked against real hardware.",
+ "safe_hold": false,
+ "final_state_sha256": "c470e0fb33601e5a59cd209e018d584ad863ca5d6834a0c0bd6e3f799e2efc03",
+ "action_chain_head": "aed682e2a2710c1a4ad388ebc60c2fe2acd75e3bc8dec7027a38ff082ed13d1b",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3117,
+ "wall_s": 6.81,
+ "end_t": 599.95,
+ "end_x": 3.269,
+ "end_y": 136.232
+}

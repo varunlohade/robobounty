@@ -1,0 +1,52 @@
+{
+ "verdict": "stuck",
+ "passed": false,
+ "reason": "The robot stopped making progress at 19.8 s, after 1 of 3 waypoints, near floor_grating.",
+ "numbers": {
+  "waypoints_reached": 1,
+  "waypoints": 3,
+  "stuck_t_s": 19.82,
+  "longest_stall_s": 10.2,
+  "deviation_max_m": 0.785,
+  "deviation_mean_m": 0.342,
+  "min_up_z": 0.879,
+  "min_clearance_m": 0.367,
+  "object_peak_N": 5835.4,
+  "object_contact_s": 16.82,
+  "foot_slip_mps": 0.206,
+  "body_on_ground_peak_N": 0.0
+ },
+ "events": [
+  {
+   "name": "waypoint 1",
+   "t": 5.8,
+   "value": 1
+  },
+  {
+   "name": "stuck",
+   "t": 19.82,
+   "value": 19.82
+  }
+ ],
+ "code": {
+  "file": "policy/packs/inspection/controller.py",
+  "line": 37,
+  "why": "RouteFollower picks every walking command here, and it cannot see objects.",
+  "traced": false
+ },
+ "label": "sim packs/inspection b1c89c64f172",
+ "note": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.",
+ "safe_hold": false,
+ "record_sha256": "930172444920316513ddc25bd1a5e0bf6b519c3dd628854da52f53ff69c7425f",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3110,
+ "wall_s": 35.87,
+ "end_t": 30.0,
+ "end_x": 4.462,
+ "end_y": 3.186
+}

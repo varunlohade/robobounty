@@ -1,0 +1,50 @@
+{
+ "verdict": "false_done",
+ "passed": false,
+ "reason": "The robot reported done at 371.8 s, with 12 points more coverage than it had.",
+ "numbers": {
+  "coverage": 0.877,
+  "time_s": 371.8,
+  "slip_m": 0.0356,
+  "peak_tether_n": 175.61,
+  "peak_chassis_contact_n": 0.0,
+  "min_pressure_pa": 1582.7,
+  "end_battery": 0.9047,
+  "hold_s": 3.8,
+  "hold_mean_wind_ms": 1.92
+ },
+ "events": [
+  {
+   "name": "false_done",
+   "t": 371.8,
+   "value": 0.1196
+  },
+  {
+   "name": "coverage",
+   "t": 371.8,
+   "value": 0.877
+  }
+ ],
+ "code": {
+  "file": "policy/highrise5/controller5.py",
+  "line": 265,
+  "why": "The controller was in its finished phase when the judge fired.",
+  "traced": false
+ },
+ "label": "sim highrise5 e8b4aad263da",
+ "note": "Simulated with hand-built physics. Not checked against real hardware.",
+ "safe_hold": false,
+ "final_state_sha256": "46d16f812446d6985f579fbadf4f521e0f23d066bc176d76b6a728fa3f035522",
+ "action_chain_head": "e9b5b274df29376fe8f39b81ada52646026a0a07130a884e1e8758cb9026132b",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3100,
+ "wall_s": 4.23,
+ "end_t": 371.75,
+ "end_x": 2.365,
+ "end_y": 134.021
+}

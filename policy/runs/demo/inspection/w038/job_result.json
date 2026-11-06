@@ -1,0 +1,40 @@
+{
+ "verdict": "timed_out",
+ "passed": false,
+ "reason": "The robot reached 0 of 3 waypoints in 30 s and ran out of time. Its longest stall was 25.7 s.",
+ "numbers": {
+  "waypoints_reached": 0,
+  "waypoints": 3,
+  "longest_stall_s": 25.7,
+  "deviation_max_m": 0.684,
+  "deviation_mean_m": 0.081,
+  "min_up_z": -0.025,
+  "min_clearance_m": 0.163,
+  "object_peak_N": 2343.7,
+  "object_contact_s": 24.66,
+  "foot_slip_mps": 0.026,
+  "body_on_ground_peak_N": 1583.5
+ },
+ "events": [],
+ "code": {
+  "file": "policy/packs/inspection/controller.py",
+  "line": 37,
+  "why": "RouteFollower picks every walking command here, and it cannot see objects.",
+  "traced": false
+ },
+ "label": "sim packs/inspection b1c89c64f172",
+ "note": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.",
+ "safe_hold": false,
+ "record_sha256": "56a3096d3abc7f27f7fc98e6dcd19b8a2e6569f75b7cbb78322084b4f47d100e",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3138,
+ "wall_s": 25.69,
+ "end_t": 30.0,
+ "end_x": 2.48,
+ "end_y": -0.684
+}

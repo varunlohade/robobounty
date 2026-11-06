@@ -1,0 +1,34 @@
+{
+ "verdict": "wind_hold",
+ "passed": false,
+ "reason": "The robot held on the glass for 600 s at a mean wind of 8.2 m/s and kept its grip. It cleaned 0.8%. The job did not finish.",
+ "numbers": {
+  "coverage": 0.0082,
+  "time_s": 600.0,
+  "slip_m": 0.0,
+  "peak_tether_n": 0.0,
+  "peak_chassis_contact_n": 0.0,
+  "min_pressure_pa": 2519.3,
+  "end_battery": 0.8151,
+  "hold_s": 600.0,
+  "hold_mean_wind_ms": 8.24
+ },
+ "events": [],
+ "code": null,
+ "label": "sim highrise5 e8b4aad263da",
+ "note": "Simulated with hand-built physics. Not checked against real hardware.",
+ "safe_hold": true,
+ "final_state_sha256": "b2b8154fb4dd50eb5654f1fa3a0325895335cfedfa76d9fd7f3809aed84fdf66",
+ "action_chain_head": "08abc85a80749ed9b380fc22a60ebfc6d9413dbfa1a58c158135c52cfa6ead44",
+ "film": {
+  "count": 24,
+  "cols": 6,
+  "w": 200,
+  "h": 150
+ },
+ "seed": 3111,
+ "wall_s": 5.4,
+ "end_t": 599.95,
+ "end_x": 0.114,
+ "end_y": 137.972
+}

@@ -1,0 +1,8 @@
+{
+ "format": "recorded-batch/1",
+ "note": "Simulated. Recorded from real campaigns by record_batch.py, with stored AI replies. See docs/LAB-EVENTS.md.",
+ "packs": [
+  "inspection",
+  "window"
+ ]
+}
