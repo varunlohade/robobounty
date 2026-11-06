@@ -47,9 +47,10 @@ stop() {
 trap 'stop 0' INT TERM
 trap 'stop 1' EXIT
 
+unset CRASHLAB_DEMO_ACCOUNTS
 export CRASHLAB_DEMO=1 CRASHLAB_WEB_PORT="$WEB" CRASHLAB_SITE_PORT="$SITE" VITE_RUN_PORT="$RUN" VITE_BOARD_PORT="$BOARD"
 case "$MODE" in
-  recorded) RECORDED=(--recorded policy/runs/demo) ;;
+  recorded) RECORDED=(--recorded policy/runs/demo); export CRASHLAB_DEMO_ACCOUNTS=1 CRASHLAB_AUTH_DB="$LOGS/auth.sqlite" ;; # Seeded demo accounts, labelled on screen, in a store that ends with this run.
   stored) RECORDED=(--recorded policy/server/fixtures) ;;
   *) RECORDED=() ;;
 esac

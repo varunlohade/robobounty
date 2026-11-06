@@ -85,7 +85,15 @@ done = W.verify(enrol_result(ctx["rp_context"]["nonce"]), "b1", None, ENV, db, u
 check(done["verified"] is True and done["human_id"].startswith("0x") and "ab" * 16 not in done["human_id"], "a good reply verifies, and the id hides the nullifier")
 
 ctx = fresh("b2")
-check(code_of(lambda: W.verify(enrol_result(ctx["rp_context"]["nonce"], session_id="session_other"), "b2", None, ENV, db, upstream(True, GOOD))) == "already_enrolled", "one human cannot enrol twice")
+again = W.verify(enrol_result(ctx["rp_context"]["nonce"], session_id="session_other"), "b2", None, ENV, db, upstream(True, GOOD))
+check(again["human_id"] == done["human_id"], "a returning human in a new browser gets the same id, so never a second account")
+check(W.request_context("b2", "session_other", ENV, db)["mode"] == "prove", "that new browser proves its own session next time")
+ctx = fresh("b3")
+check(code_of(lambda: W.verify(enrol_result(ctx["rp_context"]["nonce"], session_id="session_third"), "b3", None, ENV, db, upstream(False, {"code": "max_verifications_reached"}))) == "already_enrolled", "if World ID refuses a second first-time proof, the words say use the first browser")
+ctx = fresh("b4")
+stolen = enrol_result(ctx["rp_context"]["nonce"], session_id="session_other")
+stolen["responses"][0]["nullifier"] = "0x" + "ef" * 16
+check(code_of(lambda: W.verify(stolen, "b4", None, ENV, db, upstream(True, GOOD))) == "wrong_session", "another human cannot take over a saved session")
 
 ctx = fresh("b1", SESSION)
 check(ctx["mode"] == "prove" and ctx["session_id"] == SESSION and "action" not in ctx, "a returning browser proves its session")
@@ -102,12 +110,12 @@ ctx = fresh("b1", SESSION)
 check(code_of(lambda: W.verify(prove_result(ctx["rp_context"]["nonce"]), "b1", SESSION, ENV, db, upstream(True, GOOD))) == "replayed", "a session proof works once")
 
 W.add_login("tok", done["human_id"], "staging", "human", db)
-check(W.login_of("tok", db)["human_id"] == done["human_id"], "a login names its human")
-check(W.login_of("tok", db)["credential"] == "human", "a human login says human")
-check(W.login_of("forged", db) is None and W.login_of(None, db) is None, "a forged token names nobody")
-check(W.login_of("tok", db, now=__import__("time").time() + W.LOGIN_S + 1) is None, "a login expires")
+check(W.login_of("tok", db, env=ENV)["human_id"] == done["human_id"], "a login names its human")
+check(W.login_of("tok", db, env=ENV)["credential"] == "human", "a human login says human")
+check(W.login_of("forged", db, env=ENV) is None and W.login_of(None, db, env=ENV) is None, "a forged token names nobody")
+check(W.login_of("tok", db, now=__import__("time").time() + W.LOGIN_S + 1, env=ENV) is None, "a login expires")
 W.drop_login("tok", db)
-check(W.login_of("tok", db) is None, "sign out ends the login")
+check(W.login_of("tok", db, env=ENV) is None, "sign out ends the login")
 
 # Device mode. Mock replies again: these prove what the server does with a 3.0 reply, not that a real World App proof passes.
 DEV = {**ENV, "WORLD_CREDENTIAL": "device"}
@@ -175,9 +183,10 @@ check(code_of(dev_verify({**replay, "nonce": ctx2["rp_context"]["nonce"]})) == "
 again = W.verify(dev_result(dev_ctx()), "d1", None, DEV, db, dev_upstream)
 check(again["human_id"] == device["human_id"], "the same device signs in again with a new proof and the same id")
 W.add_login("dtok", device["human_id"], "staging", device["credential"], db)
-check(W.login_of("dtok", db)["credential"] == "device", "a device login still says device")
+check(W.login_of("dtok", db, env=DEV)["credential"] == "device", "a device login still says device")
 ctx = fresh()
-check(W.login_of("dtok", db)["credential"] == "device" and ctx["credential"] == "human", "switching back to human mode does not relabel a device login")
+check(W.login_of("dtok", db, env=ENV) is None and ctx["credential"] == "human", "after a switch to human mode, a device login counts as signed out")
+check(W.login_of("dtok", db, env=DEV)["credential"] == "device", "a switch back does not relabel a device login")
 W.drop_login("dtok", db)
 print(f"{failed} FAILED" if failed else "ALL PASS (mock replies only, no real World ID call)")
 sys.exit(1 if failed else 0)

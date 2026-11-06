@@ -1,7 +1,7 @@
 """Bounty board data: one folder per bounty, with spec.json, salt.hex, ledger.json, meta.json and submissions/.
 
 LOCAL LEDGER. NOT ON CHAIN. Amounts are test units, not money. The salt stays on this disk and never leaves through a view.
-World ID is not connected: a tester is only a name, so one person can use many names.
+A tester id comes from the signed-in engineer's account. Device-mode World ID does not prove one person, so one person can hold many accounts.
 """
 import contextlib
 import fcntl
@@ -25,7 +25,7 @@ import ledger as ledger_module
 
 ROOT = G.POLICY / "runs" / "board"
 LEDGER_LABEL = ledger_module.LABEL
-WORLD_ID_LABEL = "World ID is not connected"
+WORLD_ID_LABEL = "A tester id comes from the signed-in account, and a verified device is not proof of one person"
 SCENARIOS_LABEL = "Scenario text is for people to read. The gate does not enforce it."
 SIM_LABEL = "Simulated with hand-built physics. Limits are the company's choice, so a world inside them is not shown to be physically possible."
 ROBOT = "High-rise window robot"
@@ -116,6 +116,18 @@ def post(title, company, scenarios, cap, per_failure, limits, window=ledger_modu
             raise BoardError("bad_bounty", f"The ledger refused this bounty: {e}.") from None
         os.rename(tmp, root / str(bounty_id))
     return get(bounty_id, root)
+
+
+def set_owner(bounty_id, account_id, root=ROOT):
+    write_json(Path(root) / str(bounty_id) / "owner.json", {"account": account_id})
+
+
+def owner_of(bounty_id, root=ROOT):
+    """The company account that posted this bounty. None for an agent's or an older bounty, and then no company can act on it."""
+    try:
+        return json.loads((Path(root) / str(bounty_id) / "owner.json").read_text())["account"]
+    except (OSError, ValueError, KeyError):
+        return None
 
 
 def _balance(money, failures, rows):
@@ -248,7 +260,7 @@ def list_submissions(bounty_id, root=ROOT):
 def ledger_step(bounty_id, fingerprint, step, tester=None, root=ROOT, secret=None, on_claim=None):
     """Moves one failure on the ledger with the contract's rules, and updates the submission that earned it. Returns the failure row.
 
-    No account exists, so anyone who can reach the board can press reject and finalize. Claim needs the name and the secret that submit returned once. World ID is not connected.
+    board_server checks the session first: the bounty's company for reject and finalize, an engineer for claim. Claim also needs the secret that submit returned once.
     on_claim(amount) runs in this lock. If it raises, the ledger goes back and the claim fails.
     """
     folder = _folder(bounty_id, root)

@@ -32,7 +32,7 @@ WORDS = {
     "bad_shape": "That World ID result has the wrong shape.",
     "wrong_action": "That World ID result is for a different action.",
     "bad_nonce": "That World ID request expired or was already used. Start again.",
-    "already_enrolled": "This World ID already signed up from another browser. Sign in from that browser.",
+    "already_enrolled": "This World ID already has an account, and World ID refused a second first-time proof. Sign in from the browser you first used.",
     "wrong_session": "That proof is for a different World ID session.",
     "replayed": "That proof was already used. Start again.",
     "proof_rejected": "World ID rejected this proof.",
@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS humans (nullifier TEXT PRIMARY KEY, session_id TEXT U
 CREATE TABLE IF NOT EXISTS proofs (session_nullifier TEXT PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS nonces (nonce TEXT PRIMARY KEY, browser TEXT NOT NULL, expires_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS logins (token_sha TEXT PRIMARY KEY, human_id TEXT NOT NULL, environment TEXT NOT NULL, expires_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS human_sessions (session_id TEXT PRIMARY KEY, human_id TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS devices (nullifier TEXT PRIMARY KEY, device_id TEXT NOT NULL, at REAL NOT NULL);
 """
 
@@ -62,6 +63,12 @@ def _open(path):
     if not any(column[1] == "credential" for column in db.execute("PRAGMA table_info(logins)")):
         db.execute("ALTER TABLE logins ADD COLUMN credential TEXT NOT NULL DEFAULT 'human'")  # Every login before this column came from a 4.0 Proof of Human.
     return db
+
+
+def _human_of_session(d, session):
+    """A person who signs in from a second browser gets a second World ID session, for the same account."""
+    row = d.execute("SELECT human_id FROM humans WHERE session_id=?", (session,)).fetchone() or d.execute("SELECT human_id FROM human_sessions WHERE session_id=?", (session,)).fetchone()
+    return row[0] if row else None
 
 
 def credential_of(env):
@@ -102,7 +109,7 @@ def request_context(browser, saved_session, env=None, db=DB):
         raise Rejected("not_configured")
     device = credential_of(env) == "device"
     with closing(_open(db)) as d:
-        known = not device and saved_session and d.execute("SELECT 1 FROM humans WHERE session_id=?", (saved_session,)).fetchone()
+        known = not device and saved_session and _human_of_session(d, saved_session)
     action = None if known else env["WORLD_ACTION"]
     signed = _sign(action, env)
     with closing(_open(db)) as d:
@@ -211,17 +218,18 @@ def verify(result, browser, saved_session, env=None, db=DB, post=post_verify):
     session = result.get("session_id")
     if not isinstance(items, list) or not 1 <= len(items) <= 4 or not all(isinstance(i, dict) for i in items) or not isinstance(session, str) or not SESSION.fullmatch(session):
         raise Rejected("bad_shape")
+    if any(i.get("identifier") != "proof_of_human" for i in items):
+        raise Rejected("wrong_credential")
     enrol = "action" in result
     with closing(_open(db)) as d:
         if enrol:
             if result["action"] != env["WORLD_ACTION"]:
                 raise Rejected("wrong_action")
             nullifiers = [_nullifier(i.get("nullifier")) for i in items]
-            if any(d.execute("SELECT 1 FROM humans WHERE nullifier=?", (n,)).fetchone() for n in nullifiers):
-                raise Rejected("already_enrolled")
+            returning = any(d.execute("SELECT 1 FROM humans WHERE nullifier=?", (n,)).fetchone() for n in nullifiers)
         else:
-            row = d.execute("SELECT human_id FROM humans WHERE session_id=?", (session,)).fetchone()
-            if row is None or session != saved_session:
+            human = _human_of_session(d, session)
+            if human is None or session != saved_session:
                 raise Rejected("wrong_session")
             pairs = [i.get("session_nullifier") for i in items]
             if not all(isinstance(p, list) and p and isinstance(p[0], str) for p in pairs):
@@ -233,7 +241,7 @@ def verify(result, browser, saved_session, env=None, db=DB, post=post_verify):
         raise Rejected("bad_nonce")
     ok, reply = post(result, env)
     if not ok or reply.get("success") is not True:
-        raise Rejected("proof_rejected")
+        raise Rejected("already_enrolled" if enrol and returning else "proof_rejected")  # World ID may keep a first-time proof to one use.
     if reply.get("environment") != env["WORLD_ENVIRONMENT"]:
         raise Rejected("wrong_environment")
     passed = [r for r in reply.get("results") or [] if isinstance(r, dict) and r.get("success") is True]
@@ -245,9 +253,14 @@ def verify(result, browser, saved_session, env=None, db=DB, post=post_verify):
             if enrol:
                 nullifier = _nullifier(chosen.get("nullifier"))
                 human = _human_id(nullifier, env["WORLD_ACTION"])
-                d.execute("INSERT INTO humans VALUES (?,?,?,?)", (nullifier, session, human, time.time()))
+                holder = _human_of_session(d, session)
+                if holder not in (None, human):
+                    raise Rejected("wrong_session")
+                if d.execute("SELECT 1 FROM humans WHERE nullifier=?", (nullifier,)).fetchone():
+                    d.execute("INSERT OR IGNORE INTO human_sessions VALUES (?,?)", (session, human))
+                else:
+                    d.execute("INSERT INTO humans VALUES (?,?,?,?)", (nullifier, session, human, time.time()))
             else:
-                human = row[0]
                 d.execute("INSERT INTO proofs VALUES (?)", (chosen["session_nullifier"][0],))
         except sqlite3.IntegrityError:
             raise Rejected("already_enrolled" if enrol else "replayed") from None
@@ -265,13 +278,15 @@ def add_login(token, human_id, environment, credential, db=DB, now=None):
         d.execute("INSERT OR REPLACE INTO logins (token_sha, human_id, environment, expires_at, credential) VALUES (?,?,?,?,?)", (_token_sha(token), human_id, environment, now + LOGIN_S, credential))
 
 
-def login_of(token, db=DB, now=None):
+def login_of(token, db=DB, now=None, env=None):
+    """A login made in another credential mode counts as signed out, because it does not prove what this server asks for now."""
     if not token:
         return None
+    env = os.environ if env is None else env
     now = time.time() if now is None else now
     with closing(_open(db)) as d:
         row = d.execute("SELECT human_id, environment, credential FROM logins WHERE token_sha=? AND expires_at>=?", (_token_sha(token), now)).fetchone()
-    return {"human_id": row[0], "environment": row[1], "credential": row[2]} if row else None
+    return {"human_id": row[0], "environment": row[1], "credential": row[2]} if row and row[2] == credential_of(env) else None
 
 
 def drop_login(token, db=DB):

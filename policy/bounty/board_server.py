@@ -1,17 +1,18 @@
 """Bounty board server on 127.0.0.1:5298. It accepts only the board page's origin and host, on every route. A request with no Origin is refused.
 
-One gate runs at a time, and at most QUEUE_CAP wait. Each tester name gets MAX_PER_TESTER submissions per bounty. World ID is not connected, so a new name gets past that cap.
-LOCAL LEDGER. NOT ON CHAIN. No money, wallet, key or account exists here. Results are simulated with hand-built physics.
+One gate runs at a time, and at most QUEUE_CAP wait. Each engineer account gets MAX_PER_TESTER submissions per bounty.
+Each POST needs a board token from the site server, in the Authorization header: a company to post, an engineer to submit and claim, the bounty's own company to finalize, reject, approve or decline. A browser never sends that header by itself, so a cross-site form cannot act. A guest gets a plain refusal.
+LOCAL LEDGER. NOT ON CHAIN. No money, wallet or key exists here. Results are simulated with hand-built physics.
 
 GET  /api/health
 GET  /api/bounties
 GET  /api/bounties/<id>
 GET  /api/bounties/<id>/submissions
 GET  /api/bounties/<id>/submissions/<n>
-POST /api/bounties                     {title, company, scenarios, cap, per_failure, limits, window?}
-POST /api/bounties/<id>/submit         {tester, world, seed}
+POST /api/bounties                     {title, scenarios, cap, per_failure, limits, window?}
+POST /api/bounties/<id>/submit         {world, seed}
 POST /api/bounties/<id>/failures/<fingerprint>/reject|finalize   {}
-POST /api/bounties/<id>/failures/<fingerprint>/claim             {tester, secret}. submit returned the secret, once.
+POST /api/bounties/<id>/failures/<fingerprint>/claim             {secret}. submit returned the secret, once.
 POST /api/bounties/<id>/submissions/<n>/replay                   {}, writes the replay of the recorded run once
 GET  /api/bounties/<id>/submissions/<n>/replay/<file>
 """
@@ -33,6 +34,7 @@ import board_gate
 import board_spec
 import board_store as B
 import gate as G
+import site_auth as A
 
 HOST = "127.0.0.1"
 PORT = 5298
@@ -42,15 +44,15 @@ MAX_WORLD_BYTES = G.MAX_SUBMISSION_BYTES
 MAX_SUBMIT_BODY = 3 * MAX_WORLD_BYTES  # JSON escapes make the body larger than the world, and the world has its own limit
 MAX_POST_BODY = MAX_WORLD_BYTES
 MAX_STEP_BODY = 256
-POST_FIELDS = {"title", "company", "scenarios", "cap", "per_failure", "limits"}
-SUBMIT_FIELDS = {"tester", "world", "seed"}
+POST_FIELDS = {"title", "scenarios", "cap", "per_failure", "limits"}
+SUBMIT_FIELDS = {"world", "seed"}
 ROUTE = re.compile(r"/api/bounties/([0-9]{1,9})(?:/(submit|submissions)(?:/([0-9]{1,9}))?)?")
 STEP_ROUTE = re.compile(r"/api/bounties/([0-9]{1,9})/failures/(0x[0-9a-f]{64})/(reject|finalize|claim)")
 REPLAY_ROUTE = re.compile(r"/api/bounties/([0-9]{1,9})/submissions/([0-9]{1,9})/replay(?:/([a-z.]+))?")
 REPLAY_FILES = {"manifest.json": "application/json", "model.xml": "application/xml", "qpos.json": "application/json", "result.json": "application/json", "world.json": "application/json",
                 "controller.py.txt": "text/plain", "trace.json": "application/json", "wind.json": "application/json", "dirt.bin": "application/octet-stream"}
 LABELS = {"ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL}
-ERROR_STATUS = {"unknown_bounty": 404, "unknown_submission": 404, "tester_cap": 429, "ledger_refused": 409, "no_recorded_run": 404, "replay_refused": 409, **board_fix_routes.ERROR_STATUS}
+ERROR_STATUS = {"unknown_bounty": 404, "unknown_submission": 404, "tester_cap": 429, "ledger_refused": 409, "no_recorded_run": 404, "replay_refused": 409, "not_your_bounty": 403, **board_fix_routes.ERROR_STATUS}
 
 ROOT = B.ROOT
 WAITING = queue.Queue(QUEUE_CAP)
@@ -112,9 +114,34 @@ class Handler(BaseHTTPRequestHandler):
             return self.fail(403, "origin_refused", "This origin or host is not the board page.")
         self.head(204, "text/plain", 0)
         self.send_header("Access-Control-Allow-Methods", "GET, POST")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.send_header("Access-Control-Max-Age", "60")
         self.end_headers()
+
+    def viewer(self):
+        scheme, _, value = self.headers.get("Authorization", "").partition(" ")
+        return A.board_session(value.strip()) if scheme == "Bearer" else None
+
+    def need(self, *roles):
+        """The session, if it has one of these roles. The session decides who acts, and no field in a body can."""
+        s = self.viewer()
+        if not s:
+            raise Refused(401, "sign_in_needed", "Sign in first. Your session may have ended.")
+        if s["role"] == "guest":
+            raise Refused(403, "guest_refused", "A guest can look and run the saved demo. Sign in to do this.")
+        if s["role"] not in roles:
+            raise Refused(403, "role_refused", f"Only {' or '.join('a ' + r for r in roles)} can do this.")
+        return s
+
+    def own(self, bounty_id):
+        s = self.need("company")
+        if B.owner_of(bounty_id, ROOT) != s["account_id"]:
+            raise Refused(403, "not_your_bounty", "Only the company that posted this bounty can do this.")
+        return s
+
+    def marked(self, view):
+        s = self.viewer()
+        return {**view, "mine": bool(s) and s["role"] == "company" and B.owner_of(view["id"], ROOT) == s["account_id"]}
 
     def body(self, limit, fields, optional=()):
         if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
@@ -153,7 +180,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, {**B.get_submission(bounty_id, int(m[3]), ROOT), **LABELS})
             if m[2]:
                 return self.reply(200, {"submissions": B.list_submissions(bounty_id, ROOT), **LABELS})
-            return self.reply(200, B.get(bounty_id, ROOT))
+            return self.reply(200, self.marked(B.get(bounty_id, ROOT)))
         except B.BoardError as e:
             return self.fail(ERROR_STATUS.get(e.code, 400), e.code, e.reason)
 
@@ -170,8 +197,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.submit(int(m[1]))
             m = STEP_ROUTE.fullmatch(self.path)
             if m:
-                v = self.body(MAX_STEP_BODY, {"tester", "secret"} if m[3] == "claim" else set())
-                row = B.ledger_step(int(m[1]), m[2], m[3], v.get("tester"), ROOT, secret=v.get("secret"))
+                s = self.need("engineer") if m[3] == "claim" else self.own(int(m[1]))
+                v = self.body(MAX_STEP_BODY, {"secret"} if m[3] == "claim" else set())
+                row = B.ledger_step(int(m[1]), m[2], m[3], s["tester"], ROOT, secret=v.get("secret"))
                 return self.reply(200, {"failure": row, "bounty": B.get(int(m[1]), ROOT), **LABELS})
             m = REPLAY_ROUTE.fullmatch(self.path)
             if m and not m[3]:
@@ -184,6 +212,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.fail(ERROR_STATUS.get(e.code, 400), e.code, e.reason)
 
     def make_replay(self, bounty_id, n):
+        self.need("company", "engineer")
         self.body(MAX_STEP_BODY, set())
         B.get_submission(bounty_id, n, ROOT)
         if not EXPORT_LOCK.acquire(blocking=False):
@@ -205,11 +234,15 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def post_bounty(self):
+        s = self.need("company")
         v = self.body(MAX_POST_BODY, POST_FIELDS, ("window",))
         window = {"window": v["window"]} if "window" in v else {}
-        return self.reply(201, B.post(v["title"], v["company"], v["scenarios"], v["cap"], v["per_failure"], v["limits"], root=ROOT, **window))
+        made = B.post(v["title"], A.company_name(s), v["scenarios"], v["cap"], v["per_failure"], v["limits"], root=ROOT, **window)
+        B.set_owner(made["id"], s["account_id"], ROOT)
+        return self.reply(201, {**made, "mine": True})
 
     def submit(self, bounty_id):
+        s = self.need("engineer")
         v = self.body(MAX_SUBMIT_BODY, SUBMIT_FIELDS)
         world = v["world"]
         if not isinstance(world, str):
@@ -217,13 +250,13 @@ class Handler(BaseHTTPRequestHandler):
         if len(world.encode("utf-8", "replace")) > MAX_WORLD_BYTES:
             raise Refused(413, "world_too_large", f"The world is larger than {MAX_WORLD_BYTES} bytes.")
         with SUBMIT_LOCK:
-            B.require_room(bounty_id, v["tester"], ROOT)
+            B.require_room(bounty_id, s["tester"], ROOT)
             if B.get(bounty_id, ROOT)["status"] != "open":
                 raise Refused(409, "cap_reached", "The cap of this bounty is used up.")
             if WAITING.full():
                 raise Refused(503, "queue_full", f"{QUEUE_CAP} submissions are already waiting. Try again soon. This did not use one of your submissions.")
             secret = B.new_claim_secret()
-            row = B.reserve(bounty_id, v["tester"], v["seed"], ROOT, secret=secret)
+            row = B.reserve(bounty_id, s["tester"], v["seed"], ROOT, secret=secret)
             WAITING.put_nowait((row, world))
             ahead = WAITING.qsize() - 1
         return self.reply(202, {"claim_secret": secret, "n": row["n"], "state": row["state"], "ahead": ahead, "used": row["used_before"] + 1, "of": B.MAX_PER_TESTER, **LABELS})

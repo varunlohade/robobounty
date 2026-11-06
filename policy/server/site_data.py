@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The website's small server, 127.0.0.1:5297, reached through vite at /site-api.
 
-It reads run files and never changes them: docs/evidence, policy/runs/demo, policy/runs/server, policy/runs/board. Its only writes are World ID sign-ins, in policy/runs/site.
+It reads run files and never changes them: docs/evidence, policy/runs/demo, policy/runs/server, policy/runs/board. Its only writes are accounts and sign-ins, in policy/runs/site.
 Start it with: policy/.venv/bin/python policy/server/site_data.py
 """
 import gzip
@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "crashlab"))
 import limits as LIMITS
 import pack_job
 import regressions as REGRESSIONS
+import site_auth as auth
 import site_world as world
 
 HERE = Path(__file__).resolve().parent
@@ -37,6 +38,9 @@ ORIGINS = {f"http://{host}:{port}" for host in ("localhost", "127.0.0.1") for po
 HOSTS = {f"{host}:{port}" for host in ("localhost", "127.0.0.1") for port in WEB_PORTS | {PORT}}
 CACHE_S = 30
 MAX_BODY = 256 * 1024
+MAX_AUTH_BODY = 4096
+COOKIE = "crashlab_session"
+SECURE = "; Secure" if os.environ.get("CRASHLAB_HTTPS") == "1" else ""  # Set behind HTTPS. Plain http on localhost cannot carry a Secure cookie everywhere.
 ROBOTS = {"window": "Window cleaning", "inspection": "Plant inspection"}
 NOTES = {"window": "Simulated. Hand-built physics, not checked against real hardware.", "inspection": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated."}
 NAMES = {"slip_distance": "Slip distance", "detach": "Detach", "false_done": "False done", "time_limit": "Time limit", "stalled": "Stalled", "coverage": "Low coverage",
@@ -45,6 +49,10 @@ HOLDS = {"wind_hold", "battery_stop"}
 WORLD_DIR = re.compile(r"w[0-9]{3}")
 DEMO_TRIAL = re.compile(r"/trials/demo-window-(w[0-9]{3})/([a-z.]+)")
 TRIAL_FILES = {"manifest.json", "model.xml", "qpos.json", "result.json", "world.json", "controller.py.txt", "trace.json", "wind.json", "dirt.bin"}
+
+
+def demo_on():
+    return os.environ.get("CRASHLAB_DEMO_ACCOUNTS") == "1"  # Only scripts/demo.sh --recorded sets this, with a throwaway store.
 
 
 def load_env():
@@ -341,7 +349,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         for name, value, age in cookies:
-            self.send_header("Set-Cookie", f"{name}={value}; Path=/; HttpOnly; SameSite=Strict; Max-Age={age}")
+            self.send_header("Set-Cookie", f"{name}={value}; Path=/; HttpOnly; SameSite=Lax; Max-Age={age}{SECURE}")
         self.end_headers()
         self.wfile.write(data)
 
@@ -374,11 +382,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/site-api/providers":
             return self.reply(200, providers())
         if path == "/site-api/auth/me":
-            who = world.login_of(self.cookies().get("crashlab_login")) if world.status()["on"] else None  # World ID off means nobody is verified, whatever an old sign-in says.
-            return self.reply(200, {"verified": True, **who} if who else {"verified": False})
+            return self.me()
         if path == "/site-api/auth/world":
             state = world.status()
-            return self.reply(200, {"on": state["on"], "missing": state["missing"], "credential": state["credential"]})
+            return self.reply(200, {"on": state["on"], "missing": state["missing"], "credential": state["credential"], "demo": demo_on(), "password_min": auth.PASSWORD_MIN})
         parts = path.strip("/").split("/")
         if len(parts) == 4 and parts[1] == "film" and parts[2] in ROBOTS and WORLD_DIR.fullmatch(parts[3]):
             film = DEMO / parts[2] / parts[3] / "film.jpg"
@@ -395,36 +402,104 @@ class Handler(BaseHTTPRequestHandler):
         with gzip.open(source, "rb") as f:
             self.file(f.read(), "application/octet-stream")
 
+    def session(self):
+        """The live session of this cookie. A World ID sign-in made in another mode, or with World ID off, counts as signed out, because it does not prove what this server asks for now."""
+        token = self.cookies().get(COOKIE)
+        s = auth.session_of(token)
+        if s and s["verification"] == "demo" and not demo_on():
+            return token, None
+        if s and s["verification"].startswith("world_"):
+            state = world.status()
+            if not state["on"] or state["credential"] != s["credential"]:
+                return token, None
+        return token, s
+
+    def me(self):
+        token, s = self.session()
+        if not s:
+            return self.reply(200, {"signed_in": False, "role": None, "verified": False, "expired": bool(token)}, [(COOKIE, "", 0)] if token else ())
+        return self.reply(200, {**auth.public(s), "csrf": auth.csrf_of(token), "verified": s["verification"].startswith("world_"), **({"human_id": s["world_id"], "credential": s["credential"]} if s["verification"].startswith("world_") else {})})
+
+    def ip(self):
+        forwarded = self.headers.get("X-Forwarded-For", "")
+        return forwarded.split(",")[-1].strip() if forwarded and os.environ.get("CRASHLAB_TRUST_PROXY") == "1" else self.client_address[0]
+
+    def json_body(self, most=MAX_AUTH_BODY, empty_ok=False):
+        length = self.headers.get("Content-Length") or "0"
+        size = int(length) if length.isascii() and length.isdigit() else -1
+        if size == 0 and empty_ok:
+            return {}
+        if not 0 < size <= most or self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
+            raise auth.Refused(400, "bad_request", "That request has the wrong shape.")
+        try:
+            value = json.loads(self.rfile.read(size))
+        except ValueError:
+            raise auth.Refused(400, "bad_request", "That request has the wrong shape.") from None
+        if not isinstance(value, dict):
+            raise auth.Refused(400, "bad_request", "That request has the wrong shape.")
+        return value
+
+    def signed_in(self, account, role, old, extra=None, cookies=()):
+        token = auth.new_session(account, role, old)
+        s = auth.session_of(token)
+        return self.reply(200, {**auth.public(s), "csrf": auth.csrf_of(token), **(extra or {})}, [(COOKIE, token, auth.SESSION_S), *cookies])
+
     def do_POST(self):
         if not self.host_ok() or self.headers.get("Origin") not in ORIGINS:
-            return self.reply(403, {"error": "origin_refused"})
+            return self.reply(403, {"error": "origin_refused", "words": "This request did not come from this site."})
+        if self.headers.get("X-CrashLab-Request") != "1":  # A cross-site form cannot set this header.
+            return self.reply(403, {"error": "csrf_refused", "words": "This request did not come from this site."})
         path = urlsplit(self.path).path
+        token, s = self.session()
+        try:
+            if path in ("/site-api/auth/logout", "/site-api/auth/wallet", "/site-api/auth/board-token") and s and not auth.csrf_ok(token, self.headers.get("X-CSRF-Token")):
+                return self.reply(403, {"error": "csrf_refused", "words": "This page is out of date. Reload it and try again."})
+            if path == "/site-api/auth/logout":
+                auth.drop_session(token)
+                return self.reply(200, {"ok": True}, [(COOKIE, "", 0)])
+            if path == "/site-api/auth/board-token":
+                if not s:
+                    return self.reply(401, {"error": "sign_in_needed", "words": "Sign in first."})
+                return self.reply(200, {"token": auth.board_token(token), "expires_in": auth.BOARD_TOKEN_S})
+            if path == "/site-api/auth/wallet":
+                if not s or s["role"] != "engineer":
+                    return self.reply(403, {"error": "role_refused", "words": "Only an engineer has a payout address."})
+                auth.save_payout(s["account_id"], self.json_body().get("address"))
+                return self.reply(200, auth.public(auth.session_of(token)))
+            if path == "/site-api/auth/signup":
+                v = self.json_body()
+                return self.signed_in(auth.sign_up(v.get("email"), v.get("password"), v.get("company"), self.ip()), "company", token)
+            if path == "/site-api/auth/signin":
+                v = self.json_body()
+                return self.signed_in(auth.sign_in(v.get("email"), v.get("password"), self.ip()), "company", token)
+            if path == "/site-api/auth/guest":
+                auth.limit("guest", self.ip(), auth.IP_GUESTS)
+                return self.signed_in(None, "guest", token)
+            if path == "/site-api/auth/demo":
+                role = self.json_body().get("role")
+                if not demo_on() or role not in auth.DEMO:
+                    return self.reply(404, {"error": "not_found"})
+                return self.signed_in(auth.demo_account(role), role, token)
+            if path in ("/site-api/auth/world/context", "/site-api/auth/world/verify"):
+                return self.world_route(path, token)
+        except auth.Refused as r:
+            return self.reply(r.status, {"error": r.code, "words": r.words})
+        self.reply(404, {"error": "not_found"})
+
+    def world_route(self, path, token):
         jar = self.cookies()
-        if path == "/site-api/auth/logout":
-            world.drop_login(jar.get("crashlab_login"))
-            return self.reply(200, {"ok": True}, [("crashlab_login", "", 0)])
         browser = jar.get("crashlab_browser") or secrets.token_urlsafe(24)
         keep = [("crashlab_browser", browser, 3600)]
         try:
-            if path == "/site-api/auth/world/context":
+            auth.limit("world", self.ip(), auth.IP_WORLD)
+            if path.endswith("/context"):
                 return self.reply(200, world.request_context(browser, jar.get("crashlab_world")), keep)
-            if path == "/site-api/auth/world/verify":
-                size = int(self.headers.get("Content-Length") or 0)
-                if not 0 < size <= MAX_BODY:
-                    raise world.Rejected("bad_shape")
-                try:
-                    result = json.loads(self.rfile.read(size))
-                except ValueError:
-                    raise world.Rejected("bad_shape") from None
-                done = world.verify(result, browser, jar.get("crashlab_world"))
-                token = secrets.token_urlsafe(32)
-                world.add_login(token, done["human_id"], done["environment"], done["credential"])
-                session = [("crashlab_world", done["session_id"], 365 * 86400)] if done["session_id"] else []
-                return self.reply(200, {"verified": True, "human_id": done["human_id"], "environment": done["environment"], "credential": done["credential"]},
-                                  keep + [("crashlab_login", token, world.LOGIN_S)] + session)
+            done = world.verify(self.json_body(MAX_BODY), browser, jar.get("crashlab_world"))
+            account = auth.engineer_for_world(done["human_id"], done["credential"])
+            saved = [("crashlab_world", done["session_id"], 365 * 86400)] if done["session_id"] else []
+            return self.signed_in(account, "engineer", token, {"verified": True, "human_id": done["human_id"], "environment": done["environment"], "credential": done["credential"]}, keep + saved)
         except world.Rejected as r:
             return self.reply(409 if r.code != "not_configured" else 503, {"verified": False, "code": r.code, "words": r.words}, keep)
-        self.reply(404, {"error": "not_found"})
 
 
 def main():
