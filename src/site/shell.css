@@ -74,3 +74,4 @@ html,body{height:100%;margin:0;overflow:hidden}
 .sh-rail.closed .sh-who-name{display:none}
 .sh-rail.closed .sh-badge{display:grid}
 .sh-who-name button{display:block;padding:0;margin-top:2px;border:0;background:none;font-size:12px;line-height:16px;text-align:left;color:var(--sh-t1);text-decoration:underline;cursor:pointer}
+.sh-light .sh-who-name button{display:block;padding:0;border:0;background:none;color:var(--sh-t2);font:inherit;font-size:13px;line-height:18px;text-align:left;text-decoration:underline;cursor:pointer}

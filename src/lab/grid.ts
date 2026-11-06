@@ -937,6 +937,12 @@ export class Grid {
       const a = el('a', 'grid-btn grid-post', 'Post a bounty') as HTMLAnchorElement;
       a.href = post;
       file.append(a);
+    } else if (bad && !d.held_back && d.verdict) {
+      // The bounty is for what the AI could not fix, so the AI tries first. The button shows the way there.
+      const wait = el('button', 'grid-btn grid-post-wait', 'Post a bounty') as HTMLButtonElement;
+      wait.type = 'button';
+      wait.disabled = true;
+      file.append(wait, el('div', 'grid-rail-note grid-post-note', 'Opens if the AI cannot fix this. Press Open file, then Ask AI to fix.'));
     }
     if (d.first) {
       const before = d.first as { verdict_reason?: string | null };
