@@ -1460,6 +1460,9 @@ def build_robot(rec, coll):
         lv = np.zeros(len(me.loops), np.int32)
         me.loops.foreach_get("vertex_index", lv)
         uvl.uv.foreach_set("vector", uvs[used][lv].ravel())
+        # The asset has degenerate triangles, and custom normals read out of bounds on them. Validate after the per-face data is set.
+        if me.validate(verbose=False, clean_customdata=False):
+            print("robot mesh cleaned:", body, flush=True)
         me.update()
         n = nor[used]
         n = n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-6)
