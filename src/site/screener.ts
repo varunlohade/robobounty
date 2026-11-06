@@ -65,7 +65,7 @@ function ask(questions: Question[], at: number, answers: Record<string, number>)
     Object.assign(b.style, { width: '100%', height: 'auto', minHeight: '56px', padding: '12px 24px', fontSize: '18px', textAlign: 'left', justifyContent: 'flex-start' });
     list.append(b);
   }
-  show(h('div', 'lg-left', h('div', '', title(`${at + 1} of`, `${questions.length}.`), h('p', 'lg-say lg-status', q.question)), later()), list);
+  show(h('div', 'lg-left', h('div', '', h('h1', '', `${at + 1} of ${questions.length}.`), h('p', 'lg-say lg-status', q.question)), later()), list);
 }
 
 async function finish(answers: Record<string, number>) {

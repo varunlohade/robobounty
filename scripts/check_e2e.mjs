@@ -99,7 +99,7 @@ async function flow(mode) {
           const id = await c.js(`document.querySelector('[data-question]').dataset.question`);
           await c.js(`document.querySelector('[data-choice="${key[id]}"]').click()`);
         }
-        await c.until(`document.body.innerText.includes('AI interview: coming soon')`, 'the card after the quiz', 15);
+        await c.until(`/AI interview:\\s+coming soon/.test(document.body.innerText)`, 'the card after the quiz', 15);
         check(`${mode}: the card says a quiz is not proof of skill`, /not proof of skill/.test(await text()));
         await c.shot(join(OUT, 'screener-passed.png'));
         await go(next);
@@ -386,6 +386,11 @@ async function flow(mode) {
       });
     }
     await step('data-shows-runs', async () => {
+      await asEngineer('bounties.html');
+      check(`${mode}: an engineer sees only Bounties`, await c.js(`[...document.querySelectorAll('nav a.sh-item')].filter(a => !a.hidden).length === 1`));
+      await go('simulation.html');
+      await c.until(`location.pathname === '/bounties.html' && document.body.innerText.includes('Engineers work from Bounties')`, 'the plain message', 30);
+      await asCompany('home.html');
       await clickOn('nav a.sh-item[href="data.html"]');
       await c.until(`location.pathname === '/data.html' && !!document.querySelector('.campaigns')?.children.length`, 'the data page', 30);
       const words = await c.js(`document.querySelector('.campaigns').innerText`);
