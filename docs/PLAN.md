@@ -102,3 +102,7 @@ Owner's words: "Use Blender for now." MuJoCo stays the physics source. Blender r
 
 ## Update: gate repeat rule
 The bounty gate now needs at least 7 of 8 re-runs (policy/bounty/gate.py), replacing 3 of 3. It clears a 70% world 25.5% of the time, and a 90% world 81.3%.
+
+## Generator of real simulator code (owner, 2026-11-06)
+Owner's words: "Let's have a generator that generates real code for them. We can use GPT Astra for now for checking if it's able to do a good job."
+Scope now: an LLM writes real MuJoCo MJCF for the scene from a brief. Validator, resource limits and compile gate before anything runs. Scored by objective checks plus pictures. This replaces schema-only generation for scene content, with a stricter gate. Isaac or USD code is a later target, because it needs a rented GPU.
