@@ -1,0 +1,614 @@
+{
+ "label": "sim packs/inspection b1c89c64f172",
+ "note": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.",
+ "worlds": {
+  "plant": {
+   "verdict": "passed",
+   "passed": true,
+   "reason": "The robot reached all 3 waypoints in 20.1 s, and stayed within 0.25 m of the route.",
+   "waypoints_reached": 3,
+   "waypoints": 3,
+   "waypoint_t_s": [
+    5.84,
+    11.6,
+    20.08
+   ],
+   "time_s": 20.08,
+   "fell_t_s": null,
+   "stuck_t_s": null,
+   "longest_stall_s": 2.0,
+   "deviation_max_m": 0.246,
+   "deviation_mean_m": 0.034,
+   "min_up_z": 0.992,
+   "min_clearance_m": 0.565,
+   "end_xy_m": [
+    10.56,
+    4.0
+   ],
+   "object_peak_N": 3334.2,
+   "object_contact_s": 9.1,
+   "foot_slip_mps": 0.166,
+   "body_on_ground_peak_N": 0.0,
+   "frames": 1111,
+   "shapes": 82,
+   "rtf": 0.68,
+   "peak_nacon": 5,
+   "peak_nefc": 20,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 540.8,
+   "replay_kb": 167
+  },
+  "low_pipe": {
+   "verdict": "fell",
+   "passed": false,
+   "reason": "The robot fell at 5.2 s, at x 2.5 m, y -0.2 m, after 0 of 3 waypoints, near low_pipe.",
+   "waypoints_reached": 0,
+   "waypoints": 3,
+   "waypoint_t_s": [],
+   "time_s": null,
+   "fell_t_s": 5.2,
+   "stuck_t_s": null,
+   "longest_stall_s": 15.6,
+   "deviation_max_m": 0.214,
+   "deviation_mean_m": 0.046,
+   "min_up_z": -0.999,
+   "min_clearance_m": 0.074,
+   "end_xy_m": [
+    2.92,
+    -0.52
+   ],
+   "object_peak_N": 4147.4,
+   "object_contact_s": 2.8,
+   "foot_slip_mps": 0.211,
+   "body_on_ground_peak_N": 4131.7,
+   "frames": 1500,
+   "shapes": 87,
+   "rtf": 0.65,
+   "peak_nacon": 4,
+   "peak_nefc": 16,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 628.0,
+   "replay_kb": 225
+  },
+  "dropped_tray": {
+   "verdict": "fell",
+   "passed": false,
+   "reason": "The robot fell at 16.3 s, at x 3.2 m, y -0.5 m, after 0 of 3 waypoints, near dropped_tray.",
+   "waypoints_reached": 0,
+   "waypoints": 3,
+   "waypoint_t_s": [],
+   "time_s": null,
+   "fell_t_s": 16.32,
+   "stuck_t_s": null,
+   "longest_stall_s": 10.6,
+   "deviation_max_m": 0.465,
+   "deviation_mean_m": 0.221,
+   "min_up_z": -0.998,
+   "min_clearance_m": 0.074,
+   "end_xy_m": [
+    3.48,
+    -1.12
+   ],
+   "object_peak_N": 3445.7,
+   "object_contact_s": 13.28,
+   "foot_slip_mps": 0.074,
+   "body_on_ground_peak_N": 3969.1,
+   "frames": 1500,
+   "shapes": 96,
+   "rtf": 0.65,
+   "peak_nacon": 7,
+   "peak_nefc": 28,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 653.9,
+   "replay_kb": 221
+  },
+  "valve": {
+   "verdict": "passed",
+   "passed": true,
+   "reason": "The robot reached all 3 waypoints in 20.3 s, and stayed within 0.23 m of the route.",
+   "waypoints_reached": 3,
+   "waypoints": 3,
+   "waypoint_t_s": [
+    5.88,
+    11.8,
+    20.3
+   ],
+   "time_s": 20.3,
+   "fell_t_s": null,
+   "stuck_t_s": null,
+   "longest_stall_s": 2.1,
+   "deviation_max_m": 0.226,
+   "deviation_mean_m": 0.032,
+   "min_up_z": 0.993,
+   "min_clearance_m": 0.563,
+   "end_xy_m": [
+    10.63,
+    4.01
+   ],
+   "object_peak_N": 2340.7,
+   "object_contact_s": 9.2,
+   "foot_slip_mps": 0.17,
+   "body_on_ground_peak_N": 0.0,
+   "frames": 1123,
+   "shapes": 89,
+   "rtf": 0.64,
+   "peak_nacon": 4,
+   "peak_nefc": 16,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 539.0,
+   "replay_kb": 169
+  },
+  "leak_walkway": {
+   "verdict": "passed",
+   "passed": true,
+   "reason": "The robot reached all 3 waypoints in 21.4 s, and stayed within 0.23 m of the route.",
+   "waypoints_reached": 3,
+   "waypoints": 3,
+   "waypoint_t_s": [
+    6.78,
+    12.88,
+    21.42
+   ],
+   "time_s": 21.42,
+   "fell_t_s": null,
+   "stuck_t_s": null,
+   "longest_stall_s": 2.2,
+   "deviation_max_m": 0.231,
+   "deviation_mean_m": 0.042,
+   "min_up_z": 0.987,
+   "min_clearance_m": 0.538,
+   "end_xy_m": [
+    10.66,
+    4.01
+   ],
+   "object_peak_N": 2841.6,
+   "object_contact_s": 14.76,
+   "foot_slip_mps": 0.295,
+   "body_on_ground_peak_N": 0.0,
+   "frames": 1179,
+   "shapes": 89,
+   "rtf": 0.74,
+   "peak_nacon": 8,
+   "peak_nefc": 32,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 559.8,
+   "replay_kb": 179
+  },
+  "leak_corner": {
+   "verdict": "fell",
+   "passed": false,
+   "reason": "The robot fell at 6.5 s, at x 4.7 m, y 0.1 m, after 1 of 3 waypoints, near leak_corner.",
+   "waypoints_reached": 1,
+   "waypoints": 3,
+   "waypoint_t_s": [
+    5.9
+   ],
+   "time_s": null,
+   "fell_t_s": 6.52,
+   "stuck_t_s": null,
+   "longest_stall_s": 7.8,
+   "deviation_max_m": 0.094,
+   "deviation_mean_m": 0.039,
+   "min_up_z": 0.733,
+   "min_clearance_m": 0.174,
+   "end_xy_m": [
+    4.46,
+    0.01
+   ],
+   "object_peak_N": 5287.5,
+   "object_contact_s": 25.56,
+   "foot_slip_mps": 0.385,
+   "body_on_ground_peak_N": 0.0,
+   "frames": 1500,
+   "shapes": 89,
+   "rtf": 0.85,
+   "peak_nacon": 12,
+   "peak_nefc": 48,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 520.9,
+   "replay_kb": 222
+  },
+  "wet_floor": {
+   "verdict": "fell",
+   "passed": false,
+   "reason": "The robot fell at 9.9 s, at x 5.0 m, y -0.0 m, after 1 of 3 waypoints, near floor_grating.",
+   "waypoints_reached": 1,
+   "waypoints": 3,
+   "waypoint_t_s": [
+    8.98
+   ],
+   "time_s": null,
+   "fell_t_s": 9.88,
+   "stuck_t_s": null,
+   "longest_stall_s": 3.4,
+   "deviation_max_m": 0.175,
+   "deviation_mean_m": 0.101,
+   "min_up_z": 0.669,
+   "min_clearance_m": 0.179,
+   "end_xy_m": [
+    3.88,
+    -0.43
+   ],
+   "object_peak_N": 0.0,
+   "object_contact_s": 0.0,
+   "foot_slip_mps": 0.691,
+   "body_on_ground_peak_N": 9509.7,
+   "frames": 1500,
+   "shapes": 82,
+   "rtf": 0.95,
+   "peak_nacon": 6,
+   "peak_nefc": 24,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 531.2,
+   "replay_kb": 228
+  },
+  "steep_crossover": {
+   "verdict": "fell",
+   "passed": false,
+   "reason": "The robot fell at 9.1 s, at x 1.5 m, y -0.4 m, after 0 of 3 waypoints, near steep_crossover.",
+   "waypoints_reached": 0,
+   "waypoints": 3,
+   "waypoint_t_s": [],
+   "time_s": null,
+   "fell_t_s": 9.12,
+   "stuck_t_s": null,
+   "longest_stall_s": 12.7,
+   "deviation_max_m": 0.428,
+   "deviation_mean_m": 0.115,
+   "min_up_z": -0.962,
+   "min_clearance_m": 0.074,
+   "end_xy_m": [
+    1.08,
+    -0.06
+   ],
+   "object_peak_N": 4291.4,
+   "object_contact_s": 23.98,
+   "foot_slip_mps": 0.067,
+   "body_on_ground_peak_N": 8494.6,
+   "frames": 1500,
+   "shapes": 99,
+   "rtf": 1.32,
+   "peak_nacon": 6,
+   "peak_nefc": 24,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 604.1,
+   "replay_kb": 152
+  },
+  "low_crossover": {
+   "verdict": "stuck",
+   "passed": false,
+   "reason": "The robot stopped making progress at 3.7 s, after 0 of 3 waypoints, near low_crossover.",
+   "waypoints_reached": 0,
+   "waypoints": 3,
+   "waypoint_t_s": [],
+   "time_s": null,
+   "fell_t_s": null,
+   "stuck_t_s": 3.7,
+   "longest_stall_s": 26.3,
+   "deviation_max_m": 0.106,
+   "deviation_mean_m": 0.083,
+   "min_up_z": 0.952,
+   "min_clearance_m": 0.462,
+   "end_xy_m": [
+    2.46,
+    0.07
+   ],
+   "object_peak_N": 2983.2,
+   "object_contact_s": 28.44,
+   "foot_slip_mps": 0.022,
+   "body_on_ground_peak_N": 0.0,
+   "frames": 1500,
+   "shapes": 97,
+   "rtf": 1.34,
+   "peak_nacon": 5,
+   "peak_nefc": 20,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 576.3,
+   "replay_kb": 168
+  },
+  "clear_cabinet": {
+   "verdict": "passed",
+   "passed": true,
+   "reason": "The robot reached all 3 waypoints in 20.1 s, and stayed within 0.25 m of the route.",
+   "waypoints_reached": 3,
+   "waypoints": 3,
+   "waypoint_t_s": [
+    5.84,
+    11.6,
+    20.08
+   ],
+   "time_s": 20.08,
+   "fell_t_s": null,
+   "stuck_t_s": null,
+   "longest_stall_s": 2.0,
+   "deviation_max_m": 0.246,
+   "deviation_mean_m": 0.034,
+   "min_up_z": 0.992,
+   "min_clearance_m": 0.565,
+   "end_xy_m": [
+    10.56,
+    4.0
+   ],
+   "object_peak_N": 3334.2,
+   "object_contact_s": 9.1,
+   "foot_slip_mps": 0.166,
+   "body_on_ground_peak_N": 0.0,
+   "frames": 1111,
+   "shapes": 83,
+   "rtf": 1.26,
+   "peak_nacon": 5,
+   "peak_nefc": 20,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 540.8,
+   "replay_kb": 167
+  },
+  "conduit_4cm": {
+   "verdict": "passed",
+   "passed": true,
+   "reason": "The robot reached all 3 waypoints in 20.1 s, and stayed within 0.23 m of the route.",
+   "waypoints_reached": 3,
+   "waypoints": 3,
+   "waypoint_t_s": [
+    5.92,
+    11.7,
+    20.12
+   ],
+   "time_s": 20.12,
+   "fell_t_s": null,
+   "stuck_t_s": null,
+   "longest_stall_s": 2.0,
+   "deviation_max_m": 0.231,
+   "deviation_mean_m": 0.037,
+   "min_up_z": 0.992,
+   "min_clearance_m": 0.563,
+   "end_xy_m": [
+    10.6,
+    4.02
+   ],
+   "object_peak_N": 2701.9,
+   "object_contact_s": 9.62,
+   "foot_slip_mps": 0.168,
+   "body_on_ground_peak_N": 0.0,
+   "frames": 1113,
+   "shapes": 83,
+   "rtf": 1.03,
+   "peak_nacon": 5,
+   "peak_nefc": 20,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 548.0,
+   "replay_kb": 167
+  },
+  "payload_10kg": {
+   "verdict": "passed",
+   "passed": true,
+   "reason": "The robot reached all 3 waypoints in 20.8 s, and stayed within 0.21 m of the route.",
+   "waypoints_reached": 3,
+   "waypoints": 3,
+   "waypoint_t_s": [
+    5.92,
+    12.08,
+    20.8
+   ],
+   "time_s": 20.8,
+   "fell_t_s": null,
+   "stuck_t_s": null,
+   "longest_stall_s": 2.1,
+   "deviation_max_m": 0.205,
+   "deviation_mean_m": 0.044,
+   "min_up_z": 0.991,
+   "min_clearance_m": 0.55,
+   "end_xy_m": [
+    10.6,
+    4.0
+   ],
+   "object_peak_N": 2897.1,
+   "object_contact_s": 10.56,
+   "foot_slip_mps": 0.177,
+   "body_on_ground_peak_N": 0.0,
+   "frames": 1147,
+   "shapes": 83,
+   "rtf": 0.92,
+   "peak_nacon": 5,
+   "peak_nefc": 20,
+   "total_mass_kg": 62.1,
+   "mean_support_N": 649.4,
+   "replay_kb": 173
+  },
+  "payload_35kg": {
+   "verdict": "fell",
+   "passed": false,
+   "reason": "The robot fell at 2.0 s, at x 1.2 m, y 0.1 m, after 0 of 3 waypoints.",
+   "waypoints_reached": 0,
+   "waypoints": 3,
+   "waypoint_t_s": [],
+   "time_s": null,
+   "fell_t_s": 2.02,
+   "stuck_t_s": null,
+   "longest_stall_s": 19.0,
+   "deviation_max_m": 0.06,
+   "deviation_mean_m": 0.04,
+   "min_up_z": 0.773,
+   "min_clearance_m": 0.127,
+   "end_xy_m": [
+    1.46,
+    -0.33
+   ],
+   "object_peak_N": 0.0,
+   "object_contact_s": 0.0,
+   "foot_slip_mps": 0.051,
+   "body_on_ground_peak_N": 3980.6,
+   "frames": 1500,
+   "shapes": 83,
+   "rtf": 1.08,
+   "peak_nacon": 6,
+   "peak_nefc": 24,
+   "total_mass_kg": 87.1,
+   "mean_support_N": 899.0,
+   "replay_kb": 167
+  },
+  "gravity_3_71": {
+   "verdict": "passed",
+   "passed": true,
+   "reason": "The robot reached all 3 waypoints in 19.6 s, and stayed within 0.13 m of the route.",
+   "waypoints_reached": 3,
+   "waypoints": 3,
+   "waypoint_t_s": [
+    5.68,
+    11.4,
+    19.62
+   ],
+   "time_s": 19.62,
+   "fell_t_s": null,
+   "stuck_t_s": null,
+   "longest_stall_s": 1.8,
+   "deviation_max_m": 0.13,
+   "deviation_mean_m": 0.036,
+   "min_up_z": 0.985,
+   "min_clearance_m": 0.578,
+   "end_xy_m": [
+    10.88,
+    3.96
+   ],
+   "object_peak_N": 1925.7,
+   "object_contact_s": 5.02,
+   "foot_slip_mps": 0.18,
+   "body_on_ground_peak_N": 0.0,
+   "frames": 1087,
+   "shapes": 82,
+   "rtf": 1.28,
+   "peak_nacon": 3,
+   "peak_nefc": 12,
+   "total_mass_kg": 52.1,
+   "mean_support_N": 206.8,
+   "replay_kb": 167
+  }
+ },
+ "refusals_checked": 34,
+ "vs_plant": {
+  "low_pipe": {
+   "bitwise_equal": false,
+   "frames": [
+    1500,
+    1111
+   ],
+   "final_base_m": 8.887
+  },
+  "dropped_tray": {
+   "bitwise_equal": false,
+   "frames": [
+    1500,
+    1111
+   ],
+   "final_base_m": 8.753
+  },
+  "valve": {
+   "bitwise_equal": false,
+   "frames": [
+    1123,
+    1111
+   ],
+   "final_base_m": 0.077
+  },
+  "leak_walkway": {
+   "bitwise_equal": false,
+   "frames": [
+    1179,
+    1111
+   ],
+   "final_base_m": 0.101
+  },
+  "leak_corner": {
+   "bitwise_equal": false,
+   "frames": [
+    1500,
+    1111
+   ],
+   "final_base_m": 7.295
+  },
+  "steep_crossover": {
+   "bitwise_equal": false,
+   "frames": [
+    1500,
+    1111
+   ],
+   "final_base_m": 10.32
+  },
+  "payload_10kg": {
+   "bitwise_equal": false,
+   "frames": [
+    1147,
+    1111
+   ],
+   "final_base_m": 0.042
+  },
+  "gravity_3_71": {
+   "bitwise_equal": false,
+   "frames": [
+    1087,
+    1111
+   ],
+   "final_base_m": 0.325
+  }
+ },
+ "clear_cabinet_vs_plant": {
+  "bitwise_equal": true,
+  "frames": [
+   1111,
+   1111
+  ],
+  "final_base_m": 0.0
+ },
+ "scenery_vs_bare": {
+  "bitwise_equal": true,
+  "frames": [
+   1111,
+   1111
+  ],
+  "final_base_m": 0.0
+ },
+ "determinism": {
+  "same_seed_same_process": {
+   "bitwise_equal": true,
+   "frames": [
+    1111,
+    1111
+   ],
+   "final_base_m": 0.0
+  },
+  "same_seed_new_process": {
+   "bitwise_equal": true,
+   "frames": [
+    1111,
+    1111
+   ],
+   "final_base_m": 0.0
+  }
+ },
+ "other_seeds": {
+  "1": {
+   "verdict": "passed",
+   "time_s": 20.22,
+   "deviation_max_m": 0.276,
+   "differs_from_seed_0": true
+  },
+  "2": {
+   "verdict": "passed",
+   "time_s": 20.08,
+   "deviation_max_m": 0.287,
+   "differs_from_seed_0": true
+  },
+  "3": {
+   "verdict": "passed",
+   "time_s": 20.26,
+   "deviation_max_m": 0.241,
+   "differs_from_seed_0": true
+  },
+  "4": {
+   "verdict": "passed",
+   "time_s": 20.54,
+   "deviation_max_m": 0.262,
+   "differs_from_seed_0": true
+  }
+ },
+ "failures": []
+}
