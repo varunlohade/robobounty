@@ -1,11 +1,12 @@
 // The bounty board in the site's style: side bar, bounty list, one bounty. Real data only. All text goes in through textContent.
+import type { Who } from '../site/session.ts';
 import { mountShell, SIM_NOTE } from '../site/shell.ts';
 import './board.css';
 import { api, ApiError, fixSecret, type Bounty, type Fix, type Sub, type Budget, type Fixable, type FixResult } from './api.ts';
 import { icon, type IconName } from './icons.ts';
 
 const LEDGER = 'Local ledger. Not on chain.';
-const WORLD_ID = 'World ID is not connected';
+let who: Who | null = null; // Only for what to show. The board server checks the session on every action.
 const POLL_MS = 1500;
 
 type Kid = Node | string;
@@ -72,13 +73,14 @@ function shell() {
     h('div', 'filters', seg, robotBtn, h('label', 'field', icon('search'), search)),
     h('div', 'tablewrap', table),
     ledgerBox);
-  const site = mountShell({ page: 'bounties', title: 'Bounties', status: SIM_NOTE, statusRight: [`${WORLD_ID}, so the cap of 5 counts names, not people.`, LEDGER] });
+  const site = mountShell({ page: 'bounties', title: 'Bounties', status: SIM_NOTE, statusRight: ['The cap of 5 counts accounts, and a verified device is not proof of one person.', LEDGER] });
   // The side bar and this line read the same login state, so they cannot disagree.
-  const idLine = h('span', 'warnline', icon('warn', 'i12'), WORLD_ID);
-  void site.who.then(who => {
-    if (who.kind !== 'verified') return;
-    idLine.replaceChildren(icon('warn', 'i12'), 'World ID signs you in. The board does not check it yet');
-    site.setStatus(SIM_NOTE, ['The board does not check World ID yet, so the cap of 5 counts names, not people.', LEDGER]);
+  const idLine = h('span', 'warnline', icon('warn', 'i12'), '');
+  void site.who.then(w => {
+    who = w;
+    postBtn.hidden = w.kind !== 'company';
+    idLine.replaceChildren(icon('warn', 'i12'), w.kind === 'guest' ? 'Guest: you can look. You cannot post, submit or claim' : w.verificationLabel);
+    render();
   });
   site.actions.append(idLine, postBtn);
   site.main.append(h('div', 'bty', list, detail));
@@ -185,8 +187,8 @@ function fixDetail(b: Bounty, inner: HTMLElement) {
   const counts = `${c.held_back} held back. ${c.passed_before} passed before and must keep passing. ${c.other_failed} other failures must not get worse.`;
   inner.append(sect('Hidden worlds', h('span', 'tag quiet small', icon('eyeoff', 'i12'), `${total} stay hidden`)), h('div', 'hidden-w', cells, h('p', '', `Nobody sees these worlds. The code runs your fix on them and shows only a count. ${counts}`)));
   if (S.error) inner.append(h('div', 'err', S.error));
-  const send = button(S.fixes.length ? 'sec' : 'pri', 'Submit a fix', null, () => openSubmit(b));
-  send.disabled = b.status !== 'open';
+  const send = who?.kind === 'engineer' ? button(S.fixes.length ? 'sec' : 'pri', 'Submit a fix', null, () => openSubmit(b)) : h('span', 't3 small', 'Only a signed-in engineer can submit a fix.');
+  if (send instanceof HTMLButtonElement) send.disabled = b.status !== 'open';
   const f = S.fixes.find(x => x.n === S.focus) ?? S.fixes[S.fixes.length - 1];
   const head = sect('Submission', h('span', 'row-r', send));
   head.style.height = '40px';
@@ -240,10 +242,10 @@ function fixTag(f: Fix) {
   const c = f.result.code;
   if (c === 'accepted' || c === 'accepted_by_company') return tag('ok', 'ok', 'Accepted');
   if (c === 'awaiting_company') return tag('hold', 'warn', 'Awaiting company');
-  return tag('bad', 'bad', ({ refused_source: 'Refused', judge_changed: 'Judge changed', worse_on_hidden: 'Worse on hidden', overfit: 'Overfit', target_not_fixed: 'Not fixed', limit_hit: 'Limit hit', replay_mismatch: 'Replay differs', declined_by_company: 'Declined' } as Record<string, string>)[c] ?? cap1(words(c)));
+  return tag('bad', 'bad', ({ refused_source: 'Refused', judge_changed: 'Judge changed', campaign_stale: 'Stored runs changed', worse_on_hidden: 'Worse on hidden', overfit: 'Overfit', target_not_fixed: 'Not fixed', limit_hit: 'Limit hit', replay_mismatch: 'Replay differs', declined_by_company: 'Declined' } as Record<string, string>)[c] ?? cap1(words(c)));
 }
 
-const HEADLINE: Record<string, string> = { could_not_run: 'The check could not run', accepted: 'The fix holds on the hidden worlds', accepted_by_company: 'The fix holds, and the company approved it', awaiting_company: 'It passes, and a safety line needs the company', refused_source: 'The code rules refused this source', judge_changed: 'The judge changed, so no run counts', worse_on_hidden: 'It made hidden worlds worse', overfit: 'It does not carry over to hidden worlds', target_not_fixed: 'The failing worlds still fail', limit_hit: 'The sandbox stopped a run', replay_mismatch: 'A run did not replay to its result', declined_by_company: 'The company declined it', no_change: 'The source has no change', gate_crashed: 'The gate stopped with an error' };
+const HEADLINE: Record<string, string> = { could_not_run: 'The check could not run', accepted: 'The fix holds on the hidden worlds', accepted_by_company: 'The fix holds, and the company approved it', awaiting_company: 'It passes, and a safety line needs the company', refused_source: 'The code rules refused this source', judge_changed: 'The judge changed, so no run counts', campaign_stale: 'The stored runs changed, so no run counts', worse_on_hidden: 'It made hidden worlds worse', overfit: 'It does not carry over to hidden worlds', target_not_fixed: 'The failing worlds still fail', limit_hit: 'The sandbox stopped a run', replay_mismatch: 'A run did not replay to its result', declined_by_company: 'The company declined it', no_change: 'The source has no change', gate_crashed: 'The gate stopped with an error' };
 
 function line(state: 'ok' | 'bad' | 'skip' | 'warn', label: string, value: string) {
   const mark = h('span', state, icon(state === 'ok' ? 'check' : state === 'bad' ? 'x' : state === 'warn' ? 'warn' : 'slash'));
@@ -277,7 +279,7 @@ function fixResult(b: Bounty, f: Fix): HTMLElement[] {
     out.push(sect('Lines that touch a safety check', String(r.flags.length)));
     for (const fl of r.flags) out.push(h('div', 'flag', h('span', 't3 small', `Line ${fl.line}`), code(fl.text)));
     if (f.state === 'awaiting_company') {
-      out.push(h('div', 'acts', button('pri', 'Approve as the company', 'check', act(() => api.step(b.id, f.n, 'approve'))), button('sec', 'Decline', 'x', act(() => api.step(b.id, f.n, 'decline'))), h('span', 'sp'), h('span', 't3 small', 'No account exists yet.')));
+      out.push(h('div', 'acts', ...(b.mine ? [button('pri', 'Approve as the company', 'check', act(() => api.step(b.id, f.n, 'approve'))), button('sec', 'Decline', 'x', act(() => api.step(b.id, f.n, 'decline')))] : [h('span', 't3 small', 'Only the company that posted this bounty can decide.')])));
       (out[out.length - 1]).style.paddingTop = '8px';
     }
   }
@@ -298,13 +300,12 @@ function payout(b: Bounty, f: Fix): HTMLElement[] {
     fin.disabled = left > 0;
     const rej = button('sec', 'Reject in the window', 'x', act(() => api.step(b.id, f.n, 'reject')));
     rej.disabled = left <= 0;
-    acts.append(fin, rej, h('span', 'sp'), h('span', 't2 small', left ? `${left} s dispute window left` : 'The dispute window closed'));
+    if (b.mine) acts.append(fin, rej);
+    acts.append(h('span', 'sp'), h('span', 't2 small', left ? `${left} s dispute window left` : 'The dispute window closed'));
   } else if (p.status === 'Finalized') {
-    const who = h('input') as HTMLInputElement;
-    who.placeholder = 'Name to claim with';
-    who.setAttribute('aria-label', 'Name to claim with');
     const secret = fixSecret(b.id, f.n);
-    if (secret) acts.append(who, button('pri', 'Claim', 'check', act(() => api.claim(b.id, f.n, who.value, secret))), h('span', 'sp'), h('span', 't3 small', 'The tester id comes from the name. It is not a wallet.'));
+    if (who?.kind !== 'engineer' || who.tester !== f.tester) acts.append(h('span', 't2', 'Finalized. Only the engineer who submitted this fix can claim.'));
+    else if (secret) acts.append(button('pri', 'Claim', 'check', act(() => api.claim(b.id, f.n, secret))), h('span', 'sp'), h('span', 't3 small', `You claim as ${f.tester}, from your session. It is not a wallet.`));
     else acts.append(h('span', 't2', 'The claim secret is lost, so this tab cannot claim. Submit shows it once and only the tab that submitted keeps it.'));
   } else acts.append(h('span', 't2', p.status === 'Claimed' ? `${f.tester} claimed ${p.amount} test units.` : `${p.status}.`));
   out.push(acts);
@@ -312,7 +313,7 @@ function payout(b: Bounty, f: Fix): HTMLElement[] {
 }
 
 function notChecked(b: Bounty) {
-  const rows = [['World ID of the submitter', 'Not connected'], ['Collusion between submitter and company', 'No check exists'], ['Whether this works on a real robot', 'Simulated only'], ['Sandbox isolation', 'Shares the kernel, not a VM']];
+  const rows = [['One person per account, in device mode', 'Not proven'], ['Collusion between submitter and company', 'No check exists'], ['Whether this works on a real robot', 'Simulated only'], ['Sandbox isolation', 'Shares the kernel, not a VM']];
   if (b.replay_rejudge === false) rows.push(['Replay re-judge', 'None for this robot']);
   const box = [sect('Not checked', String(rows.length))];
   for (const [k, v] of rows) box.push(h('div', 'kv', h('span', '', h('span', 'skip', icon('slash')), k), h('span', 't3', v)));
@@ -331,7 +332,7 @@ function findDetail(b: Bounty, inner: HTMLElement) {
   table.append(body);
   inner.append(table, h('div', 'words small', 'The company chose these limits. A world inside them is not shown to be physically possible.'));
   if (S.error) inner.append(h('div', 'err', S.error));
-  inner.append(sect('Submissions', button(S.subs.length ? 'sec' : 'pri', 'Submit a world', null, () => openSubmit(b))));
+  inner.append(sect('Submissions', who?.kind === 'engineer' ? button(S.subs.length ? 'sec' : 'pri', 'Submit a world', null, () => openSubmit(b)) : h('span', 't3 small', 'Only a signed-in engineer can submit.')));
   if (!S.subs.length) inner.append(h('div', 'words small', 'No world yet.'));
   else {
     const subs = h('table', 'subs');
@@ -385,9 +386,6 @@ const field = (label: string, input: HTMLElement, cls = '') => h('div', cls, h('
 
 function openSubmit(b: Bounty) {
   const isFix = b.kind === 'fix_failure';
-  const who = h('input') as HTMLInputElement;
-  who.setAttribute('aria-label', 'Tester name');
-  who.placeholder = 'Your name';
   const seed = h('input') as HTMLInputElement;
   seed.value = '1';
   const area = h('textarea') as HTMLTextAreaElement;
@@ -398,14 +396,14 @@ function openSubmit(b: Bounty) {
   const send = button('pri', 'Run check, then simulation', null, async () => {
     error.textContent = '';
     try {
-      const r = isFix ? await api.submitFix(b.id, who.value, area.value) : await api.submitWorld(b.id, who.value, area.value, Number(seed.value));
+      const r = isFix ? await api.submitFix(b.id, area.value) : await api.submitWorld(b.id, area.value, Number(seed.value));
       S.focus = r.n;
       close();
       await refresh();
     } catch (e) { error.textContent = (e as Error).message; }
   });
   const close = dialog(isFix ? 'Submit a fix' : 'Submit a world', true,
-    h('div', 'body', field('Tester name, 5 submissions per name', who), isFix ? field('Base file', (() => { const i = h('input') as HTMLInputElement; i.value = b.controller!.file; i.disabled = true; return i; })()) : field('Seed', seed), h('div', 'full', area), h('div', 'full note2', isFix ? `${b.scope} Up to 60 KB. It runs in the sandbox with no network. One gate runs at a time.` : 'Up to 16 KB. One gate runs at a time.')),
+    h('div', 'body', field('Submitting as, 5 submissions per account', (() => { const i = h('input') as HTMLInputElement; i.value = who?.tester ?? ''; i.disabled = true; return i; })()), isFix ? field('Base file', (() => { const i = h('input') as HTMLInputElement; i.value = b.controller!.file; i.disabled = true; return i; })()) : field('Seed', seed), h('div', 'full', area), h('div', 'full note2', isFix ? `${b.scope} Up to 60 KB. It runs in the sandbox with no network. One gate runs at a time.` : 'Up to 16 KB. One gate runs at a time.')),
     [error, h('span', 'sp'), button('sec', 'Cancel', null, () => close()), send]);
 }
 
@@ -413,11 +411,9 @@ function openPost(ref: string | null) {
   const select = h('select') as HTMLSelectElement;
   select.setAttribute('aria-label', 'Failure');
   const titleIn = h('input') as HTMLInputElement;
-  const company = h('input') as HTMLInputElement;
   const pay = h('input') as HTMLInputElement;
   const windowS = h('input') as HTMLInputElement;
   pay.type = windowS.type = 'number';
-  company.value = 'Demo company (test)';
   pay.value = '40';
   windowS.value = '60';
   const error = h('span', 'bad');
@@ -429,14 +425,14 @@ function openPost(ref: string | null) {
     send.textContent = 'Checking the stored runs';
     error.textContent = '';
     try {
-      const made = await api.post({ session: pick.session, campaign: pick.cid, group: pick.group, title: titleIn.value, company: company.value, pay: Number(pay.value), window: Number(windowS.value) });
+      const made = await api.post({ session: pick.session, campaign: pick.cid, group: pick.group, title: titleIn.value, pay: Number(pay.value), window: Number(windowS.value) });
       S.picked = made.id;
       close();
       await refresh();
     } catch (e) { error.textContent = (e as Error).message; send.disabled = false; send.textContent = 'Post the bounty'; }
   });
   const close = dialog('Post a bounty', false,
-    h('div', 'body', field('Failure from a real campaign', select, 'full'), field('Title', titleIn, 'full'), field('Company', company, 'full'), field('Pay, test units', pay), field('Dispute window, seconds', windowS), h('div', 'full note2', 'One fix wins the pay. Held-back worlds stay hidden. Test units are not money.')),
+    h('div', 'body', field('Failure from a real campaign', select, 'full'), field('Title', titleIn, 'full'), field('Company, from your account', (() => { const i = h('input') as HTMLInputElement; i.value = `${who?.label ?? ''} (${who?.verificationLabel ?? ''})`; i.disabled = true; return i; })(), 'full'), field('Pay, test units', pay), field('Dispute window, seconds', windowS), h('div', 'full note2', 'One fix wins the pay. Held-back worlds stay hidden. Test units are not money.')),
     [error, h('span', 'sp'), button('sec', 'Cancel', null, () => close()), send]);
   const fill = (r: Fixable) => { titleIn.value = titleIn.value || `Fix ${words(r.group)}`; };
   api.fixable().then(reply => {
@@ -459,6 +455,7 @@ const postRef = new URLSearchParams(location.search).get('post');
 if (postRef) {
   void site.who.then(who => {
     if (who.kind === 'none') return; // The shell is on its way to login, and login brings the visitor back with this address.
+    if (who.kind !== 'company') { S.error = 'Only a company can post a bounty. Sign out and sign in with a company account.'; render(); return; }
     history.replaceState(null, '', location.pathname);  // A reload must not open the dialog again.
     openPost(postRef);
   });

@@ -24,6 +24,7 @@ import board_fix as X
 import board_fix_gate as FG
 import board_fix_run  # noqa: F401 turns the LLM off for the direct fix.py calls here
 import board_store as B
+import check_auth_helper as H
 import budget
 
 F = X.F
@@ -55,6 +56,9 @@ def call(method, path, body=None, origin=ORIGIN, raw=False):
     headers = {"Content-Type": "application/json"}
     if origin:
         headers["Origin"] = origin
+    if method == "POST":
+        body, headers["Authorization"] = H.signed(body)
+        data = json.dumps(body).encode() if body is not None else None
     request = urllib.request.Request(BASE + path, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=120) as reply:
@@ -66,6 +70,7 @@ def call(method, path, body=None, origin=ORIGIN, raw=False):
 
 
 def start_server(root):
+    H.own_all(root)
     log = open(root / "server.log", "ab")
     server = subprocess.Popen([str(X.PYTHON), str(HERE / "board_server.py"), "--root", str(root), "--port", PORT], stdout=log, stderr=subprocess.STDOUT)
     for _ in range(100):
@@ -262,7 +267,7 @@ def t3(session, cid):
         status, reply = call("POST", f"/api/bounties/{bid}/fix", {"tester": "ana", "source": "x" * 60_001})
         check("source over 60 KB is refused", status == 413, reply.get("error"))
         status, reply = call("POST", f"/api/bounties/{bid}/fix", {"tester": "../bad name!", "source": "x"})
-        check("a bad tester name is refused", status == 400 and reply["error"] == "bad_tester", reply.get("error"))
+        check("a typed tester name is refused", status == 400 and reply["error"] == "bad_fields", reply.get("error"))
         status, reply = call("POST", "/api/bounties/fix", {"session": "../../", "campaign": "c1", "group": "stalled", "title": "t", "company": "c", "pay": 1})
         check("a bad session name is refused", status == 400, reply.get("error"))
         status, reply = call("POST", "/api/bounties/fix", {"session": session, "campaign": cid, "group": "stalled", "title": "t", "company": "c", "pay": 1, "root": "/tmp"})

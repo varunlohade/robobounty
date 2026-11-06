@@ -3,7 +3,7 @@
 Roles: company (email and password), engineer (World ID), guest (no account). A session is a random token. Only its hash is stored, and only the cookie holds the token.
 No email provider exists, so no email is verified. mark_email_verified is the seam for a provider later, and nothing calls it today.
 The board runs on its own port, so the site issues it a short signed token. The board also checks that the session is still alive in this store, so a sign-out takes effect at once.
-Run: site_auth.py seed-engineer NAME prints a session token for a check's engineer, because a check has no World App.
+Run: site_auth.py seed-engineer NAME CREDENTIAL prints a session token for a check's engineer, because a check has no World App.
 """
 import base64
 import hashlib
@@ -318,8 +318,8 @@ def save_payout(account_id, address, db=None):
 
 def main():
     if sys.argv[1:2] == ["seed-engineer"]:
-        name = sys.argv[2]
-        print(new_session(engineer_for_world(f"mock-{name}", "device", tester=name), "engineer"))
+        name, credential = sys.argv[2:4]
+        print(new_session(engineer_for_world(f"mock-{name}", credential, tester=name), "engineer"))
         return
     raise SystemExit(__doc__)
 

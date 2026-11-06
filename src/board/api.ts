@@ -1,4 +1,6 @@
 // The board server. Every bounty, fix and number on the page comes from here. Nothing is sample data.
+import { boardAuth, loginHref } from '../site/auth.ts';
+
 const BASE = `http://127.0.0.1:${import.meta.env.VITE_BOARD_PORT ?? 5298}`;
 
 export class ApiError extends Error {
@@ -6,7 +8,13 @@ export class ApiError extends Error {
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const reply = await fetch(BASE + path, { method, headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const send = (token: string | null) => fetch(BASE + path, { method, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
+  let reply = await send(await boardAuth());
+  if (reply.status === 401) {
+    const token = await boardAuth(true); // The short token ran out. A new one comes only if the session lives.
+    if (!token) { location.replace(loginHref()); throw new ApiError('sign_in_needed', 'Your session ended. Sign in again.'); }
+    reply = await send(token);
+  }
   const data = await reply.json();
   if (!reply.ok) throw new ApiError(data.error ?? 'error', data.reason ?? 'The board refused this.');
   return data as T;
@@ -15,7 +23,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 export interface World { index: number; name: string; scenario: string; verdict: string; reason: string; changes: string[]; seed: number; replay: boolean; numbers: Record<string, number>; events?: { name: string; t: number; value: number }[] }
 export interface Balance { available: number; pending: number; finalized: number; claimed: number; claimed_by_tester: Record<string, number> }
 export interface Bounty {
-  id: number; kind: 'fix_failure' | 'find_failure'; title: string; company: string; status: string; spec_hash: string; available: number; dispute_window_s: number; balance: Balance; now: number; posted_by?: string; checking?: number; chain_mirror?: { label: string; chain_id: number; txs: Record<string, string> } | null;
+  mine?: boolean; id: number; kind: 'fix_failure' | 'find_failure'; title: string; company: string; status: string; spec_hash: string; available: number; dispute_window_s: number; balance: Balance; now: number; posted_by?: string; checking?: number; chain_mirror?: { label: string; chain_id: number; txs: Record<string, string> } | null;
   pay?: number; cap: number; per_failure: number; group?: string; robot: string; pack?: string; public_worlds?: World[]; hidden_counts?: Record<string, number>; frozen?: Record<string, string>; scope?: string; replay_rejudge?: boolean; controller?: { file: string; sha256: string };
   limits?: Record<string, [number, number]>; narrowed?: string[]; scenarios?: string[]; schema_limits?: Record<string, [number, number]>; scenarios_label?: string; sim_label: string;
 }
@@ -49,9 +57,9 @@ export const api = {
   budget: () => call<Budget>('GET', '/api/budget'),
   stop: () => call<Budget>('POST', '/api/budget/stop', {}),
   post: (body: unknown) => call<Bounty>('POST', '/api/bounties/fix', body),
-  submitFix: (id: number, tester: string, source: string) => call<{ n: number; claim_secret: string }>('POST', `/api/bounties/${id}/fix`, { tester, source }).then(r => keepSecret('fix', id, r)),
-  submitWorld: (id: number, tester: string, world: string, seed: number) => call<{ n: number; claim_secret: string }>('POST', `/api/bounties/${id}/submit`, { tester, world, seed }).then(r => keepSecret('world', id, r)),
+  submitFix: (id: number, source: string) => call<{ n: number; claim_secret: string }>('POST', `/api/bounties/${id}/fix`, { source }).then(r => keepSecret('fix', id, r)),
+  submitWorld: (id: number, world: string, seed: number) => call<{ n: number; claim_secret: string }>('POST', `/api/bounties/${id}/submit`, { world, seed }).then(r => keepSecret('world', id, r)),
   step: (id: number, n: number, step: string) => call<unknown>('POST', `/api/bounties/${id}/fixes/${n}/${step}`, {}),
-  claim: (id: number, n: number, tester: string, secret: string) => call<unknown>('POST', `/api/bounties/${id}/fixes/${n}/claim`, { tester, secret }),
-  findStep: (id: number, fingerprint: string, step: string, tester?: string) => call<unknown>('POST', `/api/bounties/${id}/failures/${fingerprint}/${step}`, tester ? { tester } : {}),
+  claim: (id: number, n: number, secret: string) => call<unknown>('POST', `/api/bounties/${id}/fixes/${n}/claim`, { secret }),
+  findStep: (id: number, fingerprint: string, step: string) => call<unknown>('POST', `/api/bounties/${id}/failures/${fingerprint}/${step}`, {}),
 };

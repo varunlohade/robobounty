@@ -28,3 +28,9 @@ Limit we cannot fix: a policy-by-link result proves only what that endpoint did 
 | 19 | Repo hygiene (proven) | Low | Ignore policy/runs and policy/.libero. Render library text with textContent. | No |
 
 Unknown: replay across machines; native MuJoCo file access; MJCF parser memory bugs; World ID on-chain on Arc/Hedera; usable blockhash on Arc/Hedera; 0G trace id lookup; policy_preprocessor.json in the model repo.
+
+## Sign-in (2026-11-07, proven by policy/server/check_auth.py unless marked)
+
+Sessions: random token, stored hashed, HttpOnly SameSite=Lax cookie, 12 hours, rotated at sign-in, deleted at sign-out. Site POSTs need an allowed Origin and Host, a custom header, and a CSRF token when a session exists. The board takes a 5-minute signed token in the Authorization header, and also checks that the session is alive.
+
+Open risks: no email verification, so anyone can claim any company name and the name shows "email not verified". No password reset. The run server on its own port has no session check. Agent-posted bounties have no owner, so no company can finalize them. The budget belongs to the board, not to one company. Rate limits count one address behind vite as one client unless CRASHLAB_TRUST_PROXY=1 sits behind a real proxy (inferred). World ID may refuse a second first-time proof from a new browser (inferred, no real scan): the page then says to use the first browser.

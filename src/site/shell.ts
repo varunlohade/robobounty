@@ -3,6 +3,7 @@
 // The page needs one <div id="site"></div>. A visitor with no session goes to login.html.
 import './shell.css';
 import { icon, type IconName } from './icons.ts';
+import { loginHref, onAuthChange, savePayout } from './auth.ts';
 import { signOut, whoIs, type Who } from './session.ts';
 
 export type PageName = 'home' | 'crashlab' | 'bounties' | 'data' | 'providers';
@@ -39,19 +40,27 @@ function make(tag: string, cls: string, text?: string): HTMLElement {
   return n;
 }
 
+function payoutButton(who: Who) {
+  const b = make('button', 'sh-mono', who.payout.masked ? `Payout ${who.payout.masked}` : 'Add payout address');
+  b.addEventListener('click', async () => {
+    const value = window.prompt('Your public payout address, 0x and 40 hex characters. Never enter a private key. Test units only: nothing is paid to it yet.', '');
+    if (!value) return;
+    const r = await savePayout(value);
+    if (!r.ok) { window.alert(r.words); return; }
+    location.reload();
+  });
+  return b;
+}
+
 function whoRow(box: HTMLElement, who: Who) {
   const name = make('div', 'sh-who-name');
-  if (who.kind === 'verified') {
-    box.dataset.who = 'verified';
-    const ok = icon('check', 16);
-    ok.classList.add('sh-ok');
-    name.append(make('span', '', who.credential === 'human' ? 'Verified human' : 'Verified device. Not proof of a unique human.'), make('small', 'sh-mono', `${who.humanId.slice(0, 6)}…${who.humanId.slice(-4)}`));
-    box.replaceChildren(ok, name);
-  } else {
-    box.dataset.who = 'guest';
-    name.append(make('span', '', 'Local guest, not verified'));
-    box.replaceChildren(name);
-  }
+  box.dataset.who = who.kind;
+  box.dataset.level = who.verification;
+  const words = who.kind === 'guest' ? who.verificationLabel : who.label;
+  name.append(make('span', '', words));
+  if (who.kind !== 'guest') name.append(make('small', '', who.verificationLabel));
+  if (who.kind === 'engineer') name.append(payoutButton(who));
+  box.replaceChildren(name);
   const out = make('button', 'sh-out');
   out.setAttribute('aria-label', 'Sign out');
   out.title = 'Sign out';
@@ -99,8 +108,10 @@ export function mountShell(opts: ShellOptions): Shell {
   const here = `${location.pathname.replace(/^\//, '')}${location.search}`; // Read now: a page may tidy its address while this waits.
   const who = whoIs();
   void who.then(w => {
-    if (w.kind === 'none') location.replace(`login.html?next=${encodeURIComponent(here)}`);
+    if (w.kind === 'none') location.replace(loginHref(here));
     else whoRow(whoBox, w);
   });
+  // A sign-in or sign-out in another tab: read the server again.
+  onAuthChange(() => { void whoIs().then(w => { if (w.kind === 'none') location.replace(loginHref(here)); else location.reload(); }); });
   return { root, main, actions, setStatus, who };
 }

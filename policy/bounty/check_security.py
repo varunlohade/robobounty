@@ -24,6 +24,7 @@ import board_fix as X
 import board_fix_gate as FG
 import board_fix_run  # noqa: F401 turns the LLM off, and turns the inspection re-judge on
 import board_store as B
+import check_auth_helper as H
 import budget
 
 F = X.F
@@ -307,8 +308,12 @@ def base_run(root, name, world, seed):
 
 
 def http(port, method, path, body=None):
+    bearer = {}
+    if method == "POST":
+        body, value = H.signed(body)
+        bearer = {"Authorization": value}
     data = json.dumps(body).encode() if body is not None else None
-    request = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, method=method, headers={"Content-Type": "application/json", "Origin": ORIGIN})
+    request = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, method=method, headers={"Content-Type": "application/json", "Origin": ORIGIN, **bearer})
     try:
         with urllib.request.urlopen(request, timeout=120) as reply:
             return reply.status, json.loads(reply.read())
@@ -404,6 +409,7 @@ def full(root):
     # The real honest fix, over HTTP on this board's own port, from submit to paid.
     port = ARGS.port
     log = open(root / "server.log", "ab")
+    H.own_all(bounty_root)
     server = subprocess.Popen([str(X.PYTHON), str(HERE / "board_server.py"), "--root", str(bounty_root), "--port", str(port)], stdout=log, stderr=subprocess.STDOUT)
     try:
         for _ in range(100):

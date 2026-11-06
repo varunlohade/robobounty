@@ -9,6 +9,7 @@ const BASE = `http://localhost:${process.env.CRASHLAB_WEB_PORT ?? 5199}`; // scr
 const OUT = process.argv[2] ?? 'design/site2';
 mkdirSync(OUT, { recursive: true });
 const PAGES = ['home', 'crashlab', 'data', 'providers'];
+const STRONG = 'correct horse battery';
 let failed = 0;
 const say = (ok, what, extra = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${what}${extra ? `: ${extra}` : ''}`); if (!ok) failed += 1; };
 
@@ -58,7 +59,7 @@ say(await ev(`(() => { const v = document.querySelector('video.lg-film'); return
 say(await ev(`![...document.querySelectorAll('button')].some(b => /pause/i.test(b.textContent + (b.getAttribute('aria-label') ?? '')))`), 'login has no pause control');
 await shot('live-login');
 
-// Company path. The look only: src/site/auth.ts connects it to the account server, so today nobody enters and nothing is stored.
+// Company path. A real account on the server. The email stays not verified, and the page says so.
 const clickButton = words => ev(`[...document.querySelectorAll('button')].find(b => b.textContent.includes(${JSON.stringify(words)})).click()`);
 await clickButton('Continue with work email');
 await waitText('Email not verified');
@@ -68,10 +69,17 @@ say(await ev(`!!document.querySelector('input[type=email]') && !!document.queryS
 say(!companyWords.includes('Send sign-in link') && !companyWords.includes('Use SSO'), 'the company step promises no email or SSO');
 await clickButton('Create account');
 say(await ev(`document.querySelector('form button[type=submit]').textContent === 'Create account'`), 'the toggle switches to create account');
-await ev(`document.querySelector('input[type=email]').value = 'someone@example.com'; document.querySelector('input[type=password]').value = 'not-a-real-password'; document.querySelector('form button[type=submit]').click()`);
-await wait(400);
-say((await ev(`location.pathname`)) === '/login.html', 'the company step does not enter without the account server');
-say(await ev(`localStorage.length === 0`), 'the company step stores nothing in the browser');
+await ev(`document.querySelector('input[type=email]').value = 'check-${randomBytes(4).toString('hex')}@example.com'; document.querySelector('input[type=password]').value = 'short'; document.querySelector('input[name=company]').value = 'Check Company'; document.querySelector('form button[type=submit]').click()`);
+await wait(600);
+say((await ev(`location.pathname`)) === '/login.html', 'a short password does not enter');
+say(await ev(`!document.querySelector('p.bad').hidden`), 'the refusal shows in plain words');
+await ev(`document.querySelector('input[type=password]').value = ${JSON.stringify(STRONG)}; document.querySelector('form button[type=submit]').click()`);
+await until(`location.pathname === '/home.html'`, 'home', 20).catch(() => null);
+await waitText('Check Company');
+say((await text()).includes('Email not verified'), 'sidebar names the company and says email not verified');
+say(await ev(`localStorage.length === 0`), 'the company path stores nothing in the browser');
+await ev(`document.querySelector('.sh-out').click()`);
+await until(`location.pathname === '/login.html'`, 'login after sign-out', 20).catch(() => null);
 await go('login.html');
 
 // Guest flow. The World ID step always keeps a quiet guest way in.
@@ -82,10 +90,10 @@ say((await text()).includes(worldOn ? 'Scan with' : 'World ID is not set up on t
 await waitText('Enter as local guest');
 await clickButton('Enter as local guest');
 await until(`location.pathname === '/home.html'`, 'home', 20).catch(() => null);
-await waitText('Local guest');
+await waitText('Guest, not verified');
 say((await ev(`location.pathname`)) === '/home.html', 'guest reaches home', await ev(`location.pathname`));
 const homeText = await text();
-say(homeText.includes('Local guest, not verified'), 'sidebar says local guest');
+say(homeText.includes('Guest, not verified'), 'sidebar says guest, not verified');
 say(!homeText.includes('Verified human'), 'guest never sees verified');
 
 // Local storage cannot claim verified.
@@ -93,12 +101,15 @@ await ev(`localStorage.setItem('verified','true'); localStorage.setItem('crashla
 await go('home.html');
 say(!(await text()).includes('Verified human'), 'tampered storage does not show verified');
 // A forged cookie cannot either.
-await ev(`document.cookie = 'crashlab_login=forged; path=/'`);
-await go('home.html');
-say(!(await text()).includes('Verified human'), 'forged cookie does not show verified');
+await send('Network.setCookie', { name: 'crashlab_session', value: 'forged', url: BASE });
 const me = await ev(`fetch('/site-api/auth/me').then(r => r.json())`);
-say(me.verified === false, 'server refuses a forged cookie', JSON.stringify(me));
-await ev(`document.cookie = 'crashlab_login=; path=/; max-age=0'`);
+say(me.verified === false && me.signed_in === false, 'server refuses a forged cookie', JSON.stringify(me));
+await go('login.html');
+await waitText('Continue with World ID');
+await clickButton('Continue with World ID');
+await waitText('Enter as local guest');
+await clickButton('Enter as local guest');
+await until(`location.pathname === '/home.html'`, 'home', 20).catch(() => null);
 
 // Every page: loads, links resolve, no overflow, picture saved.
 const seen = new Set();
@@ -209,7 +220,7 @@ problems.length = 0;
 
 // MOCK: the page reads "verified" only from the server's reply. This reply is invented here, in the browser, to prove the sidebar follows it.
 await go('home.html', 200);
-await send('Page.addScriptToEvaluateOnNewDocument', { source: `{ const real = window.fetch; window.fetch = (u, o) => String(u).includes('/site-api/auth/me') ? Promise.resolve(new Response(JSON.stringify({ verified: true, credential: 'human', human_id: '0xabc1230000000000000000000000000000def456', environment: 'staging' }))) : real(u, o); }` });
+await send('Page.addScriptToEvaluateOnNewDocument', { source: `{ const real = window.fetch; window.fetch = (u, o) => String(u).includes('/site-api/auth/me') ? Promise.resolve(new Response(JSON.stringify({ signed_in: true, role: 'engineer', label: 'Engineer 0xabc1…f456', verification: 'world_human', verification_label: 'Verified human', tester: 'eng-mock', payout: { set: false, masked: null }, verified: true, credential: 'human', human_id: '0xabc1230000000000000000000000000000def456', csrf: 'mock' }))) : real(u, o); }` });
 await go('home.html', 700);
 say((await text()).includes('Verified human'), 'MOCK: a verified server reply shows Verified human');
 await shot('live-mock-verified-state');
@@ -217,7 +228,7 @@ await shot('live-mock-verified-state');
 // MOCK: the signing flow on the login page, with an invented server and an invented bridge. Nothing leaves this browser.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `{ const real = window.fetch; const json = (v, status = 200) => Promise.resolve(new Response(JSON.stringify(v), { status }));
   window.fetch = (u, o) => { const url = String(u?.url ?? u);
-    if (url.includes('/site-api/auth/me')) return json({ verified: false });
+    if (url.includes('/site-api/auth/me')) return json({ signed_in: false, role: null, verified: false });
     if (url.includes('/site-api/auth/world/context')) return json(${JSON.stringify(MOCK_CTX)});
     if (url.includes('/site-api/auth/world')) return json({ on: true, missing: [] });
     if (url.includes('/request')) return json({ request_id: '4d5f0a1e-7c3b-4f6a-9d21-1a2b3c4d5e6f' });

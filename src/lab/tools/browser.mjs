@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 export const wait = ms => new Promise(r => setTimeout(r, ms));
 
-export async function openChrome({ width = 1440, height = 900 } = {}) {
+export async function openChrome({ width = 1440, height = 900, guestForLab = true } = {}) {
   const port = 9750 + Math.floor(Math.random() * 200);
   const profile = mkdtempSync(join(tmpdir(), 'lab-check-'));
   const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, `--window-size=${width},${height}`,
@@ -29,7 +29,19 @@ export async function openChrome({ width = 1440, height = 900 } = {}) {
     if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') problems.push(msg.params.args.map(a => a.value ?? a.description).join(' ').slice(0, 600));
     if (msg.method === 'Log.entryAdded' && msg.params.entry.level === 'error') problems.push(`${msg.params.entry.text} ${msg.params.entry.url ?? ''}`);
   });
-  const send = (method, params = {}) => new Promise(r => { const n = nextId++; pending.set(n, r); ws.send(JSON.stringify({ id: n, method, params })); });
+  const raw = (method, params = {}) => new Promise(r => { const n = nextId++; pending.set(n, r); ws.send(JSON.stringify({ id: n, method, params })); });
+  // The lab page needs a session. A check that opens it directly signs in as a guest first, as a visitor would.
+  const guested = new Set();
+  const send = async (method, params = {}) => {
+    if (guestForLab && method === 'Page.navigate' && /\/lab\.html/.test(params.url) && !guested.has(new URL(params.url).origin)) {
+      const { origin } = new URL(params.url);
+      guested.add(origin);
+      await raw('Page.navigate', { url: `${origin}/site-api/health` });
+      await wait(300);
+      await raw('Runtime.evaluate', { expression: `fetch('/site-api/auth/me').then(r => r.json()).then(m => m.signed_in ? null : fetch('/site-api/auth/guest', { method: 'POST', headers: { 'X-CrashLab-Request': '1' } }))`, awaitPromise: true });
+    }
+    return raw(method, params);
+  };
   const js = async expr => {
     const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
     if (r.error) throw new Error(`${expr.slice(0, 200)}: ${r.error.message}`);

@@ -1,6 +1,7 @@
 import QR from 'qrcode-generator';
 import './login.css';
-import { enterAsGuest, whoIs } from './session.ts';
+import { authOptions, demoSignIn, enterAsGuest, nextPage, signInCompany, signUpCompany, worldContext, worldVerify } from './auth.ts';
+import { whoIs } from './session.ts';
 import { getJson, h, START_SERVER } from './ui.ts';
 
 interface Status { on: boolean; missing: string[]; credential?: string | null }
@@ -45,12 +46,6 @@ function show(step: HTMLElement) {
   place();
 }
 
-// Where a visitor was going before login. Only a page of this site, so a link cannot send them elsewhere.
-function nextPage(): string {
-  const asked = new URLSearchParams(location.search).get('next') ?? '';
-  return /^[a-z]+\.html(\?[\w\-./=&%]*)?$/.test(asked) ? asked : 'home.html';
-}
-
 function pill(cls: string, label: string, on: () => void) {
   const b = h('button', `lg-pill ${cls}`, label);
   b.type = 'button';
@@ -63,22 +58,20 @@ function textButton(label: string, on: () => void) {
   b.addEventListener('click', on);
   return b;
 }
-const guestButton = () => textButton('Enter as local guest', () => { stopRequest(); enterAsGuest(); location.href = nextPage(); });
+const guestButton = () => textButton('Enter as local guest', () => { stopRequest(); void enterAsGuest().then(r => { if (r.ok) location.href = nextPage(); else failStep(r.words); }); });
 const backButton = () => textButton('Back', () => { stopRequest(); startStep(); });
 
 function startStep() {
   const option = (who: string, label: string, on: () => void) => h('div', 'lg-opt', h('span', '', who), pill('', label, on));
-  show(h('div', 'lg-step', h('h1', '', 'Robots fall', h('br'), 'here first.'),
-    h('div', 'lg-opts',
-      option('For robotics teams', 'Continue with work email', companyStep),
-      option('For engineers', 'Continue with World ID', () => { void engineerStep(); }))));
+  const demo = (role: 'company' | 'engineer', label: string) => option('Demo, seeded and not real', label, () => { void demoSignIn(role).then(r => { if (r.ok) location.href = nextPage(); else failStep(r.words); }); });
+  const opts = h('div', 'lg-opts',
+    option('For robotics teams', 'Continue with work email', companyStep),
+    option('For engineers', 'Continue with World ID', () => { void engineerStep(); }));
+  show(h('div', 'lg-step', h('h1', '', 'Robots fall', h('br'), 'here first.'), opts));
+  void status.then(st => { if (st?.demo) { opts.append(demo('company', 'Demo company'), demo('engineer', 'Demo engineer')); place(); } });
 }
 
-// The one seam for company accounts. src/site/auth.ts replaces this when the account server is up. Until then nobody enters here, and nothing is stored.
 type CompanyMode = 'signin' | 'create';
-async function companyAuth(_mode: CompanyMode, _email: string, _password: string): Promise<{ ok: true } | { ok: false; words: string }> {
-  return { ok: false, words: 'Company accounts are not connected yet.' };
-}
 
 function companyStep() {
   let mode: CompanyMode = 'signin';
@@ -89,6 +82,9 @@ function companyStep() {
   const password = h('input', 'lg-input');
   Object.assign(password, { type: 'password', required: true, placeholder: 'Password', name: 'password' });
   password.setAttribute('aria-label', 'Password');
+  const company = h('input', 'lg-input');
+  Object.assign(company, { placeholder: 'Company name', autocomplete: 'organization', name: 'company' });
+  company.setAttribute('aria-label', 'Company name');
   const enter = h('button', 'lg-pill');
   enter.type = 'submit';
   const error = h('p', 'lg-small bad');
@@ -111,14 +107,17 @@ function companyStep() {
     title.replaceChildren(...(to === 'signin' ? ['Company', h('br'), 'sign in.'] : ['New company', h('br'), 'account.']));
     enter.textContent = to === 'signin' ? 'Sign in' : 'Create account';
     password.autocomplete = to === 'signin' ? 'current-password' : 'new-password';
+    company.hidden = to === 'signin';
+    company.required = to === 'create';
     error.hidden = true;
   }
   setMode('signin');
-  const form = h('form', 'lg-form', tabs, email, password, h('div', 'lg-submit', h('p', 'lg-honest', 'Email not verified'), enter), error);
+  const form = h('form', 'lg-form', tabs, email, password, company, h('div', 'lg-submit', h('p', 'lg-honest', 'Email not verified'), enter), error);
   form.addEventListener('submit', e => {
     e.preventDefault();
     error.hidden = true;
-    void companyAuth(mode, email.value, password.value).then(r => {
+    const asked = mode === 'signin' ? signInCompany({ email: email.value, password: password.value }) : signUpCompany({ email: email.value, password: password.value, company: company.value });
+    void asked.then(r => {
       if (r.ok) location.href = nextPage();
       else { error.textContent = r.words; error.hidden = false; }
     });
@@ -127,7 +126,7 @@ function companyStep() {
   email.focus({ preventScroll: true });
 }
 
-const status = getJson<Status>('/site-api/auth/world').catch(() => null);
+const status = authOptions().catch(() => null);
 let environment = '';
 // The server names its World ID environment on the providers list. Display only.
 getJson<{ entries?: { id: string; version: string }[] }>('/site-api/providers').then(d => {
@@ -143,7 +142,7 @@ function worldStep(title: HTMLElement, body: (Node | null)[], links: Node[], qr?
 function offStep(s: Status | null) {
   worldStep(worldTitle('World ID', 'is off.'), [
     h('p', 'lg-say lg-status', s ? 'World ID is not set up on this server yet.' : 'The site server does not answer, so World ID is off.'),
-    h('p', 'lg-small', 'A guest can use everything here, and is shown as not verified.'),
+    h('p', 'lg-small', 'A guest can look and run the saved demo. A guest cannot post, submit or claim.'),
     s?.missing.length ? h('p', 'lg-small', `Missing in .env: ${s.missing.join(', ')}`) : null,
     s ? null : h('p', 'lg-small', h('code', '', START_SERVER)),
   ], [backButton(), guestButton()]);
@@ -168,11 +167,6 @@ function qrBox(text: string): HTMLElement {
   return box;
 }
 
-async function post(path: string, body?: unknown) {
-  const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(45_000) });
-  return { ok: res.ok, body: await res.json().catch(() => ({})) };
-}
-
 let cancel: AbortController | null = null;
 function stopRequest() { cancel?.abort(); cancel = null; }
 
@@ -191,7 +185,7 @@ async function engineerStep() {
   if (!s?.on) { cancel = null; offStep(s); return; }
   const device = s.credential !== 'human';
   try {
-    const ctx = await post('/site-api/auth/world/context');
+    const ctx = await worldContext();
     if (!ctx.ok) throw new Error(ctx.body.words ?? 'The server would not sign this request.');
     if (run.signal.aborted) return;
     const c = ctx.body;
@@ -220,7 +214,7 @@ async function engineerStep() {
     if (run.signal.aborted) return;
     if (!done.success) throw new Error('You are not signed in. You can try again.');
     worldStep(worldTitle('Checking', 'your proof.'), [h('p', 'lg-say lg-status', 'World App answered. The server is checking the proof.')], []);
-    const reply = await post('/site-api/auth/world/verify', done.result);
+    const reply = await worldVerify(done.result);
     if (run.signal.aborted) return;
     if (!reply.ok || reply.body.verified !== true) throw new Error(reply.body.words ?? 'The server refused this proof. You are not signed in.');
     cancel = null;
@@ -234,4 +228,5 @@ async function engineerStep() {
 }
 
 startStep();
-whoIs().then(who => { if (who.kind !== 'none') location.replace(nextPage()); });
+// ?switch=1: a guest who wants a real account stays here. A sign-in replaces the guest session.
+whoIs().then(who => { if (who.kind !== 'none' && !new URLSearchParams(location.search).has('switch')) location.replace(nextPage()); });

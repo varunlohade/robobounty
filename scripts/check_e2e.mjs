@@ -1,5 +1,5 @@
 // The whole judge flow in headless Chrome, started by scripts/demo.sh on its own ports, with its own Chrome profile and its own board folder.
-// node scripts/check_e2e.mjs [--mode recorded|stored|both]. Saves design/e2e/<mode>/NN-step.png and design/e2e/<mode>/timing.json.
+// node scripts/check_e2e.mjs [--mode recorded|stored|both] [--ports WEB,RUN,SITE,BOARD]. Saves design/e2e/<mode>/NN-step.png and design/e2e/<mode>/timing.json.
 // recorded: stored results, no AI and no sim in the lab. stored: stored AI replies and real physics. In both, a fix sent to the board runs real sims, since that proof must be real. No AI call runs.
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -10,11 +10,12 @@ import { openChrome, wait } from '../src/lab/tools/browser.mjs';
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1]; };
 const ROOT = resolve(import.meta.dirname, '..');
 const MODES = arg('mode', 'both') === 'both' ? ['recorded', 'stored'] : [arg('mode')];
-const PORTS = { web: 6199, run: 6198, site: 6297, board: 6298 };
+const [web, run, site, board] = arg('ports', '6199,6198,6297,6298').split(',').map(Number);
+const PORTS = { web, run, site, board };
 const OWNER_PORTS = [5198, 5199, 5297];
 const WEB = `http://localhost:${PORTS.web}`;
 const GOOD_FIX = readFileSync(join(ROOT, 'policy/bounty/fixtures/fix5/good_match_fan.py'), 'utf8');
-const CAMPAIGN_S = 600, AI_FIX_S = 900, PROOF_S = 1500;
+const CAMPAIGN_S = 600, AI_FIX_S = 900, PROOF_S = 1500, POST_S = 300; // A post replays every stored run first.
 
 let failed = 0;
 const check = (name, ok, detail = '') => { if (!ok) failed++; console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? `: ${String(detail).slice(0, 400)}` : ''}`); };
@@ -29,7 +30,8 @@ async function flow(mode) {
   const downloads = mkdtempSync(join(tmpdir(), 'e2e-downloads-'));
   const timing = [];
   const log = [];
-  const demo = spawn('bash', [join(ROOT, 'scripts/demo.sh'), mode === 'recorded' ? '--recorded' : '--stored', '--ports', `${PORTS.web},${PORTS.run},${PORTS.site},${PORTS.board}`, '--board-root', boardRoot], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const authDb = join(downloads, 'auth.sqlite'); // --recorded makes its own store. In the other mode the check keeps one, away from real accounts.
+  const demo = spawn('bash', [join(ROOT, 'scripts/demo.sh'), mode === 'recorded' ? '--recorded' : '--stored', '--ports', `${PORTS.web},${PORTS.run},${PORTS.site},${PORTS.board}`, '--board-root', boardRoot], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CRASHLAB_AUTH_DB: authDb } });
   demo.stdout.on('data', d => log.push(String(d)));
   demo.stderr.on('data', d => log.push(String(d)));
   const t0 = Date.now();
@@ -59,10 +61,40 @@ async function flow(mode) {
     await wait(450);
     await clickText('Enter as local guest', '.lg-sheet');
   };
+  await c.send('Network.enable');
+  // Who is signed in changes during the flow, as it would for real people. --recorded uses the seeded demo accounts, labelled on screen. The other mode makes a real company account, and seeds one engineer, because a check has no World App.
+  let companyMade = false;
+  const asCompany = async next => {
+    await go(`login.html?switch=1&next=${encodeURIComponent(next)}`);
+    if (!live) {
+      await clickText('Demo company', '.lg-sheet');
+    } else {
+      await clickText('Continue with work email', '.lg-sheet');
+      await wait(450);
+      if (!companyMade) await clickText('Create account', '.lg-sheet');
+      await c.js(`(() => { const set = (n, v) => { document.querySelector('input[name=' + n + ']').value = v; }; set('email', 'tower@services.example'); set('password', 'correct horse battery'); set('company', 'Tower Services'); document.querySelector('form button[type=submit]').click(); })()`);
+      companyMade = true;
+    }
+    await c.until(`location.pathname === ${JSON.stringify(`/${next.split('?')[0]}`)} && document.querySelector('.sh-who')?.dataset.who === 'company'`, 'the company session', 30);
+    check(`${mode}: the company is labelled`, /Tower Services|Demo company/.test(await text()) && /Email not verified|Demo account/.test(await text()));
+  };
+  const asEngineer = async next => {
+    await go(`login.html?switch=1&next=${encodeURIComponent(next)}`);
+    if (!live) {
+      await clickText('Demo engineer', '.lg-sheet');
+    } else {
+      await c.until(`document.readyState === 'complete'`, 'login', 30);
+      const credential = await c.js(`fetch('/site-api/auth/world').then(r => r.json()).then(s => s.credential)`);
+      const value = execFileSync(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/site_auth.py'), 'seed-engineer', 'ana', credential], { env: { ...process.env, CRASHLAB_AUTH_DB: authDb }, encoding: 'utf8' }).trim();
+      await c.send('Network.setCookie', { name: 'crashlab_session', value, url: WEB, httpOnly: true, sameSite: 'Lax' });
+      await go(next);
+    }
+    await c.until(`location.pathname === ${JSON.stringify(`/${next.split('?')[0]}`)} && document.querySelector('.sh-who')?.dataset.who === 'engineer'`, 'the engineer session', 30);
+  };
   const say = words => c.js(`(() => { const t = document.querySelector('.chat-input'); t.value = ${JSON.stringify(words)}; document.querySelector('.chat-send').click(); })()`);
   const noVerifiedClaim = async where => {
     const words = await text();
-    check(`${mode}: ${where} says local guest, never verified`, words.includes('Local guest, not verified') && !words.includes('Verified human'));
+    check(`${mode}: ${where} says guest, never verified`, words.includes('Guest, not verified') && !words.includes('Verified human'));
   };
   // The grid may still be settling, as its strip loads, so the click waits for a still square and is checked by the panel it opens.
   const openSquare = async index => {
@@ -105,8 +137,8 @@ async function flow(mode) {
     });
     await step('post-link-after-guest', async () => {
       await enterAsGuest();
-      await c.until(`location.pathname === '/bounties.html' && !!document.querySelector('.overlay')`, 'the post dialog after login', 30);
-      await c.until(`document.querySelector('.overlay .bad')?.textContent.includes('cannot be posted')`, 'a plain refusal of a bad link', 30);
+      await c.until(`location.pathname === '/bounties.html' && document.querySelector('.sh-actions')?.innerText.includes('Guest')`, 'the board after login', 30);
+      check(`${mode}: a guest gets no post dialog`, await c.js(`!document.querySelector('.overlay')`));
       await noVerifiedClaim('the bounty page');
     });
     await step('tampered-storage', async () => {
@@ -114,8 +146,9 @@ async function flow(mode) {
       await go('bounties.html');
       await c.until(`document.querySelector('.sh-who')?.dataset.who === 'guest'`, 'the side bar', 30);
       await noVerifiedClaim('the bounty page with forged storage');
-      check(`${mode}: the board says World ID is not connected`, (await text()).includes('World ID is not connected'));
+      check(`${mode}: the board says what its cap counts`, (await text()).includes('The cap of 5 counts accounts'));
       await c.js(`localStorage.clear(); sessionStorage.clear()`);
+      await c.js(`import('/src/site/auth.ts').then(m => m.signOut())`);
     });
 
     await step('login', async () => {
@@ -257,35 +290,40 @@ async function flow(mode) {
     await step('post-a-bounty-link', async () => {
       ref = new URL(await c.js(`document.querySelector('.code-fix-bounty').href`)).searchParams.get('post');
       await clickOn('.code-fix-bounty');
-      await c.until(`location.pathname === '/bounties.html' && !!document.querySelector('.overlay select')?.value`, 'the post dialog', 60);
-      check(`${mode}: the dialog holds this failure`, (await c.js(`document.querySelector('.overlay select').value`)) === ref, ref);
+      await c.until(`location.pathname === '/bounties.html' && document.querySelector('.sh-actions')?.innerText.includes('Guest')`, 'the board as a guest', 60);
+      check(`${mode}: the link gives a guest no post dialog`, await c.js(`!document.querySelector('.overlay')`));
       await noVerifiedClaim('the bounty page');
+      await asCompany(`bounties.html?post=${ref}`);
+      await c.until(`!!document.querySelector('.overlay select')?.value`, 'the post dialog', 60);
+      check(`${mode}: the dialog holds this failure`, (await c.js(`document.querySelector('.overlay select').value`)) === ref, ref);
     });
     const session = ref.split('/')[0];
-    const fillPost = (company, title) => c.js(`(() => { const inputs = [...document.querySelectorAll('.overlay input')]; inputs[0].value = ${JSON.stringify(title)}; inputs[1].value = ${JSON.stringify(company)}; })()`);
+    const fillPost = title => c.js(`document.querySelectorAll('.overlay input')[0].value = ${JSON.stringify(title)}`);
     await step('bounty-shows', async () => {
-      await fillPost('Tower Services (test company)', 'The robot slides on low suction');
+      await fillPost('The robot slides on low suction');
       await clickText('Post the bounty', '.overlay');
-      await c.until(`!document.querySelector('.overlay') && document.body.innerText.includes('The robot slides on low suction')`, 'the slip bounty', 60);
+      await c.until(`!document.querySelector('.overlay') && document.body.innerText.includes('The robot slides on low suction')`, 'the slip bounty', POST_S);
     }, 800);
     // No fix for the slip exists yet. The real fix on file is for the stalled worlds, so the paid path uses that failure of the same run.
     await step('second-bounty', async () => {
       await clickText('Post a bounty', '.sh-actions');
       await c.until(`[...document.querySelectorAll('.overlay select option')].some(o => o.value === ${JSON.stringify(`${session}/${ref.split('/')[1]}/stalled`)})`, 'the stalled failure', 30);
       await c.js(`document.querySelector('.overlay select').value = ${JSON.stringify(`${session}/${ref.split('/')[1]}/stalled`)}; document.querySelector('.overlay select').dispatchEvent(new Event('change'))`);
-      await fillPost('Tower Services (test company)', 'The robot stops short near the top');
+      await fillPost('The robot stops short near the top');
       await clickText('Post the bounty', '.overlay');
-      await c.until(`!document.querySelector('.overlay') && document.body.innerText.includes('The robot stops short near the top')`, 'the stalled bounty', 60);
+      await c.until(`!document.querySelector('.overlay') && document.body.innerText.includes('The robot stops short near the top')`, 'the stalled bounty', POST_S);
     }, 800);
     await step('submit-a-fix', async () => {
+      await asEngineer('bounties.html');
       await clickText('Submit a fix', '.detail');
       await c.until(`document.querySelector('.overlay textarea')?.dataset.ready === '1'`, 'the source', 30);
-      await c.js(`(() => { document.querySelector('.overlay input').value = 'ana'; document.querySelector('.overlay textarea').value = ${JSON.stringify(GOOD_FIX)}; })()`);
+      check(`${mode}: the tester comes from the session, not a typed name`, await c.js(`document.querySelector('.overlay input').disabled`));
+      await c.js(`document.querySelector('.overlay textarea').value = ${JSON.stringify(GOOD_FIX)}`);
       await clickText('Run check, then simulation', '.overlay');
       await c.until(`!document.querySelector('.overlay')`, 'the submit', 30);
     }, 3000);
     await step('hidden-world-proof', async () => {
-      await c.until(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.trim() === 'Finalize') || /Refused|Not fixed|Worse on hidden|Overfit|Limit hit|Replay differs|Stopped/.test(document.querySelector('.detail').innerText.split('Submission')[1] ?? '')`, 'the proof', PROOF_S);
+      await c.until(`/The fix holds on the hidden worlds|Refused|Not fixed|Worse on hidden|Overfit|Limit hit|Replay differs|Stopped/.test(document.querySelector('.detail').innerText.split('Submission')[1] ?? '')`, 'the proof', PROOF_S);
       const detail = await c.js(`document.querySelector('.detail').innerText`);
       paid = /The fix holds on the hidden worlds/.test(detail);
       // The stored batch's worlds are fixed, so this fix must pay there. A live list can differ, and then the fix may really fail, so the check asks that nothing is held.
@@ -296,13 +334,16 @@ async function flow(mode) {
     }, 800);
     if (paid) {
       await step('dispute-window', async () => {
+        await asCompany('bounties.html');
         await c.until(`[...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Reject in the window')?.disabled === false`, 'the open window', 10).catch(() => {});
         await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
       }, 300);
       await step('finalize', async () => {
         await c.until(`[...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Finalize')?.disabled === false`, 'the end of the window', 300);
         await clickText('Finalize', '.detail');
-        await c.until(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.trim() === 'Claim')`, 'finalized', 30);
+        await c.until(`/Only the engineer who submitted/.test(document.querySelector('.detail').innerText)`, 'finalized', 30);
+        await asEngineer('bounties.html');
+        await c.until(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.trim() === 'Claim')`, 'the claim for this engineer', 30);
         await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
       });
       await step('claim-secret-lost', async () => {
@@ -319,10 +360,10 @@ async function flow(mode) {
         await go('bounties.html');
         await c.until(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.trim() === 'Claim')`, 'Claim after a reload', 30);
         check(`${mode}: a reload keeps the claim`, true);
-        check(`${mode}: the World ID label stays`, (await text()).includes('World ID is not connected'));
+        check(`${mode}: the cap label stays`, (await text()).includes('The cap of 5 counts accounts'));
       });
       await step('claim', async () => {
-        await c.js(`(() => { const who = document.querySelector('.detail .acts input'); who.value = 'ana'; [...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Claim').click(); })()`);
+        await c.js(`[...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Claim').click()`);
         await c.until(`document.querySelector('.detail').innerText.includes('claimed')`, 'the claim', 30);
         check(`${mode}: pay is in test units, with the ledger label`, /test units/.test(await c.js(`document.querySelector('.detail').innerText`)) && /Local ledger\. Not on chain\./.test(await text()));
         await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);

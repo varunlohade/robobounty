@@ -16,7 +16,7 @@ const clickText = (label) => js(`[...document.querySelectorAll('button')].find(b
 // The site's login gate: enter as the local guest, as a visitor would. This claims no verified human.
 await send('Page.navigate', { url: 'http://localhost:5199/login.html' });
 await until(`document.readyState === 'complete'`, 'login page', 15);
-await js(`localStorage.setItem('crashlab-guest', '1')`);
+await js(`fetch('/site-api/auth/guest', { method: 'POST', headers: { 'X-CrashLab-Request': '1' } })`); // NOTE: a guest can read this page, and cannot post or submit, so the steps below need a company and an engineer.
 await send('Page.navigate', { url: PAGE });
 await until(`document.querySelector('.sh-app') && document.body.innerText.includes('No bounties yet')`, 'empty state', 15);
 await js('document.fonts.ready.then(() => true)');

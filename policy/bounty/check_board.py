@@ -17,6 +17,7 @@ sys.path.insert(0, str(HERE))
 import board_gate
 import board_spec
 import board_store as B
+import check_auth_helper as H
 import gate as G
 
 W = G.W
@@ -111,6 +112,9 @@ def gate_flow(root):
 
 def curl(method, path, body=None, origin=PAGE, host=None, ctype="application/json"):
     argv = ["curl", "-s", "-m", "20", "-X", method, "-w", "\n%{http_code}", f"{BASE}{path}"]
+    if method == "POST":
+        body, bearer = H.signed(body)
+        argv += ["-H", f"Authorization: {bearer}"]
     if origin:
         argv += ["-H", f"Origin: {origin}"]
     if host:
@@ -170,7 +174,7 @@ def server_flow(root):
         status, out = curl("POST", "/api/bounties", {"title": "x", "company": "y", "scenarios": [], "cap": 10, "per_failure": 5, "limits": {}, "robot": "my robot"})
         check("refuses a chosen robot", status == 400 and out["error"] == "bad_fields", f"{status}")
         status, out = curl("GET", "/api/bounties")
-        check("list shows both open, with both labels", len(out["bounties"]) == 2 and all(b["status"] == "open" for b in out["bounties"]) and out["ledger_label"] == "Local ledger. Not on chain." and out["world_id_label"] == "World ID is not connected", f"{out['ledger_label']} {out['world_id_label']}")
+        check("list shows both open, with both labels", len(out["bounties"]) == 2 and all(b["status"] == "open" for b in out["bounties"]) and out["ledger_label"] == "Local ledger. Not on chain." and out["world_id_label"] == B.WORLD_ID_LABEL, f"{out['ledger_label']} {out['world_id_label']}")
         salts = [(root / str(i) / "salt.hex").read_text() for i in (narrow["id"], wide["id"])]
         check("no reply holds a salt", not any(s in json.dumps(out) for s in salts))
 
@@ -185,7 +189,7 @@ def server_flow(root):
         check("unknown bounty", status == 404, f"{status}")
 
         status, out = curl("POST", f"/api/bounties/{wide['id']}/submit", {"tester": "Ana", "seed": seed, "world": world})
-        check("submit is queued", status == 202 and out["world_id_label"] == "World ID is not connected", f"{status} {out.get('used')} of {out.get('of')}")
+        check("submit is queued", status == 202 and out["world_id_label"] == B.WORLD_ID_LABEL, f"{status} {out.get('used')} of {out.get('of')}")
         secret = out["claim_secret"]
         row = wait_done(wide["id"], out["n"])
         check("failing fixture accepted over HTTP, ledger Pending", row["result"]["code"] == "accepted" and row["result"]["runs"] == 10 and row["payout"]["status"] == "Pending", f"{row['result']['reason']} {row['wall_s']}s")
@@ -259,7 +263,7 @@ def server_flow(root):
             row = wait_done(narrow["id"], out["n"], 60)
             check(f"submit {i + 1} of 5: outside_limits, 0 runs", row["result"]["code"] == "outside_limits" and row["result"]["runs"] == 0, f"{status}")
         status, out = curl("POST", submit, {"tester": " cap   CHECK ", "seed": seed + 9, "world": world})
-        check("6th submit returns 429, labelled", status == 429 and out["error"] == "tester_cap" and out["world_id_label"] == "World ID is not connected", f"{status} {out['reason']}")
+        check("6th submit returns 429, labelled", status == 429 and out["error"] == "tester_cap" and out["world_id_label"] == B.WORLD_ID_LABEL, f"{status} {out['reason']}")
         status, out = curl("POST", submit, {"tester": "Other name", "seed": seed, "world": world})
         check("a new name gets past the cap, as the label says", status == 202, f"{status}")
         wait_done(narrow["id"], out["n"], 60)
