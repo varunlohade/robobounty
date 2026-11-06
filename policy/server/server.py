@@ -73,6 +73,16 @@ QUESTIONS = (
         ("Heavy dust", {"wetness": (0.0, 0.05), "dust_gm2": (15.0, 30.0)}),
         ("Use the default", {}))},
 )
+# How a follow-up names a changed value.
+FIELD_WORDS = {
+    "steady_wind_ms": ("Wind", " m/s"), "gust_speed_ms": ("Gusts", " m/s"), "gust_start_s": ("First gust at", " s"), "gust_duration_s": ("Gust length", " s"),
+    "gust_count": ("Number of gusts", ""), "gust_period_s": ("Time between gusts", " s"), "wind_dir_deg": ("Wind direction", " degrees"), "wetness": ("Wetness", ""),
+    "mullion_depth_m": ("Joint depth", " m"), "mullion_spacing_m": ("Joint spacing", " m"), "mullion_offset_m": ("Joint offset", " m"), "joint_gap_m": ("Joint gap", " m"),
+    "edge_margin_m": ("Edge margin", " m"), "area_width_m": ("Work area width", " m"), "area_height_m": ("Work area height", " m"), "drop_below_roof_m": ("Drop below the roof", " m"),
+    "suction_pa": ("Suction", " Pa"), "seal_leak_mm2": ("Seal leak", " mm2"), "battery_start_frac": ("Battery at the start", ""), "pad_force_n": ("Pad force", " N"),
+    "dirt_level": ("Dirt", ""), "ledge_depth_m": ("Ledge depth", " m"), "ledge_below_top_m": ("Ledge below the top", " m"), "ledge_x_m": ("Ledge position", " m"),
+    "ledge_width_m": ("Ledge width", " m"), "temperature_c": ("Temperature", " C"), "humidity_pct": ("Humidity", " %"), "dust_gm2": ("Dust", " g/m2"), "sun_level": ("Sun", ""),
+}
 REJECTION_WORDS = {
     "brief_too_long": "That is too long for one brief. Keep it under 300 words.",
     "brief_has_control_characters": "That message has control characters, so I did not read it.",
@@ -172,7 +182,7 @@ def run_one(argv, stdout_file):
 def llm_label():
     if not RECORDED:
         return "claude headless"
-    stored = [n for n in ("brief", "scenarios") if (Path(RECORDED) / f"{n}.json").exists()]
+    stored = [n for n in ("brief", "followup", "scenarios") if (Path(RECORDED) / f"{n}.json").exists()]
     return f"stored {' and '.join(stored)} reply, check only"
 
 
@@ -182,6 +192,23 @@ def sha_file(path):
 
 def sim_hash():
     return hashlib.sha256((HIGHRISE / "sim.py").read_bytes()).hexdigest()
+
+
+def plain_number(v):
+    return f"{v:.0f}" if abs(v) >= 100 else f"{v:.1f}".removesuffix(".0") if abs(v) >= 1 else f"{v:.3g}"
+
+
+def changed_words(old, new, fields):
+    """The values a follow-up moved, such as Wind 2.1 to 14.8 m/s. A wrong guess by the planner shows here as plain numbers."""
+    words = []
+    for k in sorted(fields):
+        if k == "elements":
+            before, after = len(old.get(k, [])), len(new.get(k, []))
+            if old.get(k) != new.get(k):
+                words.append(f"Scene elements {before} to {after}")
+        elif old[k] != new[k]:
+            words.append(f"{FIELD_WORDS[k][0]} {plain_number(old[k])} to {plain_number(new[k])}{FIELD_WORDS[k][1]}")
+    return words
 
 
 def thumb_and_end(run):
@@ -204,6 +231,7 @@ class Session:
         self.world, self.normal, self.proposal, self.requirements = None, None, None, None
         self.results, self.batches, self.excluded, self.diverged, self.types = {}, 0, {}, [], []
         self.held, self.round = set(), 0
+        self.world_seed, self.run_seed, self.answered = 1, 1001, set()  # the same world and the same run conditions for every follow-up
         self.exports = {}
         self.llm_used = 0
         self.last_campaign, self.fix_try, self.fix_summary, self.fix_decision = None, None, None, None
@@ -302,8 +330,9 @@ class Session:
         self.chapter("brief")
         if not self.llm_allowed():
             return
-        self.working("reading the brief")
-        reply = job(HERE / "plan_job.py", {"text": joined}, "plan")
+        follow_up = self.world is not None
+        self.working("reading your change" if follow_up else "reading the brief")
+        reply = job(HERE / "plan_job.py", {"text": text, "current": self.world["world"]} if follow_up else {"text": joined}, "plan")
         if reply is None:
             self.say("The planner process died, so nothing changed.", fail=True)
             return
@@ -312,14 +341,23 @@ class Session:
             self.tool("plan_world", "rejected", [json.dumps({"rejection": code, "llm_s": reply.get("seconds")})])
             self.say(REJECTION_WORDS.get(code, f"The planner could not answer ({code}). Nothing changed."), fail=True)
             return
-        self.brief, self.plan = joined, {k: dict(v) for k, v in reply["plan"].items()}
-        self.tool("plan_world", f"ok, {reply['seconds']} s", [json.dumps({k: [v["min"], v["max"]] for k, v in self.plan.items()}) if self.plan
+        old, new = self.plan, {k: dict(v) for k, v in reply["plan"].items()}
+        self.brief, self.plan = joined, {**old, **new}
+        if "elements" in old and "elements" in new:
+            self.plan["elements"] = {**old["elements"], **new["elements"]}
+        self.tool("plan_world", f"ok, {reply['seconds']} s", [json.dumps({k: sorted(v) if k == "elements" else [v["min"], v["max"]] for k, v in new.items()}) if new
                                                                else "The brief sets no value, so defaults stand for now."])
         for item in reply["could_not_build"]:
             self.tool("could_not_build", item["reason"], [item["words"], item["why"]])
         if reply["not_accounted_for"]:
             self.tool("not_used", "words", [" ".join(reply["not_accounted_for"])])
-        self.questions = [q for q in QUESTIONS if not set(q["fields"]) & set(self.plan)][:2]
+        if follow_up:
+            if new:
+                self.build(change=(old, set(new)))
+            else:
+                self.say("I found nothing to change in that, so the world stays as it was.")
+            return
+        self.questions = [q for q in QUESTIONS if q["id"] not in self.answered and not set(q["fields"]) & set(self.plan)][:2]
         self.answers = {}
         if self.questions:
             self.phase = "asking"
@@ -342,6 +380,7 @@ class Session:
         self.emit(type="user", text=label)
         for name, (low, high) in ranges.items():
             self.plan[name] = {"min": low, "max": high}
+        self.answered.add(q["id"])
         self.questions.pop(0)
         if self.questions:
             self.phase = "asking"
@@ -349,7 +388,8 @@ class Session:
             return
         self.build()
 
-    def build(self):
+    def build(self, change=None):
+        """change is a follow-up: the plan before it, and the fields it set. It keeps every other value of the current world."""
         self.phase = "building"
         self.chapter("worlds")
         self.results, self.excluded, self.diverged, self.types, self.held, self.proposal = {}, {}, [], [], set(), None
@@ -357,16 +397,24 @@ class Session:
         self.working("building the world")
         self.round += 1
         folder = self.dir / f"world_{self.round}"
-        reply = job(HERE / "plan_job.py", {"plan": self.plan, "seed": self.round, "out": str(folder)}, "build")
+        base = self.world["world"] if change else None
+        reply = job(HERE / "plan_job.py", {"plan": self.plan, "seed": self.world_seed, "out": str(folder), "base": base, "changed": sorted(change[1]) if change else None}, "build")
         if not reply or not reply["ok"]:
             code = (reply or {}).get("rejection", "build_process_died")
+            if change:
+                self.plan = change[0]
             self.tool("build_world", "failed", [code])
             self.say(REJECTION_WORDS.get(code, "That world did not build, so nothing changed."), fail=True)
             self.phase = "brief"
             return
         self.world = reply
         short = {k: reply["world"][k] for k in reply["moved"]}
-        self.tool("build_world", f"ok, {reply['seconds']} s", [json.dumps(short or {"moved": "nothing, all defaults"}), f"world {reply['hash'][:12]}"])
+        if change:
+            words = changed_words(base, reply["world"], change[1])
+            self.tool("change_world", f"ok, {reply['seconds']} s", words or ["No value moved."])
+            self.say(f"{'. '.join(words)}." if words else "The values you named did not move.")
+        else:
+            self.tool("build_world", f"ok, {reply['seconds']} s", [json.dumps(short or {"moved": "nothing, all defaults"}), f"world {reply['hash'][:12]}"])
         self.emit(type="world", world=reply["world"], hash=reply["hash"], xml=reply["xml"], area=reply["area"], moved=reply["moved"], facts=reply["facts"])
         self.tool("inspect_world", "code check", [json.dumps(reply["facts"])])
         self.requirements_step()
@@ -392,7 +440,7 @@ class Session:
         self.chapter("test")
         self.working("one normal run")
         run = self.dir / f"normal_{self.round}"
-        code = run_one([PYTHON, str(HIGHRISE / "run_trial.py"), self.world["path"], "--seed", str(1000 + self.round), "--out", str(run)], self.dir / "normal.log")
+        code = run_one([PYTHON, str(HIGHRISE / "run_trial.py"), self.world["path"], "--seed", str(self.run_seed), "--out", str(run)], self.dir / "normal.log")
         if code != 0:
             self.tool("run_trial", "failed", [f"exit {code}"])
             self.say("The normal run crashed, so I stopped here. Log: normal.log in the session folder.", fail=True)
@@ -411,7 +459,7 @@ class Session:
         self.phase = "review_scene"
         cleaned = f"It cleaned {result['coverage'] * 100:.1f}%."
         word = f"It passed. {cleaned}" if result["passed"] else f"It failed: {result['failure']}. {cleaned}" if result["failure"] else f"It stopped and held on: {result['outcome']}. {cleaned}"
-        self.emit(type="card", title="Does the scene look right?", body=f"{word} Watch the run on the right. Say what to change, or confirm.",
+        self.emit(type="card", title="Does the scene look right?", body=f"{word} Watch the run on the right. Say what to change, or confirm.", result=word,
                   actions=[{"label": "Looks right", "action": "scene_ok", "primary": True}])
 
     def export(self, run, tid, label):

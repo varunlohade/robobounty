@@ -20,18 +20,31 @@ import scenarios
 from scene import SceneError
 
 INSTRUCTION_REASONS = {"code_or_instructions", "file_or_secret_request"}
+FOLLOW_UP = "This message changes a world that already exists."
 
 
 def _recorded(prompt, schema):
-    path = Path(os.environ["CRASHLAB_RECORDED_REPLIES"]) / ("scenarios.json" if "groups" in schema["properties"] else "brief.json")
+    folder = Path(os.environ["CRASHLAB_RECORDED_REPLIES"])
+    path = folder / ("scenarios.json" if "groups" in schema["properties"] else "followup.json" if FOLLOW_UP in prompt and (folder / "followup.json").exists() else "brief.json")
     return json.loads(path.read_text()) if path.exists() else llm._claude(prompt, schema)
+
+
+def follow_up_rules(world):
+    values = ", ".join(f"{k} {v}" for k, v in world.items() if k in plugin.FIELDS)
+    return f"""
+
+{FOLLOW_UP} The numbered words above are only this message, and the current values are data.
+Current values: {values}. Scene elements: {len(world.get("elements", []))}.
+Set a min and a max only for the fields this message asks to change, and leave out every other field.
+A relative word such as stronger, wetter or higher means a range past the current value, on the side the word asks for, inside the limits."""
 
 
 def plan(req):
     t0 = time.perf_counter()
     try:
         words = brief.words_of(req["text"])
-        raw = llm.complete_json(brief.prompt_for(plugin, words), brief.full_schema(plugin))
+        prompt = brief.prompt_for(plugin, words) + (follow_up_rules(req["current"]) if req.get("current") else "")
+        raw = llm.complete_json(prompt, brief.full_schema(plugin))
         seconds = round(time.perf_counter() - t0, 1)
         brief._check_top(raw)
         mapped = brief._spans(raw["mapped"], "factor", plugin.FACTORS, len(words))
@@ -52,12 +65,25 @@ def plan(req):
         return {"ok": False, "rejection": f"llm_{e}", "seconds": round(time.perf_counter() - t0, 1)}
 
 
+class KeepBase:
+    """A follow-up samples only the fields it changed. Every other value comes from the current world, so a dropped sample or an integer draw cannot move it."""
+    open_builder = staticmethod(plugin.open_builder)
+
+    def __init__(self, base, changed):
+        self.base, self.changed = base, changed
+
+    def expand(self, plan, seed):
+        for spec in plugin.expand(plan, seed):
+            yield {**self.base, **{k: spec[k] for k in self.changed}, "schema": spec["schema"]}
+
+
 def build(req):
     t0 = time.perf_counter()
     hw = plugin.hw
     try:
         chosen = plugin.validate_plan(req["plan"], [{"factor": f} for f in req["plan"]]) if req["plan"] else {}
-        worlds, dropped = brief.build_batch(plugin, chosen, 1, req["seed"], req["out"])
+        maker = KeepBase(req["base"], req["changed"]) if req.get("base") else plugin
+        worlds, dropped = brief.build_batch(maker, chosen, 1, req["seed"], req["out"])
     except SceneError:
         return {"ok": False, "rejection": "plan_failed_validation"}
     if not worlds:

@@ -1,6 +1,6 @@
 /* One-window lab layout. Values follow design/claude/NOTES.md, round 5. tokens.css still supplies the --sim-* values that view.ts reads. */
-@font-face { font-family: Inter; src: url(../../design/shell/inter-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; }
-@font-face { font-family: "JetBrains Mono"; src: url(../../design/shell/jetbrains-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 100 800; }
+@font-face { font-family: Inter; src: url(fonts/inter-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "JetBrains Mono"; src: url(fonts/jetbrains-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 100 800; }
 
 :root {
   --lab-app: #0B0C0E;
@@ -46,11 +46,26 @@ button { cursor: pointer; }
 /* Chat */
 .chat { width: 380px; flex: none; min-height: 0; display: flex; flex-direction: column; background: var(--lab-panel); border-right: 1px solid var(--lab-hair); }
 .chat-head { height: 36px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-weight: 500; }
-.chat-new { color: var(--lab-muted); font-weight: 400; }
+.chat-new { padding: 0; background: none; border: 0; color: var(--lab-muted); font-weight: 400; text-decoration: none; cursor: pointer; }
+.chat-new:hover { color: var(--lab-text-2); }
 .chat-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 8px 12px; }
+.chat-list { display: flex; flex-direction: column; gap: 12px; }
+.chat-agent, .chat-me { overflow-wrap: anywhere; white-space: pre-wrap; }
+.chat-fail { color: var(--lab-red-text); }
 .chat-me { background: var(--lab-hover); border-radius: 8px; padding: 8px 12px; }
 .chat-steps { display: flex; flex-direction: column; gap: 4px; color: var(--lab-text-2); }
 .chat-step::before { content: "✓"; color: var(--lab-green-text); margin-right: 8px; }
+.chat-live { display: flex; align-items: center; gap: 8px; color: var(--lab-text-2); }
+.chat-live[hidden] { display: none; }
+.chat-live::before { content: ""; width: 12px; height: 12px; margin: 0 2px; flex: none; border-radius: 50%; border: 2px solid var(--lab-track); border-top-color: var(--lab-accent); animation: chat-spin .8s linear infinite; }
+@keyframes chat-spin { to { transform: rotate(360deg); } }
+.chat-clock { margin-left: auto; color: var(--lab-muted); font-size: 12px; line-height: 16px; }
+.chat-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--lab-raised); border: 1px solid var(--lab-hair); border-radius: 8px; }
+.chat-options { display: flex; flex-direction: column; gap: 4px; }
+.chat-answered .chat-options { display: none; }
+.chat-option { padding: 4px 8px; text-align: left; background: none; border: 1px solid var(--lab-strong); border-radius: 6px; }
+.chat-option:hover:not(:disabled) { background: var(--lab-hover); }
+.chat-option:disabled { color: var(--lab-muted); border-color: var(--lab-hair); cursor: default; }
 .chat-box { flex: none; height: 92px; margin: 0 12px 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; background: var(--lab-raised); border: 1px solid var(--lab-strong); border-radius: 8px; color: var(--lab-muted); }
 .chat-box:focus-within { border-color: var(--lab-ring); }
 .chat-input { flex: 1; min-height: 0; width: 100%; padding: 0; background: none; border: 0; outline: 0; resize: none; color: var(--lab-text); }
@@ -58,12 +73,17 @@ button { cursor: pointer; }
 .chat-foot { flex: none; display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 16px; }
 .chat-send { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; display: grid; place-items: center; background: var(--lab-accent); color: #fff; }
 .chat-send:hover { background: var(--lab-accent-hover); }
+.chat-send:disabled { background: var(--lab-track); cursor: default; }
 .chat-send svg { width: 14px; height: 14px; }
 
 /* Main area */
 .lab-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .lab-tabs { height: 36px; flex: none; display: flex; background: var(--lab-panel); border-bottom: 1px solid var(--lab-hair); }
 .lab-tab { display: flex; align-items: center; padding: 0 16px; background: var(--lab-app); border-right: 1px solid var(--lab-hair); font: 400 12px/16px var(--lab-mono); }
+
+.lab-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--lab-text-2); }
+.lab-empty h2 { margin: 0; color: var(--lab-text); font-size: 16px; line-height: 24px; font-weight: 500; }
+.lab-empty p { margin: 0; }
 
 /* Reused from world_page.ts. The lab has no metrics rail. */
 .page { flex: 1; min-height: 0; display: flex; flex-direction: column; }

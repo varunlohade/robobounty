@@ -1,0 +1,27 @@
+{
+ "verdict": "build",
+ "reject_reason": "none",
+ "plan": {
+  "steady_wind_ms": {
+   "min": 6,
+   "max": 10
+  },
+  "wetness": {
+   "min": 0.6,
+   "max": 1
+  }
+ },
+ "mapped": [
+  {
+   "first_word": 2,
+   "last_word": 3,
+   "factor": "steady_wind_ms"
+  },
+  {
+   "first_word": 5,
+   "last_word": 7,
+   "factor": "wetness"
+  }
+ ],
+ "unbuildable": []
+}
