@@ -48,7 +48,7 @@ function setPlaying(on: boolean) {
   } else film.pause();
 }
 still.addEventListener('change', () => { if (still.matches) setPlaying(false); });
-else setPlaying(true);
+if (!still.matches) setPlaying(true);
 
 // Small proof, read from the site's own data, never written here.
 interface Batch { id: string; total: number; passed: number; failed: number; holds: number }
