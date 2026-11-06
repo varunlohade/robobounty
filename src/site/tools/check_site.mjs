@@ -185,7 +185,7 @@ problems.length = 0;
 
 // MOCK: the page reads "verified" only from the server's reply. This reply is invented here, in the browser, to prove the sidebar follows it.
 await go('home.html', 200);
-await send('Page.addScriptToEvaluateOnNewDocument', { source: `{ const real = window.fetch; window.fetch = (u, o) => String(u).includes('/site-api/auth/me') ? Promise.resolve(new Response(JSON.stringify({ verified: true, human_id: '0xabc1230000000000000000000000000000def456', environment: 'staging' }))) : real(u, o); }` });
+await send('Page.addScriptToEvaluateOnNewDocument', { source: `{ const real = window.fetch; window.fetch = (u, o) => String(u).includes('/site-api/auth/me') ? Promise.resolve(new Response(JSON.stringify({ verified: true, credential: 'human', human_id: '0xabc1230000000000000000000000000000def456', environment: 'staging' }))) : real(u, o); }` });
 await go('home.html', 700);
 say((await text()).includes('Verified human'), 'MOCK: a verified server reply shows Verified human');
 await shot('live-mock-verified-state');
