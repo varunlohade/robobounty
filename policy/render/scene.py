@@ -956,4 +956,5 @@ def main():
     print("mean seconds per frame %.1f" % (sum(timing) / max(len(timing), 1)))
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -1,5 +1,24 @@
 # Film renders of recorded runs
 
+`--look v2` is the close, photographic look (`scene_v2.py`, `post_v2.py`). `--look v1` is the older wide look. Both read the same recording.
+
+```
+policy/.venv/bin/python policy/render/assets.py     # CC0 maps, once
+policy/.venv/bin/python policy/render/render.py still --look v2 --trial design/render/_runs/t0014 --res 2560x1440 --samples 400 --name still_v2
+policy/.venv/bin/python policy/render/render.py clip  --look v2 --trial design/render/_runs/t0010 --shot close_slip --samples 56 --name clip_slip_v2
+policy/.venv/bin/python policy/render/render.py clip  --look v2 --trial design/render/_runs/t0014 --shot close_pass --samples 56 --name clip_pass_v2
+policy/.venv/bin/python policy/render/check.py --trial design/render/_runs/t0010 --work design/render/_work/clip_slip_v2 --all
+```
+
+Art in v2, all visual only, nothing feeds back to physics:
+
+- The wall ends at the mullion at x = -2.25 m, so the frame shows air past the corner. The sim's wall is only a plane.
+- The tether's and the white body's mirror images are left out of the glass, because they read as a second tether and a second plate.
+- The dark bumper and microfibre fringe are a design choice from the concept frames. The fringe does not change the recorded pad path.
+- The edge of the film may wander by up to 1.75 cm, which is under half a recorded 5 cm cell. Wipe marks, water spots and dust come from CC0 maps and noise.
+- Offices behind the glass, the sun, the sky and the city are invented. Street trees are off. The camera follows a smoothed copy of the recorded path and writes nothing back.
+- Dry glass. No droplets: nothing here claims rain.
+
 This folder turns one exported run into a Blender Cycles still or clip.
 
 ```

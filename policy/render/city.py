@@ -8,6 +8,7 @@ BLOCK = 86.0
 STREET = 16.0
 AVENUE_EVERY = 5
 RADIUS = 5200.0
+TREES = True  # The v2 look turns these off: close up they read as CG.
 CLEAR = (-22.0, 24.0, -30.0, 38.0)  # x0, x1, y0, y1 plaza around the tower base, relative to its centre
 
 
@@ -165,6 +166,8 @@ def layout(run, rng):
 
 
 def tree(m, rng, x, y):
+    if not TREES:
+        return
     r = float(rng.uniform(3.0, 5.2))
     h = 1.0
     g = float(rng.uniform(0.07, 0.13))

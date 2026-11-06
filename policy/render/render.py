@@ -20,6 +20,7 @@ HERE = Path(__file__).resolve().parent
 OUT = ROOT / "design" / "render"
 sys.path.insert(0, str(HERE))
 import post  # noqa: E402
+import post_v2  # noqa: E402
 
 
 def blender_cmd(a, mode, frames_dir, extra=()):
@@ -32,13 +33,15 @@ def blender_cmd(a, mode, frames_dir, extra=()):
     if not sky.exists():
         raise SystemExit(f"sky map missing: {sky}. See policy/render/README.md for the free download.")
     cmd = ["nice", "-n", "15", "blender", "--background", "--factory-startup", "--python-exit-code", "1",
-           "--python", str(HERE / "scene.py"), "--",
+           "--python", str(HERE / ("scene_v2.py" if a.look == "v2" else "scene.py")), "--",
            "--trial", str(trial), "--out", str(frames_dir), "--mode", mode, "--shot", a.shot,
            "--res", a.res, "--samples", str(a.samples), "--sky", str(sky), "--fps", str(a.fps)]
     if a.t is not None:
         cmd += ["--t", str(a.t)]
     if a.no_volume:
         cmd += ["--no-volume"]
+    if a.override:
+        cmd += ["--override", a.override]
     return cmd + list(extra)
 
 
@@ -68,10 +71,22 @@ def main():
     ap.add_argument("--start-frame", type=int, default=0)
     ap.add_argument("--end-frame", type=int, default=None)
     ap.add_argument("--no-encode", action="store_true")
+    ap.add_argument("--look", default="v1", choices=["v1", "v2"], help="v2 is the close, photographic look")
+    ap.add_argument("--override", default=None, help="JSON merged over the shot (v2), for framing tests")
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "_logs").mkdir(exist_ok=True)
     a.res = a.res or "1920x1080"
+    if a.look == "v2":
+        if a.shot == "side":
+            a.shot = "close"
+        if a.sky == "overcast_soil_puresky":
+            a.sky = "kloofendal_overcast_puresky"
+        lut = post_v2.LUT_PATH
+        if not lut.exists():
+            subprocess.check_call(["nice", "-n", "15", "blender", "--background", "--factory-startup", "--python-exit-code", "1",
+                                   "--python", str(HERE / "bake_agx.py"), "--", str(lut)], stdout=subprocess.DEVNULL)
+    finish = post_v2.process if a.look == "v2" else post.process
     if a.mode == "still":
         a.samples = a.samples or 256
         name = a.name or "still"
@@ -79,7 +94,7 @@ def main():
         work.mkdir(parents=True, exist_ok=True)
         t0 = time.time()
         run_blender(blender_cmd(a, "still", work), OUT / "_logs" / f"{name}.log")
-        post.process(str(work / "still.exr"), str(OUT / f"{name}.png"))
+        finish(str(work / "still.exr"), str(OUT / f"{name}.png"))
         print(f"{OUT / (name + '.png')} in {time.time() - t0:.0f} s")
     else:
         a.samples = a.samples or 64
@@ -97,7 +112,10 @@ def main():
         pngs.mkdir(exist_ok=True)
         exrs = sorted(work.glob("frame_*.exr"))
         for i, e in enumerate(exrs):
-            post.process(str(e), str(pngs / (e.stem + ".png")), seed=i + 1)
+            if a.look == "v2":
+                finish(str(e), str(pngs / (e.stem + ".png")), seed=i + 1, bits=8)  # Grain dithers; 16 bits per frame cost too much disk.
+            else:
+                finish(str(e), str(pngs / (e.stem + ".png")), seed=i + 1)
         out = OUT / f"{name}.mp4"
         subprocess.check_call(["nice", "-n", "15", "ffmpeg", "-y", "-loglevel", "error", "-framerate", str(a.fps),
                                "-i", str(pngs / "frame_%04d.png"), "-c:v", "libx264", "-crf", "16", "-preset", "slow",

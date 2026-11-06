@@ -44,6 +44,43 @@ SHOTS = {
     },
 }
 
+# ---- The v2 photographic look. See scene_v2.py.
+FILM_OPACITY_V2 = 0.82
+GLASS_COAT_V2 = 0.27
+GLASS_WAVE = 0.0016
+HAZE_V2 = (0.52, 0.55, 0.57)
+SKY_GAIN_V2 = 0.82
+SKY_ROTATE_V2 = 40.0
+TOWER_X0_V2 = -2.25  # The mullion at -2.25 m becomes a corner, so there is air past the wall.
+INTERIOR_LAMP = 0.8
+FIBRES = 120000
+SUN_V2 = {"energy": 3.4, "angle": 18.0, "color": (1.0, 0.95, 0.88), "to_sun": (-0.10, -0.52, 0.85)}
+
+SHOTS.update({
+    # Tight on the robot where the recorded clean lane meets the dirty pane. Run t0014.
+    "close": {
+        "t": 222.0, "still_t": 222.0, "seconds": 9.0, "follow": True,
+        "pos": ((1.3, -0.97, -0.30), (1.3, -0.97, -0.30)),
+        "target": ((-0.2, -0.17, -0.02), (-0.2, -0.17, -0.02)),
+        "lens": (50.0, 50.0), "fstop": 1.8, "sigma": 0.0,
+    },
+    # The same camera on the pass run. A slow, level push. The robot crosses the transom at 136.8 m.
+    "close_pass": {
+        "t": 211.0, "seconds": 9.0, "sigma": 1.4,
+        "pos": ((1.38, -1.0, -0.30), (1.24, -0.95, -0.26)),
+        "target": ((-0.2, -0.17, -0.02), (-0.2, -0.17, -0.02)),
+        "lens": (50.0, 50.0), "fstop": 1.8,
+    },
+    # Run t0010, wider and further back, because the recorded slide covers 1.5 m in about a second. The camera
+    # pans with the robot through a smoothed path of the same recording.
+    "close_slip": {
+        "t": 33.0, "seconds": 9.0, "sigma": 0.38, "lag": 0.06,
+        "pos": ((1.72, -1.28, -0.32), (1.66, -1.24, -0.28)),
+        "target": ((-0.28, -0.22, -0.04), (-0.28, -0.22, -0.04)),
+        "lens": (42.0, 42.0), "fstop": 1.2,
+    },
+})
+
 
 def camera_at(shot, u, robot_start, robot_end, robot_now):
     """Camera at u in 0..1 along the move. It reads the robot's pose and never writes it.
