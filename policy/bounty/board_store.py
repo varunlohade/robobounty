@@ -106,8 +106,9 @@ def post(title, company, scenarios, cap, per_failure, limits, window=ledger_modu
                 f.write(salt)
             book = ledger_module.Ledger(tmp / "ledger.json")
             book.fund("0x" + G.sha256_hex(G.canonical(spec)), cap, per_failure, window, COMPANY, RESOLVER, ARBITER)
-            book.bounty["id"] = bounty_id  # fund() always writes 1, and the spec holds the real id
-            book._save()
+            saved = json.loads(book.path.read_text())
+            saved["bounty"]["id"] = bounty_id  # fund() always writes 1, and the spec holds the real id
+            write_json(book.path, saved)
             write_json(tmp / "meta.json", {"id": bounty_id, "title": title, "company": company, "robot": ROBOT, "scenarios": scenarios, "narrowed": narrowed, "posted_at": time.time()})
         except ledger_module.LedgerError as e:
             shutil.rmtree(tmp)
@@ -116,16 +117,27 @@ def post(title, company, scenarios, cap, per_failure, limits, window=ledger_modu
     return get(bounty_id, root)
 
 
+def _balance(money, failures, rows):
+    """Where the cap sits now. These parts always add up to the cap."""
+    total = {status: sum(f["amount"] for f in failures.values() if f["status"] == status) for status in ("Pending", "Finalized", "Claimed")}
+    earned = {}
+    for r in rows:
+        if r["payout"] and r["payout"].get("status") == "Claimed":
+            earned[r["tester"]] = earned.get(r["tester"], 0) + r["payout"]["amount"]
+    return {"available": money["available"], "pending": total["Pending"], "finalized": total["Finalized"], "claimed": total["Claimed"], "claimed_by_tester": earned}
+
+
 def get(bounty_id, root=ROOT):
     folder = _folder(bounty_id, root)
     with locked(folder / ".lock"):
         book = _ledger(folder)
+        rows = _rows(folder)
     meta = json.loads((folder / "meta.json").read_text())
     spec = json.loads((folder / "spec.json").read_text())
     money = book.bounty
     return {**meta, "status": "open" if money["available"] >= money["per_failure"] else "cap_reached", "limits": spec["limits"], "schema_limits": {k: list(v) for k, v in G.W.FIELDS.items()},
             "spec_hash": money["spec_hash"], "cap": money["cap"], "per_failure": money["per_failure"], "available": money["available"], "dispute_window_s": money["dispute_window_s"],
-            "unit": "test units", "failures": book.failures, "ledger_label": LEDGER_LABEL, "world_id_label": WORLD_ID_LABEL, "scenarios_label": SCENARIOS_LABEL, "sim_label": SIM_LABEL}
+            "unit": "test units", "failures": book.failures, "balance": _balance(money, book.failures, rows), "now": time.time(), "ledger_label": LEDGER_LABEL, "world_id_label": WORLD_ID_LABEL, "scenarios_label": SCENARIOS_LABEL, "sim_label": SIM_LABEL}
 
 
 def list_bounties(root=ROOT):
@@ -202,11 +214,53 @@ def get_submission(bounty_id, n, root=ROOT):
     path = _folder(bounty_id, root) / "submissions" / str(n) / "submission.json"
     if not path.is_file():
         raise BoardError("unknown_submission", "There is no submission with this number.")
-    return json.loads(path.read_text())
+    row = json.loads(path.read_text())
+    if row["state"] == "running":
+        row["progress"] = progress_of(bounty_id, n, root)
+    return {**row, "now": time.time()}
 
 
 def list_submissions(bounty_id, root=ROOT):
     return _rows(_folder(bounty_id, root))
+
+
+def ledger_step(bounty_id, fingerprint, step, tester=None, root=ROOT):
+    """Moves one failure on the ledger with the contract's rules, and updates the submission that earned it. Returns the failure row.
+
+    No account exists, so anyone who can reach the board can press these. Claim checks only the name. World ID is not connected.
+    """
+    folder = _folder(bounty_id, root)
+    caller = tester_address(tester_key(tester)) if step == "claim" else None
+    with locked(folder / ".lock"):
+        book = _ledger(folder)
+        try:
+            if step == "reject":
+                book.reject(fingerprint)
+            elif step == "finalize":
+                book.finalize(fingerprint)
+            else:
+                book.claim(fingerprint, caller)
+        except ledger_module.LedgerError as e:
+            raise BoardError("ledger_refused", f"The ledger refused this: {e}.") from None
+        row = book.failures[fingerprint]
+        for sub in _rows(folder):
+            if sub["payout"] and sub["payout"].get("result_hash") == row["result_hash"]:
+                save_submission({**sub, "payout": {**sub["payout"], "status": row["status"]}}, root)
+    return row
+
+
+def recorded_run_of(bounty_id, n, root=ROOT):
+    """The run folder of an accepted submission's claim run, or None."""
+    path = _folder(bounty_id, root) / "submissions" / str(n)
+    found = sorted((path / "gate").glob("*/verdict.json"))
+    run = json.loads(found[-1].read_text()).get("recorded_run") if found else None
+    return Path(run) if run else None
+
+
+def progress_of(bounty_id, n, root=ROOT):
+    """Real progress of a running gate, read from its run folders. The gate makes the folder once the check has passed."""
+    gates = [g for g in (_folder(bounty_id, root) / "submissions" / str(n) / "gate").glob("*") if g.is_dir()]
+    return {"check_passed": bool(gates), "runs_done": sum(1 for g in gates for _ in g.glob("*/result.json")), "runs_most": G.RERUNS + 2}
 
 
 def mark_interrupted(root=ROOT):

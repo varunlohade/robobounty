@@ -189,6 +189,63 @@ def server_flow(root):
         status, money = curl("GET", f"/api/bounties/{wide['id']}")
         check("bounty shows the held amount", money["available"] == 10 and money["status"] == "open", f"available={money['available']}")
 
+        fp = row["result"]["fingerprint"]
+        step = lambda name, **body: curl("POST", f"/api/bounties/{wide['id']}/failures/{fp}/{name}", body)
+        status, out = step("finalize")
+        check("finalize before the window ends is refused", status == 409 and "DisputeWindowOpen" in out["reason"] and curl("GET", f"/api/bounties/{wide['id']}")[1]["balance"]["pending"] == 10, f"{status} {out['reason']}")
+        status, out = step("claim", tester="Ana")
+        check("claim before finalize is refused", status == 409 and "WrongStatus" in out["reason"], f"{status} {out['reason']}")
+
+        status, third = curl("POST", "/api/bounties", {"title": "Reject test", "company": "Sample company", "scenarios": [], "cap": 10, "per_failure": 10, "limits": {}})
+        status, out = curl("POST", f"/api/bounties/{third['id']}/submit", {"tester": "Ana", "seed": seed, "world": world})
+        seen = 0
+        while True:
+            live = curl("GET", f"/api/bounties/{third['id']}/submissions/{out['n']}")[1]
+            seen = max(seen, live.get("progress", {}).get("runs_done", 0))
+            if live["state"] == "done":
+                break
+            time.sleep(0.3)
+        check("progress counts real finished runs", 0 < seen <= 10 and live["result"]["runs"] == 10, f"saw {seen} of 10 before the end")
+        check("a bounty with all its money held is not open", curl("GET", f"/api/bounties/{third['id']}")[1]["status"] == "cap_reached")
+        status, out = curl("POST", f"/api/bounties/{third['id']}/submit", {"tester": "Late", "seed": seed, "world": world})
+        check("submit to a used-up bounty is refused", status == 409 and out["error"] == "cap_reached", f"{status}")
+        rejected_fp = live["result"]["fingerprint"]
+        status, out = curl("POST", f"/api/bounties/{third['id']}/failures/{rejected_fp}/reject", {})
+        money = curl("GET", f"/api/bounties/{third['id']}")[1]
+        row3 = curl("GET", f"/api/bounties/{third['id']}/submissions/{live['n']}")[1]
+        check("reject inside the window returns the money", status == 200 and money["available"] == 10 and money["balance"]["pending"] == 0 and row3["payout"]["status"] == "Rejected" and money["status"] == "open", f"{status} available={money['available']}")
+        status, out = curl("POST", f"/api/bounties/{third['id']}/failures/{rejected_fp}/finalize", {})
+        check("finalize after reject is refused", status == 409, f"{status} {out['reason']}")
+
+        time.sleep(max(0.0, row["payout"]["dispute_ends_at"] - time.time()) + 0.5)
+        status, out = step("reject")
+        check("reject after the window is refused", status == 409 and "DisputeWindowClosed" in out["reason"], f"{status} {out['reason']}")
+        status, out = step("claim", tester="Ana")
+        check("claim before finalize is still refused after the window", status == 409, f"{status}")
+        status, out = step("finalize")
+        check("finalize after the window", status == 200 and out["failure"]["status"] == "Finalized" and out["bounty"]["balance"]["finalized"] == 10, f"{status} {out['failure']['status']}")
+        status, out = step("claim", tester="Ben")
+        check("claim by another name is refused", status == 409 and "NotSubmitter" in out["reason"], f"{status} {out['reason']}")
+        status, out = step("claim", tester=" ANA ")
+        balance = out["bounty"]["balance"]
+        check("full path ends in Claimed with the right balance", status == 200 and out["failure"]["status"] == "Claimed" and balance["claimed"] == 10 and balance["pending"] == 0 and balance["finalized"] == 0 and balance["available"] == 10 and balance["claimed_by_tester"] == {"ana": 10} and balance["available"] + balance["claimed"] == wide["cap"], json.dumps(balance))
+        check("the submission shows Claimed", curl("GET", f"/api/bounties/{wide['id']}/submissions/{row['n']}")[1]["payout"]["status"] == "Claimed")
+        status, out = step("claim", tester="Ana")
+        check("second claim is refused", status == 409, f"{status}")
+        status, out = curl("POST", f"/api/bounties/{wide['id']}/failures/0x{'0' * 64}/finalize", {})
+        check("unknown failure is refused", status == 409, f"{status} {out['reason']}")
+        status, out = curl("POST", f"/api/bounties/{wide['id']}/failures/{fp}/finalize", {"x": 1})
+        check("extra field on a step is refused", status == 400, f"{status}")
+
+        base = f"/api/bounties/{wide['id']}/submissions/{row['n']}/replay"
+        status, out = curl("POST", base, {})
+        check("replay of the recorded run is written", status == 200 and out["base"] == base, f"{status}")
+        status, manifest = curl("GET", f"{base}/manifest.json")
+        check("replay files served, and the export matched the recorded run", status == 200 and manifest["replay_match"] is True and manifest["frames"] > 0, f"{manifest.get('frames')} frames")
+        check("replay holds no other file", curl("GET", f"{base}/reference.json")[0] == 404 and curl("GET", f"{base}/..%2Fsubmission.json")[0] == 404 and curl("GET", f"{base}/salt.hex")[0] == 404)
+        status, out = curl("POST", f"/api/bounties/{narrow['id']}/submissions/99/replay", {})
+        check("no replay for an unknown submission", status == 404, f"{status}")
+
         for i in range(5):
             status, out = curl("POST", submit, {"tester": "Cap Check", "seed": seed + i, "world": world})
             if status != 202:

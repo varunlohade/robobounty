@@ -6,6 +6,7 @@ World ID is not connected: the human id comes from the tester's name, and the co
 import argparse
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -20,6 +21,8 @@ import gate as G
 
 GATE = HERE / "gate.py"
 GATE_TIMEOUT_S = 3600  # gate.py limits each sim batch on its own. This limit is a backstop.
+EXPORT_TIMEOUT_S = 120
+EXPORT = HERE.parent / "app_export.py"
 VERDICT_KEYS = ("accepted", "code", "reason", "stage", "repeat", "fingerprint", "result_hash", "reference_check", "hardware_check", "duplicate_of", "human_cap", "limits_of_this_result", "not_checked", "claim_seed")
 _live = set()
 _live_lock = threading.Lock()
@@ -35,13 +38,13 @@ def stop_running():
                 pass
 
 
-def _gate_process(argv, log_path):
+def _process(argv, log_path, timeout=GATE_TIMEOUT_S):
     with open(log_path, "ab") as log:
         p = subprocess.Popen(["nice", "-n", "5", *argv], start_new_session=True, stdout=log, stderr=subprocess.STDOUT)
     with _live_lock:
         _live.add(p)
     try:
-        return p.wait(timeout=GATE_TIMEOUT_S)
+        return p.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         os.killpg(p.pid, signal.SIGKILL)
         p.wait()
@@ -76,7 +79,7 @@ def run(row, world_text, root=B.ROOT):
             B.save_submission(row, root)
             return row
         B.write_json(sub / "paid.json", book.paid_list())
-        code = _gate_process([sys.executable, str(GATE), "--world", str(sub / "world.json"), "--spec", str(folder / "spec.json"), "--paid", str(sub / "paid.json"), "--salt-file", str(folder / "salt.hex"),
+        code = _process([sys.executable, str(GATE), "--world", str(sub / "world.json"), "--spec", str(folder / "spec.json"), "--paid", str(sub / "paid.json"), "--salt-file", str(folder / "salt.hex"),
                               "--submitter", B.tester_address(row["tester"]), "--seed", str(row["seed"]), "--out", str(sub / "gate"),
                               "--human-id", B.human_id(bounty_id, row["tester"]), "--human-used", str(row["used_before"]), "--human-cap", str(B.MAX_PER_TESTER)], sub / "gate.log")
         found = sorted((sub / "gate").glob("*/verdict.json"))
@@ -98,6 +101,24 @@ def run(row, world_text, root=B.ROOT):
         row = {**row, "state": "done", "result": view_of(verdict), "payout": payout, "wall_s": round(time.time() - t0, 1)}
         B.save_submission(row, root)
         return row
+
+
+def export_replay(bounty_id, n, root=B.ROOT):
+    """Writes the browser replay of the recorded run once, and returns its folder. app_export.py refuses a run that no longer replays exactly."""
+    run = B.recorded_run_of(bounty_id, n, root)
+    if run is None:
+        raise B.BoardError("no_recorded_run", "This submission has no recorded run to replay.")
+    sub = Path(root) / str(bounty_id) / "submissions" / str(n)
+    out = sub / "replay"
+    if not (out / "manifest.json").is_file():
+        tmp = sub / "replay.new"
+        shutil.rmtree(tmp, ignore_errors=True)
+        code = _process([sys.executable, str(EXPORT), "trial", str(run), f"board_{bounty_id}_{n}", f"Bounty {bounty_id}, submission {n}", "--out", str(tmp)], sub / "export.log", EXPORT_TIMEOUT_S)
+        if code != 0:
+            shutil.rmtree(tmp, ignore_errors=True)
+            raise B.BoardError("replay_refused", "The recorded run did not replay exactly, so there is no replay to show. The sim may have changed since it was recorded.")
+        os.rename(tmp, out)
+    return out
 
 
 def main():

@@ -10,6 +10,10 @@ GET  /api/bounties/<id>/submissions
 GET  /api/bounties/<id>/submissions/<n>
 POST /api/bounties                     {title, company, scenarios, cap, per_failure, limits, window?}
 POST /api/bounties/<id>/submit         {tester, world, seed}
+POST /api/bounties/<id>/failures/<fingerprint>/reject|finalize   {}
+POST /api/bounties/<id>/failures/<fingerprint>/claim             {tester}
+POST /api/bounties/<id>/submissions/<n>/replay                   {}, writes the replay of the recorded run once
+GET  /api/bounties/<id>/submissions/<n>/replay/<file>
 """
 import argparse
 import json
@@ -25,6 +29,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import board_gate
+import board_spec
 import board_store as B
 import gate as G
 
@@ -35,15 +40,21 @@ QUEUE_CAP = 4
 MAX_WORLD_BYTES = G.MAX_SUBMISSION_BYTES
 MAX_SUBMIT_BODY = 3 * MAX_WORLD_BYTES  # JSON escapes make the body larger than the world, and the world has its own limit
 MAX_POST_BODY = MAX_WORLD_BYTES
+MAX_STEP_BODY = 256
 POST_FIELDS = {"title", "company", "scenarios", "cap", "per_failure", "limits"}
 SUBMIT_FIELDS = {"tester", "world", "seed"}
 ROUTE = re.compile(r"/api/bounties/([0-9]{1,9})(?:/(submit|submissions)(?:/([0-9]{1,9}))?)?")
+STEP_ROUTE = re.compile(r"/api/bounties/([0-9]{1,9})/failures/(0x[0-9a-f]{64})/(reject|finalize|claim)")
+REPLAY_ROUTE = re.compile(r"/api/bounties/([0-9]{1,9})/submissions/([0-9]{1,9})/replay(?:/([a-z.]+))?")
+REPLAY_FILES = {"manifest.json": "application/json", "model.xml": "application/xml", "qpos.json": "application/json", "result.json": "application/json", "world.json": "application/json",
+                "controller.py.txt": "text/plain", "trace.json": "application/json", "wind.json": "application/json", "dirt.bin": "application/octet-stream"}
 LABELS = {"ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL}
-ERROR_STATUS = {"unknown_bounty": 404, "unknown_submission": 404, "tester_cap": 429}
+ERROR_STATUS = {"unknown_bounty": 404, "unknown_submission": 404, "tester_cap": 429, "ledger_refused": 409, "no_recorded_run": 404, "replay_refused": 409}
 
 ROOT = B.ROOT
 WAITING = queue.Queue(QUEUE_CAP)
 SUBMIT_LOCK = threading.Lock()
+EXPORT_LOCK = threading.Lock()
 
 
 def worker():
@@ -125,9 +136,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.fail(403, "origin_refused", "This origin or host is not the board page.")
         try:
             if self.path == "/api/health":
-                return self.reply(200, {"ok": True, "waiting": WAITING.qsize(), "queue_cap": QUEUE_CAP, "max_per_tester": B.MAX_PER_TESTER, "robot": B.ROBOT, "sim_label": B.SIM_LABEL, **LABELS})
+                return self.reply(200, {"ok": True, "waiting": WAITING.qsize(), "queue_cap": QUEUE_CAP, "max_per_tester": B.MAX_PER_TESTER, "robot": B.ROBOT, "sim_label": B.SIM_LABEL, "max_world_bytes": MAX_WORLD_BYTES, "fields": G.W.FIELDS, "reference_world": G.W.load(board_spec.NOMINAL), "aliases": board_spec.ALIASES, **LABELS})
             if self.path == "/api/bounties":
                 return self.reply(200, {"bounties": B.list_bounties(ROOT), **LABELS})
+            m = REPLAY_ROUTE.fullmatch(self.path)
+            if m and m[3]:
+                return self.replay_file(int(m[1]), int(m[2]), m[3])
             m = ROUTE.fullmatch(self.path)
             if not m or m[2] == "submit":
                 return self.fail(404, "not_found", "There is no such route.")
@@ -149,12 +163,41 @@ class Handler(BaseHTTPRequestHandler):
             m = ROUTE.fullmatch(self.path)
             if m and m[2] == "submit" and not m[3]:
                 return self.submit(int(m[1]))
+            m = STEP_ROUTE.fullmatch(self.path)
+            if m:
+                v = self.body(MAX_STEP_BODY, {"tester"} if m[3] == "claim" else set())
+                row = B.ledger_step(int(m[1]), m[2], m[3], v.get("tester"), ROOT)
+                return self.reply(200, {"failure": row, "bounty": B.get(int(m[1]), ROOT), **LABELS})
+            m = REPLAY_ROUTE.fullmatch(self.path)
+            if m and not m[3]:
+                return self.make_replay(int(m[1]), int(m[2]))
             self.close_connection = True
             return self.fail(404, "not_found", "There is no such route.")
         except Refused as r:
             return self.fail(r.status, r.code, r.reason)
         except B.BoardError as e:
             return self.fail(ERROR_STATUS.get(e.code, 400), e.code, e.reason)
+
+    def make_replay(self, bounty_id, n):
+        self.body(MAX_STEP_BODY, set())
+        B.get_submission(bounty_id, n, ROOT)
+        if not EXPORT_LOCK.acquire(blocking=False):
+            raise Refused(503, "replay_busy", "Another replay is being written. Try again in a few seconds.")
+        try:
+            board_gate.export_replay(bounty_id, n, ROOT)
+        finally:
+            EXPORT_LOCK.release()
+        return self.reply(200, {"base": f"/api/bounties/{bounty_id}/submissions/{n}/replay", **LABELS})
+
+    def replay_file(self, bounty_id, n, name):
+        B.get_submission(bounty_id, n, ROOT)
+        path = ROOT / str(bounty_id) / "submissions" / str(n) / "replay" / name
+        if name not in REPLAY_FILES or not path.is_file():
+            return self.fail(404, "not_found", "There is no such replay file.")
+        data = path.read_bytes()
+        self.head(200, REPLAY_FILES[name], len(data))
+        self.end_headers()
+        self.wfile.write(data)
 
     def post_bounty(self):
         v = self.body(MAX_POST_BODY, POST_FIELDS, ("window",))
