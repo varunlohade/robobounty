@@ -1,0 +1,110 @@
+[
+ {
+  "step": "npm run demo, until the URL prints",
+  "s": 0.802
+ },
+ {
+  "step": "01-post-link-without-login",
+  "s": 0.236
+ },
+ {
+  "step": "02-post-link-after-guest",
+  "s": 0.129
+ },
+ {
+  "step": "03-tampered-storage",
+  "s": 0.11
+ },
+ {
+  "step": "04-login",
+  "s": 0.11
+ },
+ {
+  "step": "05-home",
+  "s": 0.11
+ },
+ {
+  "step": "06-crashlab",
+  "s": 0.121
+ },
+ {
+  "step": "07-pick-robot",
+  "s": 0.126
+ },
+ {
+  "step": "08-ai-builds",
+  "s": 6.508
+ },
+ {
+  "step": "09-change-world",
+  "s": 0.206
+ },
+ {
+  "step": "10-list-scenarios",
+  "s": 0.618
+ },
+ {
+  "step": "11-run-zoom-out",
+  "s": 1.024
+ },
+ {
+  "step": "12-grid-done",
+  "s": 18.444
+ },
+ {
+  "step": "13-red-square-detail-replay",
+  "s": 3.935
+ },
+ {
+  "step": "14-open-in-rerun",
+  "s": 1.726
+ },
+ {
+  "step": "15-open-file",
+  "s": 0.119
+ },
+ {
+  "step": "16-edit",
+  "s": 0.253
+ },
+ {
+  "step": "17-re-run",
+  "s": 9.231
+ },
+ {
+  "step": "18-re-run-square-has-picture",
+  "s": 0.158
+ },
+ {
+  "step": "19-reset-to-source",
+  "s": 13.069
+ },
+ {
+  "step": "20-ask-ai-did-not-help",
+  "s": 147.465
+ },
+ {
+  "step": "21-post-a-bounty-link",
+  "s": 8.723
+ },
+ {
+  "step": "22-bounty-shows",
+  "s": 25.034
+ },
+ {
+  "step": "23-second-bounty",
+  "s": 21.067
+ },
+ {
+  "step": "24-submit-a-fix",
+  "s": 0.234
+ },
+ {
+  "step": "25-hidden-world-proof",
+  "s": 77.428
+ },
+ {
+  "step": "26-data-shows-runs",
+  "s": 0.564
+ }
+]
