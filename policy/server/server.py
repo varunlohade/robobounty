@@ -70,6 +70,9 @@ _SID = re.compile(r"^[0-9a-f]{32}$")
 _CID = re.compile(r"^c[0-9]{1,4}$")
 _KEY = re.compile(r"^[0-9a-f]{16}$")
 ASK_SCENARIOS = re.compile(r"^(please )?(list|show|write|make|give|find|figure out|work out|test|simulate|run)\b.*\b(scenarios?|test cases?|all possible|all directions)\b")
+# A plain request for the whole list uses the reply the AI already wrote for this robot. Any other words, such as "scenarios with rain", go to the AI.
+PLAIN_LIST = re.compile(r"^((please|can you|could you) )*((list|show|give|write|make|find)( me)?( all)?( of)?( the)?( possible| test)*( scenarios?| test cases?)( for (this|the) robot)?)?[.!?]*$")
+PREPARED = HERE / "fixtures"  # scenarios_<pack>.json: real AI replies, stored. Code still replays and checks each call on the current world.
 RUN_WORDS = {"run", "run it", "run all", "run them", "run all of them", "go", "start", "run the campaign"}
 PACK_SEED = 0
 KEPT_UNDO = 10
@@ -1001,15 +1004,17 @@ class Session:
         if BATCH:
             return recorded_batch.list_scenarios(self, BATCH)
         self.emit(type="retire")
-        if not self.llm_allowed():
+        stored = PREPARED / f"scenarios_{self.pack}.json"
+        prepared = stored.exists() and PLAIN_LIST.match(words.strip().lower()) is not None
+        if not prepared and not self.llm_allowed():
             return
-        self.working("writing the list of scenarios")
+        self.working("checking the prepared scenarios on this world" if prepared else "writing the list of scenarios")
         world = self.current_pack_world()
         self.campaign_n += 1
         cid = f"c{self.campaign_n}"
         folder = self.dir / "campaigns" / cid
         base_hash = self.world["hash"]
-        reply = self.ai_job({"pack": self.pack, "world": world, "words": words, "out": str(folder), "limit": SCENARIO_LIMIT, "limits": testing_lab.L.load(self.dir, self.pack)}, "scenarios_pack")
+        reply = self.ai_job({"pack": self.pack, "world": world, "words": words, "out": str(folder), "limit": SCENARIO_LIMIT, "limits": testing_lab.L.load(self.dir, self.pack), **({"reply": json.loads(stored.read_text())} if prepared else {})}, "scenarios_pack")
         self.working()
         if reply is None:
             self.say("The scenario agent stopped with an error, so there is no list. Try again.", fail=True)
@@ -1017,12 +1022,13 @@ class Session:
         public = {k: v for k, v in reply.items() if k not in ("llm_reply", "ai_seconds", "base_world")}
         public["worlds"] = [{k: w[k] for k in ("index", "name", "group", "reason", "held_back", "seed", "changes")} for w in reply["worlds"]]
         self.emit(type="scenarios", campaign=cid, **public)
-        self.tool("scenario_agent", f"{reply['ai_seconds']} s", [json.dumps({"count": reply["count"], "dropped": reply["dropped"], "rejection": reply["rejection"]})])
+        self.tool("scenario_agent", "prepared list" if prepared else f"{reply['ai_seconds']} s", [json.dumps({"count": reply["count"], "dropped": reply["dropped"], "rejection": reply["rejection"]})])
         if reply["rejection"] or not reply["count"]:
             self.say(f"The scenario agent gave no usable list ({reply['rejection'] or 'every scenario was refused'}). Nothing will run.", fail=True)
             return
         self.pending_campaign, self.pending_base = cid, base_hash
-        self.say(f"I listed {reply['count']} worlds in {len(reply['groups'])} groups. {reply['to_run']} will run, and {reply['held_back']} stay held back to test a fix. The reasons are my reasoned guesses. {len(reply['not_tested'])} things stay not tested. {len(reply.get('off_limits', []))} worlds were dropped for being outside the limits.")
+        lead = f"I checked the list the AI prepared earlier for this robot against this world. {reply['count']} worlds in {len(reply['groups'])} groups fit." if prepared else f"I listed {reply['count']} worlds in {len(reply['groups'])} groups."
+        self.say(f"{lead} {reply['to_run']} will run, and {reply['held_back']} stay held back to test a fix. The reasons are my reasoned guesses. {len(reply['not_tested'])} things stay not tested. {len(reply.get('off_limits', []))} worlds were dropped for being outside the limits.")
         self.emit(type="card", title=f"Run {reply['to_run']} worlds", body=reply["note"], actions=[{"label": f"Run {reply['to_run']} worlds", "action": "run_campaign", "primary": True}])
 
     def current_pack_world(self):
