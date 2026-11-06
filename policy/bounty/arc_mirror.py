@@ -81,21 +81,22 @@ def label_of(real):
 
 
 class Wallets:
-    def __init__(self, folder, repo=A.CONTRACTS.parent):
+    def __init__(self, folder, repo=A.CONTRACTS.parent, roles=ROLES):
+        self.roles = roles
         if not folder:
             raise ArcError("no_wallets", "Arc is off: ARC_WALLET_DIR is not set.")
         self.dir = Path(folder).expanduser().resolve()
         if self.dir.is_relative_to(Path(repo).resolve()):
             raise ArcError("wallets_in_repo", "Refused: ARC_WALLET_DIR is inside the repo. Keep wallets outside it.")
         self.password = self.dir / "password"
-        missing = [name for name in (*ROLES, "password") if not (self.dir / name).is_file()]
+        missing = [name for name in (*roles, "password") if not (self.dir / name).is_file()]
         if missing:
             raise ArcError("no_wallets", f"Arc is off: {', '.join(missing)} missing from ARC_WALLET_DIR.")
         if stat.S_IMODE(self.password.stat().st_mode) & 0o077:
             raise ArcError("password_open", "Refused: the password file must be readable by you only. Run chmod 600 on it.")
 
     def signer(self, who):
-        return ["--keystore", str(self.dir / ROLES[who]), "--password-file", str(self.password)]
+        return ["--keystore", str(self.dir / self.roles[who]), "--password-file", str(self.password)]
 
 
 class ArcChain(A.Chain):
@@ -106,12 +107,12 @@ class ArcChain(A.Chain):
         self.rpc, self.wallets, self.txs = rpc, wallets, {}
         self.fee = None
         self.guard()
-        self.addresses = [self.run("cast", "wallet", "address", *wallets.signer(who)).lower() for who in range(4)]
-        default = [ROLES[i] for i, a in enumerate(self.addresses) if a in DEFAULT_ACCOUNTS]
+        self.addresses = [self.run("cast", "wallet", "address", *wallets.signer(who)).lower() for who in range(len(wallets.roles))]
+        default = [wallets.roles[i] for i, a in enumerate(self.addresses) if a in DEFAULT_ACCOUNTS]
         if default:
             raise ArcError("default_key", f"Refused: the {', '.join(default)} wallet is a public anvil dev account. Make new wallets with cast wallet new.")
-        if len(set(self.addresses)) != 4:
-            raise ArcError("roles_not_four", "Refused: the four roles must be four different wallets.")
+        if len(set(self.addresses)) != len(wallets.roles):
+            raise ArcError("roles_not_four", "Refused: each role must have its own wallet.")
 
     @staticmethod
     def run(*args):
@@ -144,10 +145,10 @@ class ArcChain(A.Chain):
         """Before a send: gas in the wallet, and no earlier send of this wallet still waiting, because a retry could then land twice."""
         address = self.addresses[who]
         if int(self.run("cast", "balance", address, "--rpc-url", self.rpc)) < MIN_GAS_WEI:
-            raise ArcError("empty_balance", f"The {ROLES[who]} wallet has too little test USDC for gas. Get some at faucet.circle.com." + NOT_PAID)
+            raise ArcError("empty_balance", f"The {self.wallets.roles[who]} wallet has too little test USDC for gas. Get some at faucet.circle.com." + NOT_PAID)
         counts = {int(self.run("cast", "nonce", address, "--block", block, "--rpc-url", self.rpc)) for block in ("latest", "pending")}
         if len(counts) != 1:
-            raise ArcError("tx_waiting", f"An earlier {ROLES[who]} transaction is still waiting, so nothing new was sent." + NOT_PAID)
+            raise ArcError("tx_waiting", f"An earlier {self.wallets.roles[who]} transaction is still waiting, so nothing new was sent." + NOT_PAID)
 
     def send(self, name, who, to, sig, *args):
         self.gas_ready(who)

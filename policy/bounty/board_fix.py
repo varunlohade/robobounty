@@ -283,9 +283,25 @@ def view(bounty_id, root=B.ROOT):
     info = _read(folder / "pack.json")
     money = book.bounty
     won = next((f for f in book.failures.values() if f["status"] != "Rejected"), None)
-    return {**info, "status": won["status"].lower() if won else "open", "spec_hash": money["spec_hash"], "per_failure": money["per_failure"], "available": money["available"], "dispute_window_s": money["dispute_window_s"],
+    arc = _arc_of(folder)
+    status = _arc_status(arc) or (won["status"].lower() if won else "open")
+    return {**info, "status": status, "arc": arc, "spec_hash": money["spec_hash"], "per_failure": money["per_failure"], "available": money["available"], "dispute_window_s": money["dispute_window_s"],
             "unit": "test units", "failures": book.failures, "balance": B._balance(money, book.failures, [r for r in rows if r.get("payout")]), "submissions": len(rows), "checking": sum(r["state"] in ("queued", "running", "awaiting_company") for r in rows), "now": time.time(),
             "ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL, "sim_label": SIM_LABEL, "sandbox_label": SANDBOX_LABEL, "chain_mirror": _mirror_of(folder), "evidence": _evidence_of(folder)}
+
+
+def _arc_of(folder):
+    """What arc_wallet.py saved after it read each receipt from the chain. No file means nothing is funded on chain."""
+    path = folder / "arc_funding.json"
+    if not path.is_file():
+        return None
+    return {**_read(path), "fixes": {p.parent.name: _read(p) for p in (folder / "fixes").glob("*/arc_steps.json")}}
+
+
+def _arc_status(arc):
+    """The chain's word for this bounty, once a fix is on chain. Before that the local gate's word stands."""
+    states = [row.get("state") for _, row in sorted((arc or {}).get("fixes", {}).items(), key=lambda kv: int(kv[0]))]
+    return {"Pending": "pending", "Finalized": "finalized", "Claimed": "claimed", "Rejected": "open"}.get(states[-1]) if states else None
 
 
 def _mirror_of(folder):
@@ -311,7 +327,7 @@ def list_views(root=B.ROOT):
 
 COULD_NOT_RUN = "could_not_run"
 FREE_STATES = ("interrupted", COULD_NOT_RUN)  # The board failed, not the tester, so these cost no submission.
-FIX_KEYS = ("n", "bounty_id", "tester", "source_sha256", "state", "submitted_at", "result", "payout", "wall_s", "used_before")
+FIX_KEYS = ("n", "bounty_id", "tester", "source_sha256", "state", "submitted_at", "result", "payout", "wall_s", "used_before", "wallet")
 
 
 def fix_view(row):

@@ -178,3 +178,21 @@ tr.row[aria-selected=true],tr.row[aria-selected=true]:hover{background:rgba(62,1
 .dialog .note2{font-size:12px;line-height:16px;color:var(--t3)}
 .dialog .bad{font-size:12px;line-height:16px;color:var(--red-t)}
 tr.click{cursor:pointer}tr.click:hover{background:var(--raised)}tr.click[aria-selected=true]{background:rgba(62,123,250,.14)}
+
+/* The wallet: one line above the board. Real values only. */
+.walletbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;min-height:44px;padding:8px 24px;flex:none;border-top:1px solid var(--line)}
+.walletbar[hidden]{display:none}
+.walletbar .sp{flex:1}
+.walletaddr code{color:var(--t1)}
+.walletmoney{color:var(--t1);font-weight:500}
+.walleterr{flex-basis:100%;color:var(--red-t);font-size:12px;line-height:16px}
+.chainstep{min-height:32px}
+.chainstep>span:first-child{min-width:0;white-space:nowrap;overflow:hidden}
+.chainstep b{font-weight:500;color:var(--t1);flex:none}
+.chainstep .t3{overflow:hidden;text-overflow:ellipsis}
+.chainstep .links{display:inline-flex;gap:10px;align-items:center;flex:none}
+.txlink{color:var(--blue-t)}
+span.txlink{color:var(--t2)}
+a.txlink:hover{text-decoration:underline}
+.chainbalance{min-height:32px;background:var(--raised);margin:4px 24px;padding:0 12px;border-radius:6px}
+.chainbalance b{font-weight:500;color:var(--t1)}

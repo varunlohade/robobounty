@@ -5,6 +5,7 @@ Safety flags send a pass to awaiting_company, and the company approves it. Then 
 """
 import hashlib
 import json
+import os
 import shutil
 import sys
 import time
@@ -20,6 +21,8 @@ import gate as G
 GATE_TIMEOUT_S = {"window": 1800, "inspection": 3600}  # An inspection world takes two full sim runs: the sandbox's and the one outside it.
 PROCS = 6
 NOTE = "Engineer's source, tested by the board. No AI call ran."
+STORED_PROOF = X.POLICY / "runs" / "demo" / "window" / "stored_proof.json"
+RECORDED_WORDS = "Recorded proof: this same source ran on these same worlds with this same code in an earlier real run, and no sim ran now. The stored runs replayed again before any pay. "
 
 
 def _fail(code, words, stage, **more):
@@ -115,6 +118,21 @@ def _frozen_problem(info, code_root):
     return changed
 
 
+def proof_key(row, info, hidden):
+    """What a stored proof must match exactly: the source, the worlds, the controller and each frozen file."""
+    return {"source": row["source_sha256"], "plan": hidden["plan_sha256"], "controller": info["controller"]["sha256"], "group": info["group"], "pack": info["pack"], "frozen": info["frozen"]}
+
+
+def _stored_proof(row, info, hidden):
+    """Only scripts/demo.sh --recorded --arc turns this on, so a film need not wait for the sims. Any difference means a real run."""
+    if os.environ.get("CRASHLAB_ARC_DEMO") != "1" or not STORED_PROOF.is_file():
+        return None
+    stored = json.loads(STORED_PROOF.read_text())
+    if stored["key"] != proof_key(row, info, hidden):
+        return None
+    return {**stored["result"], "recorded": True, "words": RECORDED_WORDS + stored["result"]["words"]}
+
+
 def _run(row, root, code_root, folder, sub, t0):
     info = json.loads((folder / "pack.json").read_text())
     hidden = json.loads((folder / "hidden.json").read_text())
@@ -128,6 +146,9 @@ def _run(row, root, code_root, folder, sub, t0):
     base = folder / info["controller"]["file"]
     if hashlib.sha256(base.read_bytes()).hexdigest() != info["controller"]["sha256"]:
         return _fail("controller_changed", "The bounty's controller copy changed after it was posted, so no run counts.", "frozen")
+    recorded = _stored_proof(row, info, hidden)
+    if recorded:
+        return recorded
     work = sub / "gate"
     work.mkdir(exist_ok=True)
     py = str(X.PYTHON)

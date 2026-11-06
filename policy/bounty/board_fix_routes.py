@@ -18,6 +18,7 @@ import re
 import threading
 from pathlib import Path
 
+import arc_wallet
 import board_fix as X
 import board_fix_gate
 import board_store as B
@@ -31,7 +32,7 @@ MAX_STEP_BODY = 256
 POST_FIELDS = {"session", "campaign", "group", "title", "pay"}
 FIX_FIELDS = {"source"}
 ERROR_STATUS = {"unknown_campaign": 404, "already_posted": 409, "campaign_published": 409, "not_fixable": 409, "campaign_stale": 409, "no_hidden_worlds": 409, "cap_reached": 409, "same_source": 409, "source_too_large": 413, "wrong_state": 409, "queue_full": 503,
-                "bad_secret": 403, "budget_stopped": 409, "over_budget": 409, "over_per_bounty": 409, "no_budget": 404, "not_found": 404, "budget_mismatch": 409}
+                "bad_secret": 403, "on_chain": 409, "not_funded": 409, "no_wallet": 409, "budget_stopped": 409, "over_budget": 409, "over_per_bounty": 409, "no_budget": 404, "not_found": 404, "budget_mismatch": 409}
 PUBLIC_FILES = {"manifest.json": "application/json", "model.xml": "application/xml", "qpos.json": "application/json", "result.json": "application/json", "world.json": "application/json",
                 "controller.py.txt": "text/plain", "trace.json": "application/json", "wind.json": "application/json", "dirt.bin": "application/octet-stream"}
 ONE = re.compile(r"/api/bounties/([0-9]{1,9})")
@@ -124,15 +125,21 @@ def _post(h, root):
             return False
         s = h.need_screened()
         v = h.body(MAX_SOURCE_BODY, FIX_FIELDS)
+        wallet = arc_wallet.wallet_for_submit(bounty_id, s, root)
         with SUBMIT_LOCK:
             if WAITING.full():
                 raise B.BoardError("queue_full", f"{QUEUE_CAP} fixes are already waiting. Try again soon. This did not use one of your submissions.")
             secret = B.new_claim_secret()
             row = X.reserve(bounty_id, s["tester"], v["source"], root, secret=secret)
+            if wallet:
+                row["wallet"] = wallet
+                X.save_fix(row, root)
             WAITING.put_nowait(row)
         h.reply(202, {"claim_secret": secret, "n": row["n"], "state": row["state"], "used": row["used_before"] + 1, "of": B.MAX_PER_TESTER, "ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL})
     elif m := STEP.fullmatch(path):
         bounty_id, n, step = int(m[1]), int(m[2]), m[3]
+        if step in ("reject", "finalize", "claim") and arc_wallet.config(root)["on"]:
+            raise B.BoardError("on_chain", "Arc decides this step, so the local ledger button is off.")
         s = h.need("engineer") if step == "claim" else h.own(bounty_id)
         v = h.body(MAX_STEP_BODY, {"secret"} if step == "claim" else set())
         if step in ("approve", "decline"):

@@ -2,12 +2,20 @@
 import type { Who } from '../site/session.ts';
 import { mountShell, SIM_NOTE } from '../site/shell.ts';
 import './board.css';
-import { api, ApiError, fixSecret, type Bounty, type Fix, type Sub, type Budget, type Fixable, type FixResult } from './api.ts';
+import { api, ApiError, fixSecret, type ArcConfig, type ArcBalance, type ArcSteps, type Bounty, type Fix, type Sub, type Budget, type Fixable, type FixResult } from './api.ts';
 import { icon, type IconName } from './icons.ts';
+import * as W from './wallet.ts';
 
-const LEDGER = 'Local ledger. Not on chain.';
+const LOCAL_LEDGER = 'Local ledger. Not on chain.';
+let LEDGER = LOCAL_LEDGER;
+let arc: ArcConfig | null = null; // Set only when the board server says the chain is on and checked.
+let arcOffReason: string | null = null;
+const wal: { address: string | null; chain: string | null; balance: ArcBalance | null; words: string | null; busy: string | null } = { address: null, chain: null, balance: null, words: null, busy: null };
+const seenBalance: Record<string, ArcBalance> = {};
+const TEST_USDC = (base: string | number | bigint) => `${W.shownUsdc(BigInt(base))} test USDC`;
 let who: Who | null = null; // Only for what to show. The board server checks the session on every action.
 const POLL_MS = 1500;
+const BALANCE_MS = 3000;
 
 type Kid = Node | string;
 function h(tag: string, cls = '', ...kids: Kid[]): HTMLElement {
@@ -33,6 +41,7 @@ const ROBOTS = ['Any robot', 'Window', 'Inspection'];
 
 const bucket = (b: Bounty): Filter => b.status === 'claimed' ? 'paid' : b.status !== 'open' || (b.checking ?? 0) > 0 ? 'checking' : 'open';
 function statusTag(b: Bounty) {
+  if (arc && !b.arc && b.kind === 'fix_failure') return tag('quiet', 'clock', 'Not funded');
   if (b.status === 'claimed') return tag('ok', 'ok', 'Paid');
   if (b.status === 'pending') return tag('hold', 'clock', 'Dispute window');
   if (b.status === 'finalized') return tag('hold', 'ok', 'Finalized');
@@ -53,6 +62,8 @@ search.setAttribute('aria-label', 'Search bounties');
 const tbody = h('tbody');
 const ledgerBox = h('div', 'ledger');
 const detail = h('section', 'detail');
+const walletBar = h('div', 'walletbar');
+walletBar.hidden = true;
 const payArrow = h('span', 'ar');
 
 function shell() {
@@ -83,7 +94,7 @@ function shell() {
     render();
   });
   site.actions.append(idLine, postBtn);
-  site.main.append(h('div', 'bty', list, detail));
+  site.main.append(walletBar, h('div', 'bty', list, detail));
   return site;
 }
 
@@ -131,6 +142,7 @@ function drawList() {
 }
 
 function drawLedger() {
+  if (arc) { drawChainTotals(); return; }
   const sum = (f: (b: Bounty) => number) => S.bounties.reduce((a, b) => a + f(b), 0);
   const num = (v: number, label: string) => h('div', '', h('b', '', String(v)), h('span', '', label));
   ledgerBox.replaceChildren(h('div', 'lh', h('h2', '', 'Ledger'), h('span', 'warnline', icon('warn', 'i12'), LEDGER)),
@@ -161,12 +173,233 @@ function drawDetail() {
   detail.scrollTop = top;
 }
 
+function drawChainTotals() {
+  const fixes = S.bounties.flatMap(b => Object.values(b.arc?.fixes ?? {}));
+  const sum = (states: (string | null)[]) => fixes.filter(f => states.includes(f.state)).reduce((a, f) => a + (f.amount_base_units ?? 0), 0);
+  const posted = S.bounties.reduce((a, b) => a + (b.arc?.cap_base_units ?? 0), 0);
+  const paid = sum(['Claimed']), held = sum(['Pending', 'Finalized']);
+  const num = (v: number, label: string) => h('div', '', h('b', '', W.shownUsdc(BigInt(v))), h('span', '', label));
+  ledgerBox.replaceChildren(h('div', 'lh', h('h2', '', 'On chain'), h('span', 'warnline', icon('warn', 'i12'), arc!.label)),
+    h('div', 'lnums', num(posted, 'Funded'), num(held, 'Held by a proposal'), num(paid, 'Paid'), num(posted - paid - held, 'Left')),
+    h('p', '', `Test USDC, read from receipts. ${arc!.agent_name} sends pay only after the gate accepts a fix. Code decides, not an AI.`));
+}
+
+const chainLink = (tx: string, url?: string | null) => {
+  const shown = h(url ? 'a' : 'span', 'txlink', code(short(tx)));
+  shown.dataset.tx = tx;
+  if (url) { shown.setAttribute('href', url); shown.setAttribute('target', '_blank'); shown.setAttribute('rel', 'noopener'); }
+  return shown;
+};
+
+// One step: its mark comes from a receipt the server read, never from a click.
+function chainStep(name: string, state: 'ok' | 'live' | 'skip' | 'bad', words: Kid, ...right: Kid[]) {
+  const mark = h('span', state === 'live' ? 'warn' : state, icon(state === 'ok' ? 'check' : state === 'bad' ? 'x' : state === 'live' ? 'clock' : 'slash'));
+  const row = h('div', 'kv chainstep', h('span', '', mark, h('b', '', name), h('span', 't3 small', words)), h('span', 'links', ...right));
+  row.dataset.step = name.toLowerCase().replace(' ', '-');
+  row.dataset.state = state;
+  return row;
+}
+
+async function ready() {
+  if (!wal.address) wal.address = await W.connect();
+  await W.useArc(arc!);
+  await readWallet();
+  return wal.address!;
+}
+
+// Runs one wallet action. Any failure stays on screen as one plain sentence.
+async function walletAct(name: string, run: () => Promise<unknown>) {
+  if (wal.busy) return;
+  wal.busy = name;
+  wal.words = null;
+  render();
+  try { await run(); } catch (e) { wal.words = (e as Error).message; }
+  wal.busy = null;
+  await refresh();
+  render();
+}
+
+const pendingKey = (id: number) => `crashlab-arc-create-${arc!.contract}-${id}`;
+const store = { get(k: string) { try { return localStorage.getItem(k); } catch { return null; } }, set(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* the retry then asks the wallet again */ } }, drop(k: string) { try { localStorage.removeItem(k); } catch { /* nothing kept */ } } };
+
+async function reportFunded(id: number, createTx: string, approveTx: string | null) {
+  for (let i = 0; i < 60; i++) {
+    const reply = await api.arcFunded(id, createTx, approveTx);
+    if (!reply.waiting) return;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  throw new W.WalletError('The server has seen no receipt for this funding yet, so it is not marked as funded. Press Fund again in a minute.');
+}
+
+const fundBounty = (b: Bounty) => walletAct('fund', async () => {
+  const address = await ready();
+  const key = pendingKey(b.id);
+  const earlier = store.get(key);
+  if (earlier) {
+    try { await reportFunded(b.id, earlier, null); store.drop(key); return; } catch (e) { store.drop(key); if (!(e instanceof ApiError)) throw e; }
+  }
+  const plan = await api.arcPlan(b.id);
+  const money = await api.arcBalance(address);
+  if (BigInt(money.usdc_base_units) < BigInt(plan.cap)) throw new W.WalletError(`This wallet holds ${TEST_USDC(money.usdc_base_units)}, and the bounty needs ${TEST_USDC(plan.cap)}. Get some at faucet.circle.com.`);
+  let approve: string | null = null;
+  if (BigInt(money.allowance_base_units) < BigInt(plan.cap)) {
+    wal.busy = 'approve';
+    render();
+    approve = await W.sendApprove(address, plan);
+    await W.waitReceipt(approve, 'USDC approval');
+  }
+  wal.busy = 'create';
+  render();
+  const create = await W.sendCreate(address, plan);
+  store.set(key, create);
+  try { await W.waitReceipt(create, 'bounty funding'); } catch (e) { if (/reverted/.test((e as Error).message)) store.drop(key); throw e; }
+  await reportFunded(b.id, create, approve);
+  store.drop(key);
+});
+
+const saveWallet = () => walletAct('save', async () => {
+  const address = await ready();
+  const asked = await api.arcChallenge({ purpose: 'wallet', address });
+  const signature = await W.sign(address, asked.message);
+  await api.arcWallet(asked.nonce, signature);
+  location.reload();
+});
+
+const rejectFix = (b: Bounty, n: number) => walletAct('reject', async () => {
+  const address = await ready();
+  if (address !== b.arc!.company) throw new W.WalletError(`Connect the wallet that funded this bounty, ${short(b.arc!.company)}, to reject.`);
+  const asked = await api.arcChallenge({ purpose: 'reject', bounty: b.id, fix: n });
+  await api.arcReject(b.id, n, asked.nonce, await W.sign(address, asked.message));
+});
+
+const claimFix = (b: Bounty, n: number, steps: ArcSteps) => walletAct('claim', async () => {
+  const address = await ready();
+  if (address !== steps.submitter) throw new W.WalletError(`Connect the wallet this fix names, ${short(steps.submitter!)}, to claim.`);
+  const plan = await api.arcPlan(b.id).catch(() => null);
+  const tx = await W.sendClaim(address, b.arc!.contract, b.arc!.chain_bounty, steps.fingerprint!, plan?.fee_wei ?? '40000000000');
+  await W.waitReceipt(tx, 'claim');
+  for (let i = 0; i < 60; i++) {
+    if (!(await api.arcClaimed(b.id, n, tx)).waiting) return;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+});
+
+function chainPanel(b: Bounty, f: Fix | undefined) {
+  const c = arc!;
+  const money = b.arc;
+  const steps = f ? money?.fixes?.[String(f.n)] : undefined;
+  const out: HTMLElement[] = [sect('On chain', h('span', 'warnline', icon('warn', 'i12'), c.label))];
+  const links = (txs: Record<string, string>, urls: Record<string, string>, names: string[]) => names.filter(k => txs[k]).map(k => chainLink(txs[k], urls[k]));
+  if (money) out.push(chainStep('Funded', 'ok', `${TEST_USDC(money.cap_base_units)} from ${short(money.company)}`, ...links(money.txs, money.tx_links, ['approve', 'create_bounty'])));
+  else if (b.mine) {
+    const go = button('pri', wal.busy === 'approve' ? 'Approve in your wallet' : wal.busy === 'create' ? 'Confirm in your wallet' : 'Fund from my wallet', null, () => { void fundBounty(b); });
+    go.disabled = !!wal.busy;
+    out.push(chainStep('Funded', 'live', `Approve ${b.pay} test USDC, then create the bounty`, go));
+  } else out.push(chainStep('Funded', 'skip', 'Waiting for the company to fund it from its wallet'));
+  const state = steps?.state ?? null;
+  const reached = (...names: string[]) => state !== null && names.includes(state);
+  const txs = steps?.txs ?? {}, urls = steps?.tx_links ?? {};
+  out.push(chainStep('Proposed', txs.propose ? 'ok' : 'skip', txs.propose ? `By ${c.agent_name}, to ${short(steps!.submitter!)}` : `${c.agent_name} proposes when the gate accepts a fix`, ...links(txs, urls, ['propose'])));
+  if (state === 'Pending') {
+    const skew = (steps!.chain_now ?? b.now) - b.now;
+    const left = Math.max(0, Math.ceil((steps!.dispute_ends_at ?? 0) - (Date.now() / 1000 + skew)));
+    const stop = button('sec', wal.busy === 'reject' ? 'Sign in your wallet' : 'Reject', 'x', () => { void rejectFix(b, f!.n); });
+    stop.disabled = !!wal.busy || left <= 0;
+    out.push(chainStep('Dispute window', 'live', left ? `${left} s left` : 'Closed. Waiting for the next block', ...(b.mine ? [stop] : [])));
+  } else out.push(chainStep('Dispute window', reached('Finalized', 'Claimed') ? 'ok' : state === 'Rejected' ? 'bad' : 'skip', reached('Finalized', 'Claimed') ? 'Closed with no rejection' : state === 'Rejected' ? 'The company rejected this fix' : 'Opens at the proposal', ...links(txs, urls, ['reject'])));
+  out.push(chainStep('Finalized', txs.finalize ? 'ok' : 'skip', txs.finalize ? `By ${c.agent_name}` : 'After the window', ...links(txs, urls, ['finalize'])));
+  const live = steps?.submitter ? seenBalance[steps.submitter] : undefined;
+  const paidTx = txs.payout || txs.claim;
+  out.push(chainStep('Paid', paidTx ? 'ok' : 'skip', paidTx ? `${TEST_USDC(steps!.amount_base_units ?? 0)} to ${short(steps!.submitter!)}${txs.claim ? ', claimed from the wallet' : `, sent by ${c.agent_name}`}` : `${c.agent_name} pays the wallet the engineer proved`, ...links(txs, urls, ['payout', 'claim'])));
+  if (steps?.submitter && live) {
+    const row = h('div', 'kv chainbalance', h('span', '', `Engineer wallet ${short(steps.submitter)}, read from chain`), h('span', '', h('b', '', TEST_USDC(live.usdc_base_units))));
+    row.dataset.balance = live.usdc_base_units;
+    out.push(row);
+    if (paidTx && steps.balance_before !== undefined) out.push(h('div', 'kv', h('span', 't3 small', 'Before the proposal'), h('span', 't3 small', TEST_USDC(steps.balance_before))));
+  }
+  if (steps?.recorded) out.push(h('div', 'words small', c.recorded_label));
+  if (steps?.message) out.push(h('div', 'err', steps.message));
+  if (state === 'Finalized' && steps?.message && wal.address === steps.submitter) {
+    const take = button('sec', 'Claim from my wallet', null, () => { void claimFix(b, f!.n, steps); });
+    take.disabled = !!wal.busy;
+    out.push(h('div', 'acts', h('span', 't2 small', `${c.agent_name} is stuck, and the contract lets you take this yourself.`), h('span', 'sp'), take));
+  }
+  out.push(h('div', 'kv', h('span', 't3 small', c.agent_name), h('span', 't3 small', code(short(c.resolver)))), h('div', 'kv', h('span', 't3 small', 'Contract'), h('span', 't3 small', code(short(c.contract)))));
+  return out;
+}
+
+function drawWalletBar() {
+  if (arcOffReason && !arc) {
+    walletBar.hidden = false;
+    walletBar.replaceChildren(h('span', 'warnline', icon('warn', 'i12'), arcOffReason));
+    return;
+  }
+  if (!arc) { walletBar.hidden = true; return; }
+  walletBar.hidden = false;
+  const parts: Kid[] = [];
+  const right = arc.chain_hex.toLowerCase() === wal.chain;
+  if (!wal.address) {
+    parts.push(button('pri', 'Connect wallet', null, () => { void walletAct('connect', async () => { wal.address = await W.connect(); await W.useArc(arc!); await readWallet(); }); }));
+  } else {
+    parts.push(h('span', 'walletaddr', code(short(wal.address))));
+    if (!right) parts.push(h('span', 'warnline', icon('warn', 'i12'), `Your wallet is on another network. Switch it to ${arc.real ? 'Arc testnet' : 'the local stand-in chain'}.`), button('sec', 'Switch network', null, () => { void walletAct('switch', async () => { await W.useArc(arc!); await readWallet(); }); }));
+    else if (wal.balance) parts.push(h('span', 'walletmoney', TEST_USDC(wal.balance.usdc_base_units)));
+    if (who?.kind === 'engineer') {
+      const saved = who.payout.signed && who.payout.masked === `${wal.address.slice(0, 6)}…${wal.address.slice(-4)}`;
+      if (saved) parts.push(tag('ok', 'ok', 'Payout wallet saved'));
+      else {
+        const save = button('pri', wal.busy === 'save' ? 'Sign in your wallet' : 'Save this wallet', null, () => { void saveWallet(); });
+        save.disabled = !!wal.busy;
+        parts.push(save);
+      }
+    }
+  }
+  parts.push(h('span', 'sp'), h('span', 'warnline', icon('warn', 'i12'), arc.label));
+  walletBar.replaceChildren(...parts);
+  if (wal.words) { const e = h('div', 'walleterr', wal.words); e.setAttribute('role', 'alert'); walletBar.append(e); }
+}
+
+async function readWallet() {
+  const now = await W.current();
+  wal.address = now.address ?? wal.address;
+  wal.chain = now.chain;
+  if (!arc || !wal.address) return;
+  try { wal.balance = await api.arcBalance(wal.address); seenBalance[wal.address] = wal.balance; } catch { /* the next pass reads it again */ }
+}
+
+async function startArc() {
+  try {
+    const c = await api.arc();
+    if (!c.on) { if (c.asked) arcOffReason = c.reason ?? 'Arc is off.'; return; }
+    arc = c;
+    LEDGER = c.label;
+    site.setStatus(SIM_NOTE, ['The cap of 5 counts accounts, and a verified device is not proof of one person.', c.label]);
+    const now = await W.current();
+    wal.address = now.address;
+    wal.chain = now.chain;
+    await readWallet();
+    W.onWalletChange(() => { wal.address = null; wal.words = null; void readWallet().then(render); });
+    setInterval(readBalances, BALANCE_MS);
+  } catch { /* An old board server has no such route, so the local path stands. */ }
+  render();
+}
+
+// Live numbers for the money line. Each comes from a chain read on the server.
+async function readBalances() {
+  await readWallet();
+  const f = picked()?.arc?.fixes;
+  for (const address of new Set(Object.values(f ?? {}).map(x => x.submitter).filter(Boolean) as string[])) {
+    try { seenBalance[address] = await api.arcBalance(address); } catch { /* the next pass reads it again */ }
+  }
+  render();
+}
+
 function fixDetail(b: Bounty, inner: HTMLElement) {
   const worlds = b.public_worlds!;
   const c = b.hidden_counts!;
   const total = hiddenTotal(b);
   inner.append(h('div', 'dh', h('div', 'top', h('h1', '', b.title), statusTag(b)), h('p', 'req', `${b.company}. ${cap1(words(b.group!))} on the ${b.robot.toLowerCase()}: ${worlds[0].reason}`)),
-    h('div', 'facts', fact('Pay', `${b.pay} test units`), fact('Failure', cap1(words(b.group!))), fact('Base file', code(b.controller!.file)), fact('Dispute window', `${b.dispute_window_s} s`)),
+    h('div', 'facts', fact('Pay', arc ? `${b.pay} test USDC` : `${b.pay} test units`), fact('Failure', cap1(words(b.group!))), fact('Base file', code(b.controller!.file)), fact('Dispute window', `${b.dispute_window_s} s`)),
     sect('Public failing worlds', String(worlds.length)));
   const table = h('table');
   table.append(h('thead', '', h('tr', '', h('th', '', 'World'), h('th', 'num', 'Fails at'), h('th', '', 'Judge'), h('th', '', 'Seed'))));
@@ -188,11 +421,12 @@ function fixDetail(b: Bounty, inner: HTMLElement) {
   inner.append(sect('Hidden worlds', h('span', 'tag quiet small', icon('eyeoff', 'i12'), `${total} stay hidden`)), h('div', 'hidden-w', cells, h('p', '', `Nobody sees these worlds. The code runs your fix on them and shows only a count. ${counts}`)));
   if (S.error) inner.append(h('div', 'err', S.error));
   const send = who?.kind === 'engineer' && !who.screened ? quizLink() : who?.kind === 'engineer' ? button(S.fixes.length ? 'sec' : 'pri', 'Submit a fix', null, () => openSubmit(b)) : h('span', 't3 small', 'Only a signed-in engineer can submit a fix.');
-  if (send instanceof HTMLButtonElement) send.disabled = b.status !== 'open';
+  if (send instanceof HTMLButtonElement) send.disabled = b.status !== 'open' || (!!arc && (!b.arc || !who?.payout.signed));
   const f = S.fixes.find(x => x.n === S.focus) ?? S.fixes[S.fixes.length - 1];
   const head = sect('Submission', h('span', 'row-r', send));
   head.style.height = '40px';
   inner.append(head, flow(b, f));
+  if (arc && who?.kind === 'engineer' && (!b.arc || !who.payout.signed)) inner.append(h('div', 'words small', !b.arc ? 'The company has not funded this bounty yet.' : 'Connect your wallet and press Save this wallet. The CrashLab agent pays only a wallet you proved.'));
   if (S.fixes.length) {
     const subs = h('table', 'subs');
     const rows = h('tbody');
@@ -205,11 +439,12 @@ function fixDetail(b: Bounty, inner: HTMLElement) {
     subs.append(rows);
     inner.append(subs);
   } else inner.append(h('div', 'words small', 'No fix yet. A fix runs on the public worlds, then on the hidden worlds.'));
+  if (arc) inner.append(...chainPanel(b, f));
   if (f) inner.append(...fixResult(b, f));
   inner.append(sect('Frozen judge and sim'));
   for (const [k, v] of Object.entries(b.frozen!).filter(([name]) => /judge|sim/.test(name))) inner.append(h('div', 'kv', h('span', '', code(k.split('/').pop()!)), h('span', '', code(short(v)))));
   inner.append(h('div', 'words small', b.scope!));
-  if (b.chain_mirror) inner.append(...chainRows(b.chain_mirror));
+  if (b.chain_mirror && !arc) inner.append(...chainRows(b.chain_mirror));
   if (b.evidence) inner.append(...evidenceRows(b.evidence));
   inner.append(...notChecked(b));
 }
@@ -247,7 +482,7 @@ function flow(b: Bounty, f: Fix | undefined) {
     ['Patch received', f ? f.source_sha256.slice(0, 12) : 'No patch yet'],
     ['Public worlds', s ? `${fixed} of ${r!.target.length} pass` : f && !r ? 'Running' : 'Waiting'],
     ['Hidden worlds', s ? `${Object.entries(s).filter(([k]) => k !== 'target').reduce((a, [, v]) => a + v.worse, 0)} worse of ${hiddenTotal(b)}` : 'Waiting'],
-    ['Ledger pays', f?.payout?.status === 'Claimed' ? `${f.payout.amount} test units paid` : f?.payout?.amount ? `${f.payout.status}, ${f.payout.amount} held` : 'Only on a full pass'],
+    arc ? [`${arc.agent_name} pays`, 'Read from the chain below'] : ['Ledger pays', f?.payout?.status === 'Claimed' ? `${f.payout.amount} test units paid` : f?.payout?.amount ? `${f.payout.status}, ${f.payout.amount} held` : 'Only on a full pass'],
   ];
   return h('div', 'flowline', ...steps.map(([k, v], i) => h('div', i < reached || reached === 4 ? 'd' : i === reached ? 'n' : '', h('b', '', k), h('small', '', v))));
 }
@@ -281,7 +516,7 @@ function fixResult(b: Bounty, f: Fix): HTMLElement[] {
     out.push(sect(f.state === 'running' ? `Fix ${f.n} is running in the sandbox` : f.state === 'interrupted' ? `The board restarted during fix ${f.n}` : `Fix ${f.n} waits for the gate`));
     return out;
   }
-  out.push(sect(HEADLINE[r.code] ?? cap1(words(r.code)), f.wall_s !== undefined ? `${f.wall_s} s` : ''), h('div', 'words', r.words));
+  out.push(sect(HEADLINE[r.code] ?? cap1(words(r.code)), r.recorded ? h('span', 'sample', 'Recorded proof') : f.wall_s !== undefined ? `${f.wall_s} s` : ''), h('div', 'words', r.words));
   const s = r.sets;
   if (s) {
     const fixed = r.target.filter(t => t.passed || t.safe_hold).length;
@@ -305,7 +540,7 @@ function fixResult(b: Bounty, f: Fix): HTMLElement[] {
 
 function payout(b: Bounty, f: Fix): HTMLElement[] {
   const p = f.payout;
-  if (!p) return [];
+  if (!p || arc) return [];
   const out = [sect('Payout', h('span', 'warnline', icon('warn', 'i12'), LEDGER))];
   if (p.status === 'LedgerRefused') { out.push(h('div', 'err', `The ledger refused this: ${p.error}.`)); return out; }
   const acts = h('div', 'acts');
@@ -367,6 +602,7 @@ function quizLink() {
 }
 
 function render() {
+  drawWalletBar();
   drawList();
   drawLedger();
   drawDetail();
@@ -424,9 +660,12 @@ function openSubmit(b: Bounty) {
       await refresh();
     } catch (e) { error.textContent = (e as Error).message; }
   });
+  const stored = arc?.demo && isFix && b.group === 'stalled' ? [button('sec', 'Use the stored good fix', null, async () => {
+    try { area.value = (await api.arcDemoFix()).source; } catch (e) { error.textContent = (e as Error).message; }
+  })] : [];
   const close = dialog(isFix ? 'Submit a fix' : 'Submit a world', true,
     h('div', 'body', field('Submitting as, 5 submissions per account', (() => { const i = h('input') as HTMLInputElement; i.value = who?.tester ?? ''; i.disabled = true; return i; })()), isFix ? field('Base file', (() => { const i = h('input') as HTMLInputElement; i.value = b.controller!.file; i.disabled = true; return i; })()) : field('Seed', seed), h('div', 'full', area), h('div', 'full note2', isFix ? `${b.scope} Up to 60 KB. It runs in the sandbox with no network. One gate runs at a time.` : 'Up to 16 KB. One gate runs at a time.')),
-    [error, h('span', 'sp'), button('sec', 'Cancel', null, () => close()), send]);
+    [error, h('span', 'sp'), ...stored, button('sec', 'Cancel', null, () => close()), send]);
 }
 
 function openPost(ref: string | null) {
@@ -436,7 +675,7 @@ function openPost(ref: string | null) {
   const pay = h('input') as HTMLInputElement;
   const windowS = h('input') as HTMLInputElement;
   pay.type = windowS.type = 'number';
-  pay.value = '40';
+  pay.value = arc ? '1' : '40';
   windowS.value = '60';
   const error = h('span', 'bad');
   let rows: Fixable[] = [];
@@ -454,7 +693,7 @@ function openPost(ref: string | null) {
     } catch (e) { error.textContent = (e as Error).message; send.disabled = false; send.textContent = 'Post the bounty'; }
   });
   const close = dialog('Post a bounty', false,
-    h('div', 'body', field('Failure from a real campaign', select, 'full'), field('Title', titleIn, 'full'), field('Company, from your account', (() => { const i = h('input') as HTMLInputElement; i.value = `${who?.label ?? ''} (${who?.verificationLabel ?? ''})`; i.disabled = true; return i; })(), 'full'), field('Pay, test units', pay), field('Dispute window, seconds', windowS), h('div', 'full note2', 'One fix wins the pay. Held-back worlds stay hidden. Test units are not money.')),
+    h('div', 'body', field('Failure from a real campaign', select, 'full'), field('Title', titleIn, 'full'), field('Company, from your account', (() => { const i = h('input') as HTMLInputElement; i.value = `${who?.label ?? ''} (${who?.verificationLabel ?? ''})`; i.disabled = true; return i; })(), 'full'), field(arc ? 'Pay, test USDC' : 'Pay, test units', pay), field('Dispute window, seconds', windowS), h('div', 'full note2', arc ? `One fix wins the pay. Held-back worlds stay hidden. You fund it from your wallet next. Limit: ${arc.cap_usdc} test USDC on this board.` : 'One fix wins the pay. Held-back worlds stay hidden. Test units are not money.')),
     [error, h('span', 'sp'), button('sec', 'Cancel', null, () => close()), send]);
   const fill = (r: Fixable) => { titleIn.value = titleIn.value || `Fix ${words(r.group)}`; };
   api.fixable().then(reply => {
@@ -462,6 +701,8 @@ function openPost(ref: string | null) {
     if (ref && !rows.some(r => r.ref === ref)) error.textContent = 'This failure cannot be posted. It may be posted already.';
     select.replaceChildren(...rows.map(r => { const o = h('option', '', `${r.robot}, ${words(r.group)}: ${r.failed} of ${r.worlds} worlds, ${r.session.slice(0, 6)}/${r.cid}`) as HTMLOptionElement; o.value = r.ref; return o; }));
     if (ref && rows.some(r => r.ref === ref)) select.value = ref;
+    const seeded = !ref && arc?.demo ? rows.find(r => r.session === arc!.demo_session && r.group === 'stalled') : undefined;
+    if (seeded) select.value = seeded.ref;
     const now = rows.find(r => r.ref === select.value);
     if (now) fill(now);
     if (!rows.length && !ref) error.textContent = 'No campaign has a failure to post yet.';
@@ -471,6 +712,7 @@ function openPost(ref: string | null) {
 
 const site = shell();
 render();
+void startArc();
 refresh();
 setInterval(refresh, POLL_MS);
 const postRef = new URLSearchParams(location.search).get('post');

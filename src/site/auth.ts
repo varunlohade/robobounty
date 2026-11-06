@@ -2,7 +2,7 @@
 export type Role = 'company' | 'engineer' | 'guest';
 export interface Me {
   signedIn: boolean; role: Role | null; label: string; verification: string; verificationLabel: string; demo: boolean; tester: string | null; screened: boolean;
-  payout: { set: boolean; masked: string | null }; expired: boolean; offline: boolean; csrf: string; humanId: string | null; credential: string | null;
+  payout: { set: boolean; masked: string | null; signed?: boolean }; expired: boolean; offline: boolean; csrf: string; humanId: string | null; credential: string | null;
 }
 export type AuthResult = { ok: true } | { ok: false; code: string; words: string };
 

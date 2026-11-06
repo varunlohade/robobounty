@@ -5,6 +5,7 @@
 #   npm run demo -- --stored    stored AI replies, real physics. No AI call.
 # It checks each port first, refuses a port in use and kills nothing it did not start. Ctrl+C stops all four.
 # --ports WEB,RUN,SITE,BOARD picks other ports. --board-root DIR keeps the board's ledger elsewhere.
+# --arc turns on the wallet flow on Arc testnet and starts the CrashLab agent, which holds the only keys. Steps: docs/ARC-DEMO.md. With --recorded, a stored good fix gets its recorded proof, labelled so.
 set -u
 trap "" PIPE # A closed log pipe must not stop the shutdown below.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,13 +13,15 @@ cd "$ROOT"
 MODE=live
 WEB=5199; RUN=5198; SITE=5297; BOARD=5298
 BOARD_ROOT=""
+ARC=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --recorded) MODE=recorded ;;
     --stored) MODE=stored ;;
     --ports) IFS=, read -r WEB RUN SITE BOARD <<<"$2"; shift ;;
     --board-root) BOARD_ROOT="$2"; shift ;;
-    *) echo "Unknown option: $1"; sed -n 2,7p "$0"; exit 2 ;;
+    --arc) ARC=1 ;;
+    *) echo "Unknown option: $1"; sed -n 2,8p "$0"; exit 2 ;;
   esac
   shift
 done
@@ -33,6 +36,16 @@ for port in "$WEB" "$RUN" "$SITE" "$BOARD"; do
   if [ -n "$who" ]; then echo "Port $port is in use by $who. I will not touch it."; busy=1; fi
 done
 if [ "$busy" = 1 ]; then echo "Stop those servers, or pick free ports: npm run demo -- --ports 6199,6198,6297,6298"; exit 1; fi
+
+unset CRASHLAB_ARC CRASHLAB_ARC_DEMO
+if [ "$ARC" = 1 ]; then
+  "$PY" policy/bounty/arc_wallet.py check ${BOARD_ROOT:+--root "$BOARD_ROOT"} || { echo "The CrashLab agent cannot start, so nothing started. See docs/ARC-DEMO.md."; exit 1; }
+  export CRASHLAB_ARC=1
+  if [ "$MODE" = recorded ]; then
+    export CRASHLAB_ARC_DEMO=1
+    "$PY" policy/bounty/arc_wallet.py seed-campaign || { echo "The recorded campaign did not unpack."; exit 1; }
+  fi
+fi
 
 PIDS=()
 LOGS="$(mktemp -d /tmp/crashlab-demo-XXXXXX)"
@@ -59,6 +72,9 @@ esac
 "$PY" policy/server/site_data.py --port "$SITE" >"$LOGS/site.log" 2>&1 & PIDS+=($!)
 "$PY" policy/bounty/board_server.py --port "$BOARD" ${BOARD_ROOT:+--root "$BOARD_ROOT"} >"$LOGS/board.log" 2>&1 & PIDS+=($!)
 node_modules/.bin/vite --port "$WEB" --strictPort >"$LOGS/vite.log" 2>&1 & PIDS+=($!)
+if [ "$ARC" = 1 ]; then
+  "$PY" policy/bounty/arc_wallet.py serve ${BOARD_ROOT:+--root "$BOARD_ROOT"} >"$LOGS/agent.log" 2>&1 & PIDS+=($!)
+fi
 
 ORIGIN="http://localhost:$WEB"
 up() {
@@ -89,6 +105,7 @@ case "$MODE" in
   stored) echo "Stored AI replies, real physics." ;;
   *) echo "Live: real AI calls and real physics." ;;
 esac
+[ "$ARC" = 1 ] && echo "The wallet flow is on. Agent log: $LOGS/agent.log"
 echo "Open $ORIGIN/"
 echo "Press Ctrl+C to stop."
 while :; do

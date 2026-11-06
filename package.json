@@ -20,7 +20,8 @@
     "@mujoco/mujoco": "3.16.0",
     "@worldcoin/idkit-core": "4.6.0",
     "qrcode-generator": "2.0.4",
-    "three": "0.180.0"
+    "three": "0.180.0",
+    "viem": "2.21.55"
   },
   "devDependencies": {
     "@types/three": "0.180.0",

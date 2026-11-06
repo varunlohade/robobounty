@@ -2,7 +2,7 @@
 
 One gate runs at a time, and at most QUEUE_CAP wait. Each engineer account gets MAX_PER_TESTER submissions per bounty.
 Each POST needs a board token from the site server, in the Authorization header: a company to post, an engineer to submit and claim, the bounty's own company to finalize, reject, approve or decline. A browser never sends that header by itself, so a cross-site form cannot act. A guest gets a plain refusal.
-LOCAL LEDGER. NOT ON CHAIN. No money, wallet or key exists here. Results are simulated with hand-built physics.
+LOCAL LEDGER. NOT ON CHAIN, unless scripts/demo.sh --arc turns on board_arc_routes.py. Even then this process holds no key: it reads receipts and checks signatures. Results are simulated with hand-built physics.
 
 GET  /api/health
 GET  /api/bounties
@@ -29,6 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import board_arc_routes
 import board_fix_routes
 import board_gate
 import board_spec
@@ -52,7 +53,7 @@ REPLAY_ROUTE = re.compile(r"/api/bounties/([0-9]{1,9})/submissions/([0-9]{1,9})/
 REPLAY_FILES = {"manifest.json": "application/json", "model.xml": "application/xml", "qpos.json": "application/json", "result.json": "application/json", "world.json": "application/json",
                 "controller.py.txt": "text/plain", "trace.json": "application/json", "wind.json": "application/json", "dirt.bin": "application/octet-stream"}
 LABELS = {"ledger_label": B.LEDGER_LABEL, "world_id_label": B.WORLD_ID_LABEL}
-ERROR_STATUS = {"unknown_bounty": 404, "unknown_submission": 404, "tester_cap": 429, "ledger_refused": 409, "no_recorded_run": 404, "replay_refused": 409, "not_your_bounty": 403, **board_fix_routes.ERROR_STATUS}
+ERROR_STATUS = {"unknown_bounty": 404, "unknown_submission": 404, "tester_cap": 429, "ledger_refused": 409, "no_recorded_run": 404, "replay_refused": 409, "not_your_bounty": 403, **board_fix_routes.ERROR_STATUS, **board_arc_routes.ERROR_STATUS}
 
 ROOT = B.ROOT
 WAITING = queue.Queue(QUEUE_CAP)
@@ -170,7 +171,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed():
             return self.fail(403, "origin_refused", "This origin or host is not the board page.")
         try:
-            if board_fix_routes.route(self, "GET", ROOT):
+            if board_arc_routes.route(self, "GET", ROOT) or board_fix_routes.route(self, "GET", ROOT):
                 return None
             if self.path == "/api/health":
                 return self.reply(200, {"ok": True, "waiting": WAITING.qsize(), "queue_cap": QUEUE_CAP, "max_per_tester": B.MAX_PER_TESTER, "robot": B.ROBOT, "sim_label": B.SIM_LABEL, "max_world_bytes": MAX_WORLD_BYTES, "fields": G.W.FIELDS, "reference_world": G.W.load(board_spec.NOMINAL), "aliases": board_spec.ALIASES, **LABELS})
@@ -195,7 +196,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed():
             return self.fail(403, "origin_refused", "This origin or host is not the board page.")
         try:
-            if board_fix_routes.route(self, "POST", ROOT):
+            if board_arc_routes.route(self, "POST", ROOT) or board_fix_routes.route(self, "POST", ROOT):
                 return None
             if self.path == "/api/bounties":
                 return self.post_bounty()
