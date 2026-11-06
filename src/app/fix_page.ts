@@ -20,6 +20,7 @@ export class FixPage {
     const tag = el('div', 'fix-tag', e.recorded ? 'Recorded result. No AI ran now.' : e.title);
     const parts: HTMLElement[] = [title, tag, el('p', '', e.source)];
     parts.push(el('h3', '', 'Conclusion'), el('p', 'fix-conclusion', e.conclusion));
+    if (e.plain) parts.push(el('p', 'fix-plain', e.plain));
     for (const c of e.caveats as string[]) parts.push(el('p', 'fix-caveat', c));
     for (const t of e.tables as { head: string; rows: any[] }[]) {
       parts.push(el('h3', '', t.head));
