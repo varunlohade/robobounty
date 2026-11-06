@@ -79,6 +79,8 @@ export class SimView {
   private dirty = true; private stopped = false; private shadowsDirty = true;
   private observer: ResizeObserver;
   private seed = 0; private lastTick = 0; private slow = 0; private frames = 0;
+  onLost: (() => void) | null = null;
+  private loopRun = 0; private lookNow: unknown = {};
   private weather: Weather; private air = { rain: false, snow: false, dust: false };
 
   constructor(private host: HTMLElement, private replay: Replay, private trial: Trial) {
@@ -254,16 +256,38 @@ export class SimView {
     }
 
     host.dataset.sceneMs = String(Math.round(performance.now() - built));
+    this.renderer.domElement.addEventListener('webglcontextlost', e => {
+      e.preventDefault();
+      if (!this.stopped) this.onLost?.();
+    });
+    this.kick();
+  }
+
+  /** Starts the render loop, or replaces one that died. */
+  kick() {
+    const run = ++this.loopRun;
+    this.dirty = true;
     const loop = (now: number) => {
-      if (this.stopped) return;
+      if (this.stopped || run !== this.loopRun) return;
       this.controls.update();
       this.stepCamera(now);
       this.stepWeather(now);
-      if (this.dirty && host.clientWidth > 0) { this.dirty = false; this.renderFrame(); this.watchSpeed(now); }
+      if (this.dirty && this.host.clientWidth > 0) { this.dirty = false; this.renderFrame(); this.watchSpeed(now); }
       this.lastTick = now;
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+  }
+
+  /** A new view in the same place, with the same look and camera. A lost context takes every texture with it, so a whole new view is the sure way back. */
+  static rebuilt(old: SimView): SimView {
+    old.dispose();
+    const fresh = new SimView(old.host, old.replay, old.trial);
+    fresh.setLook(old.lookNow);
+    fresh.camera.position.copy(old.camera.position);
+    fresh.controls.target.copy(old.controls.target);
+    fresh.sync();
+    return fresh;
   }
 
   dispose() {
@@ -298,6 +322,7 @@ export class SimView {
   /** Changes the scenery in place: uniforms and material colours, then a new light probe when the sky changes. It feeds nothing to physics, so a run is the same under any look. */
   setLook(raw: unknown) {
     const look: Look = parseLook(raw);
+    this.lookNow = raw;
     const time = TIMES[look.time ?? 'noon'], city = CITIES[look.city ?? 'default'], fog = look.fog ?? 0;
     const glass = this.glass.uniforms, sky = (this.dome.material as THREE.ShaderMaterial).uniforms, c = this.city.uniforms;
 
@@ -738,4 +763,28 @@ export class SimView {
     this.fillDirt(index, this.dirtA);
     this.fillDirt(Math.min(d.count - 1, index + 1), this.dirtB);
   }
+}
+
+export type OnFix = (code: string, words: string) => void;
+const MAX_REBUILDS = 3;
+const REBUILD_WINDOW_MS = 60_000;
+
+/** Rebuilds a view when its WebGL context is lost, with a limit, so a broken GPU does not loop forever. */
+export function restoreOnLoss(view: SimView, swap: (fresh: SimView) => void, onFix?: OnFix) {
+  let times: number[] = [];
+  const arm = (v: SimView) => {
+    v.onLost = () => {
+      const now = performance.now();
+      times = [...times.filter(t => now - t < REBUILD_WINDOW_MS), now];
+      if (times.length > MAX_REBUILDS) {
+        onFix?.('webgl_gave_up', 'The 3D view keeps losing its graphics, so I stopped rebuilding it. Reload the page.');
+        return;
+      }
+      const fresh = SimView.rebuilt(v);
+      arm(fresh);
+      swap(fresh);
+      onFix?.('webgl_lost', 'The 3D view lost its graphics, so I rebuilt it at the same frame.');
+    };
+  };
+  arm(view);
 }

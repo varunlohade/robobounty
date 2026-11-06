@@ -1,11 +1,13 @@
 import { el, icon } from './dom.ts';
 import { Replay } from './replay.ts';
-import { SimView } from './view.ts';
+import { SimView, restoreOnLoss, type OnFix } from './view.ts';
 import type { Trial } from './trial.ts';
 
 export const LABEL = 'Simulated. Replay of a recorded run.';
 const SPARK_POINTS = 96;
 const OFF_GLASS_M = 0.5;
+const PLAYBACK_STALL_MS = 5_000; // Even the slowest speed moves many frames in this time.
+const MAX_PLAYBACK_RESTARTS = 3;
 const NS = 'http://www.w3.org/2000/svg';
 
 export const fmtTime = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
@@ -34,7 +36,7 @@ function sparkline(series: number[]) {
 
 interface Metric { value: (row: number) => string; series?: number[] }
 
-export function worldPage(trial: Trial, statusRight: HTMLElement) {
+export function worldPage(trial: Trial, statusRight: HTMLElement, onFix?: OnFix) {
   const { result, manifest, trace, wind, world } = trial;
   const page = el('div', 'page');
   const body = el('div', 'world-body');
@@ -153,9 +155,10 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
 
   async function start() {
     const replay = await Replay.open(trial);
-    const simView = new SimView(viewport, replay, trial);
+    let simView = new SimView(viewport, replay, trial);
     view = simView;
     if (trial.look) simView.setLook(trial.look);
+    restoreOnLoss(simView, fresh => { simView = fresh; view = fresh; viewport.dataset.rebuilt = String(Number(viewport.dataset.rebuilt ?? 0) + 1); }, onFix);
     let playing = true;
     let at = 0;
     let last = performance.now();
@@ -223,8 +226,27 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
     addEventListener('keydown', onKey);
     toggleRun = toggle;
     let stopped = false;
+    let tickRun = 0, movedAt = performance.now(), movedFrame = -1, restarts = 0;
+    // requestAnimationFrame stops in a hidden tab, and that is not a stall. A timer still runs when the frame loop has died.
+    const stallWatch = setInterval(() => {
+      const now = performance.now();
+      if (!playing || document.hidden || at >= maxFrame || replay.frame !== movedFrame) { movedAt = now; movedFrame = replay.frame; return; }
+      if (now - movedAt < PLAYBACK_STALL_MS) return;
+      movedAt = now;
+      if (++restarts > MAX_PLAYBACK_RESTARTS) {
+        clearInterval(stallWatch);
+        onFix?.('playback_gave_up', 'The replay keeps stopping, so I left it. Reload the page.');
+        return;
+      }
+      last = now;
+      runTick();
+      simView.kick();
+      viewport.dataset.playbackRestarts = String(restarts);
+      onFix?.('playback_stalled', 'The replay stopped moving, so I restarted it from the same frame.');
+    }, 1000);
     stop = () => {
       stopped = true;
+      clearInterval(stallWatch);
       removeEventListener('keydown', onKey);
       view = null;
       simView.dispose();
@@ -232,20 +254,24 @@ export function worldPage(trial: Trial, statusRight: HTMLElement) {
       statusTime.remove();
     };
 
-    const tick = (now: number) => {
-      if (stopped) return;
-      if (playing) {
-        at += ((now - last) / 1000) * manifest.hz * Number(speed.value);
-        if (at >= maxFrame) { at = maxFrame; setPlaying(false); }
-        show(Math.floor(at));
-      }
-      last = now;
+    const runTick = () => {
+      const run = ++tickRun;
+      const tick = (now: number) => {
+        if (stopped || run !== tickRun) return;
+        if (playing) {
+          at += ((now - last) / 1000) * manifest.hz * Number(speed.value);
+          if (at >= maxFrame) { at = maxFrame; setPlaying(false); }
+          show(Math.floor(at));
+        }
+        last = now;
+        requestAnimationFrame(tick);
+      };
       requestAnimationFrame(tick);
     };
     setPlaying(true);
     show(0);
     viewport.dataset.ready = 'true';
-    requestAnimationFrame(tick);
+    runTick();
     return replay;
   }
 

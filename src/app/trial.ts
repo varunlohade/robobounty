@@ -34,8 +34,11 @@ export interface WorldsData {
 }
 export interface TrialEntry { id: string; label: string }
 
+// A local file arrives in well under a second. Past this, the request is stuck, and it must not hold the chat's event queue.
+const FETCH_DEADLINE_MS = 20_000;
+
 async function get(url: string): Promise<Response> {
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_DEADLINE_MS) });
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
   return res;
 }
@@ -58,7 +61,7 @@ export async function loadTrialFrom(base: string): Promise<Trial> {
     get(`${base}/wind.json`).then(r => r.json()),
     get(`${base}/dirt.bin`).then(r => r.arrayBuffer()),
     // Scenery only. An older export has no look.json, and that means the default look.
-    fetch(`${base}/look.json`).then(r => (r.ok ? r.json() : {})).catch(() => ({})),
+    fetch(`${base}/look.json`, { signal: AbortSignal.timeout(FETCH_DEADLINE_MS) }).then(r => (r.ok ? r.json() : {})).catch(() => ({})),
   ]);
   const qpos = new Float64Array(q.frames.length * q.nq);
   q.frames.forEach((f: number[], i: number) => qpos.set(f, i * q.nq));

@@ -37,9 +37,11 @@ policy/.venv/bin/pip install mujoco==3.8.1 numpy==2.2.6 pillow
 Keep vite running. In a second terminal, start the run server. Choose one line:
 
 ```
-policy/.venv/bin/python policy/server/server.py --recorded policy/server/fixtures
-policy/.venv/bin/python policy/server/server.py
+policy/.venv/bin/python policy/server/supervise.py --recorded policy/server/fixtures
+policy/.venv/bin/python policy/server/supervise.py
 ```
+
+`supervise.py` starts `server.py`, restarts it after a freeze or a crash, and keeps each chat's world across the restart. It refuses a port that is already in use, so stop an old server first. Every automatic fix writes one chat line and one line in `policy/runs/server/recovery-<port>.log`.
 
 The first line uses stored AI replies, so it makes no AI call. The second makes real calls through the `claude` command-line tool, which must be installed and logged in. It has a limit of 10 calls a session and 40 an hour.
 

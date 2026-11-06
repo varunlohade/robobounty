@@ -5,6 +5,7 @@ policy/.venv/bin/python policy/server/server.py [--port 5198] [--recorded DIR]
 Binds to 127.0.0.1 only, and accepts only the app's own origin and host, on every route. A request with no Origin header is refused too.
 Chat text is untrusted. It goes to the LLM layer on stdin, and only validated values come back. It never reaches a shell, an argv or a path.
 Jobs start from fixed argv lists. At most MAX_PROCS sim or LLM processes run at once, across all sessions.
+Every child runs under a named deadline in DEADLINES. A worker thread that stops beating is cut loose by the watchdog. Use policy/server/supervise.py to run this server: it restarts a frozen or crashed one, and each session's world and events survive on disk.
 """
 import argparse
 import ast
@@ -22,9 +23,10 @@ import time
 import traceback
 import uuid
 from collections import Counter
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -58,6 +60,8 @@ _FINGERPRINT = re.compile(r"^0x[0-9a-f]{64}$")
 TRIAL_FILES = {"manifest.json", "model.xml", "qpos.json", "result.json", "world.json", "controller.py.txt", "trace.json", "wind.json", "dirt.bin", "look.json"}
 _ID = re.compile(r"^[a-z0-9-]{1,40}$")
 _SID = re.compile(r"^[0-9a-f]{32}$")
+# A page opens its event stream on <session id>.localhost, so open streams from other tabs never use up the browser's 6 connections per host that fetches need.
+_STREAM_HOST = re.compile(r"^[0-9a-f]{32}\.localhost:\d+$")
 YES = {"yes", "y", "yep", "ok", "okay", "looks right", "looks good", "it looks right", "correct"}
 APPROVE = {"approve", "approved", "approve campaign", "go", "run it"}
 CHAPTERS = ("brief", "worlds", "test", "find", "fix", "bounty")
@@ -97,20 +101,104 @@ REJECTION_WORDS = {
 }
 
 
+@dataclass(frozen=True)
+class Deadline:
+    """When a child counts as hung. A child that shows progress is never killed."""
+    words: str  # The chat's name for this stage.
+    quiet_s: float | None  # No CPU use and no output growth for this long. None when the child only waits on the network, so low CPU says nothing.
+    silent_s: float  # No output growth for this long, even with CPU use. An AI call has no output until it ends, so this is its whole limit.
+    ai: bool = False  # A retry is one more AI call, and counts against the limits.
+
+
+# Times measured on this Mac on 2026-11-06. AI limits sit above llm.py's own timeouts, so its plain "timeout" answer comes first.
+DEADLINES = {
+    "route": Deadline("The AI call", None, 120, ai=True),  # llm.py gives a route call 90 s.
+    "plan": Deadline("The planner", None, 300, ai=True),  # llm.py gives a plan call 240 s.
+    "scenarios": Deadline("The scenario agent", None, 600, ai=True),  # 240 s for the AI, then one build for each world.
+    "build": Deadline("The build", 60, 180),  # Measured about 1 s.
+    "requirements": Deadline("The requirements check", 30, 120),  # Measured 0.1 s.
+    "run": Deadline("The test run", 60, 180),  # Measured 2.8 to 28 s over 91 runs. A heartbeat from each step counts as output, so a long run that steps has no limit.
+    "export": Deadline("The replay export", 60, 300),  # Measured 2.8 s for 6730 frames.
+    "campaign": Deadline("The campaign", 180, 1200),  # Each finished world grows results.jsonl. One world took at most 28 s.
+    "trace": Deadline("The code trace", 180, 1800),  # Not timed here: wide on purpose.
+    "diagnose": Deadline("The diagnosis", 180, 1800),  # Not timed here: wide on purpose.
+    "fix": Deadline("The fix test", None, 3600, ai=True),  # fix.py gives its AI call 400 s, then tests 24 or more worlds.
+    "gate": Deadline("The bounty gate", 180, 1500),  # gate.py gives each run 300 s.
+    "bounty": Deadline("The bounty step", 30, 120),  # A small file step.
+}
+POLL_S = 1.0
+CPU_SIGN_S = 0.05  # Group CPU change that counts as alive. A sleeping process adds nothing.
+WORKER_QUIET_S = 120  # A worker thread beats at least once a second, except for file reads that take far under this.
+WATCHDOG_POLL_S = 5
+PING_S = 5  # The page calls its stream dead after 3 missed pings.
+PORT = None
+RESTART_CAUSE = None
+RECOVERY_LOCK = threading.Lock()
+BROWSER_FIXES = {
+    "stream_lost": ("the page lost its event stream", "reconnected from the last event"),
+    "webgl_lost": ("the browser lost the WebGL context", "rebuilt the view at the same frame"),
+    "webgl_gave_up": ("the WebGL context kept getting lost", "stopped rebuilding and asked for a reload"),
+    "playback_stalled": ("the replay stopped advancing while set to play", "restarted it from the same frame"),
+    "playback_gave_up": ("the replay kept stopping", "stopped restarting and asked for a reload"),
+    "reply_late": ("the server did not answer a request by its deadline", "told the user to send it again"),
+    "trial_retry": ("a replay file did not load by its deadline", "fetched the replay again"),
+    "trial_failed": ("a replay file did not load after retries", "told the user"),
+}
+_tls = threading.local()
+
+
+class Abandoned(BaseException):
+    """Ends a worker thread the watchdog already cut loose, the next time it wakes. It is not an Exception, so no job handler catches it."""
+
+
+class StageHung(Exception):
+    def __init__(self, name, why):
+        super().__init__(name)
+        self.name, self.why = name, why
+
+
+def beat():
+    w = getattr(_tls, "worker", None)
+    if w:
+        if w.abandoned:
+            raise Abandoned
+        w.at = time.monotonic()
+
+
+def recovery_log(session, cause, action):
+    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} session={session.id if session else '-'} cause={cause} action={action}\n"
+    with RECOVERY_LOCK:
+        with open(RUNS / f"recovery-{PORT}.log", "a") as f:
+            f.write(line)
+
+
 class Slots:
-    """A counting gate that takes several slots at once, so a campaign cannot starve behind single jobs forever or exceed the limit."""
+    """A counting gate that takes several slots at once, so a campaign cannot starve behind single jobs forever or exceed the limit. It knows each thread's slots, so the watchdog can take them back."""
 
     def __init__(self, n):
-        self.free, self.cond = n, threading.Condition()
+        self.free, self.cond, self.held = n, threading.Condition(), Counter()
 
     def take(self, n):
         with self.cond:
-            self.cond.wait_for(lambda: self.free >= n)
+            while self.free < n:
+                self.cond.wait(POLL_S)
+                beat()
             self.free -= n
+            self.held[threading.current_thread()] += n
 
     def give(self, n):
         with self.cond:
-            self.free += n
+            me = threading.current_thread()
+            back = min(n, self.held[me])  # Zero for a thread the watchdog cut loose.
+            self.held[me] -= back
+            if not self.held[me]:
+                del self.held[me]
+            self.free += back
+            self.cond.notify_all()
+
+    def drop(self, thread):
+        with self.cond:
+            self.free += self.held.pop(thread, 0)
             self.cond.notify_all()
 
 
@@ -148,36 +236,148 @@ def spawn(argv, **kw):
     # Own process group, so shutdown can stop a campaign and its pool. Low priority, so the Mac stays usable.
     env = {**os.environ, "CRASHLAB_RECORDED_REPLIES": RECORDED} if RECORDED else None
     p = subprocess.Popen(["nice", "-n", "5", *argv], start_new_session=True, env=env, **kw)
+    p.owner = threading.current_thread()
     with LIVE_LOCK:
         LIVE.add(p)
+        write_live()
     return p
 
 
 def finish(p):
     with LIVE_LOCK:
         LIVE.discard(p)
+        write_live()
+
+
+def write_live():
+    """The live child groups, so a server that starts after a kill -9 can stop what the dead one left."""
+    if PORT:
+        (RUNS / f"live-{PORT}.txt").write_text("".join(f"{p.pid}\n" for p in LIVE))
+
+
+def kill_leftovers():
+    path = RUNS / f"live-{PORT}.txt"
+    if not path.exists():
+        return
+    for pid in path.read_text().split():
+        command = subprocess.run(["ps", "-o", "command=", "-p", pid], capture_output=True, text=True).stdout
+        if str(POLICY) in command:  # A reused pid belongs to something else, and stays alive.
+            kill_group(int(pid))
+            recovery_log(None, f"child group {pid} outlived the last server", "killed it")
+    path.unlink()
+
+
+def kill_group(pgid):
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+
+
+def group_cpu(pgid):
+    """CPU seconds of one process group. None when ps gives no answer, which proves nothing either way."""
+    try:
+        out = subprocess.run(["ps", "-A", "-o", "pgid=,time="], capture_output=True, text=True, timeout=5).stdout
+    except subprocess.TimeoutExpired:
+        return None
+    total = 0.0
+    for line in out.splitlines():
+        group, spent = line.split()
+        if int(group) == pgid:
+            total += sum(float(part) * 60 ** i for i, part in enumerate(reversed(spent.split(":"))))
+    return total
+
+
+def marks(paths):
+    seen = []
+    for path in paths:
+        try:
+            st = os.stat(path)
+            seen.append((st.st_size, st.st_mtime_ns))
+        except FileNotFoundError:
+            seen.append(None)
+    return seen
+
+
+def watch(p, rule, stdin, paths, tick):
+    """Waits for a child. Returns (stdout, None) when it ended, or (None, why) when it missed its deadline."""
+    signal_at = output_at = time.monotonic()
+    seen, cpu, polls = marks(paths), group_cpu(p.pid) if rule.quiet_s is not None else None, 0
+    send = stdin
+    while True:
+        beat()
+        try:
+            if p.stdout or p.stdin:
+                return p.communicate(send, timeout=POLL_S)[0], None
+            p.wait(POLL_S)
+            return None, None
+        except subprocess.TimeoutExpired:
+            send = None
+        if tick:
+            tick()
+        now, polls = time.monotonic(), polls + 1
+        mark = marks(paths)
+        if mark != seen:
+            seen, signal_at, output_at = mark, now, now
+        if rule.quiet_s is not None and polls % 2 == 0:
+            used = group_cpu(p.pid)
+            if used is not None and (cpu is None or abs(used - cpu) >= CPU_SIGN_S):
+                cpu, signal_at = used, now
+            if now - signal_at > rule.quiet_s:
+                return None, f"no CPU use and no output for {now - signal_at:.0f} s"
+        if now - output_at > rule.silent_s:
+            return None, f"no output for {now - output_at:.0f} s"
+
+
+def watched(name, argv, stdin=None, paths=(), tick=None, before_retry=None, **kw):
+    """Runs a child under its deadline. On a miss it kills the process group and retries once. Returns (exit code, stdout).
+    A child that ends, whatever its exit code, is a result and is not retried. Raises StageHung on the second miss."""
+    rule, session = DEADLINES[name], getattr(getattr(_tls, "worker", None), "session", None)
+    for attempt in (1, 2):
+        p = spawn(argv, **({"stdin": subprocess.PIPE} if stdin is not None else {}), **kw)
+        try:
+            out, why = watch(p, rule, stdin, paths, tick)
+        except BaseException:
+            kill_group(p.pid)
+            raise
+        finally:
+            finish(p)
+        if why is None:
+            return p.returncode, out
+        kill_group(p.pid)
+        try:
+            p.wait(5)
+        except subprocess.TimeoutExpired:
+            recovery_log(session, f"{name} pid {p.pid} survived SIGKILL for 5 s", "left it and went on")
+        if attempt == 2:
+            recovery_log(session, f"{name} froze again: {why}", "killed its process group, gave up")
+            raise StageHung(name, why)
+        recovery_log(session, f"{name} froze: {why}", "killed its process group, retried once")
+        if session:
+            session.say(f"{rule.words} froze, so I restarted it.")
+            if rule.ai and not session.llm_allowed():
+                raise StageHung(name, why)
+        if before_retry:
+            before_retry()
 
 
 def job(script, request, command):
-    """Runs plan_job.py in one slot. Returns its JSON reply, or None if it died."""
+    """Runs plan_job.py in one slot. Returns its JSON reply, or None if it died. Raises StageHung if it froze twice."""
     SLOTS.take(1)
     try:
-        p = spawn([PYTHON, str(script), command], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        out, _ = p.communicate(json.dumps(request).encode())
-        finish(p)
-        return json.loads(out) if p.returncode == 0 else None
+        partial = Path(request["out"]) if request.get("out") else None
+        code, out = watched(command, [PYTHON, str(script), command], stdin=json.dumps(request).encode(), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            before_retry=(lambda: shutil.rmtree(partial, ignore_errors=True)) if partial else None)
+        return json.loads(out) if code == 0 else None
     finally:
         SLOTS.give(1)
 
 
-def run_one(argv, stdout_file):
+def run_one(name, argv, stdout_file, paths=()):
     SLOTS.take(1)
     try:
         with open(stdout_file, "wb") as log:
-            p = spawn(argv, stdout=log, stderr=subprocess.STDOUT)
-            code = p.wait()
-            finish(p)
-        return code
+            return watched(name, argv, paths=(stdout_file, *paths), stdout=log, stderr=subprocess.STDOUT)[0]
     finally:
         SLOTS.give(1)
 
@@ -243,12 +443,25 @@ def thumb_and_end(run):
     return app_export.thumb_and_end(run)
 
 
+class Worker:
+    def __init__(self, session, kind):
+        self.session, self.kind, self.phase_before = session, kind, session.phase
+        self.at, self.abandoned = time.monotonic(), False
+
+
 class Session:
-    def __init__(self):
-        self.id = uuid.uuid4().hex
+    # The values that define where a chat stands. A checkpoint copies them, a freeze puts them back, and session.json keeps them across a restart.
+    KEPT = ("world", "normal", "plan", "brief", "phase", "before_weather", "answers", "questions", "answered", "requirements", "shown")
+
+    def __init__(self, sid=None):
+        self.id = sid or uuid.uuid4().hex
         self.dir = RUNS / self.id
-        self.dir.mkdir(parents=True)
+        self.dir.mkdir(parents=True, exist_ok=bool(sid))
         self.events, self.cond = [], threading.Condition()
+        self.events_path = self.dir / "events.jsonl"
+        self.stream_at = 0  # The page stream that is live. A newer one closes it.
+        self.workers = {}
+        self.shown = None
         self.lock = threading.Lock()
         self.busy = False
         self.routing = False  # One AI reading of a message at a time.
@@ -268,6 +481,138 @@ class Session:
         self.ledger, self.bounty_salt, self.spec_path, self.gate_info, self.verdicts = None, None, None, None, []
         self.last_seconds, self.last_recorded = None, None
         self.tester = "0x" + hashlib.sha256(self.id.encode()).hexdigest()[:40]
+        self.good, self.good_events = self.snapshot(), 0
+
+    def snapshot(self):
+        values = {k: getattr(self, k) for k in self.KEPT}
+        values["answered"] = sorted(self.answered)
+        return json.loads(json.dumps(values))
+
+    def checkpoint(self):
+        """The chat stands somewhere sound, so a later freeze comes back here."""
+        if self.phase not in ("building", "asking"):  # A half answered brief is not a place to come back to: its question cards are gone.
+            self.good, self.good_events = self.snapshot(), len(self.events)
+        self.save()
+
+    def save(self):
+        kept = {"good": self.good, "good_events": self.good_events, "look": self.look, "exports": {k: str(v) for k, v in self.exports.items()}, "llm_used": self.llm_used, "round": self.round}
+        tmp = self.dir / "session.json.tmp"
+        tmp.write_text(json.dumps(kept))
+        tmp.replace(self.dir / "session.json")
+
+    def rewind(self, show=True):
+        """Back to the last good world, and the view with it. Returns whether a world is there."""
+        for k, v in json.loads(json.dumps(self.good)).items():
+            setattr(self, k, set(v) if k == "answered" else v)
+        self.results, self.excluded, self.diverged, self.types, self.held, self.proposal = {}, {}, [], [], set(), None
+        if self.phase not in ("brief", "asking", "review_scene"):  # Campaign state does not come back.
+            self.phase = "review_scene" if self.world else "brief"
+        if show and self.world:
+            self.emit(type="world", world=self.world["world"], hash=self.world["hash"], xml=self.world["xml"], area=self.world["area"], moved=self.world["moved"], facts=self.world["facts"])
+            if self.shown and self.shown in self.exports:
+                self.emit(type="trial", tid=self.shown, label="Normal run", passed=self.normal["passed"], open=True)
+        elif show:
+            self.emit(type="no_world")
+        return self.world is not None
+
+    @classmethod
+    def load(cls, sid):
+        """A chat after a restart. Its events keep their ids, so the page goes on from the last one it saw."""
+        s = cls(sid)
+        kept = json.loads((s.dir / "session.json").read_text())
+        if s.events_path.exists():
+            for line in s.events_path.read_text().splitlines():
+                try:
+                    s.events.append(json.loads(line))
+                except ValueError:  # A kill can cut only the last line. That event never reached a page.
+                    recovery_log(s, "events.jsonl has a cut line", "skipped it")
+        s.good, s.good_events = kept["good"], kept["good_events"]
+        s.look, s.llm_used, s.round = kept["look"], kept["llm_used"], kept["round"]
+        s.exports = {k: Path(v) for k, v in kept["exports"].items()}
+        after = s.events[s.good_events:]
+        cut_off = any(e["type"] == "user" or (e["type"] == "working" and e.get("text")) for e in after) and after[-1]["type"] != "idle"
+        changed = any(e["type"] == "world" for e in after)
+        has_world = s.rewind(show=changed)
+        opening = {"froze": "The run server froze, so I restarted it.", "crashed": "The run server crashed, so I restarted it."}.get(RESTART_CAUSE, "The run server restarted.")
+        s.emit(type="text", fail=False, restart=True, text=f"{opening} Your {'world' if has_world else 'chat'} is still here.{' Send your last message again.' if cut_off else ''}")
+        recovery_log(s, f"server restart, cause {RESTART_CAUSE or 'unknown'}, job cut off: {cut_off}", "restored the session from disk")
+        s.working()
+        s.emit(type="idle")
+        return s
+
+    def launch(self, kind, target, args):
+        """Runs target on a worker thread the watchdog can see. A "job" holds the busy flag. A "side" thread does not."""
+        worker = Worker(self, kind)
+
+        def body():
+            _tls.worker = worker
+            try:
+                target(*args)
+            except StageHung as e:
+                self.gave_up(e, worker)
+            except Abandoned:
+                pass
+            except Exception as e:
+                traceback.print_exc()
+                recovery_log(self, f"job raised {type(e).__name__}", "told the user")
+                self.say(f"Job failed: {type(e).__name__}. See the run server log.", fail=True)
+            finally:
+                if not worker.abandoned:
+                    with self.lock:
+                        self.workers.pop(thread, None)
+                    if kind == "job":
+                        self.end_job()
+        thread = threading.Thread(target=body, daemon=True)
+        with self.lock:
+            self.workers[thread] = worker
+        thread.start()
+
+    def end_job(self):
+        self.working()
+        self.checkpoint()
+        with self.lock:
+            self.busy = False
+        self.emit(type="idle")
+
+    def gave_up(self, e, worker):
+        """A stage froze twice. The last good world comes back unless the world had not changed."""
+        words = DEADLINES[e.name].words
+        if worker.kind != "job":
+            self.say(f"{words} froze again, so I stopped it. Try again.", fail=True)
+            return
+        if self.phase == "building" or self.world != self.good["world"]:
+            has_world = self.rewind()
+            self.say(f"{words} froze again, so I stopped it and {'put back the last good world' if has_world else 'went back to the start'}. Send your message again.", fail=True)
+        else:
+            self.phase = worker.phase_before
+            self.say(f"{words} froze again, so I stopped it. Nothing changed. Send your message again.", fail=True)
+
+    def check_workers(self):
+        """The watchdog's look at this session: a worker past its deadline is cut loose, with its children and slots."""
+        now = time.monotonic()
+        with self.lock:
+            stuck = [(t, w) for t, w in self.workers.items() if now - w.at > WORKER_QUIET_S]
+            for t, _ in stuck:
+                del self.workers[t]
+        for thread, worker in stuck:
+            worker.abandoned = True
+            quiet = now - worker.at
+            with LIVE_LOCK:
+                mine = [p for p in LIVE if p.owner is thread]
+                for p in mine:
+                    LIVE.discard(p)
+                write_live()
+            for p in mine:
+                kill_group(p.pid)
+            SLOTS.drop(thread)
+            self.routing = False
+            recovery_log(self, f"{worker.kind} worker silent for {quiet:.0f} s", f"cut it loose, killed {len(mine)} children, cleared the session")
+            if worker.kind == "job":
+                has_world = self.rewind() if self.phase == "building" or self.world != self.good["world"] else self.world is not None
+                self.say(f"A step stopped answering, so I cleared it{' and kept the last good world' if has_world else ''}. Send your message again.", fail=True)
+                self.end_job()
+            else:
+                self.say("A step stopped answering, so I cleared it. Send your message again.", fail=True)
 
     def llm_allowed(self):
         hit = LLM_LIMIT.take(self)
@@ -278,8 +623,11 @@ class Session:
         return not hit
 
     def emit(self, **event):
+        beat()
         with self.cond:
             self.events.append(event)
+            with open(self.events_path, "a") as f:
+                f.write(json.dumps(event) + "\n")
             self.cond.notify_all()
 
     def say(self, text, fail=False):
@@ -301,19 +649,7 @@ class Session:
             if self.busy:
                 return 409, {"error": "busy"}
             self.busy = True
-
-        def body():
-            try:
-                target(*args)
-            except Exception as e:
-                traceback.print_exc()
-                self.say(f"Job failed: {type(e).__name__}. See the run server log.", fail=True)
-            finally:
-                self.working()
-                with self.lock:
-                    self.busy = False
-                self.emit(type="idle")
-        threading.Thread(target=body, daemon=True).start()
+        self.launch("job", target, args)
         return 202, {"ok": True}
 
     def message(self, text):
@@ -326,7 +662,7 @@ class Session:
         if busy:
             # A running job does not stop a look change. The physics part of the message waits.
             self.emit(type="user", text=text)
-            threading.Thread(target=self.take_brief, args=(text, True), daemon=True).start()
+            self.launch("side", self.take_brief, (text, True))
             return 202, {"ok": True}
         self.emit(type="user", text=text)
         if self.phase == "review_scene" and said in YES:
@@ -348,7 +684,7 @@ class Session:
         if name == "approve" and self.phase in ("review_campaign", "done") and (value is None or value == QUICK_WORLDS):
             return self.start(self.approve, value)
         if name == "replay" and type(value) is int and value in self.results:
-            threading.Thread(target=self.replay, args=(value,), daemon=True).start()
+            self.launch("side", self.replay, (value,))
             return 202, {"ok": True}
         if name == "fix_recorded" and self.proposal:
             return self.start(self.fix_recorded)
@@ -372,7 +708,11 @@ class Session:
             return patch, "", [], True, False
         previous = self.working_now
         self.working("reading your message")
-        reply = job(HERE / "plan_job.py", {"text": text, "look": self.look, "has_world": self.world is not None}, "route")
+        try:
+            reply = job(HERE / "plan_job.py", {"text": text, "look": self.look, "has_world": self.world is not None}, "route")
+        except StageHung:
+            reply = {"ok": False, "rejection": "froze_twice"}
+        self.working(previous)
         if reply is None or not reply["ok"]:
             self.tool("read_message", "failed", [str((reply or {}).get("rejection", "process_died"))])
             self.say("AI did not answer, so I used the simple parser.")
@@ -380,8 +720,6 @@ class Session:
             return patch, leftover, [], False, True
         routed = engine.check_reply(reply["reply"], text)
         self.tool("read_message", f"ok, {reply['seconds']} s", [json.dumps({"tools": routed.tools, "refused": routed.refused})])
-        if previous:
-            self.working(previous)
         return routed.look, routed.planner_words, routed.uncovered, True, True
 
     def weather_ranges(self, patch):
@@ -404,6 +742,7 @@ class Session:
         before = self.look
         self.look = look_module.merged(before, patch)
         self.write_look()
+        self.save()
         self.emit(type="look", look=self.look, sent=time.time() * 1000)
         for line in look_module.words(patch, before, self.world is not None):
             self.say(line)
@@ -420,7 +759,8 @@ class Session:
             self.say(f"Job failed: {type(e).__name__}. See the run server log.", fail=True)
             return
         finally:
-            self.routing = False
+            if not _tls.worker.abandoned:
+                self.routing = False
         patch = look_module.one_weather(patch)
         weather = {} if job_running else self.weather_ranges(patch)
         if patch:
@@ -553,7 +893,7 @@ class Session:
 
     def requirements_step(self):
         folder = self.dir / "requirements"
-        code = run_one([PYTHON, str(CRASHLAB / "requirements.py"), str(folder)], self.dir / "requirements.log")
+        code = run_one("requirements", [PYTHON, str(CRASHLAB / "requirements.py"), str(folder)], self.dir / "requirements.log")
         if code != 0:
             self.requirements = None
             self.say("The requirements table no longer matches the judge, so its list is unknown here.", fail=True)
@@ -571,10 +911,11 @@ class Session:
         self.chapter("test")
         self.working("one normal run")
         run = self.dir / f"normal_{self.round}"
-        code = run_one([PYTHON, str(HIGHRISE / "run_trial.py"), self.world["path"], "--seed", str(self.run_seed), "--out", str(run)], self.dir / "normal.log")
+        heartbeat = self.dir / f"normal_{self.round}.beat"
+        code = run_one("run", [PYTHON, str(HERE / "run_beat.py"), str(heartbeat), self.world["path"], "--seed", str(self.run_seed), "--out", str(run)], self.dir / "normal.log", paths=(heartbeat,))
         if code != 0:
             self.tool("run_trial", "failed", [f"exit {code}"])
-            self.say("The normal run crashed, so I stopped here. Log: normal.log in the session folder.", fail=True)
+            self.say(f"The test run crashed with exit code {code}. This is a failed run, and I did not retry it. Log: normal.log in the session folder.", fail=True)
             self.phase = "brief"
             return
         result = json.loads((run / "result.json").read_text())
@@ -582,20 +923,26 @@ class Session:
         self.tool("run_trial", f"{result['wall_s']} s", [json.dumps({"passed": result["passed"], "outcome": result["outcome"], "failure": result["failure"],
                                                                      "coverage": result["coverage"], "min_pressure_pa": result["min_pressure_pa"], "time_s": result["time_s"]})])
         self.emit(type="sim", sha=result["code_sha256"]["sim.py"], now=sim_hash())
+        diverged = result["failure"] == "sim_diverged"
+        if diverged:  # A result, not a hang. It is said before the export, so a refused replay cannot hide it.
+            self.say(f"The physics could not finish this run ({str(result['diverged_reason']).replace('_', ' ')}), so it counts as a failed run. I did not retry it.", fail=True)
         self.working("exporting the replay")
         tid = f"normal-{self.round}"
         if not self.export(run, tid, "Normal run"):
+            self.phase = "brief"
             return
+        self.working()  # The export is done. The page may take a while to fetch the replay, and that is not this step.
+        self.shown = tid
         self.emit(type="trial", tid=tid, label="Normal run", passed=result["passed"], open=True)
         self.phase = "review_scene"
         cleaned = f"It cleaned {result['coverage'] * 100:.1f}%."
-        word = f"It passed. {cleaned}" if result["passed"] else f"It failed: {result['failure']}. {cleaned}" if result["failure"] else f"{held_words(result, json.loads((self.exports[tid] / 'wind.json').read_text()))} {cleaned}"
+        word = cleaned if diverged else f"It passed. {cleaned}" if result["passed"] else f"It failed: {result['failure']}. {cleaned}" if result["failure"] else f"{held_words(result, json.loads((self.exports[tid] / 'wind.json').read_text()))} {cleaned}"
         self.emit(type="card", title="Does the scene look right?", body=f"{word} Watch the run on the right. Say what to change, or confirm.", result=word,
                   actions=[{"label": "Looks right", "action": "scene_ok", "primary": True}])
 
     def export(self, run, tid, label):
         out = self.dir / "exports" / tid
-        code = run_one([PYTHON, str(POLICY / "app_export.py"), "trial", str(run), tid, label, "--out", str(out)], self.dir / "export.log")
+        code = run_one("export", [PYTHON, str(POLICY / "app_export.py"), "trial", str(run), tid, label, "--out", str(out)], self.dir / "export.log")
         if code != 0:
             self.say("The replay export refused this run. The sim may have changed since it was recorded. Run it again.", fail=True)
             return False
@@ -608,12 +955,14 @@ class Session:
         tid = f"world-{index}"
         self.working(f"exporting {r['name']}")
         t0 = time.time()
-        if tid in self.exports or self.export(Path(r["run"]), tid, f"{r['group']}, {r['name']}"):
-            self.tool("export_replay", f"{time.time() - t0:.1f} s", [json.dumps({"world": r["name"], "failure": r["failure"]})])
-            self.emit(type="trial", tid=tid, label=r["name"], passed=r["passed"], open=True)
-            if not r["passed"] and self.types:
-                self.chapter("find")
-        self.working()
+        try:
+            if tid in self.exports or self.export(Path(r["run"]), tid, f"{r['group']}, {r['name']}"):
+                self.tool("export_replay", f"{time.time() - t0:.1f} s", [json.dumps({"world": r["name"], "failure": r["failure"]})])
+                self.emit(type="trial", tid=tid, label=r["name"], passed=r["passed"], open=True)
+                if not r["passed"] and self.types:
+                    self.chapter("find")
+        finally:
+            self.working()
 
     # Step 5: scenario agent and the campaign review.
     def scene_ok(self):
@@ -701,15 +1050,13 @@ class Session:
             with open(self.dir / "campaign.log", "ab") as log:
                 argv = [PYTHON, str(HIGHRISE / "campaign.py"), "--scenarios", str(batch), "--seed", str(30 + self.batches), "--controls", "2",
                         "--out", str(out), "--procs", str(MAX_PROCS)]
-                p = spawn(argv, stdout=log, stderr=subprocess.STDOUT)
-                seen = 0
-                while True:
-                    code = p.poll()
-                    seen = self.read_results(out, chosen, seen, rows, started)
-                    if code is not None:
-                        break
-                    time.sleep(0.25)
-                finish(p)
+                seen = [0]
+
+                def tick():
+                    seen[0] = self.read_results(out, chosen, seen[0], rows, started)
+                # A retry resumes: campaign.py skips the trials already in results.jsonl.
+                code = watched("campaign", argv, paths=(out / "results.jsonl",), tick=tick, stdout=log, stderr=subprocess.STDOUT)[0]
+                tick()
         finally:
             SLOTS.give(MAX_PROCS)
         if code != 0:
@@ -785,11 +1132,13 @@ class Session:
         t0 = time.time()
         SLOTS.take(MAX_PROCS)
         try:
-            for argv in ([str(HIGHRISE / "linetrace.py"), str(out)], [str(CRASHLAB / "diagnose.py"), str(out), "--reproduce"]):
+            for stage, argv in (("trace", [str(HIGHRISE / "linetrace.py"), str(out)]), ("diagnose", [str(CRASHLAB / "diagnose.py"), str(out), "--reproduce"])):
                 with open(self.dir / "diagnose.log", "ab") as log:
-                    p = spawn([PYTHON, *argv, "--procs", str(MAX_PROCS)], stdout=log, stderr=subprocess.STDOUT)
-                    code = p.wait()
-                    finish(p)
+                    try:
+                        code = watched(stage, [PYTHON, *argv, "--procs", str(MAX_PROCS)], paths=(self.dir / "diagnose.log",), stdout=log, stderr=subprocess.STDOUT)[0]
+                    except StageHung as e:
+                        self.say(f"{DEADLINES[e.name].words} froze again, so I stopped it. Failure types stay unknown.", fail=True)
+                        code = "frozen"
                 if code != 0:
                     self.tool("diagnose", "failed", [f"{Path(argv[0]).name} exit {code}. Failure types and code lines stay unknown."])
                     return None
@@ -881,9 +1230,11 @@ class Session:
         SLOTS.take(MAX_PROCS)
         try:
             with open(self.dir / "fix.log", "ab") as log:
-                p = spawn(argv, stdout=log, stderr=subprocess.STDOUT)
-                code = p.wait()
-                finish(p)
+                try:
+                    code = watched("fix", argv, paths=(self.dir / "fix.log",), stdout=log, stderr=subprocess.STDOUT)[0]
+                except StageHung:
+                    self.say("The fix test froze again, so I stopped it.", fail=True)
+                    code = "frozen"
         finally:
             SLOTS.give(MAX_PROCS)
         if code != 0:
@@ -940,10 +1291,8 @@ class Session:
     def bounty_job(self, command, request):
         SLOTS.take(1)
         try:
-            p = spawn([PYTHON, str(HERE / "bounty_job.py"), command], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-            out, _ = p.communicate(json.dumps(request).encode())
-            finish(p)
-            return json.loads(out) if p.returncode == 0 else None
+            code, out = watched("bounty", [PYTHON, str(HERE / "bounty_job.py"), command], stdin=json.dumps(request).encode(), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            return json.loads(out) if code == 0 else None
         finally:
             SLOTS.give(1)
 
@@ -1003,10 +1352,11 @@ class Session:
         SLOTS.take(2)
         try:
             with open(self.dir / "gate.log", "ab") as log:
-                p = spawn([PYTHON, str(GATE), "--world", str(folder / "world.json"), "--spec", str(self.spec_path), "--paid", str(paid), "--salt-file", str(self.dir / "bounty" / "salt.hex"),
-                           "--submitter", self.tester, "--seed", seed, "--out", str(folder)], stdout=log, stderr=subprocess.STDOUT)
-                code = p.wait()
-                finish(p)
+                try:
+                    code = watched("gate", [PYTHON, str(GATE), "--world", str(folder / "world.json"), "--spec", str(self.spec_path), "--paid", str(paid), "--salt-file", str(self.dir / "bounty" / "salt.hex"),
+                                            "--submitter", self.tester, "--seed", seed, "--out", str(folder)], paths=(self.dir / "gate.log",), stdout=log, stderr=subprocess.STDOUT)[0]
+                except StageHung:
+                    code = "frozen"
         finally:
             SLOTS.give(2)
         found = sorted(folder.glob("*/verdict.json"))
@@ -1050,6 +1400,7 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = "crashlab"
     sys_version = ""
+    open_streams = 0
 
     def log_message(self, *_):
         return
@@ -1057,7 +1408,11 @@ class Handler(BaseHTTPRequestHandler):
     def allowed(self):
         origin, host = self.headers.get("Origin"), self.headers.get("Host", "")
         port = self.server.server_address[1]
-        return origin in APP_ORIGINS and host in {f"{HOST}:{port}", f"localhost:{port}"}
+        if origin not in APP_ORIGINS:
+            return False
+        if _STREAM_HOST.match(host) and host.endswith(f".localhost:{port}"):
+            return urlsplit(self.path).path.endswith("/events")
+        return host in {f"{HOST}:{port}", f"localhost:{port}"}
 
     def head(self, status, ctype, length=None, extra=()):
         self.send_response(status)
@@ -1083,7 +1438,16 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(403, {"error": "origin_refused"})
 
     def session(self, sid):
-        return SESSIONS.get(sid) if _SID.match(sid) else None
+        if not _SID.match(sid):
+            return None
+        with SESSIONS_LOCK:
+            s = SESSIONS.get(sid)
+            if s is None and len(SESSIONS) < MAX_SESSIONS and (RUNS / sid / "session.json").exists():
+                try:
+                    s = SESSIONS[sid] = Session.load(sid)
+                except (ValueError, KeyError, OSError) as e:
+                    recovery_log(None, f"session {sid} did not load: {type(e).__name__}", "the page starts a new chat")
+            return s
 
     def do_OPTIONS(self):
         if not self.allowed():
@@ -1095,7 +1459,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.refuse()
         parts = urlsplit(self.path).path.strip("/").split("/")
         if parts == ["api", "health"]:
-            return self.reply(200, {"ok": True, "sim_sha": sim_hash(), "llm": llm_label(), "max_procs": MAX_PROCS, "llm_session_cap": LLM_LIMIT.session_cap})
+            return self.reply(200, {"ok": True, "sim_sha": sim_hash(), "llm": llm_label(), "max_procs": MAX_PROCS, "llm_session_cap": LLM_LIMIT.session_cap, "pid": os.getpid(), "stream_host": True, "streams": Handler.open_streams})
         if len(parts) >= 4 and parts[:2] == ["api", "sessions"]:
             s = self.session(parts[2])
             if s is None:
@@ -1113,21 +1477,38 @@ class Handler(BaseHTTPRequestHandler):
     def stream(self, s):
         self.close_connection = True
         self.head(200, "text/event-stream")
-        last = self.headers.get("Last-Event-ID", "")
+        query = parse_qs(urlsplit(self.path).query)
+        last = self.headers.get("Last-Event-ID") or query.get("after", [""])[0]
         at = int(last) + 1 if last.isdigit() else 0
+        page = "page" in query
+        with s.cond:
+            at = min(at, len(s.events))
+            if page:  # A page has one live stream for its chat. A reload or a copied tab closes the older one, which would hold a connection for nothing.
+                s.stream_at += 1
+                s.cond.notify_all()
+            mine = s.stream_at
+            Handler.open_streams += page
         try:
             while True:
                 with s.cond:
-                    s.cond.wait_for(lambda: len(s.events) > at, timeout=15)
+                    s.cond.wait_for(lambda: len(s.events) > at or (page and s.stream_at != mine), timeout=PING_S)
                     fresh = s.events[at:]
+                    replaced = page and s.stream_at != mine
+                if replaced:
+                    self.wfile.write(b"event: replaced\ndata: 0\n\n")
+                    self.wfile.flush()
+                    return
                 if not fresh:
-                    self.wfile.write(b": keep-alive\n\n")
+                    self.wfile.write(b"event: ping\ndata: 0\n\n")
                 for event in fresh:
                     self.wfile.write(f"id: {at}\ndata: {json.dumps(event)}\n\n".encode())
                     at += 1
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
             return
+        finally:
+            with s.cond:
+                Handler.open_streams -= page
 
     def do_POST(self):
         if not self.allowed():
@@ -1154,6 +1535,7 @@ class Handler(BaseHTTPRequestHandler):
                 if len(SESSIONS) >= MAX_SESSIONS:
                     return self.reply(429, {"error": "too_many_sessions"})
                 s = Session()
+                s.save()
                 SESSIONS[s.id] = s
             return self.reply(201, {"id": s.id})
         if len(parts) == 4 and parts[:2] == ["api", "sessions"]:
@@ -1170,28 +1552,47 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(400, {"error": "bad_seed"})
                 status, out = s.start(s.submit, body["world"], body["seed"])
                 return self.reply(status, out)
+            if parts[3] == "fixed" and body.get("code") in BROWSER_FIXES:
+                recovery_log(s, *BROWSER_FIXES[body["code"]])
+                return self.reply(200, {"ok": True})
             if parts[3] == "action" and isinstance(body.get("action"), str):
                 status, out = s.action(body["action"], body.get("value"))
                 return self.reply(status, out)
         self.reply(404, {"error": "not_found"})
 
 
+def watchdog():
+    while True:
+        time.sleep(WATCHDOG_POLL_S)
+        for s in list(SESSIONS.values()):
+            try:
+                s.check_workers()
+            except Exception as e:
+                traceback.print_exc()
+                recovery_log(s, f"watchdog raised {type(e).__name__}", "kept watching")
+
+
 def main():
-    global RECORDED
+    global RECORDED, PORT, RESTART_CAUSE
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=5198)
     ap.add_argument("--recorded", help="folder of stored LLM replies. For offline checks only, and the status line says so.")
     ap.add_argument("--live-route", action="store_true", help="with --recorded: the AI reads each message live, and the planner still uses stored replies. For timing checks.")
     ap.add_argument("--llm-session-cap", type=int, default=MAX_LLM_PER_SESSION)
     ap.add_argument("--llm-hour-cap", type=int, default=MAX_LLM_PER_HOUR)
+    ap.add_argument("--restart-cause", choices=("froze", "crashed"), help="supervise.py sets this, so the chat can say why the server restarted.")
     a = ap.parse_args()
+    RESTART_CAUSE = a.restart_cause
     LLM_LIMIT.session_cap, LLM_LIMIT.hour_cap = a.llm_session_cap, a.llm_hour_cap
     RECORDED = str(Path(a.recorded).resolve()) if a.recorded else None
     if a.live_route:
         os.environ["CRASHLAB_LIVE_ROUTE"] = "1"
     RUNS.mkdir(parents=True, exist_ok=True)
-    server = ThreadingHTTPServer((HOST, a.port), Handler)
+    server = ThreadingHTTPServer((HOST, a.port), Handler)  # A port in use stops here, before anything below can touch another server's children.
     server.daemon_threads = True
+    PORT = a.port
+    kill_leftovers()
+    threading.Thread(target=watchdog, daemon=True).start()
 
     def stop(*_):
         with LIVE_LOCK:

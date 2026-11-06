@@ -2,11 +2,14 @@ import { el } from '../app/dom.ts';
 import { LiveBackend, health, type ServerEvent } from '../app/chat/live.ts';
 import { Replay, loadMujoco } from '../app/replay.ts';
 import { loadTrial, loadTrialFrom, type Trial } from '../app/trial.ts';
-import { SimView } from '../app/view.ts';
+import { SimView, restoreOnLoss } from '../app/view.ts';
 import { worldPage } from '../app/world_page.ts';
 import { LabChat, replayNote } from './chat.ts';
 
 const NS = 'http://www.w3.org/2000/svg';
+const HEALTH_RETRY_MS = 2_000;
+const TRIAL_TRIES = 3;
+const TRIAL_RETRY_MS = 3_000;
 // Lucide 0.400 outlines: panel-left, layout-grid, settings.
 const ACTIVITY = [
   ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M9 3v18'],
@@ -100,6 +103,7 @@ async function live(root: HTMLElement) {
   const onEvent = async (e: ServerEvent) => {
     switch (e.type) {
       case 'world': await showWorld(e); break;
+      case 'no_world': clear(); clear = () => {}; current = () => null; host.replaceChildren(empty); setName('new'); chat.worldGone(); break;
       case 'look': applyLook(e); break;
       case 'trial': await showTrial(e.tid); break;
       case 'llm_count': aiLine.textContent = `AI calls ${e.used} of ${e.cap}`; break;
@@ -167,15 +171,35 @@ async function live(root: HTMLElement) {
     replay.seek(0);
     view = new SimView(viewport, replay, trial);
     view.setLook(look);
+    restoreOnLoss(view, fresh => { view = fresh; }, fixed);
     current = () => view;
     view.sync();
     viewport.dataset.ready = 'true';
     viewport.dataset.hash = String(e.hash);
   }
 
+  const fixed = (code: string, words: string) => { chat.note(words, /gave_up|failed/.test(code)); backend.report(code); };
+
+  async function fetchTrial(tid: string): Promise<Trial | null> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await loadTrialFrom(backend.trialBase(tid));
+      } catch (err) {
+        console.warn(`replay ${tid}, try ${attempt}: ${String(err)}`);
+        if (attempt === TRIAL_TRIES) {
+          fixed('trial_failed', 'The replay did not load after 3 tries. The run itself is safe. Ask for a change to run it again, or reload the page.');
+          return null;
+        }
+        if (attempt === 1) fixed('trial_retry', 'The replay did not load in time, so I am fetching it again.');
+        await new Promise(r => setTimeout(r, TRIAL_RETRY_MS));
+      }
+    }
+  }
+
   async function showTrial(tid: string) {
-    const trial = await loadTrialFrom(backend.trialBase(tid));
-    const world = worldPage(trial, statusRight);
+    const trial = await fetchTrial(tid);
+    if (!trial) return;
+    const world = worldPage(trial, statusRight, fixed);
     swap(world.page, () => world.stop());
     current = () => world.view;
     await world.start();
@@ -184,15 +208,19 @@ async function live(root: HTMLElement) {
   }
 
   void loadMujoco();
-  try {
-    const info = await health();
-    simLine.textContent = `Sim ${info.sim_sha.slice(0, 8)}`;
-    llmLine.textContent = `LLM: ${info.llm}`;
-    root.dataset.server = 'up';
-  } catch {
-    llmLine.textContent = 'Run server not connected';
-    chat.note('The run server is not running. Start it: policy/.venv/bin/python policy/server/server.py', true);
-    return;
+  for (let told = false; ;) {
+    try {
+      const info = await health();
+      simLine.textContent = `Sim ${info.sim_sha.slice(0, 8)}`;
+      llmLine.textContent = `LLM: ${info.llm}`;
+      root.dataset.server = 'up';
+      break;
+    } catch {
+      llmLine.textContent = 'Run server not connected';
+      if (!told) chat.note('The run server is not running. Start it: policy/.venv/bin/python policy/server/supervise.py. This page connects by itself once it is up.', true);
+      told = true;
+      await new Promise(r => setTimeout(r, HEALTH_RETRY_MS));
+    }
   }
   await chat.start();
 }

@@ -68,6 +68,11 @@ export class LabChat {
     this.input.placeholder = 'Ask for a change to the world';
   }
 
+  worldGone() {
+    this.hasWorld = false;
+    this.input.placeholder = 'Describe your robot and where it works';
+  }
+
   jobDone() {
     this.setBusy(false);
   }
@@ -97,7 +102,8 @@ export class LabChat {
 
   private async post(text: string) {
     try {
-      for await (const event of this.backend.send(text)) this.add(event);
+      // send yields only when the message did not start a job, so no idle event will come for it.
+      for await (const event of this.backend.send(text)) { this.add(event); this.setBusy(false); }
     } catch (err) {
       this.note(`Could not reach the run server: ${String(err)}`, true);
       this.setBusy(false);
