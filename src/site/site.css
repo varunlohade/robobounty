@@ -66,37 +66,8 @@ mark{background:rgba(62,123,250,.3);color:inherit;border-radius:2px}
 
 .tone-ok{color:var(--green-t)}.tone-bad{color:var(--red-t)}.tone-hold{color:var(--amber-t)}.tone-quiet{color:var(--t3)}
 
-/* login */
-.login{display:grid;grid-template-columns:minmax(440px,600px) minmax(0,1fr);height:100vh;width:100%}
-.login .side{display:flex;flex-direction:column;padding:24px clamp(32px,5vw,72px);border-right:1px solid var(--line);min-width:0;overflow:auto}
-.login .mark{font-size:15px;font-weight:500;letter-spacing:-.01em}
-.login .body{margin:auto 0}
-.login h1{font-size:32px;line-height:40px;letter-spacing:-.02em;font-weight:500}
-.login .proof{margin-top:12px;font-size:16px;line-height:24px;color:var(--t2);max-width:440px}
-.login .note{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--line);max-width:440px}
-.login .note b{font-weight:500}
-.login .note p{color:var(--t2);margin-top:2px}
-.login .note code{display:block;margin-top:8px;color:var(--t2)}
-.login .go{margin-top:28px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.login .go .btn.pri{height:44px;min-width:256px;padding:0 20px}
-.login .go .btn.sec{height:44px;padding:0 20px}
-.login .error{margin-top:16px;color:var(--red-t);max-width:440px}
-.verify{margin-top:28px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:24px}
-.qr{width:160px;height:160px;padding:10px;background:#fff;border-radius:6px}
-.qr svg{display:block;width:100%;height:100%}
-.steps{list-style:none;display:flex;flex-direction:column;gap:12px}
-.steps li{display:grid;grid-template-columns:16px 1fr;gap:10px;color:var(--t3)}
-.steps li svg{margin-top:2px}
-.steps li.done{color:var(--t2)}.steps li.done svg{color:var(--green-t)}
-.steps li.now{color:var(--t1)}
-.steps small{display:block;font-size:13px;line-height:18px;color:var(--t3);margin-top:2px}
-.steps a{color:var(--blue-t)}
 .spin{animation:spin .9s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.login .foot{color:var(--t3);font-size:13px;line-height:18px;margin-top:24px}
-.login .picture{min-width:0}
-.login .picture img{object-position:82% 50%}
-@media (max-width:760px){.login{grid-template-columns:1fr}.login .picture{display:none}.login .side{border:0;padding:24px 16px}.login .go .btn.pri{min-width:0;width:100%}.verify{grid-template-columns:1fr}}
 
 /* home */
 .home{display:flex;flex-direction:column}

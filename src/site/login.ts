@@ -1,24 +1,111 @@
 import QR from 'qrcode-generator';
 import './shell.css';
+import './login.css';
 import { icon, type IconName } from './icons.ts';
 import { enterAsGuest, whoIs } from './session.ts';
 import { button, getJson, h, START_SERVER } from './ui.ts';
 
 interface Status { on: boolean; missing: string[] }
+type Face = 'ready' | 'off' | 'asking' | 'waiting' | 'verifying' | 'verified' | 'failed';
 const root = document.getElementById('site')!;
 const go = h('div', 'go');
 const note = h('div', '');
 const live = h('div', '');
-const error = h('p', 'error');
+const error = h('div', 'lg-error');
 error.hidden = true;
 error.setAttribute('role', 'alert');
+const proves = h('p', 'lg-proves', 'World ID proves you are one unique human. It shares no name, email or face.');
+const staging = h('p', 'lg-staging', 'This server uses World ID staging, which accepts test proofs.');
+staging.hidden = true;
+const head = h('p', 'lg-head', 'Scan with World App');
+head.setAttribute('aria-live', 'polite');
+const proof = h('div', 'lg-proof');
+proof.hidden = true;
 let cancel: AbortController | null = null;
 
-const side = h('div', 'side', h('div', 'mark', 'CrashLab'),
-  h('div', 'body', h('h1', '', 'Sign in to CrashLab'), h('p', 'proof', 'World ID proves you are one unique human. It shares no name, email or face.'), go, error, live, note),
-  h('p', 'foot', 'Simulated. Hand-built physics, not checked against real hardware.'));
-const picture = h('div', 'picture frame', Object.assign(h('img'), { src: '/site/frames/login-snow.jpg', alt: 'The window robot on a tower in snow' }), h('div', 'frame-note', 'Simulated. Still from a recorded run.'));
-root.append(h('div', 'login', side, picture));
+const panel = h('section', 'lg-panel', h('div', 'lg-mark', 'CrashLab'),
+  h('h1', '', 'Crash tests for robots'),
+  h('p', 'lg-lede', 'Describe the job. AI builds the world and runs your robot through it. Every failure comes with its reason.'),
+  head, go, error, live, proves, staging, note, proof,
+  h('p', 'lg-foot', 'Simulated. Hand-built physics and an upstream walking policy, not checked against real hardware.'));
+panel.setAttribute('aria-label', 'Sign in to CrashLab');
+const face = (f: Face) => { panel.dataset.state = f; };
+
+// The wall. One video holds every run, so the browser decodes one stream and the labels are plain text on top.
+interface Fix { who: string; from: string; minus: string; plus: string }
+interface Tile { robot: string; world: string; name: string; phase: number; fix?: Fix; states: { at: number; s: string; words: string }[] }
+interface Wall { cols: number; rows: number; loop_s: number; poster_t: number; tiles: Tile[] }
+const FPS = 15;
+const POSTER = new URL('./assets/login-wall.jpg', import.meta.url).href;
+const FILM = new URL('./assets/login-wall.mp4', import.meta.url).href;
+const WALL_DATA = new URL('./assets/login-wall.json', import.meta.url).href;
+const still = matchMedia('(prefers-reduced-motion: reduce)');
+const film = Object.assign(h('video', 'lg-film'), { muted: true, loop: true, playsInline: true, poster: POSTER, preload: 'metadata' });
+film.setAttribute('muted', '');
+film.setAttribute('aria-hidden', 'true');
+const cells = h('div', 'lg-cells');
+const scrim = h('div', 'lg-scrim');
+const wallBox = h('div', 'lg-wall', film, cells, scrim);
+const pauseBtn = button('', 'Pause', () => setPlaying(film.paused));
+pauseBtn.className = '';
+const caption = h('div', 'lg-cap', h('p', '', 'Recorded simulated runs, replayed. Window runs sped up. Fixes come from recorded checks.'), pauseBtn);
+root.append(h('div', 'lg', wallBox, caption, panel));
+
+let wall: Wall | null = null;
+const painted: { tile: Tile; box: HTMLElement; word: HTMLElement; last: string }[] = [];
+function buildWall(w: Wall) {
+  wall = w;
+  for (const tile of w.tiles) {
+    const word = h('span', 't-word');
+    const diff = tile.fix ? h('div', 't-diff', h('i', 'm', `- ${tile.fix.minus}`), h('i', 'p', `+ ${tile.fix.plus}`)) : null;
+    const box = h('div', 't', h('div', 't-tint'), h('div', 't-chip', h('span', 't-name', tile.name), word, diff));
+    cells.append(box);
+    painted.push({ tile, box, word, last: '' });
+  }
+}
+function paintWall(t: number) {
+  if (!wall) return;
+  for (const p of painted) {
+    const local = (t - p.tile.phase / FPS + wall.loop_s * 2) % wall.loop_s;
+    let now = p.tile.states[0];
+    for (const s of p.tile.states) if (s.at <= local) now = s;
+    if (now.words !== p.last) { p.last = now.words; p.box.dataset.s = now.s; p.word.textContent = now.words; }
+  }
+}
+function setPlaying(on: boolean) {
+  if (on) {
+    if (!film.src) film.src = FILM;
+    void film.play().catch(() => { pauseBtn.textContent = 'Play'; });
+  } else film.pause();
+  pauseBtn.textContent = on ? 'Pause' : 'Play';
+}
+setInterval(() => { if (wall && !film.paused) paintWall(film.currentTime); }, 200);
+film.addEventListener('pause', () => { pauseBtn.textContent = 'Play'; paintWall(film.currentTime); });
+film.addEventListener('seeked', () => paintWall(film.currentTime));
+film.addEventListener('playing', () => { pauseBtn.textContent = 'Pause'; });
+still.addEventListener('change', () => { if (still.matches) setPlaying(false); });
+getJson<Wall>(WALL_DATA).then(w => {
+  buildWall(w);
+  paintWall(w.poster_t);
+  if (still.matches) pauseBtn.textContent = 'Play';
+  else setPlaying(true);
+}).catch(() => { pauseBtn.hidden = true; });
+
+// Small proof, read from the site's own data, never written here.
+interface Batch { id: string; total: number; passed: number; failed: number; holds: number }
+getJson<{ campaigns: Batch[] }>('/site-api/data').then(d => {
+  const batches = d.campaigns.filter(c => c.id === 'demo-window' || c.id === 'demo-inspection');
+  if (!batches.length) return;
+  const sum = (k: 'total' | 'passed' | 'failed' | 'holds') => batches.reduce((n, b) => n + b[k], 0);
+  const cell = (n: number, word: string, cls = '') => h('div', cls, h('dd', '', String(n)), h('dt', '', word));
+  proof.replaceChildren(h('dl', '', cell(sum('total'), 'runs'), cell(sum('passed'), 'passed'), cell(sum('failed'), 'failed', 'bad'), cell(sum('holds'), 'safe holds')),
+    h('p', 'lg-from', 'Latest recorded batches, window robot and walking robot.'));
+  proof.hidden = false;
+}).catch(() => {});
+// The server names its World ID environment on the providers list. Display only.
+getJson<{ entries?: { id: string; version: string }[] }>('/site-api/providers').then(d => {
+  if (d.entries?.find(e => e.id === 'world')?.version === 'staging') staging.hidden = false;
+}).catch(() => {});
 
 // Where a visitor was going before login. Only a page of this site, so a link cannot send them elsewhere.
 function nextPage(): string {
@@ -32,7 +119,8 @@ function guest() {
 }
 
 function fail(words: string) {
-  error.textContent = words;
+  face('failed');
+  error.replaceChildren(icon('x', 16), h('div', '', words));
   error.hidden = false;
 }
 
@@ -52,8 +140,10 @@ function qrSvg(text: string): HTMLElement {
 }
 
 function offState(status: Status | null) {
+  face('off');
+  proves.hidden = true;
   go.replaceChildren(button('sec', 'Enter as local guest', guest));
-  note.replaceChildren(h('div', 'note',
+  note.replaceChildren(h('div', 'lg-note',
     h('b', '', status ? 'World ID is not set up on this server yet' : 'The site server does not answer, so World ID is off'),
     h('p', '', 'A guest can use everything here, and is shown as not verified.'),
     status?.missing.length ? h('p', 'quiet', `Missing in .env: ${status.missing.join(', ')}`) : null,
@@ -61,6 +151,8 @@ function offState(status: Status | null) {
 }
 
 function onState() {
+  face('ready');
+  proves.hidden = false;
   go.replaceChildren(button('pri', 'Sign in with World ID', () => { void start(); }), button('bare', 'Enter as local guest', guest));
   note.replaceChildren();
   live.replaceChildren();
@@ -72,6 +164,7 @@ async function post(path: string, body?: unknown) {
 }
 
 async function start() {
+  face('asking');
   error.hidden = true;
   cancel = new AbortController();
   const waiting = h('button', 'btn pri wait', icon('loader'), 'Waiting for World App');
@@ -85,6 +178,7 @@ async function start() {
     const ctx = await post('/site-api/auth/world/context');
     if (!ctx.ok) throw new Error(ctx.body.words ?? 'The server would not sign this request.');
     const c = ctx.body;
+    if (c.environment === 'staging') staging.hidden = false;
     const { IDKit, CredentialRequest } = await import('@worldcoin/idkit-core');
     const config = { app_id: c.app_id, rp_context: c.rp_context, environment: c.environment };
     const credential = CredentialRequest('proof_of_human');
@@ -100,12 +194,21 @@ async function start() {
       step('done', 'check', 'Request created'),
       step('now', 'loader', 'Scan the code with World App', 'Or ', openLink, '. The request ends in 5 minutes.'),
       step('', 'circle', 'Check the proof on the server'));
-    live.replaceChildren(h('div', 'verify', qrSvg(uri), steps));
+    head.textContent = 'Scan with World App';
+    go.replaceChildren(stop);
+    live.replaceChildren(h('div', 'lg-verify', qrSvg(uri), steps));
+    face('waiting');
     const done = await request.pollUntilCompletion({ signal: cancel.signal, timeout: 300_000 });
     if (!done.success) throw new Error(cancel.signal.aborted ? 'cancelled' : 'World ID did not finish. You are not signed in. You can try again.');
+    head.textContent = 'Checking your proof';
+    go.replaceChildren();
+    proves.hidden = true;
+    face('verifying');
     steps.replaceChildren(step('done', 'check', 'Request created'), step('done', 'check', 'World App answered'), step('now', 'loader', 'Checking the proof on the server'));
     const reply = await post('/site-api/auth/world/verify', done.result);
     if (!reply.ok || reply.body.verified !== true) throw new Error(reply.body.words ?? 'The server refused this proof. You are not signed in.');
+    face('verified');
+    live.replaceChildren(h('div', 'lg-done', icon('ok', 16), 'The server verified your proof. Opening CrashLab.'));
     location.href = nextPage();
   } catch (err) {
     onState();

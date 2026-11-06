@@ -47,10 +47,11 @@ await clearAll();
 // A visitor with no session goes to login, from / and from any page.
 await go('');
 await until(`location.pathname === '/login.html'`, 'login', 20).catch(() => null);
-await waitText('World ID is not set up');
+const worldOn = await ev(`fetch('/site-api/auth/world').then(r => r.json()).then(s => s.on)`);
+await waitText(worldOn ? 'Sign in with World ID' : 'World ID is not set up');
 say((await ev(`location.pathname`)) === '/login.html', '/ leads to login with no session', await ev(`location.pathname`));
 const offWords = await text();
-say(offWords.includes('World ID is not set up on this server yet'), 'login says World ID is not set up');
+say(worldOn ? offWords.includes('Sign in with World ID') : offWords.includes('World ID is not set up on this server yet'), worldOn ? 'login offers World ID, as the server says it is set up' : 'login says World ID is not set up');
 say(!offWords.includes('Verified human'), 'login shows no verified state');
 await shot('live-login');
 
