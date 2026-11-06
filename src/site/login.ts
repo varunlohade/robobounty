@@ -1,6 +1,6 @@
 import QR from 'qrcode-generator';
 import './login.css';
-import { authOptions, demoSignIn, enterAsGuest, nextPage, signInCompany, signUpCompany, worldContext, worldVerify } from './auth.ts';
+import { authOptions, demoSignIn, enterAsGuest, landing, me, signInCompany, signUpCompany, worldContext, worldVerify } from './auth.ts';
 import { whoIs } from './session.ts';
 import { getJson, h, START_SERVER } from './ui.ts';
 
@@ -46,6 +46,8 @@ function show(step: HTMLElement) {
   place();
 }
 
+const goIn = () => { void me().then(m => { location.href = landing(m); }); };
+
 function pill(cls: string, label: string, on: () => void) {
   const b = h('button', `lg-pill ${cls}`, label);
   b.type = 'button';
@@ -58,12 +60,12 @@ function textButton(label: string, on: () => void) {
   b.addEventListener('click', on);
   return b;
 }
-const guestButton = () => textButton('Enter as local guest', () => { stopRequest(); void enterAsGuest().then(r => { if (r.ok) location.href = nextPage(); else failStep(r.words); }); });
+const guestButton = () => textButton('Enter as local guest', () => { stopRequest(); void enterAsGuest().then(r => { if (r.ok) goIn(); else failStep(r.words); }); });
 const backButton = () => textButton('Back', () => { stopRequest(); startStep(); });
 
 function startStep() {
   const option = (who: string, label: string, on: () => void) => h('div', 'lg-opt', h('span', '', who), pill('', label, on));
-  const demo = (role: 'company' | 'engineer', label: string) => option('Demo, seeded and not real', label, () => { void demoSignIn(role).then(r => { if (r.ok) location.href = nextPage(); else failStep(r.words); }); });
+  const demo = (role: 'company' | 'engineer', label: string) => option('Demo, seeded and not real', label, () => { void demoSignIn(role).then(r => { if (r.ok) goIn(); else failStep(r.words); }); });
   const opts = h('div', 'lg-opts',
     option('For robotics teams', 'Continue with work email', companyStep),
     option('For engineers', 'Continue with World ID', () => { void engineerStep(); }));
@@ -118,7 +120,7 @@ function companyStep() {
     error.hidden = true;
     const asked = mode === 'signin' ? signInCompany({ email: email.value, password: password.value }) : signUpCompany({ email: email.value, password: password.value, company: company.value });
     void asked.then(r => {
-      if (r.ok) location.href = nextPage();
+      if (r.ok) goIn();
       else { error.textContent = r.words; error.hidden = false; }
     });
   });
@@ -219,7 +221,7 @@ async function engineerStep() {
     if (!reply.ok || reply.body.verified !== true) throw new Error(reply.body.words ?? 'The server refused this proof. You are not signed in.');
     cancel = null;
     worldStep(worldTitle('Opening', 'CrashLab.'), [h('p', 'lg-say lg-status', reply.body.credential === 'human' ? 'The server verified your proof.' : 'Verified device. Not proof of a unique human.')], []);
-    location.href = nextPage();
+    goIn();
   } catch (err) {
     if (run.signal.aborted) return;
     cancel = null;
@@ -229,4 +231,4 @@ async function engineerStep() {
 
 startStep();
 // ?switch=1: a guest who wants a real account stays here. A sign-in replaces the guest session.
-whoIs().then(who => { if (who.kind !== 'none' && !new URLSearchParams(location.search).has('switch')) location.replace(nextPage()); });
+whoIs().then(who => { if (who.kind !== 'none' && !new URLSearchParams(location.search).has('switch')) location.replace(landing(who)); });

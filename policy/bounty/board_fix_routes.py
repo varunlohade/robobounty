@@ -122,7 +122,7 @@ def _post(h, root):
         bounty_id = int(m[1])
         if not X.is_fix(bounty_id, root):
             return False
-        s = h.need("engineer")
+        s = h.need_screened()
         v = h.body(MAX_SOURCE_BODY, FIX_FIELDS)
         with SUBMIT_LOCK:
             if WAITING.full():

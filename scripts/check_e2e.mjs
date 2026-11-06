@@ -88,6 +88,22 @@ async function flow(mode) {
       const value = execFileSync(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/site_auth.py'), 'seed-engineer', 'ana', credential], { env: { ...process.env, CRASHLAB_AUTH_DB: authDb }, encoding: 'utf8' }).trim();
       await c.send('Network.setCookie', { name: 'crashlab_session', value, url: WEB, httpOnly: true, sameSite: 'Lax' });
       await go(next);
+      await c.until(`document.querySelector('.sh-who')?.dataset.who === 'engineer'`, 'the seeded engineer', 30);
+      if (/Not screened/.test(await text())) {
+        check(`${mode}: an unscreened engineer is told about the quiz`, /short quiz/.test(await text()));
+        const key = JSON.parse(execFileSync(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/screener.py'), 'key'], { encoding: 'utf8' }));
+        await go('screener.html');
+        await clickText('Start', '.lg-sheet');
+        for (let i = 0; i < 6; i++) {
+          await c.until(`document.querySelector('[data-question]')?.dataset.index === '${i}'`, `question ${i + 1}`, 15);
+          const id = await c.js(`document.querySelector('[data-question]').dataset.question`);
+          await c.js(`document.querySelector('[data-choice="${key[id]}"]').click()`);
+        }
+        await c.until(`document.body.innerText.includes('AI interview: coming soon')`, 'the card after the quiz', 15);
+        check(`${mode}: the card says a quiz is not proof of skill`, /not proof of skill/.test(await text()));
+        await c.shot(join(OUT, 'screener-passed.png'));
+        await go(next);
+      }
     }
     await c.until(`location.pathname === ${JSON.stringify(`/${next.split('?')[0]}`)} && document.querySelector('.sh-who')?.dataset.who === 'engineer'`, 'the engineer session', 30);
   };
@@ -159,13 +175,13 @@ async function flow(mode) {
       await enterAsGuest();
       await c.until(`location.pathname === '/home.html' && document.querySelector('.sh-who')?.dataset.who === 'guest'`, 'home', 30);
     }, 1500);
-    await step('crashlab', async () => {
-      await clickOn('nav a.sh-item[href="crashlab.html"]');
-      await c.until(`location.pathname === '/crashlab.html' && document.body.innerText.includes('Choose a robot')`, 'crashlab page', 30);
+    await step('simulation', async () => {
+      await clickOn('nav a.sh-item[href="simulation.html"]');
+      await c.until(`location.pathname === '/simulation.html' && document.body.innerText.includes('Choose a robot')`, 'simulation page', 30);
     }, 1200);
     await step('pick-robot', async () => {
       await c.js(`document.querySelector('input[name=robot][value=window]').click()`);
-      await clickText('Open CrashLab');
+      await clickText('Open Simulation');
       await c.until(`location.pathname === '/lab.html' && document.getElementById('lab')?.dataset.server === 'up' && document.getElementById('lab')?.dataset.pack === 'window'`, 'the lab', 60);
     }, 1000);
     if (live) {

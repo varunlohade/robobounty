@@ -3,15 +3,15 @@
 // The page needs one <div id="site"></div>. A visitor with no session goes to login.html.
 import './shell.css';
 import { icon, type IconName } from './icons.ts';
-import { loginHref, onAuthChange, savePayout } from './auth.ts';
+import { ENGINEER_HOME, loginHref, onAuthChange, savePayout } from './auth.ts';
 import { signOut, whoIs, type Who } from './session.ts';
 
-export type PageName = 'home' | 'crashlab' | 'bounties' | 'data' | 'providers';
+export type PageName = 'home' | 'simulation' | 'bounties' | 'data' | 'providers';
 export const SIM_NOTE = 'Simulated. Hand-built physics, not checked against real hardware.';
 
 const NAV: { page: PageName; label: string; href: string; icon: IconName }[] = [
   { page: 'home', label: 'Home', href: 'home.html', icon: 'home' },
-  { page: 'crashlab', label: 'CrashLab', href: 'crashlab.html', icon: 'box' },
+  { page: 'simulation', label: 'Simulation', href: 'simulation.html', icon: 'box' },
   { page: 'bounties', label: 'Bounties', href: 'bounties.html', icon: 'target' },
   { page: 'data', label: 'Data', href: 'data.html', icon: 'chart' },
   { page: 'providers', label: 'Providers', href: 'providers.html', icon: 'layers' },
@@ -59,7 +59,7 @@ function whoRow(box: HTMLElement, who: Who) {
   const words = who.kind === 'guest' ? who.verificationLabel : who.label;
   name.append(make('span', '', words));
   if (who.kind !== 'guest') name.append(make('small', '', who.verificationLabel));
-  if (who.kind === 'engineer') name.append(payoutButton(who));
+  if (who.kind === 'engineer') name.append(make('small', '', who.screened ? 'Screened. A quiz, not proof of skill.' : 'Not screened yet'), payoutButton(who));
   box.replaceChildren(name);
   const out = make('button', 'sh-out');
   out.setAttribute('aria-label', 'Sign out');
@@ -81,6 +81,8 @@ export function mountShell(opts: ShellOptions): Shell {
     const a = make('a', 'sh-item') as HTMLAnchorElement;
     a.href = item.href;
     a.append(icon(item.icon, 16), make('span', '', item.label));
+    a.hidden = item.page !== 'bounties'; // Shown once the server names the role, so an engineer never sees them flash.
+    a.dataset.page = item.page;
     if (item.page === opts.page) a.setAttribute('aria-current', 'page');
     nav.append(a);
   }
@@ -108,8 +110,11 @@ export function mountShell(opts: ShellOptions): Shell {
   const here = `${location.pathname.replace(/^\//, '')}${location.search}`; // Read now: a page may tidy its address while this waits.
   const who = whoIs();
   void who.then(w => {
-    if (w.kind === 'none') location.replace(loginHref(here));
-    else whoRow(whoBox, w);
+    if (w.kind === 'none') { location.replace(loginHref(here)); return; }
+    if (w.kind === 'engineer' && opts.page !== 'bounties') { location.replace(ENGINEER_HOME); return; }
+    whoRow(whoBox, w);
+    for (const a of nav.querySelectorAll<HTMLElement>('a.sh-item')) a.hidden = w.kind === 'engineer' && a.dataset.page !== 'bounties';
+    if (w.kind === 'engineer' && new URLSearchParams(location.search).get('notice') === 'engineer') head.append(make('p', 'sh-sub', 'That page is for companies. Engineers work from Bounties.'));
   });
   // A sign-in or sign-out in another tab: read the server again.
   onAuthChange(() => { void whoIs().then(w => { if (w.kind === 'none') location.replace(loginHref(here)); else location.reload(); }); });

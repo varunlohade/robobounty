@@ -19,13 +19,14 @@ HERE = Path(__file__).resolve().parent
 BOUNTY = HERE.parent / "bounty"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(BOUNTY))
-SITE, DEVICE_SITE, BOARD, WEB = 7397, 7395, 7396, 7399
+SITE, DEVICE_SITE, BOARD, RUN, WEB = 7397, 7395, 7396, 7394, 7399
 ORIGIN = f"http://localhost:{WEB}"
 tmp = Path(tempfile.mkdtemp(prefix="check-auth-"))
 DB = tmp / "auth.sqlite"
 ROOT = tmp / "board"
 ROOT.mkdir()
 os.environ["CRASHLAB_AUTH_DB"] = str(DB)
+import screener as Q
 import site_auth as A
 import site_world as W
 
@@ -100,8 +101,8 @@ class Browser:
         return self.call("POST", "/site-api/auth/board-token")[1].get("token")
 
 
-def board(method, path, body=None, token=None, origin=ORIGIN):
-    c = http.client.HTTPConnection("127.0.0.1", BOARD, timeout=60)
+def board(method, path, body=None, token=None, origin=ORIGIN, port=None):
+    c = http.client.HTTPConnection("127.0.0.1", port or BOARD, timeout=60)
     h = {"Content-Type": "application/json"}
     if origin:
         h["Origin"] = origin
@@ -121,10 +122,10 @@ def board(method, path, body=None, token=None, origin=ORIGIN):
 
 
 def wait_up(port, host_header):
-    for _ in range(100):
+    for _ in range(300):
         try:
             c = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
-            c.request("GET", "/site-api/health" if port != BOARD else "/api/health", headers={"Host": host_header, "Origin": ORIGIN})
+            c.request("GET", "/site-api/health" if port not in (BOARD, RUN) else "/api/health", headers={"Host": host_header, "Origin": ORIGIN})
             if c.getresponse().status == 200:
                 return
         except OSError:
@@ -137,12 +138,14 @@ LOG = open(tmp / "servers.log", "wb")
 PY = sys.executable
 procs = [subprocess.Popen([PY, str(HERE / "check_auth_server.py"), "--port", str(SITE)], env=ENV, stdout=LOG, stderr=LOG),
          subprocess.Popen([PY, str(HERE / "check_auth_server.py"), "--port", str(DEVICE_SITE)], env={**ENV, "WORLD_CREDENTIAL": "device"}, stdout=LOG, stderr=LOG),
-         subprocess.Popen([PY, str(BOUNTY / "board_server.py"), "--root", str(ROOT), "--port", str(BOARD)], env=ENV, stdout=LOG, stderr=LOG)]
+         subprocess.Popen([PY, str(BOUNTY / "board_server.py"), "--root", str(ROOT), "--port", str(BOARD)], env=ENV, stdout=LOG, stderr=LOG),
+         subprocess.Popen([PY, str(HERE / "server.py"), "--port", str(RUN)], env=ENV, stdout=LOG, stderr=LOG)]
 PASSWORD = "correct horse battery"
 try:
     wait_up(SITE, f"localhost:{WEB}")
     wait_up(DEVICE_SITE, f"localhost:{WEB}")
     wait_up(BOARD, f"127.0.0.1:{BOARD}")
+    wait_up(RUN, f"127.0.0.1:{RUN}")
 
     # Sign-up and the cookie.
     a = Browser()
@@ -334,6 +337,47 @@ try:
     co2.signin("second@acme.example", PASSWORD)
     company, other, engineer = co.board_token(), co2.board_token(), w.board_token()
     guest_tok = guest.board_token()
+
+    # The screener. The server grades, and the answers stay on the server.
+    made_for_quiz = board("POST", "/api/bounties", {"title": "Quiz", "scenarios": [], "cap": 20, "per_failure": 10, "limits": {}}, company)[1]["id"]
+    s, r = board("POST", f"/api/bounties/{made_for_quiz}/submit", {"world": "{}", "seed": 1}, engineer)
+    check(s == 403 and r["error"] == "not_screened", "an unscreened engineer cannot submit", str(r))
+    check(board("GET", f"/api/bounties/{made_for_quiz}", token=engineer)[0] == 200, "an unscreened engineer can still browse")
+    check(co.call("POST", "/site-api/auth/screener/start", headers={"X-CSRF-Token": co.me()["csrf"]})[0] == 403, "the quiz is for engineers")
+    check(w.call("POST", "/site-api/auth/screener/start", csrf=False)[1].get("error") == "csrf_refused", "the quiz needs the CSRF token")
+    s, quiz = w.call("POST", "/site-api/auth/screener/start")
+    ids = [q["id"] for q in quiz["questions"]]
+    text = json.dumps(quiz)
+    check(len(ids) == 6 == len(set(ids)) and len(Q.BANK) >= 20, "six different questions from a bank of 20")
+    check("answer" not in text and "right" not in {k for q in quiz["questions"] for k in q} and all(set(c) == {"n", "text"} for q in quiz["questions"] for c in q["choices"]), "the reply holds no answers")
+    check(w.call("POST", "/site-api/auth/screener/start")[1]["questions"] == quiz["questions"], "asking again gives the same questions, so nobody fishes for easy ones")
+    right = {q: Q.BY_ID[q][3] for q in ids}
+    check(w.call("POST", "/site-api/auth/screener/grade", {"answers": {ids[0]: 0}})[0] == 400, "a partial answer sheet is refused")
+    wrong = {**right, ids[0]: 3, ids[1]: 3}
+    s, r = w.call("POST", "/site-api/auth/screener/grade", {"answers": wrong})
+    check(s == 200 and r["passed"] is False and r["score"] == 4 and ids[0] not in json.dumps(r), "4 of 6 fails, in plain words, naming no question", str(r))
+    check(w.call("POST", "/site-api/auth/screener/grade", {"answers": right})[0] == 400, "a graded sheet cannot be sent again")
+    check(w.call("POST", "/site-api/auth/screener/start")[1].get("error") == "screener_wait", "a fail waits")
+    with __import__("contextlib").closing(A._open(DB)) as d:
+        d.execute("UPDATE screen SET retry_at=0")
+    s, again = w.call("POST", "/site-api/auth/screener/start")
+    ids = [q["id"] for q in again["questions"]]
+    answers = {q: Q.BY_ID[q][3] for q in ids}
+    answers[ids[0]] = 3
+    s, r = w.call("POST", "/site-api/auth/screener/grade", {"answers": answers})
+    check(r["passed"] is True and r["score"] == 5 and "not proof of skill" in r["words"], "5 of 6 passes, with an honest label", str(r))
+    check(w.me()["screened"] is True, "the account says screened")
+    w2.me()
+    check(w2.me()["screened"] is True, "the same person in another browser is screened too")
+
+    # Simulation is for a company or a guest, on the run server too.
+    for path, payload in (("/api/sessions", {}), ("/api/sessions/nope/message", {"text": "x"})):
+        status = {who: board("POST", path, payload, tok, port=RUN)[0] for who, tok in (("engineer", engineer), ("company", company), ("guest", guest_tok))}
+        status["nobody"] = board("POST", path, payload, port=RUN)[0]
+        status["forged"] = board("POST", path, payload, company[:-4] + "0000", port=RUN)[0]
+        check(status["nobody"] == 401 and status["forged"] == 401 and status["engineer"] == 403 and status["company"] not in (401, 403) and status["guest"] not in (401, 403), f"run server {path}: company and guest pass, engineer and nobody refused", str(status))
+    e_site = w.call("GET", "/site-api/data")[0]
+    check(e_site == 403 and co.call("GET", "/site-api/recent")[0] == 200, "stored runs are for a company, and refused to an engineer", str(e_site))
     body = {"title": "Test", "scenarios": [], "cap": 20, "per_failure": 10, "limits": {}}
     fp = "0x" + "0" * 64
     s, made = board("POST", "/api/bounties", {**body, "company": "Typed name"}, company)

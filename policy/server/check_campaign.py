@@ -8,6 +8,8 @@ import gzip
 import json
 import subprocess
 import sys
+sys.path.insert(0, __import__("os").path.dirname(__import__("os").path.abspath(__file__)))
+import site_auth
 import tempfile
 import threading
 import time
@@ -37,7 +39,7 @@ class Client:
         self.base = f"http://127.0.0.1:{port}"
 
     def call(self, path, body=None, timeout=60, raw=False):
-        request = urllib.request.Request(self.base + path, data=None if body is None else json.dumps(body).encode(), headers={"Origin": ORIGIN, "Content-Type": "application/json"})
+        request = urllib.request.Request(self.base + path, data=None if body is None else json.dumps(body).encode(), headers={"Origin": ORIGIN, "Content-Type": "application/json", "Authorization": f"Bearer {site_auth.local_token()}"})
         try:
             with urllib.request.urlopen(request, timeout=timeout) as reply:
                 data = reply.read()

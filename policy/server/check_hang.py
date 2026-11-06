@@ -7,6 +7,8 @@ import signal
 import socket
 import subprocess
 import sys
+sys.path.insert(0, __import__("os").path.dirname(__import__("os").path.abspath(__file__)))
+import site_auth
 import tempfile
 import time
 import urllib.error
@@ -115,7 +117,7 @@ class Chat:
 
     def call(self, method, path, body=None, timeout=10):
         data = None if body is None else json.dumps(body).encode()
-        req = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}", data=data, method=method, headers={"Origin": ORIGIN, "Content-Type": "application/json"})
+        req = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}", data=data, method=method, headers={"Origin": ORIGIN, "Content-Type": "application/json", "Authorization": f"Bearer {site_auth.local_token()}"})
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.status, json.loads(r.read())

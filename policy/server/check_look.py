@@ -10,6 +10,8 @@ import os
 import socket
 import subprocess
 import sys
+sys.path.insert(0, __import__("os").path.dirname(__import__("os").path.abspath(__file__)))
+import site_auth
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -196,7 +198,7 @@ class Server:
 
     def call(self, method, path, body=None):
         req = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}", method=method, data=json.dumps(body).encode() if body is not None else None,
-                                     headers={"Origin": "http://localhost:5199", "Content-Type": "application/json"})
+                                     headers={"Origin": "http://localhost:5199", "Content-Type": "application/json", "Authorization": f"Bearer {site_auth.local_token()}"})
         with urllib.request.urlopen(req, timeout=120) as res:
             return json.load(res)
 

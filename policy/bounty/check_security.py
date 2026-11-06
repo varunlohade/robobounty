@@ -222,7 +222,7 @@ def f3_and_secret(root):
     check("claim: the secret is not on disk, and its hash is", b"ana-secret" not in on_disk and B.claim_hash("ana-secret").encode() in on_disk)
     check("claim: no public view holds the hash", B.claim_hash("ana-secret") not in json.dumps([X.list_fixes(bid, plain), X.get_fix(bid, n, plain), X.view(bid, plain)]))
     check("claim: the right name and secret are paid", X.ledger_step(bid, n, "claim", "ana", plain, secret="ana-secret")["payout"]["status"] == "Claimed")
-    check("claim: the label stays", X.view(bid, plain)["world_id_label"] == "World ID is not connected")
+    check("claim: the label stays", X.view(bid, plain)["world_id_label"] == B.WORLD_ID_LABEL)
 
     other = root / "no_secret"
     other.mkdir()

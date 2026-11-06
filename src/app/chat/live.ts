@@ -1,4 +1,5 @@
 // The chat backend for the local run server. DEMO SHORTCUT: an embedded runtime can replace this transport.
+import { runHeaders } from '../../site/auth.ts';
 import type { ChatAction, ChatBackend, ChatEvent } from './backend.ts';
 
 // ?server=PORT points the page at another local run server. Checks use it, so they never touch one that is already open.
@@ -21,7 +22,7 @@ function remember(id: string | null) {
 }
 
 async function post(path: string, body: unknown): Promise<Response> {
-  return fetch(`${SERVER}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(REPLY_DEADLINE_MS) });
+  return fetch(`${SERVER}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...await runHeaders() }, body: JSON.stringify(body), signal: AbortSignal.timeout(REPLY_DEADLINE_MS) });
 }
 
 export interface ServerInfo { sim_sha: string; llm: string; max_procs: number; stream_host?: boolean }

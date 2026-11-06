@@ -1,4 +1,5 @@
 // Operating limits, the boundary search and the regression suite on the grid. The server's numbers, as they are. Results are simulated. Tested never means safe.
+import { runHeaders } from '../site/auth.ts';
 import { el } from '../app/dom.ts';
 import type { ServerEvent } from '../app/chat/live.ts';
 import './testing.css';
@@ -149,7 +150,7 @@ export class Testing {
     const campaign = this.deps.base.match(/\/campaigns\/([^/]+)$/)?.[1];
     this.refusal = '';
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, campaign }), signal: AbortSignal.timeout(15_000) });
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...await runHeaders() }, body: JSON.stringify({ ...body, campaign }), signal: AbortSignal.timeout(15_000) });
       if (!res.ok) this.refusal = (await res.json().catch(() => ({}))).words ?? `HTTP ${res.status}`;
     } catch (err) { this.refusal = String(err); }
   }

@@ -1,7 +1,7 @@
 // The auth journeys in headless Chrome, against a real site server, a real board server and vite on their own ports, with a throwaway store.
 // The engineer's World ID reply is a MOCK (policy/server/check_auth_server.py). No real scan runs and no email is sent. Pictures: design/site2/auth-*.png.
 // Run: node src/site/tools/check_auth.mjs
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -80,6 +80,12 @@ try {
   await sidebar();
   await until(hasButton('Post a bounty'), 'the post button', 20);
   say(true, 'a company sees Post a bounty');
+  say(await js(`!document.querySelector('a.sh-item[href="simulation.html"]').hidden && document.querySelector('a.sh-item[href="simulation.html"]').textContent === 'Simulation'`), 'a company sees Simulation');
+  await go('crashlab.html');
+  await at('simulation.html', 'the old address');
+  await until(`document.querySelector('.sh-title')?.textContent === 'Simulation' && document.body.innerText.includes('Open Simulation')`, 'the Simulation page', 20);
+  say(true, 'crashlab.html redirects to simulation.html, and the page says Simulation');
+  say(/^CrashLab/.test(await js('document.title')) && (await js(`document.querySelector('.sh-brand').textContent`)) === 'CrashLab', 'the product name stays CrashLab');
   await signOut();
   say((await who()).signed_in === false, 'sign-out ends the session on the server');
   await go('login.html');
@@ -113,6 +119,29 @@ try {
   await sidebar();
   say(/Verified human/.test(await js(`document.querySelector('.sh-who').innerText`)), 'MOCK engineer: the sidebar shows it');
   await shot('4-engineer-mock');
+  const key = JSON.parse(execFileSync(PY, ['policy/server/screener.py', 'key'], { cwd: ROOT, encoding: 'utf8' }));
+  const links = await js(`[...document.querySelectorAll('nav a.sh-item')].filter(a => !a.hidden).map(a => a.textContent)`);
+  say(links.length === 1 && links[0] === 'Bounties', 'an engineer sees only Bounties in the sidebar', links.join());
+  for (const page of ['home.html', 'simulation.html', 'crashlab.html', 'data.html', 'providers.html', 'lab.html']) {
+    await go(page);
+    await at('bounties.html', `${page} to Bounties`);
+    await until(`document.body.innerText.includes('Engineers work from Bounties')`, 'the plain message', 15);
+    say(true, `an engineer on ${page} lands on Bounties, with a plain message`);
+  }
+  await shot('9-engineer-bounties');
+  await go('screener.html');
+  await clickWhenReady('Start');
+  await until(`!!document.querySelector('[data-question]')`, 'a question', 15);
+  await wait(300);
+  await shot('10-screener-question');
+  for (let i = 0; i < 6; i++) {
+    await until(`document.querySelector('[data-question]')?.dataset.index === '${i}'`, `question ${i + 1}`, 15);
+    const id = await js(`document.querySelector('[data-question]').dataset.question`);
+    await js(`document.querySelector('[data-choice="${key[id]}"]').click()`);
+  }
+  await until(`document.body.innerText.includes('coming soon')`, 'the card', 15);
+  say(/AI interview:\s+coming soon/.test(await text()) && /not proof of skill/.test(await text()), 'a pass shows a calm card, with an honest label');
+  await shot('11-screener-passed');
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__answer = ['0xdeadbeef00000000000000000000000000000000']; window.prompt = () => window.__next_address ?? sessionStorage.getItem('addr'); window.alert = t => { sessionStorage.setItem('alerted', t); };` });
   await go('home.html');
   await sidebar();

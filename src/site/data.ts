@@ -317,7 +317,7 @@ document.addEventListener('keydown', e => {
 
 getJson<{ campaigns: Campaign[] }>('/site-api/data').then(d => {
   campaigns = d.campaigns;
-  if (!campaigns.length) { page.replaceChildren(h('div', 'empty', h('p', '', 'No campaigns on disk yet.'), h('p', 'quiet', 'Open CrashLab and run a batch.'))); return; }
+  if (!campaigns.length) { page.replaceChildren(h('div', 'empty', h('p', '', 'No campaigns on disk yet.'), h('p', 'quiet', 'Open Simulation and run a batch.'))); return; }
   pick(campaigns.find(c => c.id === params.get('c')) ?? campaigns[0]);
 }).catch(() => { page.replaceChildren(serverDown('This page')); });
 getJson<Suites>('/site-api/regressions').then(d => { suites = d; if (current) paintSuites(); }).catch(() => {});

@@ -8,7 +8,7 @@ import { openChrome, wait } from '../../lab/tools/browser.mjs';
 const BASE = `http://localhost:${process.env.CRASHLAB_WEB_PORT ?? 5199}`; // scripts/demo.sh's --ports picks another.
 const OUT = process.argv[2] ?? 'design/site2';
 mkdirSync(OUT, { recursive: true });
-const PAGES = ['home', 'crashlab', 'data', 'providers'];
+const PAGES = ['home', 'simulation', 'data', 'providers'];
 const STRONG = 'correct horse battery';
 let failed = 0;
 const say = (ok, what, extra = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${what}${extra ? `: ${extra}` : ''}`); if (!ok) failed += 1; };
@@ -73,6 +73,7 @@ await ev(`document.querySelector('input[type=email]').value = 'check-${randomByt
 await wait(600);
 say((await ev(`location.pathname`)) === '/login.html', 'a short password does not enter');
 say(await ev(`!document.querySelector('p.bad').hidden`), 'the refusal shows in plain words');
+problems.length = 0; // The browser logs that 400, which this step asked for.
 await ev(`document.querySelector('input[type=password]').value = ${JSON.stringify(STRONG)}; document.querySelector('form button[type=submit]').click()`);
 await until(`location.pathname === '/home.html'`, 'home', 20).catch(() => null);
 await waitText('Check Company');
@@ -183,16 +184,16 @@ await go('data.html', 800);
 const all = await text();
 say(!/\bSample\b|Sign in to CrashLab/.test(all), 'data page holds no sample label');
 
-// Open CrashLab reaches lab.html with the chosen robot.
+// Open Simulation reaches lab.html with the chosen robot.
 for (const pack of ['inspection', 'window']) {
-  await go('crashlab.html', 800);
+  await go('simulation.html', 800);
   await until(`!!document.querySelector('input[value=${pack}]')`, 'cards', 20);
   await ev(`document.querySelector('input[value=${pack}]').click()`);
   await wait(250);
   await shot(`live-crashlab-${pack}`);
-  await ev(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Open CrashLab').click()`);
+  await ev(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Open Simulation').click()`);
   await until(`location.pathname === '/lab.html' && !!document.querySelector('.lab-title a')`, 'the lab page', 60).catch(() => null);
-  say((await ev(`location.pathname`)) === '/lab.html', `Open CrashLab reaches lab.html for ${pack}`);
+  say((await ev(`location.pathname`)) === '/lab.html', `Open Simulation reaches lab.html for ${pack}`);
   say((await ev(`sessionStorage.getItem('crashlab-pack')`)) === pack, `lab.html has ${pack} preselected`);
   say(await ev(`[...document.querySelectorAll('.lab-title a')].some(a => a.getAttribute('href') === 'home.html')`), 'lab has a way home');
 }

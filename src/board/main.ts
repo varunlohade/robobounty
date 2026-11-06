@@ -187,7 +187,7 @@ function fixDetail(b: Bounty, inner: HTMLElement) {
   const counts = `${c.held_back} held back. ${c.passed_before} passed before and must keep passing. ${c.other_failed} other failures must not get worse.`;
   inner.append(sect('Hidden worlds', h('span', 'tag quiet small', icon('eyeoff', 'i12'), `${total} stay hidden`)), h('div', 'hidden-w', cells, h('p', '', `Nobody sees these worlds. The code runs your fix on them and shows only a count. ${counts}`)));
   if (S.error) inner.append(h('div', 'err', S.error));
-  const send = who?.kind === 'engineer' ? button(S.fixes.length ? 'sec' : 'pri', 'Submit a fix', null, () => openSubmit(b)) : h('span', 't3 small', 'Only a signed-in engineer can submit a fix.');
+  const send = who?.kind === 'engineer' && !who.screened ? quizLink() : who?.kind === 'engineer' ? button(S.fixes.length ? 'sec' : 'pri', 'Submit a fix', null, () => openSubmit(b)) : h('span', 't3 small', 'Only a signed-in engineer can submit a fix.');
   if (send instanceof HTMLButtonElement) send.disabled = b.status !== 'open';
   const f = S.fixes.find(x => x.n === S.focus) ?? S.fixes[S.fixes.length - 1];
   const head = sect('Submission', h('span', 'row-r', send));
@@ -332,7 +332,7 @@ function findDetail(b: Bounty, inner: HTMLElement) {
   table.append(body);
   inner.append(table, h('div', 'words small', 'The company chose these limits. A world inside them is not shown to be physically possible.'));
   if (S.error) inner.append(h('div', 'err', S.error));
-  inner.append(sect('Submissions', who?.kind === 'engineer' ? button(S.subs.length ? 'sec' : 'pri', 'Submit a world', null, () => openSubmit(b)) : h('span', 't3 small', 'Only a signed-in engineer can submit.')));
+  inner.append(sect('Submissions', who?.kind === 'engineer' && !who.screened ? quizLink() : who?.kind === 'engineer' ? button(S.subs.length ? 'sec' : 'pri', 'Submit a world', null, () => openSubmit(b)) : h('span', 't3 small', 'Only a signed-in engineer can submit.')));
   if (!S.subs.length) inner.append(h('div', 'words small', 'No world yet.'));
   else {
     const subs = h('table', 'subs');
@@ -342,6 +342,12 @@ function findDetail(b: Bounty, inner: HTMLElement) {
     inner.append(subs);
   }
   inner.append(...notChecked(b));
+}
+
+function quizLink() {
+  const a = h('a', 't2 small', 'Take the short quiz to submit') as HTMLAnchorElement;
+  a.href = 'screener.html';
+  return a;
 }
 
 function render() {

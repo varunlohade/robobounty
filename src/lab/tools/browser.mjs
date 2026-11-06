@@ -36,7 +36,7 @@ export async function openChrome({ width = 1440, height = 900, guestForLab = tru
     if (guestForLab && method === 'Page.navigate' && /\/lab\.html/.test(params.url) && !guested.has(new URL(params.url).origin)) {
       const { origin } = new URL(params.url);
       guested.add(origin);
-      await raw('Page.navigate', { url: `${origin}/site-api/health` });
+      await raw('Page.navigate', { url: `${origin}/login.html` });
       await wait(300);
       await raw('Runtime.evaluate', { expression: `fetch('/site-api/auth/me').then(r => r.json()).then(m => m.signed_in ? null : fetch('/site-api/auth/guest', { method: 'POST', headers: { 'X-CrashLab-Request': '1' } }))`, awaitPromise: true });
     }

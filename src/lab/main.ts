@@ -1,5 +1,5 @@
 import { el } from '../app/dom.ts';
-import { loginHref, me } from '../site/auth.ts';
+import { ENGINEER_HOME, loginHref, me } from '../site/auth.ts';
 import { LiveBackend, SERVER, health, type ServerEvent } from '../app/chat/live.ts';
 import { Replay, loadMujoco } from '../app/replay.ts';
 import { isV5, loadTrial, loadTrialFrom, type Trial } from '../app/trial.ts';
@@ -12,7 +12,7 @@ import { Grid } from './grid.ts';
 import { PosesView, loadPoses, posesPage, previewReplay, type PoseReplay } from './poses.ts';
 
 // Signed-out visitors go to login and come back here. With no site server the lab still opens, because nobody can sign in then.
-void me().then(m => { if (!m.signedIn && !m.offline) location.replace(loginHref()); });
+void me().then(m => { if (!m.signedIn && !m.offline) location.replace(loginHref()); else if (m.role === 'engineer') location.replace(ENGINEER_HOME); });
 
 const NS = 'http://www.w3.org/2000/svg';
 const HEALTH_RETRY_MS = 2_000;

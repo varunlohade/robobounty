@@ -80,7 +80,7 @@ forge test
 
 | Part | Path | What it does |
 |---|---|---|
-| Site | `login.html`, `home.html`, `crashlab.html`, `data.html`, `providers.html`, `src/site/`, `policy/server/site_data.py` | Login, home, robot picker, stored run data |
+| Site | `login.html`, `home.html`, `simulation.html`, `data.html`, `providers.html`, `src/site/`, `policy/server/site_data.py` | Login, home, robot picker, stored run data |
 | Lab | `lab.html`, `src/lab/` | The main tool: chat, world view, test grid, code tab, Find the limit |
 | Earlier app | `app.html`, `src/app/` | Single-robot chat, world view, worlds map. The lab reuses parts of it. TypeScript, Three.js |
 | Browser MuJoCo | `src/app/replay.ts` | MuJoCo 3.16 in WASM. It sets recorded states and never steps physics |

@@ -37,7 +37,7 @@ Delete `/tmp/crashlab-board` first if it exists. Then open five tabs, in this or
 
 **Tab 3, the payout. Do this one early, because it needs about 3 minutes of waiting.**
 
-1. Open `http://localhost:6199/`, click Enter as local guest, then CrashLab, Window cleaning, Open CrashLab.
+1. Open `http://localhost:6199/`, click Enter as local guest, then Simulation, Window cleaning, Open Simulation.
 2. Click List test scenarios, then Run 34 scenarios. Wait for the grid to finish.
 3. Click a red Slipped square, then Open file, then Ask AI to fix: Slipped (6).
 4. Click Post a bounty. Title: `The robot slides on low suction`. Company: `Tower Services (test company)`. Click Post the bounty.
@@ -46,11 +46,11 @@ Delete `/tmp/crashlab-board` first if it exists. Then open five tabs, in this or
 7. Wait for Accepted, about 2 minutes. Wait until Finalize lights up, about 1 more minute. Leave it unclicked.
 8. Do not reload this tab. It holds the claim secret.
 
-**Tab 2, the grid.** Open `http://localhost:6199/crashlab.html`, choose Window cleaning, click Open CrashLab, then List test scenarios. Stop at the Run 34 scenarios button.
+**Tab 2, the grid.** Open `http://localhost:6199/simulation.html`, choose Window cleaning, click Open Simulation, then List test scenarios. Stop at the Run 34 scenarios button.
 
-**Tab 4, the limit.** Open CrashLab the same way. List, run, and wait. Click a red Low coverage square. Stop at the Find the limit button.
+**Tab 4, the limit.** Open Simulation the same way. List, run, and wait. Click a red Low coverage square. Stop at the Find the limit button.
 
-**Tab 5, the robots.** Open `http://localhost:6199/crashlab.html`.
+**Tab 5, the robots.** Open `http://localhost:6199/simulation.html`.
 
 **The film.** Open `design/shell/hull-film.mp4` in a video player, paused at the start. It runs 13 seconds and has no audio track.
 
@@ -66,7 +66,7 @@ Tab 1. Click **Enter as local guest**.
 
 ### 0:10 Pick a robot (7 s)
 
-Click **CrashLab**, **Window cleaning**, **Open CrashLab**.
+Click **Simulation**, **Window cleaning**, **Open Simulation**.
 
 > "We pick a robot. This window cleaner is fictional. Its controller is a script we wrote."
 

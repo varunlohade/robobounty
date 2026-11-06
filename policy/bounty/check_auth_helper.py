@@ -28,7 +28,11 @@ def company_token():
 
 def engineer_token(name):
     key = B.tester_key(name)
-    return _token(key, lambda: A.new_session(A.engineer_for_world(f"mock-{key}", "device", tester=key), "engineer"))
+    def make():
+        account = A.engineer_for_world(f"mock-{key}", "device", tester=key)
+        A.mark_screened(account)
+        return A.new_session(account, "engineer")
+    return _token(key, make)
 
 
 def signed(body):

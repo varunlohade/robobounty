@@ -133,6 +133,13 @@ class Handler(BaseHTTPRequestHandler):
             raise Refused(403, "role_refused", f"Only {' or '.join('a ' + r for r in roles)} can do this.")
         return s
 
+    def need_screened(self):
+        """Browsing and replays stay open. A submission needs the short quiz."""
+        s = self.need("engineer")
+        if not s["screened"]:
+            raise Refused(403, "not_screened", "Pass the short quiz before you submit.")
+        return s
+
     def own(self, bounty_id):
         s = self.need("company")
         if B.owner_of(bounty_id, ROOT) != s["account_id"]:
@@ -242,7 +249,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(201, {**made, "mine": True})
 
     def submit(self, bounty_id):
-        s = self.need("engineer")
+        s = self.need_screened()
         v = self.body(MAX_SUBMIT_BODY, SUBMIT_FIELDS)
         world = v["world"]
         if not isinstance(world, str):

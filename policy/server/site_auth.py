@@ -42,6 +42,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY, role TEXT NOT NULL, label TEXT NOT NULL, email TEXT UNIQUE, password TEXT, company TEXT, world_id TEXT UNIQUE, tester TEXT UNIQUE, credential TEXT, payout TEXT, email_verified_at REAL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions (token_sha TEXT PRIMARY KEY, account_id TEXT, role TEXT NOT NULL, expires_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS tries (key TEXT PRIMARY KEY, count INTEGER NOT NULL, since REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS screen (account_id TEXT PRIMARY KEY, questions TEXT, started_at REAL, retry_at REAL);
 """
 _DUMMY = None
 
@@ -64,6 +65,8 @@ def _open(db=None):
     if fresh:
         os.chmod(path, 0o600)
     d.executescript(SCHEMA)
+    if not any(column[1] == "screened_at" for column in d.execute("PRAGMA table_info(accounts)")):
+        d.execute("ALTER TABLE accounts ADD COLUMN screened_at REAL")
     return d
 
 
@@ -214,7 +217,7 @@ def demo_account(role, db=None):
     """Only scripts/demo.sh --recorded reaches this, on its own throwaway store."""
     seed = DEMO[role]
     with closing(_open(db)) as d:
-        d.execute("INSERT OR IGNORE INTO accounts (id, role, label, company, tester, credential, created_at) VALUES (?,?,?,?,?,?,?)", (seed["id"], role, seed["label"], seed.get("company"), seed.get("tester"), "demo", time.time()))
+        d.execute("INSERT OR IGNORE INTO accounts (id, role, label, company, tester, credential, created_at, screened_at) VALUES (?,?,?,?,?,?,?,?)", (seed["id"], role, seed["label"], seed.get("company"), seed.get("tester"), "demo", time.time(), time.time() if role == "engineer" else None))
     return seed["id"]
 
 
@@ -233,12 +236,12 @@ def new_session(account_id, role, old_token=None, db=None, now=None):
 def _session_row(sha, db, now):
     now = time.time() if now is None else now
     with closing(_open(db)) as d:
-        row = d.execute("SELECT s.token_sha, s.role, s.expires_at, a.id, a.label, a.company, a.tester, a.credential, a.payout, a.email_verified_at, a.world_id FROM sessions s LEFT JOIN accounts a ON a.id=s.account_id WHERE s.token_sha=? AND s.expires_at>=?", (sha, now)).fetchone()
+        row = d.execute("SELECT s.token_sha, s.role, s.expires_at, a.id, a.label, a.company, a.tester, a.credential, a.payout, a.email_verified_at, a.world_id, a.screened_at FROM sessions s LEFT JOIN accounts a ON a.id=s.account_id WHERE s.token_sha=? AND s.expires_at>=?", (sha, now)).fetchone()
     if not row:
         return None
     role, credential = row[1], row[7]
     level = "none" if role == "guest" else "demo" if credential == "demo" else "email_not_verified" if role == "company" and not row[9] else "email_verified" if role == "company" else f"world_{credential}"
-    return {"sid": row[0], "role": role, "expires_at": row[2], "account_id": row[3], "label": row[4] or "Guest", "company": row[5], "tester": row[6], "credential": credential, "payout": row[8], "verification": level, "world_id": row[10]}
+    return {"sid": row[0], "role": role, "expires_at": row[2], "account_id": row[3], "label": row[4] or "Guest", "company": row[5], "tester": row[6], "credential": credential, "payout": row[8], "verification": level, "world_id": row[10], "screened": bool(row[11])}
 
 
 def session_of(token, db=None, now=None):
@@ -262,7 +265,7 @@ def csrf_ok(token, sent, db=None):
 def public(s):
     """What /site-api/auth/me names. No token and no full address."""
     level = s["verification"]
-    return {"signed_in": True, "role": s["role"], "label": s["label"], "verification": level, "verification_label": VERIFICATION.get(level, "Email verified"), "demo": level == "demo", "tester": s["tester"], "expires_at": s["expires_at"],
+    return {"signed_in": True, "role": s["role"], "label": s["label"], "verification": level, "verification_label": VERIFICATION.get(level, "Email verified"), "demo": level == "demo", "tester": s["tester"], "screened": s["screened"], "expires_at": s["expires_at"],
             "payout": {"set": bool(s["payout"]), "masked": mask(s["payout"]) if s["payout"] else None}}
 
 
@@ -314,6 +317,22 @@ def save_payout(account_id, address, db=None):
         address = text
     with closing(_open(db)) as d:
         d.execute("UPDATE accounts SET payout=? WHERE id=? AND role='engineer'", (address, account_id))
+
+
+def mark_screened(account_id, db=None):
+    """For a check's seeded engineer. A real engineer gets this from screener.grade."""
+    with closing(_open(db)) as d:
+        d.execute("UPDATE accounts SET screened_at=? WHERE id=? AND role='engineer'", (time.time(), account_id))
+
+
+_local_session = None
+
+
+def local_token(db=None):
+    """A guest token for a tool on this machine that drives the run server. Reading this store already takes this machine's files."""
+    global _local_session
+    _local_session = _local_session or new_session(None, "guest", db=db)
+    return board_token(_local_session, db)
 
 
 def main():

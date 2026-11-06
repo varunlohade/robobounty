@@ -38,6 +38,7 @@ import generate_lab
 import pack_campaign
 import pack_job
 import recorded_batch
+import site_auth
 import testing_lab
 from stored_fix import STORED_FIX, ab_rows, recorded_fix
 
@@ -2072,7 +2073,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         if not self.allowed():
             return self.refuse()
-        self.head(204, "text/plain", 0, (("Access-Control-Allow-Methods", "GET, POST"), ("Access-Control-Allow-Headers", "Content-Type"), ("Access-Control-Max-Age", "60")))
+        self.head(204, "text/plain", 0, (("Access-Control-Allow-Methods", "GET, POST"), ("Access-Control-Allow-Headers", "Content-Type, Authorization"), ("Access-Control-Max-Age", "60")))
 
     def do_GET(self):
         if not self.allowed():
@@ -2208,6 +2209,15 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.allowed():
             return self.refuse()
+        # Every POST here makes a session, runs or edits. Simulation is for a company or a guest. An engineer replays public failing worlds through the board.
+        scheme, _, value = self.headers.get("Authorization", "").partition(" ")
+        who = site_auth.board_session(value.strip()) if scheme == "Bearer" else None
+        if not who:
+            self.close_connection = True
+            return self.reply(401, {"error": "sign_in_needed", "words": "Sign in first. Your session may have ended."})
+        if who["role"] not in ("company", "guest"):
+            self.close_connection = True
+            return self.reply(403, {"error": "role_refused", "words": "Simulation is for companies and guests. Engineers work from Bounties."})
         if self.headers.get_content_type() != "application/json":
             return self.reply(415, {"error": "json_only"})
         try:

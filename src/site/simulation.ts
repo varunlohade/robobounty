@@ -16,7 +16,7 @@ const ROBOTS = [
 ] as const;
 type Pack = typeof ROBOTS[number]['pack'];
 
-const { main, setStatus } = mountShell({ page: 'crashlab', title: 'CrashLab', subtitle: 'Say the job. The AI builds the world, lists what could go wrong and runs it all.' });
+const { main, setStatus } = mountShell({ page: 'simulation', title: 'Simulation', subtitle: 'Say the job. The AI builds the world, lists what could go wrong and runs it all.' });
 let data: Recent | null = null;
 let down = false;
 let chosen: Pack = 'window';
@@ -40,7 +40,7 @@ for (const r of ROBOTS) {
 }
 
 const aside = h('aside', '', h('h2', '', 'Choose a robot'), cards, about, facts,
-  h('div', '', button('pri lg wide', 'Open CrashLab', open), h('p', 'open-note', 'Opens the tool with this robot.')),
+  h('div', '', button('pri lg wide', 'Open Simulation', open), h('p', 'open-note', 'Opens the tool with this robot.')),
   h('div', 'later', icon('upload', 16), 'Importing a robot file is not built yet.'));
 main.append(h('div', 'lab', aside, stage));
 
@@ -63,7 +63,7 @@ function paint() {
   const table = h('div', '', h('div', 'sect', h('h2', '', 'Recent runs'), h('div', 'r', String(runs.length))));
   if (down) table.append(serverDown('The run list'));
   else if (!data) table.append(h('div', 'empty', h('p', 'quiet', 'Reading runs.')));
-  else if (!runs.length) table.append(h('div', 'empty', h('p', '', 'No runs with this robot yet.'), h('p', 'quiet', 'Open CrashLab and run its scenarios. They appear here.')));
+  else if (!runs.length) table.append(h('div', 'empty', h('p', '', 'No runs with this robot yet.'), h('p', 'quiet', 'Open Simulation and run its scenarios. They appear here.')));
   else {
     const body = h('tbody');
     for (const x of runs.slice(0, 4)) {

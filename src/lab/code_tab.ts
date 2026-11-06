@@ -1,4 +1,5 @@
 // The code tab: a real editor for a session copy of the robot's controller, opened from a square, and a read-only world file. The source files never change.
+import { runHeaders } from '../site/auth.ts';
 import { history, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { json } from '@codemirror/lang-json';
 import { python } from '@codemirror/lang-python';
@@ -319,7 +320,7 @@ export class CodeTab {
   }
 
   private async post(rest: string, body: unknown) {
-    const res = await fetch(this.url(rest), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(FETCH_MS * 2) });
+    const res = await fetch(this.url(rest), { method: 'POST', headers: { 'Content-Type': 'application/json', ...await runHeaders() }, body: JSON.stringify(body), signal: AbortSignal.timeout(FETCH_MS * 2) });
     return { status: res.status, body: await res.json().catch(() => ({})) };
   }
 

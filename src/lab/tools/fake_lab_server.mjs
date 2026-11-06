@@ -43,7 +43,7 @@ const sessions = new Map();
 const cors = (req, res) => {
   const origin = req.headers.origin ?? '*';
   res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Vary', 'Origin');
 };

@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "crashlab"))
 import limits as LIMITS
 import pack_job
 import regressions as REGRESSIONS
+import screener
 import site_auth as auth
 import site_world as world
 
@@ -40,6 +41,7 @@ CACHE_S = 30
 MAX_BODY = 256 * 1024
 MAX_AUTH_BODY = 4096
 COOKIE = "crashlab_session"
+ENGINEER_REFUSED = {"/site-api/data", "/site-api/recent", "/site-api/regressions"}
 SECURE = "; Secure" if os.environ.get("CRASHLAB_HTTPS") == "1" else ""  # Set behind HTTPS. Plain http on localhost cannot carry a Secure cookie everywhere.
 ROBOTS = {"window": "Window cleaning", "inspection": "Plant inspection"}
 NOTES = {"window": "Simulated. Hand-built physics, not checked against real hardware.", "inspection": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated."}
@@ -250,7 +252,7 @@ def open_work():
     if path.exists():
         missing = read_gz(path).get("not_tested") or []
         if missing:
-            work.append({"title": f"{len(missing)} factors not tested", "body": "No world function can model them yet: " + ", ".join(m["factor"] for m in missing[:2]) + ".", "tone": "quiet", "icon": "eyeoff", "href": "crashlab.html", "tag": ""})
+            work.append({"title": f"{len(missing)} factors not tested", "body": "No world function can model them yet: " + ", ".join(m["factor"] for m in missing[:2]) + ".", "tone": "quiet", "icon": "eyeoff", "href": "simulation.html", "tag": ""})
     return work
 
 
@@ -368,6 +370,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self.host_ok():
             return self.reply(403, {"error": "host_refused"})
         path = urlsplit(self.path).path
+        if (path in ENGINEER_REFUSED or DEMO_TRIAL.fullmatch(path) or path.startswith(("/site-api/film/", "/site-api/replay/"))) and (self.session()[1] or {}).get("role") == "engineer":
+            return self.reply(403, {"error": "role_refused", "words": "Engineers work from Bounties."})
         trial = DEMO_TRIAL.fullmatch(path)
         if trial:
             return self.demo_trial(trial[1], trial[2])
@@ -452,7 +456,7 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         token, s = self.session()
         try:
-            if path in ("/site-api/auth/logout", "/site-api/auth/wallet", "/site-api/auth/board-token") and s and not auth.csrf_ok(token, self.headers.get("X-CSRF-Token")):
+            if path in ("/site-api/auth/logout", "/site-api/auth/wallet", "/site-api/auth/board-token", "/site-api/auth/screener/start", "/site-api/auth/screener/grade") and s and not auth.csrf_ok(token, self.headers.get("X-CSRF-Token")):
                 return self.reply(403, {"error": "csrf_refused", "words": "This page is out of date. Reload it and try again."})
             if path == "/site-api/auth/logout":
                 auth.drop_session(token)
@@ -466,6 +470,14 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(403, {"error": "role_refused", "words": "Only an engineer has a payout address."})
                 auth.save_payout(s["account_id"], self.json_body().get("address"))
                 return self.reply(200, auth.public(auth.session_of(token)))
+            if path in ("/site-api/auth/screener/start", "/site-api/auth/screener/grade"):
+                if not s or s["role"] != "engineer":
+                    return self.reply(403, {"error": "role_refused", "words": "This quiz is for signed-in engineers."})
+                if s["screened"]:
+                    return self.reply(200, {"screened": True, "passed": True})
+                if path.endswith("/start"):
+                    return self.reply(200, screener.start(s["account_id"]))
+                return self.reply(200, screener.grade(s["account_id"], self.json_body().get("answers")))
             if path == "/site-api/auth/signup":
                 v = self.json_body()
                 return self.signed_in(auth.sign_up(v.get("email"), v.get("password"), v.get("company"), self.ip()), "company", token)

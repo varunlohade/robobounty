@@ -78,7 +78,7 @@ up "Web server, port $WEB" "$ORIGIN/login.html" || exit 1
 
 # The first request to each page makes vite prepare its code. Doing it here saves the judge that wait.
 printf 'Warming up the pages ... '
-for path in login.html home.html crashlab.html lab.html bounties.html data.html src/lab/main.ts src/board/main.ts src/site/data.ts src/site/home.ts src/app/view.ts; do
+for path in login.html home.html simulation.html lab.html bounties.html data.html src/lab/main.ts src/board/main.ts src/site/data.ts src/site/home.ts src/app/view.ts; do
   curl -fs -o /dev/null "$ORIGIN/$path"
 done
 echo ok

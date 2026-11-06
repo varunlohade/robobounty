@@ -19,16 +19,16 @@ function hero(run: Run | undefined): HTMLElement {
     info.append(h('div', 'nums', n(run.total, 'Worlds run'), n(run.passed, 'Passed'), n(run.failed, 'Failed', 'f'), n(run.holds, 'Safe holds')), outcomeBar(run, true));
     info.append(h('ul', 'types', ...run.types.map(t => h('li', '', t.name, h('b', '', String(t.count))))));
   } else {
-    info.append(h('h2', '', 'No batch yet'), h('p', 'quiet', 'Open CrashLab, choose a robot and run its scenarios. The numbers appear here.'));
+    info.append(h('h2', '', 'No batch yet'), h('p', 'quiet', 'Open Simulation, choose a robot and run its scenarios. The numbers appear here.'));
   }
-  info.append(h('div', 'acts', link('btn pri lg', 'crashlab.html', 'Open CrashLab'), run ? link('btn sec lg', `data.html?c=${run.id}`, `See the ${run.total} worlds`) : null));
+  info.append(h('div', 'acts', link('btn pri lg', 'simulation.html', 'Open Simulation'), run ? link('btn sec lg', `data.html?c=${run.id}`, `See the ${run.total} worlds`) : null));
   return h('section', 'hero', picture, info);
 }
 
 function runsTable(runs: Run[]): HTMLElement {
   const box = h('section', '', h('div', 'sect', h('h2', '', 'Recent runs'), h('div', 'r', link('more', 'data.html', 'All data'))));
   if (!runs.length) {
-    box.append(h('div', 'empty', h('p', '', 'No runs yet.'), h('p', 'quiet', 'Open CrashLab and run a batch. It appears here.')));
+    box.append(h('div', 'empty', h('p', '', 'No runs yet.'), h('p', 'quiet', 'Open Simulation and run a batch. It appears here.')));
     return box;
   }
   const body = h('tbody');
