@@ -160,7 +160,7 @@ export class LabChat {
       return option;
     }));
     this.route.value = this.routeNow = e.route;
-    this.route.hidden = false;
+    this.route.hidden = import.meta.env.VITE_HIDE_AI === '1';
   }
 
   private async chooseRoute() {

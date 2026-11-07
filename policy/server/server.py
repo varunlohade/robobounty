@@ -416,6 +416,9 @@ def llm_route_open(route):
 def default_llm_route():
     """A new chat starts on the first route this server can use. A stored run has no route, so the page shows no picker.
     0G Private comes first: in the real agent on 2026-11-07, both fast models refused or failed "add snow", so 0G Fast is a choice and not the default."""
+    asked = os.environ.get("CRASHLAB_DEFAULT_ROUTE")  # A film or a booth can start on one route.
+    if not RECORDED and asked in LLM_ROUTES and llm_route_open(asked):
+        return asked
     return None if RECORDED else next(r for r in ("private", "fast", "claude") if llm_route_open(r))
 
 

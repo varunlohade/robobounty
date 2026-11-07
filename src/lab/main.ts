@@ -11,6 +11,7 @@ import { lookOf } from '../view/real/look.ts';
 import { LabChat, replayNote } from './chat.ts';
 import { CodeTab } from './code_tab.ts';
 import { Grid } from './grid.ts';
+const HIDE_AI = import.meta.env.VITE_HIDE_AI === '1'; // A film can leave out which AI answers.
 import { PosesView, loadPoses, posesPage, previewReplay, type PoseReplay } from './poses.ts';
 
 // Signed-out visitors go to login and come back here. With no site server the lab still opens, because nobody can sign in then.
@@ -144,7 +145,7 @@ async function live(root: HTMLElement) {
       case 'view': applyView(e); break;
       case 'camera': if (e.box) current()?.frameOn(e.box); else current()?.backToRobot(); break;
       case 'trial': await showTrial(e.tid); break;
-      case 'llm_route': routeLine = `LLM: ${e.label}`; llmLine.textContent = routeLine; chat.llmRoute(e); break;
+      case 'llm_route': routeLine = HIDE_AI ? '' : `LLM: ${e.label}`; llmLine.textContent = routeLine; chat.llmRoute(e); break;
       case 'llm_count': aiLine.textContent = `AI calls ${e.used} of ${e.cap}`; break;
       case 'sim': simLine.textContent = e.label ? String(e.label) : `Sim ${e.sha ? String(e.sha).slice(0, 8) : 'unknown'}${e.sha && e.sha !== e.now ? `, now ${String(e.now).slice(0, 8)}: this run is from older code` : ''}`; break;
       case 'idle':
@@ -418,7 +419,7 @@ async function live(root: HTMLElement) {
     try {
       const info = await health();
       runLabel = info.recorded_batch ? LABEL : THIS_RUN_LABEL;
-      llmLine.textContent = routeLine || `LLM: ${info.llm}`;
+      llmLine.textContent = HIDE_AI ? '' : routeLine || `LLM: ${info.llm}`;
       root.dataset.server = 'up';
       break;
     } catch {
