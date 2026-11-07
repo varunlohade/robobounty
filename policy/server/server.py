@@ -334,7 +334,7 @@ def watch(p, rule, stdin, paths, tick):
             p.wait(POLL_S)
             return None, None
         except subprocess.TimeoutExpired:
-            send = None
+            pass  # The same input goes back in. Without it, a slow child's stdin never closes and it waits forever.
         if tick:
             tick()
         now, polls = time.monotonic(), polls + 1
