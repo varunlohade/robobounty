@@ -623,9 +623,9 @@ export class PosesView {
     const routePart = { meshes: route, lines: [], axis: 'x' as const, noBand: true };
     const ground = BLUE_GROUND.clone().multiplyScalar(0.4), real = new THREE.Color(BACKGROUND), now = new THREE.Color();
     this.renderer.setClearColor(ground);
-    const parts = staggered([floor, ...groups, routePart], [0, 3.2], [2.4, 7.2], 1.3, 1.5);
+    const parts = staggered([floor, ...groups, routePart], [0, 5], [4.4, 8.4], 1.6, 1.6);
     this.startBuild('first', parts, t => {
-      this.renderer.setClearColor(now.copy(ground).lerp(real, smooth((t - 3.4) / 2.6)));
+      this.renderer.setClearColor(now.copy(ground).lerp(real, smooth((t - 5.2) / 2.6)));
     });
   }
 

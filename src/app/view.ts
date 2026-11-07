@@ -645,19 +645,19 @@ export class SimView {
     skyU.uBlue.value = 1;
     this.lens = 0;
     const parts: BuildPart[] = [
-      { ...ground, at: 0, draw: 1.2, revealAt: 2.9, reveal: 3.6 }, // The city spreads while the sky clears.
-      { ...wall, at: 0.2, draw: 1.5, revealAt: 3.3, reveal: 1.9 },
-      { ...wallFine, at: 0.5, draw: 1.3, revealAt: 3.3, reveal: 1.9 },
-      ...staggered([...fixtures, robotPart], [1, 3], [4.1, 6.7], 1, 1.1),
-      { meshes: [this.robot.tether], lines: [tip.x, tip.y, tip.z, anchor.x, anchor.y, anchor.z], at: 2.6, draw: 0.6, revealAt: 6.5, reveal: 0.7, noBand: true, span: [tip.z, Math.min(anchor.z, nearTop)] },
+      { ...ground, at: 0, draw: 2, revealAt: 4.6, reveal: 3.8 }, // The city spreads while the sky clears.
+      { ...wall, at: 0.3, draw: 2.5, revealAt: 5, reveal: 2.4 },
+      { ...wallFine, at: 0.8, draw: 2.4, revealAt: 5, reveal: 2.4 },
+      ...staggered([...fixtures, robotPart], [1.6, 5], [5.6, 8.3], 1.6, 1.2),
+      { meshes: [this.robot.tether], lines: [tip.x, tip.y, tip.z, anchor.x, anchor.y, anchor.z], at: 4.2, draw: 0.8, revealAt: 7.9, reveal: 0.6, noBand: true, span: [tip.z, Math.min(anchor.z, nearTop)] },
     ];
     // The glass draws the robot's contact shadow itself. It waits for the robot.
     const robotAt = parts[parts.length - 2].revealAt, near = this.glass.uniforms.uRobotNear, nearReal = near.value;
     near.value = 0;
     this.startBuild('first', parts, t => {
       near.value = nearReal * smooth((t - robotAt) / 0.6);
-      skyU.uBlue.value = 1 - smooth((t - 4) / 2.2);
-      this.lens = smooth((t - 5.4) / 1.8);
+      skyU.uBlue.value = 1 - smooth((t - 5.2) / 2.4);
+      this.lens = smooth((t - 6.8) / 1.6);
     });
   }
 

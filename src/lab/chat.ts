@@ -56,6 +56,7 @@ export class LabChat {
   private routeNow = '';
   /** The user chose a robot from the + menu. */
   onPick: (pack: string) => void = () => {};
+  onPrompt: () => void = () => {}; // The first thing asked of this chat. The world waits for it.
   private runCards: HTMLElement[] = [];
 
   constructor(private backend: LiveBackend, private pack = 'window') {
@@ -103,6 +104,7 @@ export class LabChat {
     this.test.type = 'button';
     this.test.hidden = true;
     this.test.addEventListener('click', () => {
+      this.onPrompt();
       this.setBusy(true);
       void this.backend.act({ action: 'list_scenarios' } as ChatAction);
     });
@@ -261,6 +263,7 @@ export class LabChat {
   private async post(text: string) {
     try {
       // send yields only when the message did not start a job, so no idle event will come for it.
+      this.onPrompt();
       for await (const event of this.backend.send(text)) { this.add(event); this.setBusy(false); }
     } catch (err) {
       this.note(`Could not reach the run server: ${String(err)}`, true);
@@ -271,6 +274,7 @@ export class LabChat {
   private add(event: ChatEvent) {
     switch (event.type) {
       case 'user':
+        this.onPrompt();
         this.said.push(event.text);
         this.append(el('div', 'chat-me', event.text));
         break;

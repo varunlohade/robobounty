@@ -131,7 +131,19 @@ async function live(root: HTMLElement) {
   root.dataset.pack = pack ?? 'window';
   const built = buildMemory(() => backend.id);
   let runLabel = THIS_RUN_LABEL;
+  // The environment stays empty until the first prompt. A chat with history, or a run, shows it at once.
+  let prompted = false;
+  let held: ServerEvent | null = null;
+  const release = () => {
+    prompted = true;
+    if (!held) return;
+    const e = held;
+    held = null;
+    void onEvent(e);
+  };
   const onEvent = async (e: ServerEvent) => {
+    if (!prompted && (e.type === 'world' || e.type === 'pose_world')) { held = e; return; }
+    if (!prompted && (e.type === 'scenarios' || e.type === 'grid' || e.type === 'trial' || e.type === 'pose_trial')) release();
     switch (e.type) {
       case 'pose_world': showPoseWorld(e); break;
       case 'pose_trial': await showPoseTrial(String(e.url)); break;
@@ -140,7 +152,7 @@ async function live(root: HTMLElement) {
       case 'code_run': case 'code_changed': case 'code_fix': case 'code_fix_decided': code.event(e); break;
       case 'campaign_done': await onCampaignDone(e); break;
       case 'world': await showWorld(e); break;
-      case 'no_world': clear(); clear = () => {}; current = () => null; host.replaceChildren(empty); setName('new'); chat.worldGone(); break;
+      case 'no_world': held = null; prompted = false; clear(); clear = () => {}; current = () => null; host.replaceChildren(empty); setName('new'); chat.worldGone(); break;
       case 'look': applyLook(e); break;
       case 'view': applyView(e); break;
       case 'camera': if (e.box) current()?.frameOn(e.box); else current()?.backToRobot(); break;
@@ -158,6 +170,7 @@ async function live(root: HTMLElement) {
   const backend = new LiveBackend(onEvent, pack ? { pack } : { engine: 'v5' });
   const chat = new LabChat(backend, pack ?? 'window');
   chat.onPick = next => { choosePack(next); backend.reset(); };
+  chat.onPrompt = release;
   const { main, statusRight, setName, tab, gridTab, tabs } = shell(root, chat.root);
   const code = new CodeTab({
     session: () => backend.id!,

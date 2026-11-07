@@ -7,8 +7,8 @@ import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeome
 
 export const BLUE_LINE = 0x4cc2ff;
 export const BLUE_GROUND = new THREE.Color().setRGB(0.012, 0.045, 0.115);
-export const OBJECT_DRAW_S = 0.8;
-export const OBJECT_REVEAL_S = 0.8;
+export const OBJECT_DRAW_S = 1.2;
+export const OBJECT_REVEAL_S = 1.2;
 const BAND_LINE = new THREE.Color(0.8, 0.95, 1);
 const LINE_PX = 1.35;
 const BAND_PX = 2.2;
