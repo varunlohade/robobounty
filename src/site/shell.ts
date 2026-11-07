@@ -66,7 +66,7 @@ function whoRow(box: HTMLElement, who: Who, quiet = false) {
   const words = who.kind === 'guest' ? who.verificationLabel : who.label;
   name.append(make('span', '', words));
   if (who.kind !== 'guest' && (!quiet || who.verification === 'world_human')) name.append(make('small', '', who.verificationLabel));
-  if (who.kind === 'engineer' && !quiet) name.append(make('small', '', who.screened ? 'Screened. A quiz, not proof of skill.' : 'Not screened yet'), payoutButton(who));
+  if (who.kind === 'engineer' && !quiet) name.append(make('small', '', ''), payoutButton(who));
   else if (who.kind === 'engineer' && !who.payout.signed) name.append(payoutButton(who));
   box.replaceChildren(badge, name);
   const out = make('button', 'sh-out');

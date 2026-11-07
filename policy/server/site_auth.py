@@ -49,6 +49,7 @@ KEYLIKE = re.compile(r"(0x)?[0-9a-fA-F]{64}")
 WRONG = "That email or password is wrong."
 SIGNUP_REFUSED = "We could not create this account. Check the details, or sign in."
 BUSY = "Too many tries. Wait a few minutes and try again."
+QUIZ_OFF = os.environ.get("CRASHLAB_QUIZ") != "1"  # The engineer quiz is off for now. CRASHLAB_QUIZ=1 turns it back on.
 VERIFICATION = {"email_not_verified": "Email not verified", "world_human": "Verified human", "world_device": "Verified device.", "demo": "Demo account. Seeded, not real.", "none": "Guest, not verified"}
 DEMO = {"company": {"id": "demo-company", "label": "Demo company", "company": "Tower Services"}, "engineer": {"id": "demo-engineer", "label": "Demo engineer", "tester": "demo engineer"}}
 SCHEMA = """
@@ -257,7 +258,7 @@ def _session_row(sha, db, now):
         return None
     role, credential = row[1], row[7]
     level = "none" if role == "guest" else "demo" if credential == "demo" else "email_not_verified" if role == "company" and not row[9] else "email_verified" if role == "company" else f"world_{credential}"
-    return {"sid": row[0], "role": role, "expires_at": row[2], "account_id": row[3], "label": row[4] or "Guest", "company": row[5], "tester": row[6], "credential": credential, "payout": row[8], "verification": level, "world_id": row[10], "screened": bool(row[11]), "payout_signed": bool(row[12]), "email": row[13]}
+    return {"sid": row[0], "role": role, "expires_at": row[2], "account_id": row[3], "label": row[4] or "Guest", "company": row[5], "tester": row[6], "credential": credential, "payout": row[8], "verification": level, "world_id": row[10], "screened": QUIZ_OFF or bool(row[11]), "payout_signed": bool(row[12]), "email": row[13]}
 
 
 def session_of(token, db=None, now=None):
@@ -281,7 +282,7 @@ def csrf_ok(token, sent, db=None):
 def public(s):
     """What /site-api/auth/me names, to the signed-in person. No token and no full payout address."""
     level = s["verification"]
-    return {"signed_in": True, "role": s["role"], "label": s["label"], "verification": level, "verification_label": VERIFICATION.get(level, "Email verified"), "email": s.get("email"), "demo": level == "demo", "tester": s["tester"], "screened": s["screened"], "expires_at": s["expires_at"],
+    return {"signed_in": True, "role": s["role"], "label": s["label"], "verification": level, "verification_label": VERIFICATION.get(level, "Email verified"), "email": s.get("email"), "demo": level == "demo", "tester": s["tester"], "screened": QUIZ_OFF or s["screened"], "expires_at": s["expires_at"],
             "payout": {"set": bool(s["payout"]), "masked": mask(s["payout"]) if s["payout"] else None, "signed": bool(s.get("payout_signed"))}}
 
 
