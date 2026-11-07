@@ -121,6 +121,7 @@ def _post(h, root):
     if path == "/api/bounties/fix":
         s = h.need("company")
         v = h.body(MAX_POST_BODY, POST_FIELDS, ("window",))
+        B.require_post_room(s["account_id"], root)
         extra = {"window": v["window"]} if "window" in v else {}
         made = X.post(v["session"], v["campaign"], v["group"], v["title"], A.company_name(s), v["pay"], root=root, **extra)
         B.set_owner(made["id"], s["account_id"], root)

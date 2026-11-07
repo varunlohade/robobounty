@@ -246,6 +246,7 @@ class Handler(BaseHTTPRequestHandler):
     def post_bounty(self):
         s = self.need("company")
         v = self.body(MAX_POST_BODY, POST_FIELDS, ("window",))
+        B.require_post_room(s["account_id"], ROOT)
         window = {"window": v["window"]} if "window" in v else {}
         made = B.post(v["title"], A.company_name(s), v["scenarios"], v["cap"], v["per_failure"], v["limits"], root=ROOT, **window)
         B.set_owner(made["id"], s["account_id"], ROOT)

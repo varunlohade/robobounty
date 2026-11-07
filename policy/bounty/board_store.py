@@ -122,6 +122,13 @@ def set_owner(bounty_id, account_id, root=ROOT):
     write_json(Path(root) / str(bounty_id) / "owner.json", {"account": account_id})
 
 
+def require_post_room(account_id, root=ROOT):
+    """Hosted only, where CRASHLAB_POST_CAP is set: one account can hold this many bounties."""
+    cap = os.environ.get("CRASHLAB_POST_CAP")
+    if cap and sum(owner_of(p.parent.name, root) == account_id for p in Path(root).glob("*/owner.json")) >= int(cap):
+        raise BoardError("post_cap", f"This account reached its limit of {cap} bounties.")
+
+
 def owner_of(bounty_id, root=ROOT):
     """The company account that posted this bounty. None for an agent's or an older bounty, and then no company can act on it."""
     try:

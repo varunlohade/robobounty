@@ -27,6 +27,7 @@ SCRYPT_MEM = 64 * 1024 * 1024
 HASHING = threading.BoundedSemaphore(4)
 PASSWORD_MIN, PASSWORD_MAX = 12, 128
 EMAIL_TRIES, IP_TRIES, IP_SIGNUPS, IP_GUESTS, IP_WORLD = 8, 40, 20, 60, 60
+ALL_SIGNUPS, ALL_GUESTS = 60, 300  # In one window, across all addresses. An address header can be forged on a direct hit, so these hold regardless.
 PUBLIC_ORIGIN = os.environ.get("CRASHLAB_PUBLIC_ORIGIN", "").rstrip("/")  # Hosted, one origin behind a proxy. Unset on this machine, where the localhost lists apply.
 PUBLIC_HOST = os.environ.get("CRASHLAB_BACKEND_HOST") or PUBLIC_ORIGIN.partition("://")[2]  # The name this server is reached by. Behind a rewrite it differs from the page's origin.
 
@@ -175,6 +176,7 @@ def sign_up(email, password, company, ip, db=None):
     check_new_password(password, email)
     company = company_of(company)
     limit("signup", ip, IP_SIGNUPS, db)
+    limit("signup", "all", ALL_SIGNUPS, db)
     stored = hash_password(password)  # Hashed before the look-up, so a taken email costs the same time.
     account = "co_" + secrets.token_hex(12)
     with closing(_open(db)) as d:

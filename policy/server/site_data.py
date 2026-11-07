@@ -492,11 +492,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.signed_in(auth.sign_in(v.get("email"), v.get("password"), self.ip()), "company", token)
             if path == "/site-api/auth/guest":
                 auth.limit("guest", self.ip(), auth.IP_GUESTS)
+                auth.limit("guest", "all", auth.ALL_GUESTS)
                 return self.signed_in(None, "guest", token)
             if path == "/site-api/auth/demo":
                 role = self.json_body().get("role")
                 if not demo_on() or role not in auth.DEMO:
                     return self.reply(404, {"error": "not_found"})
+                auth.limit("demo", self.ip(), auth.IP_GUESTS)
+                auth.limit("demo", "all", auth.ALL_GUESTS)
                 return self.signed_in(auth.demo_account(role), role, token)
             if path in ("/site-api/auth/world/context", "/site-api/auth/world/verify"):
                 return self.world_route(path, token)

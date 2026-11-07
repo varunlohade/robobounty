@@ -14,7 +14,8 @@ mkdir -p "$DATA/board" "$DATA/server"
 ln -sfn "$DATA/board" policy/runs/board
 ln -sfn "$DATA/server" policy/runs/server
 export CRASHLAB_AUTH_DB="$DATA/auth.sqlite" CRASHLAB_HTTPS=1 CRASHLAB_TRUST_PROXY=1 CRASHLAB_HOSTED=1
-export CRASHLAB_DEMO=1 CRASHLAB_DEMO_ACCOUNTS=1 CRASHLAB_ARC_DEMO=1 # Recorded mode: seeded demo accounts, labelled on screen, and the recorded proof, tagged so.
+export CRASHLAB_DEMO_ACCOUNTS="${CRASHLAB_DEMO_ACCOUNTS:-0}" # Off unless the owner asks. Sign-in is guest and real accounts.
+export CRASHLAB_DEMO=1 CRASHLAB_ARC_DEMO=1 CRASHLAB_POST_CAP="${CRASHLAB_POST_CAP:-5}" # The recorded proof, tagged so, and a cap on one account's bounties.
 unset CRASHLAB_ARC
 PY=policy/.venv/bin/python
 "$PY" policy/bounty/arc_wallet.py seed-campaign
