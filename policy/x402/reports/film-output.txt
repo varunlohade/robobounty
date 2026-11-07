@@ -1,0 +1,16 @@
+agent  0.0.11347656, budget 0.05 HBAR, max 0.03 per call
+find   5 scenarios at http://127.0.0.1:7402/.well-known/x402
+402    vent_row: 0.02 HBAR quoted, in budget, paying
+paid   0.02 HBAR settled, 0.03 left, tx 0.0.7162784@1794012063.937691606
+sim    fail (detach), coverage 0%, simulated
+audit  HCS 0.0.11347686 #4
+402    wet_dirty: 0.03 HBAR quoted, in budget, paying
+paid   0.03 HBAR settled, 0.00 left, tx 0.0.7162784@1794012072.376135758
+sim    fail (slip_distance), coverage 67%, simulated
+audit  HCS 0.0.11347686 #5
+skip   dense_grid: 0.03 HBAR, over budget
+skip   nominal: 0.01 HBAR, over budget
+skip   signage: 0.02 HBAR, over budget
+spent  0.05 of 0.05 HBAR, 2 settled, 3 skipped
+report reports/spend-report.json
+proof  https://hashscan.io/testnet/transaction/1794012072.275315104?tid=0.0.7162784-1794012063-937691606

@@ -1,0 +1,114 @@
+{
+ "simulated_results_notice": "Simulated result from a hand-built MuJoCo model of the window robot. Not a real robot failure.",
+ "network": "hedera:testnet",
+ "started": "2026-11-07T00:41:10.529Z",
+ "finished": "2026-11-07T00:41:33.253Z",
+ "agent": "0.0.11347656",
+ "merchant": "0.0.11347685",
+ "audit_topic": "0.0.11347686",
+ "facilitator": "https://api.testnet.blocky402.com",
+ "budget_tinybars": "5000000",
+ "max_per_call_tinybars": "3000000",
+ "spent_tinybars": "5000000",
+ "settled_runs": 2,
+ "agent_paid_payment_fees_tinybars": 0,
+ "agent_paid_audit_fees_tinybars": 792811,
+ "runs": [
+  {
+   "scenario": "vent_row",
+   "amount_tinybars": "2000000",
+   "tx": "0.0.7162784@1794012063.937691606",
+   "hashscan": "https://hashscan.io/testnet/transaction/1794012072.275315104?tid=0.0.7162784-1794012063-937691606",
+   "fee_payer": "0.0.7162784",
+   "network_fee_tinybars": 296290,
+   "result": {
+    "source": "live simulation, run for this request",
+    "simulated": true,
+    "notice": "Simulated result from a hand-built MuJoCo model of the window robot. Not a real robot failure.",
+    "seed": 7,
+    "outcome": "fail",
+    "failure": "detach",
+    "fired": {
+     "detach": {
+      "t": 10.7,
+      "value": 0.0362
+     },
+     "coverage": {
+      "t": 10.7,
+      "value": 0
+     }
+    },
+    "coverage": 0,
+    "sim_time_s": 10.7,
+    "steps": 214,
+    "wall_s": 0.17,
+    "sim_label": "sim highrise5 aefb9d57602c",
+    "world_sha256": "edd73d31493e7ff3aa7e278604a2167e122d00c0716c7ec4dceea294df4149ec",
+    "action_chain_head": "4687ad22fcfd45fd6581a5c61da7f66618da88e9eaadc68f0a95f5673616288d"
+   },
+   "audit": {
+    "sequence": 4,
+    "tx": "0.0.11347656@1794012068.437532981"
+   }
+  },
+  {
+   "scenario": "wet_dirty",
+   "amount_tinybars": "3000000",
+   "tx": "0.0.7162784@1794012072.376135758",
+   "hashscan": "https://hashscan.io/testnet/transaction/1794012085.657497562?tid=0.0.7162784-1794012072-376135758",
+   "fee_payer": "0.0.7162784",
+   "network_fee_tinybars": 296290,
+   "result": {
+    "source": "live simulation, run for this request",
+    "simulated": true,
+    "notice": "Simulated result from a hand-built MuJoCo model of the window robot. Not a real robot failure.",
+    "seed": 7,
+    "outcome": "fail",
+    "failure": "slip_distance",
+    "fired": {
+     "slip_distance": {
+      "t": 60.9,
+      "value": 0.3008
+     },
+     "false_done": {
+      "t": 348.6,
+      "value": 0.3295
+     },
+     "coverage": {
+      "t": 348.6,
+      "value": 0.6705
+     }
+    },
+    "coverage": 0.6705,
+    "sim_time_s": 348.6,
+    "steps": 6972,
+    "wall_s": 4.731,
+    "sim_label": "sim highrise5 aefb9d57602c",
+    "world_sha256": "a4af0055383945832d900d5e2a15a5826977089b6aeed829c1d3cc77a941309d",
+    "action_chain_head": "9cd36da0eb9397d05fe04799cca2cac005cdaa88ce478b9f87c77b9a09f13486"
+   },
+   "audit": {
+    "sequence": 5,
+    "tx": "0.0.11347656@1794012082.148964407"
+   }
+  }
+ ],
+ "skipped": [
+  {
+   "scenario": "dense_grid",
+   "price_tinybars": "3000000",
+   "reason": "over budget"
+  },
+  {
+   "scenario": "nominal",
+   "price_tinybars": "1000000",
+   "reason": "over budget"
+  },
+  {
+   "scenario": "signage",
+   "price_tinybars": "2000000",
+   "reason": "over budget"
+  }
+ ],
+ "stopped_on_error": null
+}
