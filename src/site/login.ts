@@ -209,7 +209,7 @@ async function engineerStep() {
     open.target = '_blank';
     open.rel = 'noopener';
     worldStep(title(), [
-      h('p', 'lg-say', device ? 'Verified device. Not proof of a unique human. It shares no name, email or face.' : 'World ID proves you are one unique human. It shares no name, email or face.'),
+      h('p', 'lg-say', device ? 'Confirm with World ID.' : 'World ID proves you are one unique human. It shares no name, email or face.'),
       h('p', 'lg-small', 'Waiting for World App. Or ', open, '. The request ends in 5 minutes.'),
       stagingLine(),
     ], [backButton(), guestButton()], qrBox(uri));
@@ -221,7 +221,7 @@ async function engineerStep() {
     if (run.signal.aborted) return;
     if (!reply.ok || reply.body.verified !== true) throw new Error(reply.body.words ?? 'The server refused this proof. You are not signed in.');
     cancel = null;
-    worldStep(worldTitle('Opening', 'CrashLab.'), [h('p', 'lg-say lg-status', reply.body.credential === 'human' ? 'The server verified your proof.' : 'Verified device. Not proof of a unique human.')], []);
+    worldStep(worldTitle('Opening', 'CrashLab.'), [h('p', 'lg-say lg-status', reply.body.credential === 'human' ? 'The server verified your proof.' : 'Verified device.')], []);
     goIn();
   } catch (err) {
     if (run.signal.aborted) return;

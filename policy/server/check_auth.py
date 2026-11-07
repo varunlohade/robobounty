@@ -304,7 +304,7 @@ try:
 
     dv = Browser(DEVICE_SITE)
     s, r = device_scan(dv)
-    check(s == 200 and r["verification_label"] == "Verified device. Not proof of a unique human." and r["credential"] == "device", "MOCK device mode: the label stays honest", str(r))
+    check(s == 200 and r["verification_label"] == "Verified device." and r["credential"] == "device", "MOCK device mode: the label stays honest", str(r))
     device_tester = r["tester"]
     dv.me()
     dv.call("POST", "/site-api/auth/logout")

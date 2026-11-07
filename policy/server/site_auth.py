@@ -49,7 +49,7 @@ KEYLIKE = re.compile(r"(0x)?[0-9a-fA-F]{64}")
 WRONG = "That email or password is wrong."
 SIGNUP_REFUSED = "We could not create this account. Check the details, or sign in."
 BUSY = "Too many tries. Wait a few minutes and try again."
-VERIFICATION = {"email_not_verified": "Email not verified", "world_human": "Verified human", "world_device": "Verified device. Not proof of a unique human.", "demo": "Demo account. Seeded, not real.", "none": "Guest, not verified"}
+VERIFICATION = {"email_not_verified": "Email not verified", "world_human": "Verified human", "world_device": "Verified device.", "demo": "Demo account. Seeded, not real.", "none": "Guest, not verified"}
 DEMO = {"company": {"id": "demo-company", "label": "Demo company", "company": "Tower Services"}, "engineer": {"id": "demo-engineer", "label": "Demo engineer", "tester": "demo engineer"}}
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY, role TEXT NOT NULL, label TEXT NOT NULL, email TEXT UNIQUE, password TEXT, company TEXT, world_id TEXT UNIQUE, tester TEXT UNIQUE, credential TEXT, payout TEXT, email_verified_at REAL, created_at REAL NOT NULL);
