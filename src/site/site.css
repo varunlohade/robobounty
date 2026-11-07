@@ -234,3 +234,5 @@ table.fixed td:nth-child(1){width:34%;white-space:normal}table.fixed td:nth-chil
 .suite-worlds th,.suite-worlds td{white-space:normal}
 table.fixed td{white-space:normal}
 .kind .stat{white-space:normal}
+.add-robot{display:block;width:100%;margin-top:8px;padding:14px 16px;background:none;border:1px dashed var(--line-2,#c9c9cc);border-radius:10px;color:var(--t2);font:inherit;text-align:left;cursor:pointer}
+.add-robot:hover{color:var(--t1,#0b0b0c);border-color:var(--t2)}

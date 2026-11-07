@@ -30,7 +30,9 @@ const picture = h('div', 'pick-picture');
 const name = h('h2', 'pick-name');
 const line = h('p', 'pick-line');
 const stage = h('section', 'stage pick', picture, h('div', 'pick-foot', h('div', '', name, line), button('pri lg', 'Open Simulation', open)));
-main.append(h('div', 'lab', h('aside', '', h('h2', '', 'Choose a robot'), cards), stage));
+const addRobot = h('button', 'add-robot', '+ Add a robot') as HTMLButtonElement;
+addRobot.type = 'button';
+main.append(h('div', 'lab', h('aside', '', h('h2', '', 'Choose a robot'), cards, addRobot), stage));
 
 function paint() {
   const r = ROBOTS.find(x => x.pack === chosen)!;
