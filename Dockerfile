@@ -9,6 +9,7 @@ COPY --from=caddy:2.10-alpine /usr/bin/caddy /usr/local/bin/caddy
 COPY package.json deploy/Caddyfile deploy/start.sh ./deploy-files/
 COPY policy/ policy/
 COPY docs/evidence/ docs/evidence/
+COPY contracts/src/ contracts/src/
 RUN cp deploy-files/package.json package.json && useradd -m -u 1000 app && chown -R app /app
 ENV PYTHONDONTWRITEBYTECODE=1
 CMD ["bash", "/app/deploy-files/start.sh"]

@@ -6,6 +6,7 @@
 !deploy/Caddyfile
 !deploy/start.sh
 !docs/evidence
+!contracts/src
 !policy/bounty
 !policy/server
 !policy/crashlab
