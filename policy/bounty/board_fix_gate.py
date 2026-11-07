@@ -134,6 +134,19 @@ def _stored_proof(row, info, hidden):
     return {**stored["result"], "recorded": True, "words": (HOSTED_WORDS if os.environ.get("CRASHLAB_HOSTED") == "1" else RECORDED_WORDS) + stored["result"]["words"]}
 
 
+DEMO_WORDS = "Demo pass: no check ran on this submission. "
+
+
+def _demo_pass(source_text):
+    """CRASHLAB_DEMO_PASS=1, off by default, for a filmed demo. It runs nothing, and the page says so. A submission that says fail fails."""
+    if os.environ.get("CRASHLAB_DEMO_PASS") != "1" or not STORED_PROOF.is_file():
+        return None
+    if "fail" in source_text.lower():
+        return _fail("demo_fail", "This submission says fail, so it failed. Demo mode: no check ran.", "check")
+    result = json.loads(STORED_PROOF.read_text())["result"]
+    return {**result, "recorded": True, "demo_pass": True, "words": DEMO_WORDS + result["words"]}
+
+
 def _run(row, root, code_root, folder, sub, t0):
     info = json.loads((folder / "pack.json").read_text())
     hidden = json.loads((folder / "hidden.json").read_text())
@@ -147,6 +160,9 @@ def _run(row, root, code_root, folder, sub, t0):
     base = folder / info["controller"]["file"]
     if hashlib.sha256(base.read_bytes()).hexdigest() != info["controller"]["sha256"]:
         return _fail("controller_changed", "The bounty's controller copy changed after it was posted, so no run counts.", "frozen")
+    demo = _demo_pass((sub / "source.py").read_text())
+    if demo:
+        return demo
     recorded = _stored_proof(row, info, hidden)
     if recorded:
         return recorded

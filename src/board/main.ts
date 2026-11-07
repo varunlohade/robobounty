@@ -651,7 +651,7 @@ function fixResult(b: Bounty, f: Fix): HTMLElement[] {
     out.push(sect(f.state === 'running' ? `Fix ${f.n} is running in the sandbox` : f.state === 'interrupted' ? `The board restarted during fix ${f.n}` : `Fix ${f.n} waits for the gate`));
     return out;
   }
-  out.push(sect(HEADLINE[r.code] ?? cap1(words(r.code)), r.recorded ? h('span', 'sample', 'Recorded proof') : f.wall_s !== undefined ? `${f.wall_s} s` : ''));
+  out.push(sect(HEADLINE[r.code] ?? cap1(words(r.code)), r.demo_pass ? h('span', 'sample', 'Demo pass, no check ran') : r.recorded ? h('span', 'sample', 'Recorded proof') : f.wall_s !== undefined ? `${f.wall_s} s` : ''));
   if (!passedCode(f)) out.push(h('div', 'words', r.words));
   const s = r.sets;
   if (s) {
