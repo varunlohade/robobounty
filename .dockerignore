@@ -5,6 +5,7 @@
 !deploy/requirements.txt
 !deploy/Caddyfile
 !deploy/start.sh
+!deploy/arc.json
 !docs/evidence
 !contracts/src
 !policy/bounty

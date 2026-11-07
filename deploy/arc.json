@@ -1,0 +1,10 @@
+{
+ "label": "Arc testnet. Test USDC, not real money.",
+ "chain_id": 5042002,
+ "contract": "0xc3cc7807884049c97e024242d72be65b8811cfd8",
+ "token": "0x3600000000000000000000000000000000000000",
+ "tx": "0xd75afcb3026e0f7e1ee85fa142595f9a635fd8102808d6122cd34c5bb86443a7",
+ "tx_link": "https://explorer.testnet.arc.io/tx/0xd75afcb3026e0f7e1ee85fa142595f9a635fd8102808d6122cd34c5bb86443a7",
+ "resolver": "0x040bf606eb0422fa3a403e270cc18daa70ea8e00",
+ "arbiter": "0xf7a4cd0b0d23dd25ed08f7d45431e655f6df59f1"
+}
