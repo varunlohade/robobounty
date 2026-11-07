@@ -22,6 +22,7 @@ GATE_TIMEOUT_S = {"window": 1800, "inspection": 3600}  # An inspection world tak
 PROCS = 6
 NOTE = "Engineer's source, tested by the board. No AI call ran."
 STORED_PROOF = X.POLICY / "runs" / "demo" / "window" / "stored_proof.json"
+HOSTED_WORDS = "Recorded proof: this same source ran on these same worlds with this same code in an earlier real run on a Mac. No sim ran here, and the hosted site only checked that the bytes match. "
 RECORDED_WORDS = "Recorded proof: this same source ran on these same worlds with this same code in an earlier real run, and no sim ran now. The stored runs replayed again before any pay. "
 
 
@@ -130,7 +131,7 @@ def _stored_proof(row, info, hidden):
     stored = json.loads(STORED_PROOF.read_text())
     if stored["key"] != proof_key(row, info, hidden):
         return None
-    return {**stored["result"], "recorded": True, "words": RECORDED_WORDS + stored["result"]["words"]}
+    return {**stored["result"], "recorded": True, "words": (HOSTED_WORDS if os.environ.get("CRASHLAB_HOSTED") == "1" else RECORDED_WORDS) + stored["result"]["words"]}
 
 
 def _run(row, root, code_root, folder, sub, t0):

@@ -117,6 +117,8 @@ def _is_stale(folder, worlds, pack, base_sha, code_root=POLICY, tick=None):
         return True
     if not worlds:
         return True
+    if os.environ.get("CRASHLAB_HOSTED") == "1" and pack == "window":
+        return not _same_bytes_as_recorded(folder, now, base_sha)
     checks, replays = [], []
     for w in worlds:
         if not w.get("hash"):
@@ -153,6 +155,16 @@ def _same_physics(worlds, code):
     except subprocess.TimeoutExpired:
         return False
     return done.returncode == 0 and done.stdout.strip() == "same"
+
+
+def _same_bytes_as_recorded(folder, now, base_sha):
+    """The hosted site runs no simulation, so it replays nothing. A recorded campaign counts only if its worlds, its controller and every frozen file are the exact bytes of the recorded real run."""
+    try:
+        key = _read(POLICY / "runs" / "demo" / "window" / "stored_proof.json")["key"]
+        plan = hashlib.sha256((Path(folder) / "scenarios.json").read_bytes()).hexdigest()
+    except (OSError, ValueError, KeyError):
+        return False
+    return plan == key["plan"] and base_sha == key["controller"] and now == key["frozen"]
 
 
 def _replays_same(replays, code_root, tick=None):
