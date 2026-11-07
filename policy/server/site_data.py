@@ -395,7 +395,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.me()
         if path == "/site-api/auth/world":
             state = world.status()
-            return self.reply(200, {"on": state["on"], "missing": state["missing"], "credential": state["credential"], "demo": demo_on(), "password_min": auth.PASSWORD_MIN})
+            return self.reply(200, {"on": state["on"], "missing": (["hidden"] if state["missing"] else []) if auth.PUBLIC_ORIGIN else state["missing"], "credential": state["credential"], "demo": demo_on(), "password_min": auth.PASSWORD_MIN})
         parts = path.strip("/").split("/")
         if len(parts) == 4 and parts[1] == "film" and parts[2] in ROBOTS and WORLD_DIR.fullmatch(parts[3]):
             film = DEMO / parts[2] / parts[3] / "film.jpg"

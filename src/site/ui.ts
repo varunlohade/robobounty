@@ -28,7 +28,7 @@ export const START_SERVER = 'policy/.venv/bin/python policy/server/site_data.py'
 export function serverDown(what: string): HTMLElement {
   return h('div', 'empty',
     h('p', '', `${what} comes from the site server, and it does not answer.`),
-    h('p', 'quiet', 'Start it with: ', h('code', '', START_SERVER)));
+    import.meta.env.VITE_HOSTED === '1' ? h('p', 'quiet', 'Try again in a minute.') : h('p', 'quiet', 'Start it with: ', h('code', '', START_SERVER)));
 }
 
 export async function getJson<T>(path: string): Promise<T> {

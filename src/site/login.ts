@@ -146,8 +146,8 @@ function offStep(s: Status | null) {
   worldStep(worldTitle('World ID', 'is off.'), [
     h('p', 'lg-say lg-status', s ? 'World ID is not set up on this server yet.' : 'The site server does not answer, so World ID is off.'),
     h('p', 'lg-small', 'A guest can look and run the saved demo. A guest cannot post, submit or claim.'),
-    s?.missing.length ? h('p', 'lg-small', `Missing in .env: ${s.missing.join(', ')}`) : null,
-    s ? null : h('p', 'lg-small', h('code', '', START_SERVER)),
+    s?.missing.length ? h('p', 'lg-small', import.meta.env.VITE_HOSTED === '1' ? 'World ID sign-in is off.' : `Missing in .env: ${s.missing.join(', ')}`) : null,
+    s || import.meta.env.VITE_HOSTED === '1' ? null : h('p', 'lg-small', h('code', '', START_SERVER)),
   ], [backButton(), guestButton()]);
 }
 
