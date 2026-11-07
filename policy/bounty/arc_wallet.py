@@ -95,8 +95,8 @@ _config = {}
 def config(root):
     """What the page needs, cached a few seconds, since every step asks. It holds nothing secret."""
     root = str(root)
-    if os.environ.get(ON_ENV) != "1":
-        return {"on": False}
+    if os.environ.get(ON_ENV) != "1":  # The hosted site has no chain, but its recorded path still offers the stored campaign and the stored good fix.
+        return {"on": False, "demo": True, "demo_session": DEMO_SESSION, "recorded_label": RECORDED_LABEL} if os.environ.get(DEMO_ENV) == "1" else {"on": False}
     held = _config.get(root)
     if held and held[0] > time.time():
         return held[1]

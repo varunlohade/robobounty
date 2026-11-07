@@ -10,6 +10,7 @@ POST /api/arc/bounties/<id>/funded    {create_tx, approve_tx?}. Saved only after
 POST /api/arc/bounties/<id>/fixes/<n>/reject   {nonce, signature}. Signed by the wallet that funded it.
 POST /api/arc/bounties/<id>/fixes/<n>/claimed  {tx}. The engineer's fallback for a stuck agent.
 """
+import os
 import re
 import secrets
 import threading
@@ -65,7 +66,7 @@ def _get(h, root):
     elif m := BALANCE.fullmatch(h.path):
         h.reply(200, W.balances(m[1], root))
     elif h.path == "/api/arc/demo-fix":
-        if not W.need_on(root)["demo"]:
+        if os.environ.get(W.DEMO_ENV) != "1":
             raise B.BoardError("not_found", "There is no stored fix outside the recorded film path.")
         h.reply(200, {"source": W.DEMO_FIX.read_text(), "group": W.DEMO_GROUP})
     else:
