@@ -451,9 +451,9 @@ export class CodeTab {
   private cards = new Map<string, HTMLElement>();
   private unsolved = new Set<string>();
 
-  /** The bounty page's address for a failure the AI could not fix. Null until an AI fix for it did not help or was rejected. */
+  /** The bounty page's address for a failure. */
   bountyLink(campaign: string, verdict: string): string | null {
-    return this.unsolved.has(`${campaign}/${verdict}`) ? `/bounties.html?post=${this.deps.session()}/${campaign}/${verdict}` : null;
+    return `/bounties.html?post=${this.deps.session()}/${campaign}/${verdict}`;
   }
 
   private offerBounty(e: ServerEvent) {

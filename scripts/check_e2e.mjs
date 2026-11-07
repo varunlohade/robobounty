@@ -239,7 +239,7 @@ async function flow(mode) {
       check(`${mode}: the detail shows the judge and the log`, rail.includes('Judge') && rail.includes('Last log lines'));
       check(`${mode}: the timeline marks the failure`, await c.js(`document.querySelectorAll('.scrub .mark').length > 0`));
       check(`${mode}: the replay fills the main area`, await c.js(`document.querySelector('.grid-replay .viewport').getBoundingClientRect().width > 600`));
-      check(`${mode}: no bounty offer before an AI try`, !(await c.js(`!!document.querySelector('.grid-post')`)));
+      check(`${mode}: a failed run offers a bounty`, await c.js(`!!document.querySelector('.grid-post')`));
     }, 2500);
     await step('open-in-rerun', async () => {
       await clickText('Open in Rerun', '.grid-file');

@@ -904,6 +904,12 @@ export class Grid {
   private detailBody(d: ServerEvent): HTMLElement[] {
     const out: HTMLElement[] = [];
     const bad = d.status === 'failed' || d.status === 'stuck';
+    const post = d.verdict && (d.status === 'failed' || d.status === 'stuck') && !d.held_back ? this.deps.bountyLink?.(String(d.verdict)) : null;
+    if (post) {
+      const a = el('a', 'grid-post', 'Post a bounty') as HTMLAnchorElement;
+      a.href = post;
+      out.push(a);
+    }
     if (d.verdict_reason) out.push(section('Judge', [el('div', bad ? 'grid-text bad' : 'grid-text', String(d.verdict_reason))]));
     out.push(section('Why this scenario', [el('div', 'grid-text', String(d.reason))]));
     if (d.held_back) out.push(el('div', 'grid-rail-note', 'Kept back as a fresh set for testing a change. It does not run here.'));
@@ -932,24 +938,12 @@ export class Grid {
     world.addEventListener('click', () => this.deps.openWorld?.(d));
     file.append(open, world);
     if (d.rerun) file.append(this.rerunButton(d));
-    const post = d.verdict && (d.status === 'failed' || d.status === 'stuck') ? this.deps.bountyLink?.(String(d.verdict)) : null;
     if (bad && !d.held_back && d.verdict) {
       const find = el('button', 'grid-btn grid-find', 'Find the limit');
       find.type = 'button';
       find.title = 'Varies one factor of this world to find where failure starts. At most 12 runs per factor.';
       find.addEventListener('click', () => void this.testing.findLimit(String(d.verdict), Number(d.index)));
       file.append(find);
-    }
-    if (post) {
-      const a = el('a', 'grid-btn grid-post', 'Post a bounty') as HTMLAnchorElement;
-      a.href = post;
-      file.append(a);
-    } else if (bad && !d.held_back && d.verdict) {
-      // The bounty is for what the AI could not fix, so the AI tries first. The button shows the way there.
-      const wait = el('button', 'grid-btn grid-post-wait', 'Post a bounty') as HTMLButtonElement;
-      wait.type = 'button';
-      wait.disabled = true;
-      file.append(wait, el('div', 'grid-rail-note grid-post-note', 'Opens if the AI cannot fix this. Press Open file, then Ask AI to fix.'));
     }
     if (d.first) {
       const before = d.first as { verdict_reason?: string | null };

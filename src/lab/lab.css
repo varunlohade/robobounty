@@ -239,7 +239,7 @@ button.lab-tab[hidden] { display: none; }
 .grid-nt-source { color: var(--lab-muted); font-size: 11px; line-height: 16px; }
 .grid-replay > .grid-replay-note:not(:only-child) { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); padding: 4px 10px; background: var(--lab-panel); border: 1px solid var(--lab-hair); border-radius: 6px; z-index: 5; }
 .grid-file { flex-wrap: wrap; }
-.grid-post-note { flex-basis: 100%; }
-.grid-post { display: inline-flex; align-items: center; text-decoration: none; color: var(--lab-text); }
+.grid-post { display: flex; align-items: center; justify-content: center; height: 40px; margin-bottom: 12px; background: var(--lab-text); color: var(--lab-panel); border-radius: 8px; font-size: 14px; font-weight: 550; text-decoration: none; }
+.grid-post:hover { opacity: .88; }
 .code-fix-post { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .code-fix-bounty { display: block; text-decoration: none; color: inherit; font-weight: 500; }
