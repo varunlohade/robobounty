@@ -47,7 +47,7 @@ function payoutButton(who: Who) {
   if (who.payout.signed) return make('small', 'sh-mono', `Wallet ${who.payout.masked}, signature checked`);
   const b = make('button', 'sh-mono', who.payout.masked ? `Payout ${who.payout.masked}` : 'Add payout address');
   b.addEventListener('click', async () => {
-    const value = window.prompt('Your public payout address, 0x and 40 hex characters. Never enter a private key. Test units only: nothing is paid to it yet.', '');
+    const value = window.prompt('Your public payout address, 0x and 40 hex characters. Never enter a private key. Credits only: nothing is paid to it yet.', '');
     if (!value) return;
     const r = await savePayout(value);
     if (!r.ok) { window.alert(r.words); return; }

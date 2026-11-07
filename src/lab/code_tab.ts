@@ -461,7 +461,7 @@ export class CodeTab {
     const box = el('div', 'code-fix-post');
     const a = el('a', 'chat-option code-fix-bounty', 'Post a bounty') as HTMLAnchorElement;
     a.href = this.bountyLink(String(e.campaign), String(e.group))!;
-    box.append(el('div', 'chat-card-note', 'The AI could not fix this. Engineers can try. Pay moves only after their fix passes on worlds nobody sees. Test units, not money.'), a);
+    box.append(el('div', 'chat-card-note', 'The AI could not fix this. Engineers can try. Pay moves only after their fix passes on worlds nobody sees. Credits, not money.'), a);
     return box;
   }
 

@@ -31,8 +31,8 @@ function bountyCounts(b: Board) {
 
 function budgetStat(b: Board) {
   if (!b.budget) return stat('Budget', 'No reply', 'Board is off', 'bounties.html');
-  if (!b.budget.funded) return stat('Budget', 'Not set', 'Local test units', 'bounties.html');
-  return stat('Budget', (b.budget.left ?? 0).toLocaleString('en'), 'Local test units left', 'bounties.html');
+  if (!b.budget.funded) return stat('Budget', 'Not set', 'Credits', 'bounties.html');
+  return stat('Budget', (b.budget.left ?? 0).toLocaleString('en'), 'Credits left', 'bounties.html');
 }
 
 function bar(r: Tally, widest: number) {
@@ -89,7 +89,7 @@ function bountiesBox(b: Board) {
   const c = bountyCounts(b);
   const n = (word: string, v: number) => h('div', '', h('span', '', word), h('b', '', String(v)));
   box.append(h('div', 'ov-b3', n('Open', c.open), n('In checking', c.checking), n('Paid', c.paid)),
-    h('p', 'ov-note', `${c.units.toLocaleString('en')} test units paid.`));
+    h('p', 'ov-note', `${c.units.toLocaleString('en')} credits paid.`));
   return box;
 }
 
@@ -123,7 +123,7 @@ function first(b: Board) {
     h('div', 'ov-first',
       h('div', '', h('h2', '', 'Add your first robot'), h('p', '', 'Pick your robot once. AI builds the worlds, and simulated runs show you where it fails.'), link('ov-pill big', 'simulation.html', icon('plus', 16), 'Add your first robot')),
       h('div', 'ov-smp', h('p', '', 'Or look around with a sample robot'), ...SAMPLES.map(s => h('div', 'ov-sr', Object.assign(h('img'), { src: s.img, alt: '' }), h('div', '', h('b', '', s.name), h('span', '', s.line)), robotLink('ov-btn', s.pack, 'lab.html', 'Use sample'))))),
-    h('div', 'ov-zero', h('div', 'ov-stats', zero('Worlds run', 'No runs yet'), zero('Passed'), zero('Failed'), zero('Safe holds'), zero('Open failures'), zero('Open bounties'), stat('Budget', units, 'Local test units', null))));
+    h('div', 'ov-zero', h('div', 'ov-stats', zero('Worlds run', 'No runs yet'), zero('Passed'), zero('Failed'), zero('Safe holds'), zero('Open failures'), zero('Open bounties'), stat('Budget', units, 'Credits', null))));
 }
 
 void who.then(async w => {

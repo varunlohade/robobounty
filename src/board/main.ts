@@ -148,7 +148,7 @@ function drawLedger() {
   if (arc) { drawChainTotals(); return; }
   const sum = (f: (b: Bounty) => number) => S.bounties.reduce((a, b) => a + f(b), 0);
   const num = (v: number, label: string) => h('div', '', h('b', '', String(v)), h('span', '', label));
-  ledgerBox.replaceChildren(h('div', 'lh', h('h2', '', 'Test units on this board')),
+  ledgerBox.replaceChildren(h('div', 'lh', h('h2', '', 'Credits on this board')),
     h('div', 'lnums', num(sum(b => b.cap), 'Posted'), num(sum(b => b.balance.pending + b.balance.finalized), 'Held while checking'), num(sum(b => b.balance.claimed), 'Paid'), num(sum(b => b.balance.available), 'Left')));
   const b = S.budget;
   if (b.funded) {
@@ -431,10 +431,10 @@ function storyAndNext(b: Bounty, f: Fix | undefined): HTMLElement[] {
   const link = (tx?: string, url?: string) => tx ? chainLink(tx, url) : '';
   const left = state === 'Pending' ? chainLeft(b, steps!) : pay === 'Pending' && !arc ? windowLeft(b, f!.payout!.dispute_ends_at, b.now) : 0;
   const rows: [string, Kid, Kid?][] = [
-    [arc ? 'Company locks the money' : 'Company locks the pay', arc ? (b.arc ? plainUsdc(b.arc.cap_base_units) : `${b.pay} test USDC`) : `${b.pay} test units, no chain`, arc && b.arc ? link(b.arc.txs.create_bounty, b.arc.tx_links.create_bounty) : ''],
+    [arc ? 'Company locks the money' : 'Company locks the pay', arc ? (b.arc ? plainUsdc(b.arc.cap_base_units) : `${b.pay} test USDC`) : `${b.pay} credits, no chain`, arc && b.arc ? link(b.arc.txs.create_bounty, b.arc.tx_links.create_bounty) : ''],
     ['Engineer submits a fix', done >= 2 && f ? `From ${f.tester}` : 'No fix yet'],
     ['Hidden worlds check it', s && done >= 3 ? `${worse} worse of ${hiddenTotal(b)}` : checking ? 'Running now' : held ? 'Needs the company' : `${hiddenTotal(b)} you cannot see`, done >= 3 ? link(txs.propose, urls.propose) : ''],
-    [arc ? 'Agent pays' : 'Ledger pays', paid ? (arc ? plainUsdc(steps!.amount_base_units ?? 0) : `${f!.payout!.amount} test units`) : rejected ? 'Rejected, not paid' : left ? `In ${left} s` : '', paid ? link(txs.payout || txs.claim, urls.payout || urls.claim) : rejected ? link(txs.reject, urls.reject) : ''],
+    [arc ? 'Agent pays' : 'Ledger pays', paid ? (arc ? plainUsdc(steps!.amount_base_units ?? 0) : `${f!.payout!.amount} credits`) : rejected ? 'Rejected, not paid' : left ? `In ${left} s` : '', paid ? link(txs.payout || txs.claim, urls.payout || urls.claim) : rejected ? link(txs.reject, urls.reject) : ''],
   ];
   const story = h('ol', 'story', ...rows.map(([name, sub, tx], i) => {
     const bad = rejected && i === 3;
@@ -476,7 +476,7 @@ function nextStep(b: Bounty, f: Fix | undefined, at: Stage): Next {
 
   if (at.paid) return arc
     ? { tone: 'done', say: `Paid ${plainUsdc(steps!.amount_base_units ?? 0)} to ${short(steps!.submitter!)}.` }
-    : { tone: 'done', say: `${f!.tester} claimed ${f!.payout!.amount} test units. No chain was used.` };
+    : { tone: 'done', say: `${f!.tester} claimed ${f!.payout!.amount} credits. No chain was used.` };
 
   if (at.rejected) {
     const say = `${b.mine ? 'You' : 'The company'} rejected this fix. No pay moved.`;
@@ -497,7 +497,7 @@ function nextStep(b: Bounty, f: Fix | undefined, at: Stage): Next {
       if (!eng || !yours) return { tone: 'wait', say: 'Finalized. Only the engineer who submitted this fix can claim.' };
       const secret = fixSecret(b.id, f!.n);
       if (!secret) return { tone: 'stop', say: 'The claim secret is lost, so this tab cannot claim. Submit shows it once and only the tab that submitted keeps it.' };
-      return { tone: 'go', say: `Claim ${p.amount} test units.`, acts: [button('pri lg', 'Claim', 'check', act(() => api.claim(b.id, f!.n, secret)))] };
+      return { tone: 'go', say: `Claim ${p.amount} credits.`, acts: [button('pri lg', 'Claim', 'check', act(() => api.claim(b.id, f!.n, secret)))] };
     }
     if (steps?.state === 'Pending') {
       const say = at.left ? `The fix passed. Paying in ${at.left} s unless ${b.mine ? 'you reject' : 'the company rejects'} it.` : 'The fix passed. The agent pays at the next block.';
@@ -538,7 +538,7 @@ function offer(b: Bounty, lead: string): Next {
     save.disabled = !!wal.busy;
     return { tone: 'go', say: `${lead}Save your wallet so the agent can pay you.`, acts: [save] };
   }
-  return { tone: 'go', say: `${lead}Submit a fix. If it passes on worlds you cannot see, ${arc ? 'the agent pays your wallet' : 'you get test units'}.`, acts: [button('pri lg', 'Submit a fix', null, () => openSubmit(b))] };
+  return { tone: 'go', say: `${lead}Submit a fix. If it passes on worlds you cannot see, ${arc ? 'the agent pays your wallet' : 'you get credits'}.`, acts: [button('pri lg', 'Submit a fix', null, () => openSubmit(b))] };
 }
 
 // A closed section that stays as the reader left it across the page's redraws.
@@ -558,7 +558,7 @@ function fixDetail(b: Bounty, inner: HTMLElement) {
   inner.append(h('div', 'dh', h('div', 'top', h('h1', '', b.title), statusTag(b)), h('p', 'req', `${b.company}, ${b.robot.toLowerCase()}`)),
     ...storyAndNext(b, f));
   if (S.error) inner.append(h('div', 'err', S.error));
-  inner.append(h('div', 'facts', fact('Pay', arc ? `${b.pay} test USDC` : `${b.pay} test units`), fact('Failure', cap1(words(b.group!))), fact('Base file', code(b.controller!.file)), fact('Dispute window', `${b.dispute_window_s} s`)));
+  inner.append(h('div', 'facts', fact('Pay', arc ? `${b.pay} test USDC` : `${b.pay} credits`), fact('Failure', cap1(words(b.group!))), fact('Base file', code(b.controller!.file)), fact('Dispute window', `${b.dispute_window_s} s`)));
   if (arc) {
     inner.append(moreSection('On chain', 'Contract, agent and every transaction', ...chainPanel(b, f)));
   }
@@ -688,7 +688,7 @@ function notChecked(b: Bounty) {
 function findDetail(b: Bounty, inner: HTMLElement) {
   const named = b.narrowed ?? [];
   inner.append(h('div', 'dh', h('div', 'top', h('h1', '', b.title), statusTag(b)), h('p', 'req', `${b.company} wants new failures of the ${b.robot.toLowerCase()}.`)),
-    h('div', 'facts', fact('Cap', `${b.cap} test units`), fact('Per failure', String(b.per_failure)), fact('Left', String(b.available)), fact('Dispute window', `${b.dispute_window_s} s`)), sect('Allowed worlds', `${Object.keys(b.limits!).length - named.length} more keep the schema range`));
+    h('div', 'facts', fact('Cap', `${b.cap} credits`), fact('Per failure', String(b.per_failure)), fact('Left', String(b.available)), fact('Dispute window', `${b.dispute_window_s} s`)), sect('Allowed worlds', `${Object.keys(b.limits!).length - named.length} more keep the schema range`));
   const table = h('table');
   const body = h('tbody');
   for (const k of named) body.append(h('tr', '', h('td', '', words(k)), h('td', 't2', `${b.limits![k][0]} to ${b.limits![k][1]}`)));
@@ -834,7 +834,7 @@ function openPost(ref: string | null) {
     } catch (e) { error.textContent = (e as Error).message; send.disabled = false; send.textContent = postLabel; why.style.display = 'none'; } finally { clearInterval(progress); }
   });
   const close = dialog('Post a bounty', false,
-    h('div', 'body', field('Failure from a real campaign', select, 'full'), field('Title', titleIn, 'full'), field('Company, from your account', (() => { const i = h('input') as HTMLInputElement; i.value = who?.label ?? ''; i.disabled = true; return i; })(), 'full'), field(arc ? 'Pay, test USDC' : 'Pay, test units', pay), field('Dispute window, seconds', windowS)),
+    h('div', 'body', field('Failure from a real campaign', select, 'full'), field('Title', titleIn, 'full'), field('Company, from your account', (() => { const i = h('input') as HTMLInputElement; i.value = who?.label ?? ''; i.disabled = true; return i; })(), 'full'), field(arc ? 'Pay, test USDC' : 'Pay, credits', pay), field('Dispute window, seconds', windowS)),
     [error, h('span', 'sp'), button('sec', 'Cancel', null, () => close()), send]);
   send.parentElement!.after(why);
   const fill = (r: Fixable) => { titleIn.value = titleIn.value || `Fix ${words(r.group)}`; };
