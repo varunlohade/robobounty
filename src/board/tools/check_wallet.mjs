@@ -149,7 +149,7 @@ const postBounty = async (title, group, pay) => {
   while (Date.now() - t < POST_S * 1000) { const state = await c.js(checked); if (state !== 'waiting' && state !== 'running') break; await wait(500); }
   console.log(`  stored-run check ready after ${((Date.now() - t) / 1000).toFixed(1)} s`);
   const started = Date.now();
-  await pressTimed('Post bounty');
+  await pressTimed('Post and deposit');
   const popup = await popupSeconds().catch(() => null);
   await c.until(`!document.querySelector('.overlay') && document.querySelector('.detail h1')?.textContent === ${JSON.stringify(title)}`, `the bounty "${title}"`, POST_S);
   return { post: (Date.now() - started) / 1000, popup };

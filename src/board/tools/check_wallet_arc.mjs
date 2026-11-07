@@ -282,7 +282,7 @@ try {
     await shot('04-post-form');
     const started = Date.now();
     if (sends.some(s => s.kind === 'create')) throw new Error('A create was sent, but the board has no funding row. Check the hash in .check_sends.json before you spend more.');
-    await press('Post bounty'); // One press: it posts, then funds, with no second button.
+    await press('Post and deposit'); // One press: it posts, then funds, with no second button.
     await c.until(`${hasButton('Confirm in your wallet')} !== undefined || document.querySelector('[data-step="funded"]')?.dataset.state === 'ok' || !!document.querySelector('.walleterr')`, 'the wallet step', 90);
     if (await c.js(`!!document.querySelector('.walleterr')`)) throw new Error(`Fund failed: ${await text('.walleterr')}`);
     await shot('06-funding-confirm-in-wallet');
