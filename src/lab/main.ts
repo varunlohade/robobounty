@@ -21,7 +21,6 @@ const TRIAL_TRIES = 3;
 const TRIAL_RETRY_MS = 3_000;
 const TRIAL_DEADLINE_MS = 15_000;
 const PACK_KEY = 'crashlab-pack';
-const WINDOW_NOTE = 'Simulated. Hand-built physics, not checked against real hardware.';
 
 function chosenPack(): string | null {
   try { return sessionStorage.getItem(PACK_KEY); } catch { return null; }
@@ -59,10 +58,9 @@ function shell(root: HTMLElement, chat: HTMLElement) {
   body.append(chat, main);
   const statusRight = el('div', 'lab-status-end');
   const status = el('footer', 'lab-status');
-  const statusNote = el('span', 'lab-status-note', WINDOW_NOTE);
-  status.append(statusNote, statusRight);
+  status.append(statusRight);
   root.append(mountRail(root), titleBar(name), body, status);
-  return { main, statusRight, setName, tab, gridTab, statusNote, tabs };
+  return { main, statusRight, setName, tab, gridTab, tabs };
 }
 
 async function replayOnly(root: HTMLElement, id: string) {
@@ -159,7 +157,7 @@ async function live(root: HTMLElement) {
   const backend = new LiveBackend(onEvent, pack ? { pack } : { engine: 'v5' });
   const chat = new LabChat(backend, pack ?? 'window');
   chat.onPick = next => { choosePack(next); backend.reset(); };
-  const { main, statusRight, setName, tab, gridTab, statusNote, tabs } = shell(root, chat.root);
+  const { main, statusRight, setName, tab, gridTab, tabs } = shell(root, chat.root);
   const code = new CodeTab({
     session: () => backend.id!,
     tabs,
@@ -228,7 +226,6 @@ async function live(root: HTMLElement) {
     poseView = () => world.view;
     world.viewport.dataset.tid = key;
     shownReplay = replay;
-    statusNote.textContent = replay.note;
     jump = world.jump;
   }
   let jump: (frame: number) => void = () => {};
@@ -236,7 +233,6 @@ async function live(root: HTMLElement) {
   function showPoseWorld(e: ServerEvent) {
     setName('inspection_plant');
     chat.worldReady();
-    statusNote.textContent = String(e.note);
     const same = shownReplay && e.hash === shownHash;
     shownHash = String(e.hash);
     const scene = { solids: e.solids, scenery: e.scenery, route: e.route, floor_friction: e.floor_friction };
@@ -253,7 +249,7 @@ async function live(root: HTMLElement) {
   function playPreview(replay: PoseReplay, first = false, fresh: string[] = []) {
     const page = el('div', 'world-body');
     const viewport = el('div', 'viewport');
-    viewport.append(el('div', 'sim-tag sim-label', 'Simulated. World preview. No robot has run yet.'));
+    viewport.append(el('div', 'sim-tag sim-label', 'World preview. No robot has run yet.'));
     page.append(viewport);
     let view: PosesView | null = null;
     swap(page, () => { view?.dispose(); poseView = () => null; });
@@ -367,7 +363,7 @@ async function live(root: HTMLElement) {
     chat.worldReady();
     const page = el('div', 'world-body');
     const viewport = el('div', 'viewport');
-    viewport.append(el('div', 'sim-tag sim-label', 'Simulated. World preview. No robot has run yet.'));
+    viewport.append(el('div', 'sim-tag sim-label', 'World preview. No robot has run yet.'));
     page.append(viewport);
     let view: SimView | null = null, replay: Replay | null = null;
     swap(page, () => { view?.dispose(); replay?.dispose(); });

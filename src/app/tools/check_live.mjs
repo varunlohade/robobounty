@@ -125,7 +125,7 @@ await send('Page.navigate', { url: APP });
 await until(`document.getElementById('app')?.dataset.server === 'up' && !!document.querySelector('.chat-input textarea')`, 'app and server up', 30);
 check('a Recorded run link is one click away', (await js(`document.querySelector('.chat-mode').textContent`)) === 'Recorded run');
 check('starts at Brief', (await chapter()) === 'Brief');
-check('status line says Simulated and names the sim', (await js(`document.querySelector('.status').textContent`)).startsWith('Simulated') && /sim [0-9a-f]{8}/.test(await js(`document.querySelector('.status').textContent`)));
+check('status line names the sim, with no Simulated tag', !(await js(`document.querySelector('.status').textContent`)).includes('Simulated') && /sim [0-9a-f]{8}/.test(await js(`document.querySelector('.status').textContent`)));
 check('input box is rounded', parseFloat(await js(`getComputedStyle(document.querySelector('.chat-input')).borderRadius`)) >= 8);
 
 // Hostile text first. It stays plain text, and it does not become the brief.
@@ -245,7 +245,7 @@ if (failedRow) {
     await until(`document.querySelector('.viewport')?.dataset.tid?.startsWith('world-') && document.querySelector('.viewport')?.dataset.ready === 'true'`, 'failed replay', 90);
   });
   check('the replay shows a failed run', await js(`!!document.querySelector('.rail-head h2.fail')`));
-  check('the replay stays labelled Simulated', (await js(`document.querySelector('.sim-label').textContent`)).startsWith('Simulated'));
+  check('the replay label has no Simulated tag', !(await js(`document.querySelector('.sim-label').textContent`)).includes('Simulated'));
   await js(`(() => { const s = document.querySelector('.scrub input'); s.value = s.max; s.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   await wait(800);
   await shot('06-find-failed-replay.png');
@@ -301,7 +301,7 @@ await press('Send to a bounty');
 await idleAfter(n);
 await until(`!!document.querySelector('.bounty .fund')`, 'bounty draft', 30);
 check('chapter is Bounty', (await chapter()) === 'Bounty');
-check('the label says local ledger', (await js(`document.querySelector('.bounty').textContent`)).includes('Local ledger. Not on chain.') && (await js(`document.querySelector('.status').textContent`)).includes('Local ledger. Not on chain.'));
+check('no local ledger label shows', !(await js(`document.querySelector('.bounty').textContent`)).includes('Local ledger') && !(await js(`document.querySelector('.status').textContent`)).includes('Local ledger'));
 const gateInfo = JSON.parse(execFileSync(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/bounty_job.py'), 'constants'], { input: '{}' }).toString());
 const testerText = await js(`document.querySelector('.bounty').textContent`);
 check('the rule text uses the gate constants', testerText.includes(`${gateInfo.repeat_need} of ${gateInfo.reruns} must end`), `${gateInfo.repeat_need} of ${gateInfo.reruns}`);

@@ -250,3 +250,4 @@ p { margin: 0; }
 .sim-elements { left: 10px; top: 40px; color: var(--text); border: 1px solid var(--text-3); }
 .status-ledger { color: var(--text); font-weight: 600; }
 .spark line.spark-fail { stroke: #E5534B; }
+.ledger-label:empty { display: none; }

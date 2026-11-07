@@ -51,7 +51,7 @@ function paint() {
   about.textContent = r.about;
   const row = (k: string, v: string) => [h('dt', '', k), h('dd', '', v)];
   facts.replaceChildren(...row('Where', r.where), ...row('Controller', r.controller), ...row('Physics', r.physics), ...row('Last batch', batch ? `${batch.total} run, ${batch.passed} passed` : 'None yet'));
-  const big = h('div', 'frame big swap', Object.assign(h('img'), { src: r.frame, alt: r.alt }), h('div', 'frame-note', 'Simulated. Still from a recorded run.'));
+  const big = h('div', 'frame big swap', Object.assign(h('img'), { src: r.frame, alt: r.alt }), h('div', 'frame-note', 'Still from a recorded run.'));
   stage.replaceChildren(big);
   const sample = data?.samples[chosen];
   if (sample) {
@@ -77,7 +77,7 @@ function paint() {
     table.append(h('table', '', h('thead', '', h('tr', '', h('th', '', 'Run'), h('th', 'num', 'Worlds'), h('th', 'hide-s', 'Outcome'), h('th', '', 'Result'), h('th', 'hide-n', 'Sim'))), body));
   }
   stage.append(table);
-  if (batch) setStatus(batch.note, batch.sim ? [`sim ${batch.sim}`] : []);
+  if (batch) setStatus('', batch.sim ? [`sim ${batch.sim}`] : []);
 }
 
 paint();

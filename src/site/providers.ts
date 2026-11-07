@@ -15,7 +15,7 @@ function show(e: Entry, rows: HTMLElement[], row: HTMLElement) {
   rows.forEach(r => r.setAttribute('aria-selected', r === row ? 'true' : 'false'));
   const dl = h('dl', '', h('dt', '', 'Status'), h('dd', `tone-${e.tone}`, e.status), h('dt', '', 'Version'), h('dd', 'mono', e.version ?? 'unknown'));
   detail.replaceChildren(h('div', 'swap',
-    e.frame ? h('div', 'frame', Object.assign(h('img'), { src: `/site/frames/${e.frame}`, alt: '' }), h('div', 'frame-note', 'Simulated')) : null,
+    e.frame ? h('div', 'frame', Object.assign(h('img'), { src: `/site/frames/${e.frame}`, alt: '' })) : null,
     h('div', 'in', h('h2', '', e.name), h('p', '', e.detail), dl)));
 }
 

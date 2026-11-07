@@ -124,7 +124,7 @@ try {
   check(`one canvas per scenario`, REAL ? squares > 0 : squares === SQUARES, String(squares));
   const after = await gl();
   check('the WebGL view closes behind the grid, so no extra context', after.live === 0 && after.peak === 1, JSON.stringify(after));
-  check('status bar still says Simulated', await c.js(`document.querySelector('.lab-status').innerText.includes('Simulated')`));
+  { const bar = await c.js(`document.querySelector('.lab-status').innerText`); check('status bar has no Simulated tag', !bar.includes('Simulated'), bar); }
 
   const t1 = await c.js(SAMPLE(6));
   check(`smooth at ${squares} squares`, t1.p95 < 25 && t1.over33 < t1.frames * 0.05, fmt(t1));

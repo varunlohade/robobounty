@@ -142,7 +142,7 @@ try {
   await wait(800);
   const found = await rail();
   check('the search says what it found, in words', /between .* and .*seeds|No clean boundary/.test(found), found.replaceAll('\n', ' ').slice(0, 300));
-  check('the panel says simulated', /Simulated/.test(found));
+  check('the panel has no Simulated tag', !/Simulated/.test(found));
   await c.js(`document.querySelector('.grid-rail').scrollTop = 0`);
   await shot(`boundary-done-${PACK}.png`);
   await clickOn('.grid-back');

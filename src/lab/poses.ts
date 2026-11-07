@@ -1,4 +1,5 @@
 // A three.js player for a robot pack's replay JSON (format robot-pack-replay/1). It draws what the file holds: solids, scenery and the route. The robot is the asset's own meshes, one group per body at its recorded pose.
+import { plainNote } from '../site/plain_note.ts';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -663,7 +664,8 @@ export function posesPage(replay: PoseReplay, statusRight: HTMLElement, onFix?: 
   const total = replay.frames[maxFrame].t;
   const seconds = (s: number) => fmtTime(s);
 
-  viewport.append(el('div', 'sim-tag sim-label', replay.note));
+  const note = plainNote(replay.note);
+  if (note) viewport.append(el('div', 'sim-tag sim-label', note));
   const verdict = el('div', `sim-tag sim-key${replay.result.passed ? '' : ' sim-bad'}`, replay.result.reason);
   viewport.append(verdict);
   body.append(viewport);

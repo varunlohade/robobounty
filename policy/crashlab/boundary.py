@@ -22,7 +22,7 @@ MAX_FACTORS = 2
 MAX_RUNS_PER_FACTOR = 12
 MAX_BISECT = 4
 EXTRA_SEEDS = 3
-NOTES = {"window": "Simulated with hand-built physics. Not checked against real hardware.", "inspection": "Simulated with hand-built worlds and upstream's walking policy. Not calibrated, and not checked against a real robot."}
+NOTES = {"window": "Not checked against real hardware.", "inspection": "Not calibrated, and not checked against a real robot."}
 VERDICT_WORDS = {"slip_distance": "slip distance", "false_done": "false finish", "time_limit": "time limit", "tether_load": "tether load", "timed_out": "timed out", "off_route": "off route", "coverage": "low coverage", "sim_failed": "sim failed", "sim_diverged": "sim failed", "controller_crashed": "controller crashed"}
 FAILED = ("failed", "stuck")
 

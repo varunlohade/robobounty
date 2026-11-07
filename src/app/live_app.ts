@@ -1,4 +1,5 @@
 // The live app: chat on the left, and on the right whatever the run server's events say is true now.
+import { plainNote } from '../site/plain_note.ts';
 import { el, icon } from './dom.ts';
 import { ChatPanel } from './chat/panel.ts';
 import { LiveBackend, health, type ServerEvent } from './chat/live.ts';
@@ -130,7 +131,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
       facts.append(row);
     }
     rail.append(facts);
-    viewport.append(el('div', 'sim-tag sim-label', 'Simulated. World preview. No robot has run yet.'));
+    viewport.append(el('div', 'sim-tag sim-label', 'World preview. No robot has run yet.'));
     page.append(rail, viewport);
     let view: SimView | null = null, replay: Replay | null = null;
     swap(page, () => { view?.dispose(); replay?.dispose(); });
@@ -187,7 +188,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
       el('h2', '', 'Report'), numbers,
       el('p', '', `${e.recorded ? `Recorded run: nothing ran now. The campaign took ${e.seconds} s on this Mac, before its diagnosis.` : `The campaign and its diagnosis took ${e.seconds} s on this Mac.`} Stopped and held on: ${e.safe_holds}. Numerical divergence: ${e.diverged}.`),
       el('p', '', e.fixes),
-      el('p', '', `Simulated. Hand-built physics, not checked against real hardware. Sim ${String(e.sim_recorded ?? 'unknown').slice(0, 8)} recorded these results.`),
+      el('p', '', `Sim ${String(e.sim_recorded ?? 'unknown').slice(0, 8)} recorded these results.`),
     );
     chat.addEvent({ type: 'tool', title: 'report', meta: `${e.seconds} s`, lines: [(e.numbers as { n: number; label: string }[]).map(r => `${r.n} ${r.label}`).join(', '), e.fixes] });
   }
@@ -224,7 +225,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
         fixView.decided(e);
         if (e.code) codeText(codePage, e.code, `controller.py, session copy ${e.copy_sha}. The real file did not change (${e.real_sha}). Runs here still use the real file.`);
         break;
-      case 'bounty_draft': bountyView.showDraft(e); bountyLabel.textContent = e.label; show(TAB.bounty); break;
+      case 'bounty_draft': bountyView.showDraft(e); bountyLabel.textContent = plainNote(e.label); show(TAB.bounty); break;
       case 'ledger': bountyView.showLedger(e); break;
       case 'gate_running': bountyView.gateRunning(e); break;
       case 'verdict': bountyView.showVerdict(e); break;
@@ -235,7 +236,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
   };
   const backend = recorded ? new RecordedBackend(onEvent, recorded) : new LiveBackend(onEvent);
 
-  const chat = new ChatPanel(backend, tab => show(tab === 'worlds' ? TAB.worlds : TAB.code), 'Simulated');
+  const chat = new ChatPanel(backend, tab => show(tab === 'worlds' ? TAB.worlds : TAB.code), '');
   const chatHead = el('div', 'chat-head');
   const mode = el('a', 'chat-mode', recorded ? 'Live run' : 'Recorded run');
   mode.href = recorded ? 'app.html' : '?recorded=1';
@@ -248,7 +249,7 @@ export async function liveApp(app: HTMLElement, title: HTMLElement, recorded: Wo
   chatHead.append(newChat);
 
   const status = el('footer', 'status');
-  status.append(el('span', '', 'Simulated'), llmLine, llmCount, bountyLabel, el('span', '', 'Hand-built physics, not checked against real hardware'), statusEnd);
+  status.append(llmLine, llmCount, bountyLabel, statusEnd);
   app.classList.add('live');
   app.append(chatHead, el('div', 'head-rule'), tabs, chat.root, divider(), pane, bar.root, status);
 

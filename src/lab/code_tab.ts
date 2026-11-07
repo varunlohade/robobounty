@@ -1,4 +1,5 @@
 // The code tab: a real editor for a session copy of the robot's controller, opened from a square, and a read-only world file. The source files never change.
+import { plainNote } from '../site/plain_note.ts';
 import { runHeaders } from '../site/auth.ts';
 import { history, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { json } from '@codemirror/lang-json';
@@ -186,7 +187,7 @@ export class CodeTab {
     this.src = await res.json();
     this.saved = this.src!.source;
     this.path.textContent = this.src!.file;
-    this.foot.textContent = `${this.src!.note} ${this.src!.scope} Simulated.`;
+    this.foot.textContent = `${this.src!.note} ${this.src!.scope}`;
     if (this.view) this.view.dispatch({ changes: { from: 0, to: this.view.state.doc.length, insert: this.saved } });
     else this.view = editor(this.host, this.saved, python(), false, () => this.changed());
     this.refresh();
@@ -470,9 +471,9 @@ export class CodeTab {
     card.dataset.status = String(e.status);
     this.cards.set(String(e.fix), card);
     card.append(el('div', 'chat-card-title', `${e.recorded ? 'Recorded result: ' : ''}AI fix for ${asRow({ status: 'failed', verdict: e.group })}`));
-    if (e.llm_note) card.append(el('div', 'chat-card-note', String(e.llm_note)));
+    if (e.llm_note) card.append(el('div', 'chat-card-note', plainNote(e.llm_note)));
     const helped = e.status === 'helped';
-    card.append(el('div', helped ? 'code-fix-words' : 'code-fix-words code-fix-bad', String(e.words)));
+    card.append(el('div', helped ? 'code-fix-words' : 'code-fix-words code-fix-bad', plainNote(e.words)));
     if (e.sets) {
       const table = el('div', 'code-fix-table');
       const row = (cells: string[], cls = '') => {

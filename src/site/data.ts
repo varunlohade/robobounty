@@ -1,3 +1,4 @@
+import { plainNote } from './plain_note.ts';
 import { mountShell } from './shell.ts';
 import { icon } from './icons.ts';
 import { filmStrip, getJson, h, link, outcomeBar, resultWords, serverDown, type Tally } from './ui.ts';
@@ -10,7 +11,7 @@ interface World {
 interface Campaign extends Tally { id: string; label: string; robot: string; pack: string; sim: string | null; source: string; kind: 'rows' | 'totals'; note: string; held_back: number; worlds: World[]; coverage?: Coverage | null; evidence?: { label: string; root_hash: string; rechecked: boolean } | null }
 type SortKey = 'id' | 'group' | 'kind_name' | 'at' | 'reading' | 'repeat' | 'line';
 
-const { main, setStatus } = mountShell({ page: 'data', title: 'Data', subtitle: 'Campaign results. All simulated.' });
+const { main, setStatus } = mountShell({ page: 'data', title: 'Data', subtitle: 'Campaign results.' });
 const wrap = h('div', 'datawrap');
 const page = h('div', 'scroll');
 const drawer = h('aside', 'drawer');
@@ -284,7 +285,7 @@ function openRun(id: string) {
       w.reason ? h('p', '', w.reason) : null,
       dl,
       w.replay ? link('btn pri wide', w.replay, icon('play'), 'Replay the recorded run') : h('p', 'quiet', import.meta.env.VITE_HOSTED === '1' ? 'Replay runs on your Mac. Download the GitHub repo to run it.' : 'This run kept its numbers only. It has no stored replay.'),
-      h('p', 'quiet', current.note)));
+      h('p', 'quiet', plainNote(current.note))));
   drawer.classList.add('on');
 }
 
@@ -309,7 +310,7 @@ function pick(c: Campaign) {
   coverageBox.replaceChildren(...(c.coverage ? [coverageTable(c.coverage)] : []));
   paintSuites();
   paintLibrary();
-  setStatus(c.note, c.sim ? [`sim ${c.sim}`, resultWords(c)] : [resultWords(c)]);
+  setStatus('', c.sim ? [`sim ${c.sim}`, resultWords(c)] : [resultWords(c)]);
 }
 
 input.addEventListener('input', () => { query = input.value; paintLibrary(); });

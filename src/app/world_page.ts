@@ -3,8 +3,8 @@ import { Replay } from './replay.ts';
 import { SimView, restoreOnLoss, type OnFix } from './view.ts';
 import { worldFacts, type Trial } from './trial.ts';
 
-export const LABEL = 'Simulated. Replay of a recorded run.';
-export const THIS_RUN_LABEL = 'This run. Simulated.';
+export const LABEL = 'Replay of a recorded run.';
+export const THIS_RUN_LABEL = 'This run.';
 const SPARK_POINTS = 96;
 const OFF_GLASS_M = 0.5;
 const PLAYBACK_STALL_MS = 5_000; // Even the slowest speed moves many frames in this time.

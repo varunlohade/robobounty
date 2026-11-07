@@ -151,7 +151,9 @@ button.lab-tab[hidden] { display: none; }
 .select:hover { background: var(--lab-hover); }
 
 .lab-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 12px; background: var(--lab-panel); border-top: 1px solid var(--lab-hair); color: var(--lab-text-2); font-size: 11px; line-height: 16px; white-space: nowrap; overflow: hidden; }
-.lab-status-end { display: flex; gap: 16px; }
+.lab-status-end { display: flex; gap: 16px; margin-left: auto; }
+#lab.sh-app:not(:has(.lab-status-end > *)) { grid-template-rows: 36px minmax(0, 1fr) 0; }
+#lab:not(:has(.lab-status-end > *)) .lab-status { display: none; }
 
 .view-back { position: absolute; right: 12px; top: 12px; z-index: 5; padding: 0 16px; height: 34px; font: inherit; font-size: 13px; font-weight: 550; color: #fff; background: var(--accent); border: 0; border-radius: 17px; cursor: pointer; }
 .view-back:hover { background: var(--accent-h); }

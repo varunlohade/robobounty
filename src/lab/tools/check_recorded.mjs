@@ -79,7 +79,7 @@ try {
     await c.until(`document.querySelector('.grid-replay .viewport')?.dataset.ready === 'true' && Number(document.querySelector('.grid-replay .viewport').dataset.frame) > 0`, 'replay plays', 30);
     const rail = await c.js(`document.querySelector('.grid-rail').innerText`);
     check(`${pack}: the panel shows the judge's reason and the log`, rail.includes('Judge') && rail.includes('Last log lines'));
-    check(`${pack}: Simulated stays on screen`, /Simulated/.test(await seen()));
+    check(`${pack}: no Simulated tag on screen`, !/Simulated/.test(await seen()));
     await wait(1500);
     await c.shot(join(OUT, `recorded-${pack}-replay.png`));
     await clickOn('.grid-back');

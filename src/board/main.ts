@@ -1,12 +1,11 @@
 // The bounty board in the site's style: side bar, bounty list, one bounty. Real data only. All text goes in through textContent.
 import type { Who } from '../site/session.ts';
-import { mountShell, SIM_NOTE } from '../site/shell.ts';
+import { mountShell } from '../site/shell.ts';
 import './board.css';
 import { api, ApiError, fixSecret, type ArcConfig, type ArcBalance, type FundPlan, type ArcSteps, type Bounty, type Fix, type Sub, type Budget, type Fixable, type FixResult } from './api.ts';
 import { icon, type IconName } from './icons.ts';
 import * as W from './wallet.ts';
 
-const LOCAL_LEDGER = 'Local ledger. Not on chain.';
 let arc: ArcConfig | null = null; // Set only when the board server says the chain is on and checked.
 let arcOffReason: string | null = null;
 const wal: { address: string | null; chain: string | null; balance: ArcBalance | null; words: string | null; busy: string | null } = { address: null, chain: null, balance: null, words: null, busy: null };
@@ -86,7 +85,7 @@ function shell() {
     h('div', 'filters', seg, robotBtn, h('label', 'field', icon('search'), search)),
     h('div', 'tablewrap', table),
     ledgerBox);
-  const site = mountShell({ page: 'bounties', title: 'Bounties', status: SIM_NOTE, statusRight: [], quietWho: true });
+  const site = mountShell({ page: 'bounties', title: 'Bounties', statusRight: [], quietWho: true });
   // The side bar and this line read the same login state, so they cannot disagree.
   const idLine = h('span', 'warnline', icon('warn', 'i12'), '');
   idLine.hidden = true; // A signed-in account's label already sits in the side bar. Only a guest needs this line.
@@ -381,7 +380,7 @@ async function readWallet() {
 async function startArc() {
   try {
     const c = await api.arc();
-    if (!c.on) { site.setStatus(SIM_NOTE, [LOCAL_LEDGER]); if (c.asked) arcOffReason = c.reason ?? 'Arc is off.'; return; }
+    if (!c.on) { if (c.asked) arcOffReason = c.reason ?? 'Arc is off.'; return; }
     arc = c;
     document.body.classList.add('arc-on');
     const now = await W.current();
@@ -390,7 +389,7 @@ async function startArc() {
     await readWallet();
     W.onWalletChange(() => { wal.address = null; wal.words = null; void readWallet().then(render); });
     setInterval(noOverlap(readBalances), BALANCE_MS);
-  } catch { site.setStatus(SIM_NOTE, [LOCAL_LEDGER]); /* An old board server has no such route, so the local path stands. */ }
+  } catch { /* An old board server has no such route, so the local path stands. */ }
   render();
 }
 
@@ -539,7 +538,7 @@ function offer(b: Bounty, lead: string): Next {
     save.disabled = !!wal.busy;
     return { tone: 'go', say: `${lead}Save your wallet so the agent can pay you.`, acts: [save] };
   }
-  return { tone: 'go', say: `${lead}Submit a fix. If it passes on worlds you cannot see, ${arc ? 'the agent pays your wallet' : 'the local ledger pays you in test units. No chain is used'}.`, acts: [button('pri lg', 'Submit a fix', null, () => openSubmit(b))] };
+  return { tone: 'go', say: `${lead}Submit a fix. If it passes on worlds you cannot see, ${arc ? 'the agent pays your wallet' : 'you get test units'}.`, acts: [button('pri lg', 'Submit a fix', null, () => openSubmit(b))] };
 }
 
 // A closed section that stays as the reader left it across the page's redraws.
@@ -677,7 +676,7 @@ function payout(_b: Bounty, f: Fix): HTMLElement[] {
 }
 
 function notChecked(b: Bounty) {
-  const rows = [['One person per account, in device mode', 'Not proven'], ['Collusion between submitter and company', 'No check exists'], ['Whether this works on a real robot', 'Simulated only'], ['Sandbox isolation', 'Shares the kernel, not a VM']];
+  const rows = [['One person per account, in device mode', 'Not proven'], ['Collusion between submitter and company', 'No check exists'], ['Whether this works on a real robot', 'Not checked'], ['Sandbox isolation', 'Shares the kernel, not a VM']];
   if (b.replay_rejudge === false) rows.push(['Replay re-judge', 'None for this robot']);
   const box = [sect('Not checked', String(rows.length))];
   for (const [k, v] of rows) box.push(h('div', 'kv', h('span', '', h('span', 'skip', icon('slash')), k), h('span', 't3', v)));

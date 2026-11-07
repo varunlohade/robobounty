@@ -386,7 +386,7 @@ async function flow(mode) {
       await step('claim', async () => {
         await c.js(`[...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Claim').click()`);
         await c.until(`document.querySelector('.detail').innerText.includes('claimed')`, 'the claim', 30);
-        check(`${mode}: pay is in test units, with the ledger label`, /test units/.test(await c.js(`document.querySelector('.detail').innerText`)) && /Local ledger\. Not on chain\./.test(await text()));
+        check(`${mode}: pay is in test units, with no local ledger label`, /test units/.test(await c.js(`document.querySelector('.detail').innerText`)) && !/Local ledger\. Not on chain\./.test(await text()));
         await c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent.includes('Payout'))?.scrollIntoView({ block: 'center' })`);
       });
     }

@@ -233,7 +233,7 @@ export class WorldsPage {
     const held = this.planned.filter(w => w.held).length;
     const waiting = this.planned.length - all.length - held;
     this.heading.textContent = runs.length ? `${failed} of ${runs.length} tested worlds failed` : `${this.planned.length} worlds proposed`;
-    const notes = ['Simulated.'];
+    const notes: string[] = [];
     if (held) notes.push(`${held} held back (bright dashes).`);
     if (waiting > 0) notes.push(`${waiting} not tested yet.`);
     if (all.length > runs.length) notes.push(`${all.length - runs.length} with scene elements, not counted.`);

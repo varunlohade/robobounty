@@ -4,7 +4,7 @@ import { signOut } from './session.ts';
 import { h } from './ui.ts';
 import './overview.css';
 
-const { main, who } = mountShell({ page: 'settings', title: 'Settings', status: 'Local ledger. Not on chain.' });
+const { main, who } = mountShell({ page: 'settings', title: 'Settings' });
 const page = h('div', 'scroll ov');
 main.append(page);
 

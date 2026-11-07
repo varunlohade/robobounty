@@ -170,8 +170,8 @@ try {
   const banned = /\b(fix|bounty|report|worlds)\b|controller\.py/i;
   check('DOM text has no campaign words', !banned.test(body), body.match(banned)?.[0]);
   check('DOM markup has no campaign words', !banned.test(html), html.match(banned)?.[0]);
-  check('Simulated stays in the status bar', (await js(`document.querySelector('.lab-status').textContent`)).startsWith('Simulated'));
-  check('replay label stays', (await js(`document.querySelector('.sim-label').textContent`)) === 'Simulated. Replay of a recorded run.');
+  check('no Simulated tag in the status bar', !(await js(`document.querySelector('.lab-status').textContent`)).includes('Simulated'));
+  check('replay label stays', (await js(`document.querySelector('.sim-label').textContent`)) === 'Replay of a recorded run.');
   check('fonts load from src/lab/fonts', await js(`document.fonts.ready.then(() => document.fonts.check('13px Inter') && document.fonts.check('12px "JetBrains Mono"'))`));
   const fonts = await js(`performance.getEntriesByType('resource').map(r => r.name).filter(n => n.endsWith('.woff2'))`);
   check('font paths', fonts.length === 2 && fonts.every(f => f.includes('/src/lab/fonts/')), fonts.join(' '));

@@ -23,8 +23,8 @@ try {
   await wait(800);
   const f1 = await c.js(`Number(document.querySelector('.viewport').dataset.frame)`);
   check('it plays', f1 > f0, `${f0} -> ${f1}`);
-  check('Simulated label is visible', await c.js(`document.querySelector('.sim-label').textContent.startsWith('Simulated')`));
-  check('status bar still says Simulated', await c.js(`document.querySelector('.lab-status').textContent.includes('Simulated')`));
+  check('the label has no Simulated tag', await c.js(`!document.querySelector('.sim-label')?.textContent.includes('Simulated')`));
+  check('status bar has no Simulated tag', await c.js(`!document.querySelector('.lab-status').textContent.includes('Simulated')`));
   check('one canvas', await c.js(`document.querySelectorAll('.viewport canvas').length === 1`));
 
   const count = await c.js(`document.querySelector('.scrub input').max * 1 + 1`);

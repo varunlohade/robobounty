@@ -107,7 +107,7 @@ for (const id of ['nominal-seed1', 'dubai-final-world-033']) {
   const marks = await js(`document.querySelectorAll('.mark').length`);
   const fired = Object.keys(JSON.parse(readFileSync(join(ROOT, 'public/trials', id, 'result.json'), 'utf8')).fired).length;
   check(`${id}: one red timeline mark per fired rule`, marks === fired, `${marks} of ${fired}`);
-  check(`${id}: label shows`, (await js(`document.querySelector('.sim-label').textContent`)) === 'Simulated. Replay of a recorded run.');
+  check(`${id}: label shows`, (await js(`document.querySelector('.sim-label').textContent`)) === 'Replay of a recorded run.');
 }
 
 await open('?trial=nominal-seed1');
@@ -161,7 +161,7 @@ await js(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'Co
 await wait(100);
 const code = readFileSync(join(ROOT, 'public/trials/nominal-seed1/controller.py.txt'), 'utf8');
 check('Code tab shows controller.py', (await js(`document.querySelectorAll('.code-line').length`)) === code.replace(/\n$/, '').split('\n').length);
-check('label stays on Code tab', (await js(`document.querySelector('.status span').textContent`)) === 'Simulated. Replay of a recorded run.');
+check('label stays on Code tab', (await js(`document.querySelector('.status span').textContent`)) === 'Replay of a recorded run.');
 await shot('tab-code.png');
 await js(`[...document.querySelectorAll('.tab')].find(t => t.textContent.endsWith(' worlds')).click()`);
 await wait(100);
@@ -232,7 +232,7 @@ const linked = worldsData.worlds.filter(w => w.trial);
 check('headline replays are all reproduced failures', linked.length >= 3 && linked.every(w => w.failure && !w.flaky), linked.map(w => w.name).join(' '));
 await js(`[...document.querySelectorAll('.card button, .card .btn')].find(b => b.textContent.startsWith('${linked[0].name}')).click()`);
 await until(`document.querySelector('.viewport')?.dataset.ready === 'true'`, 'recorded replay');
-check('a recorded replay opens', (await js(`document.querySelector('.sim-label').textContent`)) === 'Simulated. Replay of a recorded run.');
+check('a recorded replay opens', (await js(`document.querySelector('.sim-label').textContent`)) === 'Replay of a recorded run.');
 await shot('recorded-replay.png');
 
 // Source rules.

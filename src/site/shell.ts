@@ -1,5 +1,5 @@
 // The site's frame: sidebar, page head and status line. Any page imports this and fills `main`.
-//   const { main } = mountShell({ page: 'bounties', title: 'Bounties', status: 'Local ledger. Not on chain.' });
+//   const { main } = mountShell({ page: 'bounties', title: 'Bounties' });
 // The page needs one <div id="site"></div>. A visitor with no session goes to login.html.
 import './shell.css';
 import { icon, type IconName } from './icons.ts';
@@ -9,7 +9,6 @@ import { signOut, whoIs, type Who } from './session.ts';
 export type PageName = 'home' | 'simulation' | 'failures' | 'bounties' | 'data' | 'settings' | 'providers';
 const MARK = '<svg viewBox="0 0 28 28" width="22" height="22" aria-hidden="true"><g fill="currentColor"><path d="M3 20.2A11 11 0 0 1 18.6 4.6z"/><path d="M25 7.8A11 11 0 0 1 9.4 23.4z"/></g></svg>';
 const RAIL_KEY = 'crashlab-rail';
-export const SIM_NOTE = 'Simulated. Hand-built physics, not checked against real hardware.';
 
 const NAV: { page: PageName; label: string; href: string; icon: IconName }[] = [
   { page: 'home', label: 'Overview', href: 'home.html', icon: 'overview' },
@@ -150,8 +149,9 @@ export function mountShell(opts: ShellOptions): Shell {
     const r = make('div', 'sh-status-r');
     r.append(...right.map(text => make('span', '', text)));
     status.replaceChildren(make('span', 'sh-status-l', left), r);
+    status.hidden = !left && !right.length;
   };
-  setStatus(opts.status ?? SIM_NOTE, opts.statusRight);
+  setStatus(opts.status ?? '', opts.statusRight);
   root.replaceChildren(nav, column, status);
 
   const here = `${location.pathname.replace(/^\//, '')}${location.search}`; // Read now: a page may tidy its address while this waits.

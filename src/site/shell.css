@@ -4,7 +4,7 @@
 @font-face{font-family:"JetBrains Mono";src:url(../lab/fonts/jetbrains-mono-latin-wght-normal.woff2) format("woff2");font-weight:100 800;font-display:swap}
 html,body{height:100%;margin:0;overflow:hidden}
 .sh-app{--sh-line:var(--line);--sh-t1:var(--t1);--sh-t2:var(--t2);--sh-raised:var(--raised);--sh-hover:var(--hover);--sh-ease:cubic-bezier(.23,1,.32,1);
-  display:grid;grid-template-columns:216px minmax(0,1fr);grid-template-rows:minmax(0,1fr) 28px;height:100vh;width:100%;
+  display:grid;grid-template-columns:216px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;height:100vh;width:100%;
   font:400 14px/20px Inter,system-ui,sans-serif;color:var(--sh-t1);font-feature-settings:"tnum","cv11";font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;background:var(--app)}
 .sh-app *{box-sizing:border-box}
 .sh-nav{display:flex;flex-direction:column;gap:2px;padding:12px 8px 0;border-right:1px solid var(--sh-line);min-height:0}
@@ -29,7 +29,8 @@ html,body{height:100%;margin:0;overflow:hidden}
 .sh-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
 .sh-main{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;animation:sh-in 140ms var(--sh-ease)}
 @keyframes sh-in{from{opacity:0}to{opacity:1}}
-.sh-status{grid-column:1/3;display:flex;align-items:center;gap:24px;padding:0 12px;border-top:1px solid var(--sh-line);font-size:12px;line-height:16px;color:var(--sh-t2);white-space:nowrap;min-width:0;overflow:hidden}
+.sh-status[hidden]{display:none!important}
+.sh-status{grid-column:1/3;height:28px;display:flex;align-items:center;gap:24px;padding:0 12px;border-top:1px solid var(--sh-line);font-size:12px;line-height:16px;color:var(--sh-t2);white-space:nowrap;min-width:0;overflow:hidden}
 .sh-status-l{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .sh-status-r{margin-left:auto;display:flex;gap:20px;flex:none}
 @media (prefers-reduced-motion:reduce){.sh-app *{transition-duration:1ms!important;animation-duration:1ms!important}}

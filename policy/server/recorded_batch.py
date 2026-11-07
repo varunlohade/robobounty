@@ -16,7 +16,7 @@ LABEL = "Recorded run"
 PLAY_S = 40.0  # A long campaign plays faster than it ran.
 MAX_STEP_S = 1.0
 ENDED = ("passed", "failed", "stuck", "held")
-BANNER = "Recorded run. No AI and no sim run here. These are stored results from one earlier simulated campaign. The buttons work, and new words change nothing."
+BANNER = "Recorded run. No AI and no sim run here. These are stored results from one earlier campaign. The buttons work, and new words change nothing."
 NO_RERUN = "This is a recorded run, so no sim runs here and a re-run cannot start. Start the demo without --recorded to run your edit."
 STORED_FIX = "stored_fix.json"
 NO_CHAT = "This is a recorded run, so words cannot change the world. Press List test scenarios, then Run."
@@ -102,7 +102,7 @@ def run_campaign(s, folder):
     s.working()
     counts = grid["counts"]
     s.emit(type="campaign_done", campaign=cid, counts=counts, wall_s=grid["elapsed_s"], max_procs=grid["max_procs"], label=f"{LABEL}, {moment['label']}", note=plan["note"])
-    s.say(f"Recorded result, as it ran in {grid['elapsed_s']:.0f} s: {counts['passed']} passed, {counts['failed']} failed, {counts['stuck']} stuck, {counts['safe_hold']} safe holds, {counts['held']} held back. Simulated. {len(plan['not_tested'])} things stay not tested.")
+    s.say(f"Recorded result, as it ran in {grid['elapsed_s']:.0f} s: {counts['passed']} passed, {counts['failed']} failed, {counts['stuck']} stuck, {counts['safe_hold']} safe holds, {counts['held']} held back. {len(plan['not_tested'])} things stay not tested.")
 
 
 def _copy_gunzipped(source, target):

@@ -27,7 +27,7 @@ const brand = h('div', 'lg-brand');
 brand.innerHTML = `${MARK}CrashLab`;
 const sheet = h('section', 'lg-sheet');
 sheet.setAttribute('aria-label', 'Sign in to CrashLab');
-root.append(h('div', 'lg', film, brand, h('div', 'lg-sim', 'Simulated'), sheet));
+root.append(h('div', 'lg', film, brand, sheet));
 
 // The sheet's top edge follows the height of its step. Past the screen height the sheet scrolls.
 const fit = new ResizeObserver(() => place());

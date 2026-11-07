@@ -1,4 +1,5 @@
 // The Data page's limits coverage and regression suite tables. Numbers come from stored run files. All simulated. Tested never means safe.
+import { plainNote } from './plain_note.ts';
 import { h } from './ui.ts';
 
 interface Band { runs: number; failed: number; moved: boolean }
@@ -32,7 +33,7 @@ export function coverageTable(c: Coverage): HTMLElement {
   }
   const head = h('tr', '', h('th', '', 'Factor'), h('th', '', 'Operating limit'), h('th', '', 'Tested'), h('th', '', 'Bands'), h('th', 'num', 'Bands tested'), h('th', 'num', 'Worlds moved it'), h('th', 'num hide-s', 'Runs outside'));
   const out = h('div', '', h('div', 'chart-h', h('h2', '', 'Operating limits: what this campaign tested'), h('span', '', `${c.bands_touched} of ${c.bands_total} bands, ${c.runs} runs`)), h('table', '', h('thead', '', head), body),
-    h('p', 'quiet', `${c.limits_words} ${c.note}`), h('p', 'legendline quiet', h('i', 'b-none'), 'Not tested', h('i', 'b-start'), 'Start value only', h('i', 'b-pass'), 'Moved, none failed', h('i', 'b-mix'), 'Moved, some failed', h('i', 'b-fail'), 'Moved, all failed'));
+    h('p', 'quiet', `${c.limits_words} ${plainNote(c.note)}`), h('p', 'legendline quiet', h('i', 'b-none'), 'Not tested', h('i', 'b-start'), 'Start value only', h('i', 'b-pass'), 'Moved, none failed', h('i', 'b-mix'), 'Moved, some failed', h('i', 'b-fail'), 'Moved, all failed'));
   if (c.dropped?.length) out.append(h('p', 'quiet', `Dropped for being outside the limits: ${c.dropped.length}. ${c.dropped.slice(0, 3).map(d => `${words(d.name)}: ${d.reason}`).join(' ')}`));
   return out;
 }

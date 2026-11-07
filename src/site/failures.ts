@@ -5,7 +5,7 @@ import { askAi, board, campaigns, OPEN_SCOPE, openRuns, postBounty, postRef, row
 
 const plainName = (name: string) => { const s = name.replaceAll('_', ' '); return s.charAt(0).toUpperCase() + s.slice(1); };
 
-const { main, who } = mountShell({ page: 'failures', title: 'Failures', subtitle: 'Simulated' });
+const { main, who } = mountShell({ page: 'failures', title: 'Failures' });
 const page = h('div', 'scroll ov');
 main.append(page);
 

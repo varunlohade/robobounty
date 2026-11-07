@@ -3,7 +3,7 @@ import { icon } from './icons.ts';
 import { h, link, resultWords, serverDown, type Tally } from './ui.ts';
 import { ago, askAi, board, byNewest, campaigns, failKinds, OPEN_SCOPE, openRuns, pickRobot, postBounty, postRef, robotLink, rowGo, type Board, type Campaign } from './overview_data.ts';
 
-const { main, actions, who } = mountShell({ page: 'home', title: 'Overview', subtitle: 'Simulated' });
+const { main, actions, who } = mountShell({ page: 'home', title: 'Overview' });
 const page = h('div', 'scroll ov');
 main.append(page);
 
@@ -89,7 +89,7 @@ function bountiesBox(b: Board) {
   const c = bountyCounts(b);
   const n = (word: string, v: number) => h('div', '', h('span', '', word), h('b', '', String(v)));
   box.append(h('div', 'ov-b3', n('Open', c.open), n('In checking', c.checking), n('Paid', c.paid)),
-    h('p', 'ov-note', `${c.units.toLocaleString('en')} local test units paid. Local ledger. Not on chain.`));
+    h('p', 'ov-note', `${c.units.toLocaleString('en')} test units paid.`));
   return box;
 }
 
@@ -104,7 +104,7 @@ function filled(list: Campaign[], b: Board) {
     stat('Failed', sum(list, 'failed').toLocaleString('en'), share(sum(list, 'failed'), total), 'failures.html'),
     stat('Safe holds', sum(list, 'holds').toLocaleString('en'), share(sum(list, 'holds'), total), 'data.html'),
     stat('Open failures', open.toLocaleString('en'), openNote, 'failures.html'),
-    b.bounties ? stat('Open bounties', String(bountyCounts(b).open), 'Local ledger', 'bounties.html') : stat('Open bounties', 'No reply', 'Board is off', 'bounties.html'),
+    b.bounties ? stat('Open bounties', String(bountyCounts(b).open), 'On the board', 'bounties.html') : stat('Open bounties', 'No reply', 'Board is off', 'bounties.html'),
     budgetStat(b));
   stats.title = `Open failures: ${OPEN_SCOPE}`;
   page.replaceChildren(stats, h('div', 'ov-cols', h('div', '', runsTable(list), robotsTable(list)), h('div', '', failuresList(list, b), bountiesBox(b))));

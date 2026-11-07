@@ -5,10 +5,9 @@ html,body{background:#000;margin:0}
 .lg{--ink:#0b0b0b;--grey:#4f4f4f;--fill:#efefef;--bad:#b3261e;--amber:#8a5a00;--sheet-ease:cubic-bezier(.23,1,.32,1);
   position:fixed;inset:0;overflow:hidden;background:#000;color:var(--ink);font:400 20px/1.35 "Instrument Sans",Inter,system-ui,sans-serif;font-feature-settings:normal;-webkit-font-smoothing:antialiased}
 .lg-film{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;object-position:left top;background:#000}
-.lg-brand,.lg-sim{position:absolute;top:28px;height:52px;border-radius:26px;background:#fff;display:flex;align-items:center}
+.lg-brand{position:absolute;top:28px;height:52px;border-radius:26px;background:#fff;display:flex;align-items:center}
 .lg-brand{left:28px;padding:0 22px 0 16px;gap:9px;font-weight:600;font-size:18px;letter-spacing:-.02em}
 .lg-brand svg{width:24px;height:24px}
-.lg-sim{right:28px;padding:0 22px;color:var(--grey);font-size:15px}
 
 /* The sheet is as tall as the screen and its top edge is set by a transform, so a change of height never lays out or paints the film. */
 .lg-sheet{position:absolute;inset:0;background:#fff;border-radius:44px 44px 0 0;overflow:hidden auto;transform:translateY(100%);transition:transform 300ms var(--sheet-ease);will-change:transform;overscroll-behavior:contain}
@@ -65,9 +64,8 @@ html,body{background:#000;margin:0}
   .lg-qr{width:300px;height:300px}
 }
 @media (max-width:760px){
-  .lg-brand,.lg-sim{top:16px;height:44px;border-radius:22px}
+  .lg-brand{top:16px;height:44px;border-radius:22px}
   .lg-brand{left:16px;font-size:17px;padding:0 18px 0 12px}
-  .lg-sim{right:16px;padding:0 16px}
   .lg-sheet{border-radius:32px 32px 0 0}
   .lg-step{flex-direction:column;padding:36px 20px 28px;gap:24px}
   .lg h1{font-size:52px}

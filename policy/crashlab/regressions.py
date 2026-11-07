@@ -19,7 +19,7 @@ ROOT_ENV = "CRASHLAB_REGRESSIONS_ROOT"  # A check keeps its own suite.
 FAILED = ("failed", "stuck")
 KEPT_RUNS = 30
 KEPT_HISTORY = 12
-NOTE = "Same world, same seed, each time. Only a code change that stops the failure counts as fixed. Simulated."
+NOTE = "Same world, same seed, each time. Only a code change that stops the failure counts as fixed."
 CHANGES = ("fixed", "still_failing", "new_failure", "still_passing", "passes_same_code", "world_changed", "could_not_run")
 
 
@@ -156,7 +156,7 @@ def run_suite(pack, code_sha, run_many, validate, publish=None, label=None, edit
         suite["runs"] = (suite["runs"] + [{"run": number, "at": now, "code_sha": code_sha, "edited": edited, "label": label, "counts": state["counts"], "worlds": len(state["rows"])}])[-KEPT_RUNS:]
         _save(pack, suite)
     c = state["counts"]
-    state["words"] = f"Run {number}, {len(state['rows'])} worlds: {c['fixed']} fixed, {c['still_failing']} still failing, {c['new_failure']} new failures. Simulated."
+    state["words"] = f"Run {number}, {len(state['rows'])} worlds: {c['fixed']} fixed, {c['still_failing']} still failing, {c['new_failure']} new failures."
     publish(state)
     return state
 

@@ -46,7 +46,7 @@ COOKIE = "crashlab_session"
 ENGINEER_REFUSED = {"/site-api/data", "/site-api/recent", "/site-api/regressions"}
 SECURE = "; Secure" if os.environ.get("CRASHLAB_HTTPS") == "1" else ""  # Set behind HTTPS. Plain http on localhost cannot carry a Secure cookie everywhere.
 ROBOTS = {"window": "Window cleaning", "inspection": "Plant inspection"}
-NOTES = {"window": "Simulated. Hand-built physics, not checked against real hardware.", "inspection": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated."}
+NOTES = {"window": "Hand-built physics, not checked against real hardware.", "inspection": "The policy is upstream's and unchecked against a real robot. Not calibrated."}
 NAMES = {"slip_distance": "Slip distance", "detach": "Detach", "false_done": "False done", "time_limit": "Time limit", "stalled": "Stalled", "coverage": "Low coverage",
          "wind_hold": "Wind hold", "battery_stop": "Battery stop", "pass": "Passed", "passed": "Passed", "fell": "Fell", "timed_out": "Timed out", "stuck": "Stuck"}
 HOLDS = {"wind_hold", "battery_stop"}
@@ -228,7 +228,7 @@ def cached(key, build):
 
 def build_data():
     demo = [c for c in (demo_campaign("window"), demo_campaign("inspection")) if c]
-    return {"campaigns": demo + evidence_campaigns() + session_campaigns(), "note": "All simulated. Nothing here is checked against real hardware."}
+    return {"campaigns": demo + evidence_campaigns() + session_campaigns(), "note": "Nothing here is checked against real hardware."}
 
 
 def types_of(campaign):
@@ -253,7 +253,7 @@ def open_work():
         work.append({"title": "Review the suction patch", "body": f'{a["pass"]} passed before, {b["pass"]} passed after, on {fix["fresh"]["n"]} new worlds. Not applied.', "tone": "hold", "icon": "doc", "href": "data.html?c=retest_patched", "tag": "Not applied"})
     people = board_people()
     if people["bounties"]:
-        work.append({"title": f'{people["bounties"]} bounties on the board', "body": "Local ledger. Not on chain.", "tone": "quiet", "icon": "target", "href": "bounties.html", "tag": ""})
+        work.append({"title": f'{people["bounties"]} bounties on the board', "body": "", "tone": "quiet", "icon": "target", "href": "bounties.html", "tag": ""})
     path = DEMO / "window" / "scenarios.json.gz"
     if path.exists():
         missing = read_gz(path).get("not_tested") or []

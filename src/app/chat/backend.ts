@@ -48,8 +48,8 @@ export class StubBackend implements ChatBackend {
       note: 'Real values of this world. Accept and Reject change nothing yet.',
     };
     yield {
-      type: 'tool', title: 'Ran 1 test', meta: 'Simulated',
-      lines: [`seed ${result.seed}`, `${result.steps} steps`, `${result.time_s} s simulated`],
+      type: 'tool', title: 'Ran 1 test',
+      lines: [`seed ${result.seed}`, `${result.steps} steps`, `${result.time_s} s`],
     };
     yield result.passed
       ? { type: 'text', text: `It held for the whole run. Lowest suction ${(lowest / 1000).toFixed(2)} kPa. It cleaned ${(result.coverage * 100).toFixed(1)}% in ${result.time_s} s.` }

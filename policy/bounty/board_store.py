@@ -24,7 +24,7 @@ import gate as G
 import ledger as ledger_module
 
 ROOT = G.POLICY / "runs" / "board"
-LEDGER_LABEL = ledger_module.LABEL
+LEDGER_LABEL = ""
 WORLD_ID_LABEL = "A tester id comes from the signed-in account, and a verified device is not proof of one person"
 SCENARIOS_LABEL = "Scenario text is for people to read. The gate does not enforce it."
 SIM_LABEL = "Simulated with hand-built physics. Limits are the company's choice, so a world inside them is not shown to be physically possible."

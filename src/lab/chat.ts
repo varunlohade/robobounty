@@ -1,3 +1,4 @@
+import { plainNote } from '../site/plain_note.ts';
 import { el, icon } from '../app/dom.ts';
 import type { ChatAction, ChatEvent } from '../app/chat/backend.ts';
 import { SERVER, type LiveBackend, type ServerEvent } from '../app/chat/live.ts';
@@ -192,7 +193,7 @@ export class LabChat {
     groups.append(el('summary', '', `${(e.groups ?? []).length} groups`));
     for (const g of e.groups ?? []) groups.append(el('div', 'chat-group', `${g.name} (${g.count}). ${g.reason}`));
     card.append(groups);
-    if (e.note) card.append(el('div', 'chat-card-note', e.note));
+    if (e.note) card.append(el('div', 'chat-card-note', plainNote(e.note)));
     card.append(run);
     this.runCards.push(run);
     this.append(card);
@@ -274,7 +275,7 @@ export class LabChat {
         this.append(el('div', 'chat-me', event.text));
         break;
       case 'text':
-        this.note(event.text, event.fail);
+        this.note(plainNote(event.text), event.fail);
         break;
       case 'picture': {
         const figure = el('figure', 'chat-picture');

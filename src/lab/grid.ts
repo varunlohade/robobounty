@@ -1,4 +1,5 @@
 // The test run: one light 2D canvas per scenario, driven by the 1 Hz grid event. No WebGL here. A replay opens one view in the same stage and closes it on the way back.
+import { plainNote } from '../site/plain_note.ts';
 import { el } from '../app/dom.ts';
 import type { ServerEvent } from '../app/chat/live.ts';
 import { fmtTime } from '../app/world_page.ts';
@@ -853,7 +854,7 @@ export class Grid {
     if (!list.length) body.push(el('div', 'grid-rail-note', 'The list is empty.'));
     const dropped = Object.entries((s?.dropped ?? {}) as Record<string, number>);
     if (dropped.length) body.push(section('Refused by the code', dropped.map(([k, n]) => fact(k.replace(/^refused:/, '').replaceAll('_', ' '), String(n)))));
-    if (s?.note) body.push(el('div', 'grid-rail-note', String(s.note)));
+    if (s?.note) body.push(el('div', 'grid-rail-note', plainNote(s.note)));
     this.rail.hidden = false;
     this.rail.dataset.mode = 'not_tested';
     this.back.hidden = false;
@@ -865,7 +866,7 @@ export class Grid {
   private rerunButton(d: ServerEvent) {
     const b = el('button', 'grid-btn', 'Open in Rerun') as HTMLButtonElement;
     b.type = 'button';
-    b.title = 'Downloads a .rrd file of this recorded run. Open it with the Rerun viewer. Simulated.';
+    b.title = 'Downloads a .rrd file of this recorded run. Open it with the Rerun viewer.';
     b.addEventListener('click', async () => {
       b.disabled = true;
       b.textContent = 'Making the file';
@@ -953,7 +954,7 @@ export class Grid {
     if (d.first) {
       const before = d.first as { verdict_reason?: string | null };
       out.push(section('Before and after', [fact('First run', statusWord({ ...d, ...d.first } as unknown as Row)), fact('Latest run', statusWord(d as unknown as Row)),
-        el('div', 'grid-text', `Before: ${before.verdict_reason ?? 'no reason recorded.'} After: ${d.verdict_reason ?? 'no reason recorded.'} Same world and seed, with your code. Simulated.`)]));
+        el('div', 'grid-text', `Before: ${before.verdict_reason ?? 'no reason recorded.'} After: ${d.verdict_reason ?? 'no reason recorded.'} Same world and seed, with your code.`)]));
     }
     const code = d.code as { file: string; line: number; traced: boolean; why?: string } | null;
     const parts: HTMLElement[] = [];
@@ -966,7 +967,7 @@ export class Grid {
     if (d.seed !== undefined) facts.push(fact('Seed', String(d.seed)));
     if (d.wall_s != null) facts.push(fact('Wall time', `${Number(d.wall_s).toFixed(1)} s`));
     if (facts.length) out.push(section('Run', facts));
-    if (d.note) out.push(el('div', 'grid-rail-note', String(d.note)));
+    if (d.note) out.push(el('div', 'grid-rail-note', plainNote(d.note)));
     if (d.label) out.push(el('div', 'grid-mono grid-label', String(d.label)));
     out.push(file);
     return out;

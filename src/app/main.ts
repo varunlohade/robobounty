@@ -135,7 +135,7 @@ async function main() {
   chatHead.append(newChat);
 
   const status = el('footer', 'status');
-  status.append(el('span', '', LABEL), el('span', '', 'Stub chat'), el('span', '', 'Hand-built physics, not checked against real hardware'), statusRight);
+  status.append(el('span', '', LABEL), el('span', '', 'Stub chat'), statusRight);
   app.append(title, chatHead, el('div', 'head-rule'), tabs, chat.root, divider(), pane, status);
 
   try {

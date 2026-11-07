@@ -24,7 +24,7 @@ let body = await text();
 const visible = await js(`[...document.fonts].filter(f => f.status === 'loaded').length > 0`);
 check('the fonts load, so the text shows', visible);
 check('empty state shows, with no sample rows', body.includes('No bounties yet') && !/sample/i.test(body), '');
-check('both labels are fixed on the page', body.includes('Local ledger. Not on chain.') && body.includes('World ID is not connected'));
+check('the World ID label stays and no ledger label shows', !body.includes('Local ledger') && body.includes('World ID is not connected'));
 await shot(`${OUT}board-empty.png`);
 
 await send('Page.navigate', { url: `${PAGE}?post=${ref}` });

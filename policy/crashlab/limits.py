@@ -12,7 +12,7 @@ BANDS = 10
 ENDED = ("passed", "failed", "stuck", "held")
 FAILED = ("failed", "stuck")
 LIMITS_FILE = "limits.json"
-COVERAGE_NOTE = "Tested means a finished run touched that part of the range. It does not mean the robot is safe there. Simulated, and not checked against real hardware."
+COVERAGE_NOTE = "Tested means a finished run touched that part of the range. It does not mean the robot is safe there. Not checked against real hardware."
 DEFAULTS_NOTE = "These are the default limits. Say a new range in the chat, for example: set the wind limit to 0 to 12."
 CODES = {"unknown_factor": "That is not a factor in this robot's limits.", "bad_args": "A limit needs a factor, a low number and a high number.", "low_above_high": "The low number must be below the high number.",
          "out_of_range": "That range is outside what this robot's physics can model."}

@@ -504,7 +504,7 @@ def agent5():
     return module
 
 
-PACK_NOTES = {"inspection": "Simulated. The policy is upstream's and unchecked against a real robot. Not calibrated.", "window": "Simulated with hand-built physics. Not checked against real hardware."}
+PACK_NOTES = {"inspection": "The policy is upstream's and unchecked against a real robot. Not calibrated.", "window": "Not checked against real hardware."}
 
 
 def pack_prompt(info, world, message, chat, feedback, round_no):
@@ -1141,7 +1141,7 @@ class Session:
         results = [pack_campaign.read_json(folder / f"w{w['index']:03d}" / "job_result.json") for w in plan["worlds"]]
         label = next((r["label"] for r in results if r), None)
         self.emit(type="campaign_done", campaign=cid, counts=counts, wall_s=grid["elapsed_s"], max_procs=limit, label=label, note=plan["note"])
-        self.say(f"Done in {grid['elapsed_s']:.0f} s: {counts['passed']} passed, {counts['failed']} failed, {counts['stuck']} stuck, {counts['safe_hold']} safe holds, {counts['held']} held back. Simulated. {len(plan['not_tested'])} things stay not tested.")
+        self.say(f"Done in {grid['elapsed_s']:.0f} s: {counts['passed']} passed, {counts['failed']} failed, {counts['stuck']} stuck, {counts['safe_hold']} safe holds, {counts['held']} held back. {len(plan['not_tested'])} things stay not tested.")
         testing_lab.after_campaign(self, cid, plan, grid, label)
 
     def code_post(self, body):
@@ -1987,7 +1987,7 @@ class Session:
             SLOTS.give(1)
 
     def bounty_draft(self):
-        self.chapter("bounty", "Local ledger")
+        self.chapter("bounty", "Bounty")
         self.working("reading the gate's rules")
         self.gate_info = self.bounty_job("constants", {})
         preview = self.bounty_job("spec", {"groups": self.proposal["groups"], "salt": "00" * 32, "preview": True})
@@ -1997,12 +1997,12 @@ class Session:
             return
         unresolved = [{"id": t["id"], "rule": t["rule"], "severity": t["severity"], "count": t["count"]} for t in self.types]
         self.emit(type="bounty_draft", not_tested=self.proposal["not_tested"], unresolved=unresolved, limits=preview["limits"], narrowed=preview["narrowed"], gate=self.gate_info,
-                  label=ledger_module.LABEL, min_window=ledger_module.MIN_DISPUTE_WINDOW, defaults={"cap": 1000, "per_failure": 100, "window": ledger_module.MIN_DISPUTE_WINDOW}, tester=self.tester,
+                  label="", min_window=ledger_module.MIN_DISPUTE_WINDOW, defaults={"cap": 1000, "per_failure": 100, "window": ledger_module.MIN_DISPUTE_WINDOW}, tester=self.tester,
                   fix=self.fix_summary)
-        self.tool("bounty_draft", ledger_module.LABEL, [json.dumps({"not_tested": len(self.proposal["not_tested"]), "unresolved_failure_types": len(unresolved), "gate_needs": f"{self.gate_info['repeat_need']} of {self.gate_info['reruns']}"})])
+        self.tool("bounty_draft", "", [json.dumps({"not_tested": len(self.proposal["not_tested"]), "unresolved_failure_types": len(unresolved), "gate_needs": f"{self.gate_info['repeat_need']} of {self.gate_info['reruns']}"})])
 
     def ledger_event(self):
-        self.emit(type="ledger", bounty=self.ledger.bounty, failures=self.ledger.failures, now=time.time(), label=ledger_module.LABEL)
+        self.emit(type="ledger", bounty=self.ledger.bounty, failures=self.ledger.failures, now=time.time(), label="")
 
     def fund(self, value):
         amounts = [value.get(k) for k in ("cap", "per_failure", "window")]
@@ -2026,7 +2026,7 @@ class Session:
             return
         self.ledger = ledger
         self.ledger_event()
-        self.tool("fund_bounty", ledger_module.LABEL, [json.dumps({"cap": amounts[0], "per_failure": amounts[1], "dispute_window_s": amounts[2], "spec_hash": spec["spec_hash"][:18]})])
+        self.tool("fund_bounty", "", [json.dumps({"cap": amounts[0], "per_failure": amounts[1], "dispute_window_s": amounts[2], "spec_hash": spec["spec_hash"][:18]})])
 
     def submit(self, text, seed):
         """The pasted text goes into a file with a fixed name, and only the gate reads it. It never reaches an argv or a reply."""
@@ -2063,7 +2063,7 @@ class Session:
             try:
                 self.ledger.propose(self.tester, v["fingerprint"], v["result_hash"])
             except ledger_module.LedgerError as e:
-                self.say(f"The local ledger refused the proposal: {e}.", fail=True)
+                self.say(f"The ledger refused the proposal: {e}.", fail=True)
             self.ledger_event()
 
     def ledger_step(self, name, fingerprint):
@@ -2078,7 +2078,7 @@ class Session:
             self.ledger_event()
             return 409, {"error": str(e)}
         self.ledger_event()
-        self.tool(name, ledger_module.LABEL, [json.dumps({"fingerprint": fingerprint[:18], "status": self.ledger.failures[fingerprint]["status"]})])
+        self.tool(name, "", [json.dumps({"fingerprint": fingerprint[:18], "status": self.ledger.failures[fingerprint]["status"]})])
         return 200, {"ok": True}
 
 

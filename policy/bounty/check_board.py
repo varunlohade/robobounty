@@ -66,7 +66,7 @@ def fast(root):
     first = B.post("Wind on tower A", "Sample company A", ["Night cleaning in wind"], 100, 10, {"wind_ms": [0, 25]}, root=root)
     second = B.post("Wet glass", "Sample company B", [], 50, 25, {"wetness": [0, 0.5]}, root=root)
     rows = B.list_bounties(root)
-    check("two posts list as open with the ledger label", [r["id"] for r in rows] == [1, 2] and all(r["status"] == "open" and r["ledger_label"] == "Local ledger. Not on chain." for r in rows), rows[0]["ledger_label"])
+    check("two posts list as open with the ledger label", [r["id"] for r in rows] == [1, 2] and all(r["status"] == "open" and r["ledger_label"] == "" for r in rows), rows[0]["ledger_label"])
     check("each bounty has its own folder, spec id and ledger id", all(json.loads((root / str(i) / "spec.json").read_text())["bounty_id"] == i and json.loads((root / str(i) / "ledger.json").read_text())["bounty"]["id"] == i for i in (1, 2)))
     check("get returns the post", B.get(2, root)["per_failure"] == 25 and first["limits"]["gust_speed_ms"] == [0, 25] and second["narrowed"] == ["wetness"])
     check("robot is fixed", all(r["robot"] == "High-rise window robot" for r in rows))
@@ -174,7 +174,7 @@ def server_flow(root):
         status, out = curl("POST", "/api/bounties", {"title": "x", "company": "y", "scenarios": [], "cap": 10, "per_failure": 5, "limits": {}, "robot": "my robot"})
         check("refuses a chosen robot", status == 400 and out["error"] == "bad_fields", f"{status}")
         status, out = curl("GET", "/api/bounties")
-        check("list shows both open, with both labels", len(out["bounties"]) == 2 and all(b["status"] == "open" for b in out["bounties"]) and out["ledger_label"] == "Local ledger. Not on chain." and out["world_id_label"] == B.WORLD_ID_LABEL, f"{out['ledger_label']} {out['world_id_label']}")
+        check("list shows both open, with both labels", len(out["bounties"]) == 2 and all(b["status"] == "open" for b in out["bounties"]) and out["ledger_label"] == "" and out["world_id_label"] == B.WORLD_ID_LABEL, f"{out['ledger_label']} {out['world_id_label']}")
         salts = [(root / str(i) / "salt.hex").read_text() for i in (narrow["id"], wide["id"])]
         check("no reply holds a salt", not any(s in json.dumps(out) for s in salts))
 

@@ -156,7 +156,7 @@ def _post(h, root):
     elif m := STEP.fullmatch(path):
         bounty_id, n, step = int(m[1]), int(m[2]), m[3]
         if step in ("reject", "finalize", "claim") and arc_wallet.config(root)["on"]:
-            raise B.BoardError("on_chain", "Arc decides this step, so the local ledger button is off.")
+            raise B.BoardError("on_chain", "Arc decides this step, so this button is off.")
         s = h.need("engineer") if step == "claim" else h.own(bounty_id)
         v = h.body(MAX_STEP_BODY, {"secret"} if step == "claim" else set())
         if step in ("approve", "decline"):

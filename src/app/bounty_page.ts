@@ -1,3 +1,4 @@
+import { plainNote } from '../site/plain_note.ts';
 import { el } from './dom.ts';
 import type { ChatAction } from './chat/backend.ts';
 import type { ServerEvent } from './chat/live.ts';
@@ -27,7 +28,7 @@ export class BountyPage {
 
   showDraft(e: ServerEvent) {
     this.gate = e.gate;
-    const banner = el('div', 'ledger-label', e.label);
+    const banner = el('div', 'ledger-label', plainNote(e.label));
     const list = (head: string, rows: string[]) => {
       const box = el('div');
       box.append(el('h3', '', head));
@@ -58,7 +59,7 @@ export class BountyPage {
     const cap = field('Cap, test units', e.defaults.cap, 1);
     const per = field('Per failure, test units', e.defaults.per_failure, 1);
     const window = field(`Dispute window, seconds (at least ${e.min_window})`, e.defaults.window, e.min_window);
-    const fund = el('button', 'btn btn-large btn-primary', 'Fund on the local ledger');
+    const fund = el('button', 'btn btn-large btn-primary', 'Fund the bounty');
     fund.type = 'submit';
     form.append(fund);
     form.addEventListener('submit', ev => {
@@ -122,7 +123,7 @@ export class BountyPage {
     box.append(el('h3', e.accepted ? '' : 'fail', `Submission ${e.n}: ${e.accepted ? 'Accepted' : 'Rejected'} (${e.code})`), el('p', '', e.reason));
     if (e.repeat) box.append(el('p', '', `Repeats: ${e.repeat.same} of ${e.repeat.of} ended in ${e.repeat.failure}. The gate needs ${e.repeat.need}.`));
     if (e.reference_check) box.append(el('p', '', `Reference twin: ${e.reference_check.label}. ${e.reference_check.meaning}`));
-    box.append(el('p', 'excluded-row', `${e.runs ?? 0} sim runs, ${e.wall} s. Simulated. Not checked: ${((e.not_checked ?? []) as string[]).join(' ')}`));
+    box.append(el('p', 'excluded-row', `${e.runs ?? 0} sim runs, ${e.wall} s. Not checked: ${((e.not_checked ?? []) as string[]).join(' ')}`));
     this.verdicts.prepend(box);
     box.scrollIntoView({ block: 'center' });
     if (this.gate) this.runBtn.disabled = false;
@@ -136,7 +137,7 @@ export class BountyPage {
     const rows = Object.entries(e.failures as Record<string, any>);
     const draw = () => {
       const now = (Date.now() + this.serverSkew) / 1000;
-      const parts: HTMLElement[] = [el('h2', '', 'Ledger'), el('div', 'ledger-label', e.label),
+      const parts: HTMLElement[] = [el('h2', '', 'Ledger'), el('div', 'ledger-label', plainNote(e.label)),
         el('p', '', `Funded: ${b.cap} test units. Available: ${b.available}. Per failure: ${b.per_failure}. Dispute window: ${b.dispute_window_s} s. Spec ${String(b.spec_hash).slice(0, 18)}.`)];
       if (!rows.length) parts.push(this.track(0));
       for (const [fp, f] of rows) {

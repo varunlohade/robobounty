@@ -143,7 +143,7 @@ def compared(before, after, run):
 def report_run(session, cid, run, scope, rows, source_sha):
     count = {c: sum(r["change"] == c for r in rows) for c in ("better", "worse", "same")}
     session.emit(type="code_run", campaign=cid, run=run, scope=scope, sha=source_sha, rows=rows, counts=count)
-    session.say(f"Run {run}, {len(rows)} worlds: {count['better']} better, {count['worse']} worse, {count['same']} same. Simulated.")
+    session.say(f"Run {run}, {len(rows)} worlds: {count['better']} better, {count['worse']} worse, {count['same']} same.")
 
 
 def check_could_run(session, folder, worlds):

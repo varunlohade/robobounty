@@ -88,7 +88,7 @@ check('play resumes', e.frame > d.frame, `${d.frame} -> ${e.frame}`);
 const text = await js(`document.body.innerText`);
 const banned = text.match(/\b(fix|bounty|report|worlds|inspector)\b|controller\.py/gi);
 check('no banned words on screen', !banned, banned?.join(', '));
-check('Simulated label visible', await js(`(() => { const e = document.querySelector('.sim-label'); return !!e && e.offsetParent !== null && e.textContent === 'Simulated. Replay of a recorded run.'; })()`));
+check('replay label visible', await js(`(() => { const e = document.querySelector('.sim-label'); return !!e && e.offsetParent !== null && e.textContent === 'Replay of a recorded run.'; })()`));
 check('rail hidden', await js(`document.querySelector('.rail').offsetParent === null`));
 const scroll = await js(`document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight`);
 check('no page overflow', scroll);

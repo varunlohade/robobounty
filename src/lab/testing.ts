@@ -1,4 +1,5 @@
 // Operating limits, the boundary search and the regression suite on the grid. The server's numbers, as they are. Results are simulated. Tested never means safe.
+import { plainNote } from '../site/plain_note.ts';
 import { runHeaders } from '../site/auth.ts';
 import { el } from '../app/dom.ts';
 import type { ServerEvent } from '../app/chat/live.ts';
@@ -213,7 +214,7 @@ export class Testing {
   private searchBox(s: OneSearch) {
     const box = el('div', 't-search');
     box.dataset.clean = String(s.clean);
-    const said = s.words ?? `Searching ${s.label.toLowerCase()}: ${s.runs.length} of at most 12 runs so far.`;
+    const said = plainNote(s.words) || `Searching ${s.label.toLowerCase()}: ${s.runs.length} of at most 12 runs so far.`;
     box.append(el('div', 't-said', said));
     const line = this.line(s);
     if (line) box.append(line);
@@ -233,13 +234,13 @@ export class Testing {
     if (this.refusal) body.push(el('div', 'grid-rail-note bad', this.refusal));
     if (!b || (!b.groups?.length && !b.words)) body.push(el('div', 'grid-rail-note', b?.empty ? 'No search has run for this campaign yet.' : 'Starting the search.'));
     if (b?.recorded) body.push(el('div', 'grid-rail-note', 'Recorded result of an earlier real search. No sim runs here.'));
-    if (b?.words) body.push(el('div', 'grid-text', String(b.words)));
+    if (b?.words) body.push(el('div', 'grid-text', plainNote(b.words)));
     for (const g of (b?.groups ?? []) as Group[]) {
       const parts: (HTMLElement | null)[] = [g.world ? el('div', 'grid-rail-note', `From ${g.world.replaceAll('_', ' ')}, seed ${g.seed}. ${g.count} ${g.count === 1 ? 'world' : 'worlds'} in this group.`) : null, g.words ? el('div', 't-said', g.words) : null];
       for (const s of g.searches) parts.push(this.searchBox(s));
       body.push(section(`Failure group: ${g.verdict_name}`, parts));
     }
-    if (b?.note) body.push(el('div', 'grid-rail-note', String(b.note)));
+    if (b?.note) body.push(el('div', 'grid-rail-note', plainNote(b.note)));
     this.deps.showPanel('boundary', b?.running ? 'Finding the limit' : 'The limit', body);
   }
 
@@ -267,7 +268,7 @@ export class Testing {
       body.push(go);
     } else if (s) {
       if (s.counts) body.push(this.counts(s.counts as Record<string, number>));
-      body.push(el('div', 'grid-rail-note', `Code ${short(s.code_sha as string)}${s.edited ? ', your edit' : ', the original'}.${s.words ? ` ${s.words}` : ''}`));
+      body.push(el('div', 'grid-rail-note', `Code ${short(s.code_sha as string)}${s.edited ? ', your edit' : ', the original'}.${s.words ? ` ${plainNote(s.words)}` : ''}`));
       const order = ['new_failure', 'fixed', 'still_failing', 'passes_same_code', 'world_changed', 'could_not_run', 'still_passing', null];
       const rows = [...((s.rows ?? []) as SuiteRow[])].sort((a, b) => order.indexOf(a.change) - order.indexOf(b.change));
       for (const r of rows) {
@@ -280,7 +281,7 @@ export class Testing {
         body.push(row);
       }
     }
-    body.push(el('div', 'grid-rail-note', 'Same world, same seed, each time. Only a code change that stops the failure counts as fixed. Simulated.'));
+    body.push(el('div', 'grid-rail-note', 'Same world, same seed, each time. Only a code change that stops the failure counts as fixed.'));
     this.deps.showPanel('regressions', 'Re-run failures', body);
   }
 
