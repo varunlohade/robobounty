@@ -6,13 +6,16 @@ GET  /api/bounties/<id>/source             the controller copy engineers start f
 GET  /api/bounties/<id>/fixes[/<n>]
 GET  /api/bounties/<id>/public/<world>/<file>   a recorded run of one public failing world
 GET  /api/fixable
+GET  /api/fixable/check/<session>/<campaign>   counts of the stale check. A company session.
 GET  /api/budget
+POST /api/fixable/check                    {session, campaign, group}. A company session. Begins the stale check in the background.
 POST /api/bounties/fix                     {session, campaign, group, title, pay, window?}. A company session; the company name comes from it.
 POST /api/bounties/<id>/fix                {source}. An engineer session; the tester id comes from it. The server sets every other field. Any other field is refused. The reply holds claim_secret, once.
 POST /api/bounties/<id>/fixes/<n>/approve|decline|reject|finalize   {}
 POST /api/bounties/<id>/fixes/<n>/claim    {secret}. An engineer session.
 POST /api/budget/stop                      {}. The company that deposited the budget.
 """
+import os
 import queue
 import re
 import threading
@@ -30,6 +33,7 @@ MAX_SOURCE_BODY = 3 * X.F.MAX_SOURCE_BYTES
 MAX_POST_BODY = 4096
 MAX_STEP_BODY = 256
 POST_FIELDS = {"session", "campaign", "group", "title", "pay"}
+CHECK_FIELDS = {"session", "campaign", "group"}
 FIX_FIELDS = {"source"}
 ERROR_STATUS = {"unknown_campaign": 404, "already_posted": 409, "campaign_published": 409, "not_fixable": 409, "campaign_stale": 409, "no_hidden_worlds": 409, "cap_reached": 409, "same_source": 409, "source_too_large": 413, "wrong_state": 409, "queue_full": 503,
                 "bad_secret": 403, "on_chain": 409, "not_funded": 409, "no_wallet": 409, "budget_stopped": 409, "over_budget": 409, "over_per_bounty": 409, "no_budget": 404, "not_your_budget": 403, "not_found": 404, "budget_mismatch": 409}
@@ -41,6 +45,7 @@ FIXES = re.compile(r"/api/bounties/([0-9]{1,9})/fixes(?:/([0-9]{1,9}))?")
 PUBLIC = re.compile(r"/api/bounties/([0-9]{1,9})/public/([0-9]{1,4})/([a-z.]+)")
 SUBMIT = re.compile(r"/api/bounties/([0-9]{1,9})/fix")
 STEP = re.compile(r"/api/bounties/([0-9]{1,9})/fixes/([0-9]{1,9})/(approve|decline|reject|finalize|claim)")
+CHECK = re.compile(r"/api/fixable/check/([0-9a-f]{32})/(c[0-9]{1,6})")
 FIND_CLAIM = re.compile(r"/api/bounties/([0-9]{1,9})/failures/(0x[0-9a-f]{64})/claim")
 
 WAITING = queue.Queue(QUEUE_CAP)
@@ -63,6 +68,8 @@ def start(root):
             if row["state"] in ("queued", "running"):
                 X.save_fix({**row, "state": "interrupted"}, root)
     threading.Thread(target=_worker, args=(root,), daemon=True).start()
+    recorded = os.environ.get("CRASHLAB_DEMO_ACCOUNTS") == "1"  # scripts/demo.sh sets this only with --recorded.
+    threading.Thread(target=X.watch_campaigns, args=(arc_wallet.DEMO_SESSION, "c1") if recorded else (), daemon=True).start()
 
 
 def _both(root):
@@ -81,6 +88,9 @@ def _get(h, root):
         h.reply(200, {"bounties": [h.marked(b) for b in _both(root)], **labels})
     elif path == "/api/fixable":
         h.reply(200, {"fixable": X.fixable(root), **labels})
+    elif m := CHECK.fullmatch(path):
+        h.need("company")
+        h.reply(200, X.check_view(m[1], m[2]))
     elif path == "/api/budget":
         h.reply(200, budget.view(root))
     elif (m := ONE.fullmatch(path)) and X.is_fix(int(m[1]), root):
@@ -115,6 +125,10 @@ def _post(h, root):
         made = X.post(v["session"], v["campaign"], v["group"], v["title"], A.company_name(s), v["pay"], root=root, **extra)
         B.set_owner(made["id"], s["account_id"], root)
         h.reply(201, {**made, "mine": True})
+    elif path == "/api/fixable/check":
+        h.need("company")
+        v = h.body(MAX_POST_BODY, CHECK_FIELDS)
+        h.reply(202, X.start_check(v["session"], v["campaign"], v["group"]))
     elif path == "/api/budget/stop":
         s = h.need("company")
         h.body(MAX_STEP_BODY, set())

@@ -698,6 +698,152 @@ def payout_rule(root, dense):
         FG._run = real_run
 
 
+def cache_rule(root):
+    """The saved result of the stale check makes a post quick. Each attack changes one thing after a good result is saved, and the real check, not the cache, must then refuse the post."""
+    runs = root / "cache_runs"
+    campaign = runs / SESSION / "campaigns" / "c1"
+    worlds = demo_campaign(campaign)
+    grid = json.loads((campaign / "grid.json").read_text())
+    group = max(X._fixable_groups("window", grid["rows"]).items(), key=lambda kv: kv[1])[0]
+    code = code_copy(root)
+    made = root / "cache_board"
+    ask = dict(runs=runs, code_root=code)
+    key_now = lambda: X._check_key(X._postable(SESSION, "c1", group, runs), code)
+    post = lambda title: X.post(SESSION, "c1", group, title, "Check company", 40, root=made, **ask)
+    drop = lambda info: (shutil.rmtree(X.folder_of(info["id"], made)), None)[1]
+    real_export, exports = X._export_public, []
+
+    def export(pack, source, index, out):  # The stored batch keeps no qpos, so export5 cannot run on it. What this tests is where the bounty's copy comes from.
+        exports.append(index)
+        Path(out).mkdir(parents=True)
+        (Path(out) / "manifest.json").write_text(f"export {len(exports)}")
+        return True
+    X._export_public = export
+
+    started = time.monotonic()
+    X.start_check(SESSION, "c1", group, **ask)
+    seen = X.check_view(SESSION, "c1", **ask)
+    check("the check counts what it replays", seen["total"] == sum(not w["held_back"] for w in worlds) and seen["state"] in ("waiting", "running"), str(seen))
+    joined = post("A post during the check")
+    check("a post that presses during the check waits for it, and goes through", joined["status"] and (time.monotonic() - started) > 1, f"{time.monotonic() - started:.1f} s")
+    check("the check ends good", X.check_view(SESSION, "c1", **ask)["state"] == "good", str(X.check_view(SESSION, "c1", **ask)))
+    made_once = len(exports)
+    check("each export is made once", 0 < made_once <= X.MAX_PUBLIC_REPLAYS and all((X.folder_of(joined["id"], made) / "public" / f"w{w['index']:03d}" / "manifest.json").is_file() for w in joined["public_worlds"] if w["replay"]), str(exports))
+    drop(joined)
+    key = key_now()
+    check("a good check is saved under its key", X._cached_good(campaign, key))
+    measured = time.monotonic()
+    key_now()
+    check("hashing everything the check depends on takes under 1 s", time.monotonic() - measured < 1, f"{time.monotonic() - measured:.3f} s")
+
+    real_stale, calls = X._is_stale, []
+    X._is_stale = lambda *a, **k: (calls.append(a), real_stale(*a, **k))[1]
+    try:
+        hit = post("A post on the saved result")
+        check("an exact match replays nothing", not calls)
+        check("an exact match exports nothing", len(exports) == made_once, str(exports))
+        check("a bounty on a saved result lists its exports", sum(w["replay"] for w in hit["public_worlds"]) == made_once)
+        kept = campaign / X.CHECK_DIR / key / "public"
+        for world in (w for w in hit["public_worlds"] if w["replay"]):
+            name = f"w{world['index']:03d}"
+            check(f"the bounty copies export {name} from the saved result", (X.folder_of(hit["id"], made) / "public" / name / "manifest.json").read_bytes() == (kept / name / "manifest.json").read_bytes())
+        drop(hit)
+
+        def after(name, change, undo):
+            calls.clear()
+            change()
+            refused_now = refused(lambda: post(f"Attack: {name}"), "campaign_stale")
+            check(f"attack: {name} after a good result: the post is refused", refused_now)
+            check("  the real check ran", len(calls) == 1, str(len(calls)))
+            check("  the refusal is not saved as good", not X._cached_good(campaign, key_now()))
+            undo()
+            check("  the same bytes again give the same key", key_now() == key)
+
+        public = next(w for w in worlds if not w["held_back"])
+        run = campaign / f"w{public['index']:03d}"
+        actions = run / "run" / "actions.jsonl.gz"
+        real_actions = actions.read_bytes()
+        after("one changed byte in a stored action log", lambda: actions.write_bytes(real_actions[:-9] + bytes([real_actions[-9] ^ 1]) + real_actions[-8:]), lambda: actions.write_bytes(real_actions))
+        job = run / "job_result.json"
+        real_job = job.read_text()
+        verdict = json.loads(real_job)
+        after("a changed stored verdict", lambda: job.write_text(json.dumps({**verdict, "verdict": "passed" if verdict["verdict"] != "passed" else "slip_distance"})), lambda: job.write_text(real_job))
+        session_code = runs / SESSION / "code" / "controller5.py"
+        session_code.parent.mkdir()
+        after("a changed controller", lambda: session_code.write_text(WINDOW + "\n# changed\n"), session_code.unlink)
+        frozen = code / "highrise5" / "world5.py"
+        real_frozen = frozen.read_text()
+        after("a changed frozen file", lambda: thicker_air(code / "highrise5"), lambda: frozen.write_text(real_frozen))
+        planted = campaign / X.CHECK_DIR / ("0" * 64)
+        planted.mkdir()
+        (planted / "good.json").write_text(json.dumps({"key": key}))
+        check("a good.json whose key is not its folder does not count", not X._cached_good(campaign, "0" * 64))
+        shutil.rmtree(planted)
+    finally:
+        X._is_stale, X._export_public = real_stale, real_export
+    warm_rule(root, code)
+    fifo = run / "run" / "pipe"
+    os.mkfifo(fifo)
+    check("attack: a pipe in a run folder changes the key and does not hang the hash", key_now() != key)
+    fifo.unlink()
+
+    out = run / "sandbox_probe"
+    out.mkdir()
+    target = campaign / X.CHECK_DIR / key / "good.json"
+    script = out / "forge.py"
+    script.write_text(f"import sys\nopen({str(target)!r}, 'w').write('forged')\n")
+    profile = F.sandbox_profile(out.resolve(), script.resolve())
+    before = target.read_bytes()
+    done = subprocess.run(["sandbox-exec", "-p", profile, str(F.PY), "-I", str(script.resolve())], capture_output=True, text=True, cwd=out)
+    check("attack: code in the sandbox cannot write the saved result", target.read_bytes() == before and "PermissionError" in done.stderr, done.stderr[-120:])
+    shutil.rmtree(out)
+
+
+def warm_rule(root, code):
+    """A campaign that finishes gets its check without a press, and a warmed result is still only good for the same bytes."""
+    runs = root / "warm_runs"
+    campaign = runs / SESSION / "campaigns" / "c1"
+    demo_campaign(campaign)
+    path = campaign / "grid.json"
+    grid = json.loads(path.read_text())
+    since = time.time() - 60
+    seen = {}
+    real_export = X._export_public
+    X._export_public = lambda pack, source, index, out: (Path(out).mkdir(parents=True), (Path(out) / "manifest.json").write_text("export"), True)[2]
+    real_stale, calls = X._is_stale, []
+    X._is_stale = lambda *a, **k: (calls.append(a), real_stale(*a, **k))[1]
+    try:
+        old = time.time() - 30
+        path.write_text(json.dumps({**grid, "running": True}))
+        os.utime(path, (old, old))
+        X.warm_finished(since, seen, runs, code)
+        check("a campaign still running gets no check", not calls and not (campaign / X.CHECK_DIR).exists())
+        path.write_text(json.dumps(grid))
+        os.utime(path, (since - 10, since - 10))
+        X.warm_finished(since, seen, runs, code)
+        check("a campaign from before this board started gets no check", not calls)
+        os.utime(path, (old, old))
+        X.warm_finished(since, seen, runs, code)
+        groups = list(X._fixable_groups("window", grid["rows"]))
+        p = X._postable(SESSION, "c1", groups[0], runs)
+        key = X._check_key(p, code)
+        check("a finished campaign gets one real check, with no press", len(calls) == 1 and X._cached_good(campaign, key), str(len(calls)))
+        check("every group's exports are ready", all((campaign / X.CHECK_DIR / key / "public" / f"w{w['index']:03d}").is_dir() for g in groups for w in X._postable(SESSION, "c1", g, runs).target[:X.MAX_PUBLIC_REPLAYS]))
+        X.warm_finished(since, seen, runs, code)
+        check("the same finish is not checked twice", len(calls) == 1, str(len(calls)))
+        made = root / "warm_board"
+        bounty = X.post(SESSION, "c1", groups[0], "Warm post", "Check company", 40, root=made, runs=runs, code_root=code)
+        check("the first press on a warmed campaign replays nothing", bounty["status"] and len(calls) == 1, str(len(calls)))
+        public = next(w for w in p.plan["worlds"] if not w["held_back"])
+        actions = campaign / f"w{public['index']:03d}" / "run" / "actions.jsonl.gz"
+        data = actions.read_bytes()
+        actions.write_bytes(data[:-9] + bytes([data[-9] ^ 1]) + data[-8:])
+        check("attack: a changed log after warming: the post is refused", refused(lambda: X.post(SESSION, "c1", groups[-1], "Warm attack", "Check company", 40, root=made, runs=runs, code_root=code), "campaign_stale") if len(groups) > 1 else False)
+        check("  the real check ran", len(calls) == 2, str(len(calls)))
+    finally:
+        X._is_stale, X._export_public = real_stale, real_export
+
+
 def inspection_rule(root):
     """Finding: inspection skipped the stale rule. Hashes only here, no sim."""
     base = hashlib.sha256(INSPECTION.encode()).hexdigest()
@@ -833,6 +979,7 @@ def main():
     f1()
     f2()
     stale_rule(root)
+    cache_rule(root)
     inspection_rule(root)
     site_rule(root)
     could_not_run(root)

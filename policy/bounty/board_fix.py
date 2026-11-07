@@ -9,11 +9,14 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -104,7 +107,7 @@ print("same" if all(C.physics_hash(W.validate(w["world"])) == w["physics"] for w
 """
 
 
-def _is_stale(folder, worlds, pack, base_sha, code_root=POLICY):
+def _is_stale(folder, worlds, pack, base_sha, code_root=POLICY, tick=None):
     """A stored run from other code or other physics says nothing about the code frozen now. It covers every world the bounty uses, public and hidden. Anything missing counts as stale.
     The files that build a world may gain new kinds of object, so those are judged by each world's compiled physics hash, and every stored action log must replay on the code here, since sim code in those files reaches no hash.
     An inspection run has no action log, so its stored run must name the exact bytes of every frozen file."""
@@ -140,7 +143,7 @@ def _is_stale(folder, worlds, pack, base_sha, code_root=POLICY):
         replays.append((w, run, job))
     if pack == "inspection":
         return False
-    return not (_same_physics(checks, Path(code_root) / "highrise5") and _replays_same(replays, code_root))
+    return not (_same_physics(checks, Path(code_root) / "highrise5") and _replays_same(replays, code_root, tick))
 
 
 def _same_physics(worlds, code):
@@ -152,11 +155,13 @@ def _same_physics(worlds, code):
     return done.returncode == 0 and done.stdout.strip() == "same"
 
 
-def _replays_same(replays, code_root):
+def _replays_same(replays, code_root, tick=None):
     """Each stored action log through the judge outside the sandbox, on the code on disk now. It must give the stored states, result and verdict. No reply counts as changed."""
     def same(entry):
         world, run, job = entry
         judged = F.rejudge5("window", None, world["world"], world["seed"], run.resolve(), code_root)
+        if tick:
+            tick()
         return bool(judged) and judged.get("matches") is True and judged["verdict"] == job.get("verdict") and judged["passed"] == job.get("passed")
     with ThreadPoolExecutor(REPLAY_PROCS) as pool:
         return all(pool.map(same, replays))
@@ -176,14 +181,21 @@ def _export_public(pack, campaign, index, out):
     return done.returncode == 0
 
 
-def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DISPUTE_WINDOW, posted_by="company", root=B.ROOT, runs=SERVER_RUNS, code_root=POLICY):
-    """Makes one fix bounty from one failure group. cap = pay, so one fix can win. Returns the public view."""
-    title, company = B._text(title, "The title", 120), B._text(company, "The company", 80)
-    pay, window = B._amount(pay, "The pay"), B._amount(window, "The dispute window", B.MAX_WINDOW_S)
+CHECK_DIR = ".postcheck"  # In the campaign folder, outside every wNNN. A sandboxed run writes only inside its own run folder, and no route writes here, so only this server can.
+CHECK_SCHEMA = 1
+CHECK_CODE = ("highrise5/*.py", "packs/__init__.py", "packs/window/*.py", "packs/inspection/*.py", "bounty/rejudge.py", "server/pack_job.py")  # What a replay or an export imports.
+STALE_REASON = "A stored run no longer matches or no longer replays. The sim, the judge, this controller or a world's physics changed after it ran. Run those worlds again before you post it."
+WARM_LOOK_S = 2
+WARM_SETTLE_S = 1  # The lab writes other files just after the grid. A check that starts sooner would see them change, and save nothing.
+CHECKS = {}
+CHECKS_LOCK = threading.Lock()
+CHECK_TURN = threading.Lock()  # One check at a time, since each one fills every core.
+
+
+def _postable(session, cid, group, runs):
+    """Every refusal a post can give before the stale rule, and what the rule and the post then need."""
     if not (isinstance(group, str) and GROUP.fullmatch(group)):
         raise B.BoardError("bad_group", "The failure group is not valid.")
-    root = Path(root)
-    root.mkdir(parents=True, exist_ok=True)
     source = _campaign(session, cid, runs)
     grid, plan = _read(source / "grid.json"), _read(source / "scenarios.json")
     pack = grid["pack"]
@@ -194,8 +206,6 @@ def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DI
     rows = {r["index"]: r for r in grid["rows"]}
     target = [w for w in plan["worlds"] if not w["held_back"] and rows[w["index"]]["verdict"] == group and rows[w["index"]]["status"] in ("failed", "stuck")]
     held_back = [w for w in plan["worlds"] if w["held_back"]]
-    passed = [w for w in plan["worlds"] if not w["held_back"] and rows[w["index"]]["status"] in ("passed", "held")]
-    other = [w for w in plan["worlds"] if not w["held_back"] and w not in target and w not in passed]
     if (source / "zg_evidence.json").is_file():
         raise B.BoardError("campaign_published", "This campaign's passed worlds are already public on 0G Storage, so they cannot stay hidden in a bounty. Post the bounty first, then upload.")
     if not held_back:
@@ -203,8 +213,216 @@ def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DI
     session_copy = source.parent.parent / "code" / F.PACK5[pack]["file"].name
     base = session_copy if session_copy.is_file() else F.PACK5[pack]["file"]
     base_text = base.read_text()
-    if _is_stale(source, plan["worlds"], pack, hashlib.sha256(base_text.encode()).hexdigest(), code_root):
-        raise B.BoardError("campaign_stale", "A stored run no longer matches or no longer replays. The sim, the judge, this controller or a world's physics changed after it ran. Run those worlds again before you post it.")
+    return SimpleNamespace(source=source, plan=plan, pack=pack, rows=rows, target=target, held_back=held_back, base=base, base_text=base_text, base_sha=hashlib.sha256(base_text.encode()).hexdigest())
+
+
+def _file_sha(path):
+    """A run folder is hostile data. It may hold a pipe or a link, so this opens without blocking and reads only a regular file."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+    except OSError:
+        return "unreadable"
+    with os.fdopen(fd, "rb") as f:
+        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            return "not_a_file"
+        digest = hashlib.sha256()
+        while chunk := f.read(1 << 20):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _tree_shas(folder):
+    out = {}
+    for base, dirs, files in os.walk(folder):
+        for name in dirs + files:
+            out[os.path.relpath(os.path.join(base, name), folder)] = _file_sha(os.path.join(base, name))
+    return out
+
+
+def _check_key(p, code_root=POLICY):
+    """Over everything the stale rule and the exports read, plus the code of the rule itself. Any change gives another key, so a good result counts only for these exact bytes."""
+    code_root = Path(code_root)
+    python = Path(F.PACK5[p.pack]["python"])
+    runs = {}
+    for w in p.plan["worlds"]:
+        if not w["held_back"]:
+            run = F.latest_run5(p.source, w["index"])
+            runs[w["index"]] = {"folder": os.path.relpath(run, p.source), "job": _file_sha(run / "job_result.json"), "run": _tree_shas(run / "run")}
+    parts = {"schema": CHECK_SCHEMA, "pack": p.pack, "code_root": str(code_root), "controller": p.base_sha, "plan": _file_sha(p.source / "scenarios.json"), "grid": _file_sha(p.source / "grid.json"), "runs": runs,
+             "frozen": {name: _file_sha(code_root / name) for name in FROZEN_FILES[p.pack]}, "code": {str(f.relative_to(code_root)): _file_sha(f) for pattern in CHECK_CODE for f in sorted(code_root.glob(pattern))},
+             "rule": [_file_sha(__file__), _file_sha(F.__file__)], "python": [os.path.realpath(python), sorted(f.name for f in python.parent.parent.glob("lib/python*/site-packages/*.dist-info"))]}
+    return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
+
+
+def _cached_good(source, key):
+    try:
+        return _read(source / CHECK_DIR / key / "good.json")["key"] == key
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+def _store_good(source, key):
+    """Only a check that passed reaches this. Older results go, since their key can never match again unless the same bytes come back, and then a new check costs only time."""
+    folder = source / CHECK_DIR
+    folder.mkdir(mode=0o700, exist_ok=True)
+    for old in folder.iterdir():
+        if old.name != key:
+            shutil.rmtree(old, ignore_errors=True)
+    (folder / key).mkdir(mode=0o700, exist_ok=True)
+    B.write_json(folder / key / "good.json", {"key": key, "checked_at": time.time()})
+
+
+def _store_exports(job, p):
+    folder = p.source / CHECK_DIR / job.key / "public"
+    wanted = [w["index"] for w in p.target[:MAX_PUBLIC_REPLAYS] if not (folder / f"w{w['index']:03d}").is_dir()] if p.pack == "window" else []
+    job.phase, job.done, job.total = "export", 0, len(wanted)
+
+    def one(index):
+        tmp = folder / f".new-w{index:03d}"
+        shutil.rmtree(tmp, ignore_errors=True)
+        if _export_public(p.pack, p.source, index, tmp):
+            os.rename(tmp, folder / f"w{index:03d}")
+        shutil.rmtree(tmp, ignore_errors=True)
+        job.tick()
+    folder.mkdir(parents=True, exist_ok=True)
+    with ThreadPoolExecutor(MAX_PUBLIC_REPLAYS) as pool:
+        list(pool.map(one, wanted))
+
+
+class _Check:
+    def __init__(self, key, total):
+        self.key, self.total, self.done, self.state, self.phase, self.good, self.error = key, total, 0, "waiting", "replay", False, None
+        self.finished = threading.Event()
+        self.count = threading.Lock()
+
+    def tick(self):
+        with self.count:
+            self.done += 1
+
+    def view(self):
+        return {"state": self.state, "phase": self.phase, "done": self.done, "total": self.total}
+
+
+def _run_check(job, p, code_root):
+    try:
+        with CHECK_TURN:
+            job.state = "running"
+            if not _cached_good(p.source, job.key):
+                if _is_stale(p.source, p.plan["worlds"], p.pack, p.base_sha, code_root, job.tick) or _check_key(p, code_root) != job.key:  # A file that changed during the check was not the file it read.
+                    job.state = "stale"
+                    return
+                try:
+                    _store_good(p.source, job.key)
+                except OSError:  # No cache, so the next post checks in full. This one passed.
+                    pass
+            job.good = True
+            try:
+                _store_exports(job, p)
+            except OSError:  # The post makes any export that is not here.
+                pass
+            job.state = "good"
+    except Exception as e:  # noqa: BLE001 The post that waits on this raises it, as if the post had run the check itself.
+        job.error, job.state = e, "failed"
+    finally:
+        job.finished.set()
+
+
+def _begin_check(p, code_root):
+    """The check for these exact bytes: the one still running, or a new one. A new one that finds a good result on disk only makes the missing exports. Returns the job, and whether this call began it."""
+    key = _check_key(p, code_root)
+    with CHECKS_LOCK:
+        job = CHECKS.get((str(p.source), str(code_root)))
+        if job and job.key == key and not job.finished.is_set():
+            return job, False
+        job = CHECKS[(str(p.source), str(code_root))] = _Check(key, sum(not w["held_back"] for w in p.plan["worlds"]) if p.pack == "window" else 0)
+    threading.Thread(target=_run_check, args=(job, p, code_root), daemon=True).start()
+    return job, True
+
+
+def start_check(session, cid, group, runs=SERVER_RUNS, code_root=POLICY):
+    """Begins the check in the background when a company opens the post dialog, so the press finds it done."""
+    return _begin_check(_postable(session, cid, group, runs), code_root)[0].view()
+
+
+def check_view(session, cid, runs=SERVER_RUNS, code_root=POLICY):
+    """Counts only, for the post button."""
+    job = CHECKS.get((str(_campaign(session, cid, runs)), str(code_root)))
+    return job.view() if job else {"state": "idle", "phase": "replay", "done": 0, "total": 0}
+
+
+def warm_campaign(session, cid, runs=SERVER_RUNS, code_root=POLICY):
+    """The check and every group's exports, one group at a time, so the first press finds them saved. A refusal here saves nothing, and the post still decides for itself."""
+    try:
+        grid = _read(_campaign(session, cid, runs) / "grid.json")
+        for group in _fixable_groups(grid["pack"], grid["rows"]):
+            job = _begin_check(_postable(session, cid, group, runs), code_root)[0]
+            job.finished.wait()
+            if not job.good:
+                return
+    except (B.BoardError, OSError, ValueError, KeyError, TypeError):
+        return
+
+
+def warm_finished(since, seen, runs=SERVER_RUNS, code_root=POLICY):
+    """One look for campaigns that finished after this board started. The lab is another process, so the board reads the time on each grid.json. Another write to a grid counts as new."""
+    for path in Path(runs).glob("*/campaigns/*/grid.json"):
+        try:
+            changed = path.stat().st_mtime
+            if changed <= since or seen.get(path) == changed or time.time() - changed < WARM_SETTLE_S or _read(path).get("running"):
+                continue
+        except (OSError, ValueError, AttributeError):
+            continue
+        seen[path] = changed
+        warm_campaign(path.parent.parent.parent.name, path.parent.name, runs, code_root)
+
+
+def watch_campaigns(session=None, cid=None):
+    """Runs for the life of the board. With a session, it warms that stored campaign first, so a recorded demo is ready when the page opens."""
+    since, seen = time.time(), {}
+    if session:
+        warm_campaign(session, cid)
+    while True:
+        warm_finished(since, seen)
+        time.sleep(WARM_LOOK_S)
+
+
+def _checked(p, code_root):
+    """The stale rule for one post. Only a check this call began decides, so a post that joined one still running asks again: a pass then comes from disk, and a failure runs in full. Returns the key."""
+    while True:
+        job, mine = _begin_check(p, code_root)
+        job.finished.wait()
+        if mine:
+            break
+    if job.error:
+        raise job.error
+    if not job.good:
+        raise B.BoardError("campaign_stale", STALE_REASON)
+    return job.key
+
+
+def _public_replay(pack, source, key, index, out):
+    """The export the check kept for this key, or a new one as a last resort."""
+    kept = source / CHECK_DIR / key / "public" / f"w{index:03d}"
+    if kept.is_dir():
+        try:
+            shutil.copytree(kept, out)
+            return True
+        except OSError:
+            shutil.rmtree(out, ignore_errors=True)
+    return _export_public(pack, source, index, out)
+
+
+def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DISPUTE_WINDOW, posted_by="company", root=B.ROOT, runs=SERVER_RUNS, code_root=POLICY):
+    """Makes one fix bounty from one failure group. cap = pay, so one fix can win. Returns the public view."""
+    title, company = B._text(title, "The title", 120), B._text(company, "The company", 80)
+    pay, window = B._amount(pay, "The pay"), B._amount(window, "The dispute window", B.MAX_WINDOW_S)
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    p = _postable(session, cid, group, runs)
+    source, plan, pack, rows, target, held_back, base, base_text = p.source, p.plan, p.pack, p.rows, p.target, p.held_back, p.base, p.base_text
+    passed = [w for w in plan["worlds"] if not w["held_back"] and rows[w["index"]]["status"] in ("passed", "held")]
+    other = [w for w in plan["worlds"] if not w["held_back"] and w not in target and w not in passed]
+    key = _checked(p, code_root)
 
     with B.locked(root / ".lock"):
         for p in root.glob("*/hidden.json"):
@@ -231,7 +449,7 @@ def post(session, cid, group, title, company, pay, window=B.ledger_module.MIN_DI
             (tmp / F.PACK5[pack]["file"].name).write_text(base_text)
             public = []
             with ThreadPoolExecutor(MAX_PUBLIC_REPLAYS) as pool:
-                exported = list(pool.map(lambda w: _export_public(pack, source, w["index"], tmp / "public" / f"w{w['index']:03d}"), target[:MAX_PUBLIC_REPLAYS]))
+                exported = list(pool.map(lambda w: _public_replay(pack, source, key, w["index"], tmp / "public" / f"w{w['index']:03d}"), target[:MAX_PUBLIC_REPLAYS]))
             for n, w in enumerate(target):
                 stored = F.latest_run5(source, w["index"]) / "job_result.json"
                 entry = _public_world(w, rows[w["index"]], _read(stored) if stored.is_file() else {})
