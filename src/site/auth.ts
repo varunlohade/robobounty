@@ -37,12 +37,18 @@ async function post(path: string, body?: unknown, timeout = 20_000): Promise<{ o
   return { ok: res.ok, status: res.status, body: await res.json().catch(() => ({})) };
 }
 
+// A new person gets a new simulation: this tab forgets the last person's chat session and robot.
+function forgetSimulation() {
+  try { sessionStorage.removeItem('crashlab-session'); sessionStorage.removeItem('crashlab-pack'); } catch { /* no storage: nothing is remembered */ }
+}
+
 async function entered(path: string, body?: unknown): Promise<AuthResult> {
   try {
     const r = await post(path, body);
     if (!r.ok) return { ok: false, code: String(r.body.error ?? 'refused'), words: String(r.body.words ?? 'The server refused this. You are not signed in.') };
     read(r.body);
     boardToken = null;
+    forgetSimulation();
     channel?.postMessage('changed');
     return { ok: true };
   } catch {
@@ -62,7 +68,7 @@ export const authOptions = () => fetch('/site-api/auth/world').then(r => r.json(
 export const worldContext = () => post('/site-api/auth/world/context', undefined, 45_000);
 export async function worldVerify(result: unknown) {
   const r = await post('/site-api/auth/world/verify', result, 45_000);
-  if (r.ok) { read(r.body); boardToken = null; channel?.postMessage('changed'); }
+  if (r.ok) { read(r.body); boardToken = null; forgetSimulation(); channel?.postMessage('changed'); }
   return r;
 }
 
@@ -71,6 +77,7 @@ export async function signOut() {
   try { await post('/site-api/auth/logout'); } catch { /* no server: no server session either */ }
   csrf = '';
   boardToken = null;
+  forgetSimulation();
   channel?.postMessage('changed');
 }
 
