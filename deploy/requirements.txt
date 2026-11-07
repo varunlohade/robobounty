@@ -1,0 +1,8 @@
+# Pinned from policy/.venv: only what the site and board servers import.
+mujoco==3.8.1
+numpy==2.2.6
+absl-py==2.5.1
+etils==1.15.0
+glfw==2.11.0
+pyopengl==3.1.10
+typing_extensions==4.16.0

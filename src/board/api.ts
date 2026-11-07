@@ -1,7 +1,7 @@
 // The board server. Every bounty, fix and number on the page comes from here. Nothing is sample data.
 import { boardAuth, loginHref } from '../site/auth.ts';
 
-const BASE = `http://127.0.0.1:${import.meta.env.VITE_BOARD_PORT ?? 5298}`;
+const BASE = import.meta.env.VITE_HOSTED === '1' ? `${location.origin}/board` : `http://127.0.0.1:${import.meta.env.VITE_BOARD_PORT ?? 5298}`; // Hosted: the proxy serves the board at /board.
 
 export class ApiError extends Error {
   constructor(readonly code: string, reason: string) { super(reason); }

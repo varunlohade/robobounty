@@ -7,6 +7,7 @@ Each 0G call leaves one row in CALLS. plan_job.py hands the rows to the server, 
 Add a backend by adding a function to BACKENDS. CRASHLAB_LLM picks one, CRASHLAB_LLM_MODEL picks its model.
 The chat's picker chooses a route for one child process: use_route. 0G Fast is not private: it sends no private header, and its line says it is not verified.
 """
+import fcntl
 import hashlib
 import json
 import os
@@ -218,8 +219,31 @@ def _complete_0g(prompt, schema):
 BACKENDS = {"claude": _claude, "0g": _complete_0g}
 
 
+def _take_day_call():
+    """Hosted only: one count of AI calls a day across every process, kept in a locked file. An unreadable or unwritable count refuses the call, so spend stays capped."""
+    path = os.environ.get("CRASHLAB_LLM_DAY_FILE")
+    if not path:
+        return
+    try:
+        with open(path, "a+") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            f.seek(0)
+            text = f.read()
+            count = json.loads(text) if text else {}
+            day = time.strftime("%Y-%m-%d", time.gmtime())
+            used = count.get("used", 0) if count.get("day") == day else 0
+            if used >= int(os.environ.get("CRASHLAB_LLM_DAY_CAP", "500")):
+                raise LLMError("day_cap")
+            f.seek(0)
+            f.truncate()
+            f.write(json.dumps({"day": day, "used": used + 1}))
+    except (OSError, ValueError):
+        raise LLMError("day_cap") from None
+
+
 def complete_json(prompt, schema):
     backend = BACKENDS.get(os.environ.get("CRASHLAB_LLM", "claude"))
     if backend is None:
         raise LLMError("unknown_backend")
+    _take_day_call()
     return backend(prompt, schema)

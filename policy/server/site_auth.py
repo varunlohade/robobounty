@@ -27,6 +27,18 @@ SCRYPT_MEM = 64 * 1024 * 1024
 HASHING = threading.BoundedSemaphore(4)
 PASSWORD_MIN, PASSWORD_MAX = 12, 128
 EMAIL_TRIES, IP_TRIES, IP_SIGNUPS, IP_GUESTS, IP_WORLD = 8, 40, 20, 60, 60
+PUBLIC_ORIGIN = os.environ.get("CRASHLAB_PUBLIC_ORIGIN", "").rstrip("/")  # Hosted, one origin behind a proxy. Unset on this machine, where the localhost lists apply.
+PUBLIC_HOST = os.environ.get("CRASHLAB_BACKEND_HOST") or PUBLIC_ORIGIN.partition("://")[2]  # The name this server is reached by. Behind a rewrite it differs from the page's origin.
+
+
+def public_ok(headers, method):
+    """Hosted mode: the host and origin must be exactly the public ones. A browser sends no Origin on a same-origin GET, so a read may show Sec-Fetch-Site instead, which a page on another site cannot forge."""
+    if headers.get("Host", "") != PUBLIC_HOST:
+        return False
+    origin = headers.get("Origin")
+    if origin is not None:
+        return origin == PUBLIC_ORIGIN
+    return method in ("GET", "HEAD") and headers.get("Sec-Fetch-Site") == "same-origin"
 WINDOW_S = 900
 COMMON = {"password1234", "123456789012", "qwertyuiopas", "passwordpassword", "letmeinletmein", "administrator", "iloveyou1234"}
 EMAIL = re.compile(r"[a-z0-9._%+-]{1,64}@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,24}")

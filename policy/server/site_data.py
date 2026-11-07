@@ -37,6 +37,8 @@ PORT = 5297
 WEB_PORTS = {5199, int(os.environ.get("CRASHLAB_WEB_PORT", 5199))}  # scripts/demo.sh sets the port when vite runs on another one.
 ORIGINS = {f"http://{host}:{port}" for host in ("localhost", "127.0.0.1") for port in WEB_PORTS}
 HOSTS = {f"{host}:{port}" for host in ("localhost", "127.0.0.1") for port in WEB_PORTS | {PORT}}
+if auth.PUBLIC_ORIGIN:  # Hosted: exactly the public origin, and no localhost name.
+    ORIGINS, HOSTS = {auth.PUBLIC_ORIGIN}, {auth.PUBLIC_HOST}
 CACHE_S = 30
 MAX_BODY = 256 * 1024
 MAX_AUTH_BODY = 4096
@@ -51,6 +53,10 @@ HOLDS = {"wind_hold", "battery_stop"}
 WORLD_DIR = re.compile(r"w[0-9]{3}")
 DEMO_TRIAL = re.compile(r"/trials/demo-window-(w[0-9]{3})/([a-z.]+)")
 TRIAL_FILES = {"manifest.json", "model.xml", "qpos.json", "result.json", "world.json", "controller.py.txt", "trace.json", "wind.json", "dirt.bin"}
+
+
+def replay_link(url):
+    return None if os.environ.get("CRASHLAB_HOSTED") == "1" else url  # A replay plays in lab.html, which runs on the Mac.
 
 
 def demo_on():
@@ -140,8 +146,8 @@ def demo_campaign(pack):
                      "line": f'{Path(code["file"]).name}:{code["line"]}' if code.get("file") and code.get("line") else "", "repeat": "not re-run", "flaky": False,
                      "reason": job.get("reason") or row.get("verdict_reason") or "", "changes": w.get("changes", []), "seed": w.get("seed"),
                      "film": f"/site-api/film/{pack}/{name}" if (folder / name / "film.jpg").exists() else None,
-                     "replay": (f"lab.html?trial=demo-window-{name}" if pack == "window" and (folder / name / "export" / "manifest.json.gz").exists() else
-                                f"lab.html?poses=/site-api/replay/inspection/{name}" if pack == "inspection" and (folder / name / "replay.json.gz").exists() else None)})
+                     "replay": replay_link(f"lab.html?trial=demo-window-{name}" if pack == "window" and (folder / name / "export" / "manifest.json.gz").exists() else
+                                            f"lab.html?poses=/site-api/replay/inspection/{name}" if pack == "inspection" and (folder / name / "replay.json.gz").exists() else None)})
     return {"id": f"demo-{pack}", "label": f"{ROBOTS[pack]} batch", "robot": ROBOTS[pack], "pack": pack, "sim": short(last.get("label")), "source": f"policy/runs/demo/{pack}", "kind": "rows",
             "note": NOTES[pack], "held_back": plan.get("held_back", 0), "recorded": True, "at": (folder / "timeline.json.gz").stat().st_mtime, "evidence": json_or(folder / "zg_evidence.json"), **tally(rows), "worlds": rows, "coverage": coverage_of(pack, plan, last["rows"])}
 
@@ -164,7 +170,7 @@ def evidence_campaigns():
         w = r["world"]
         return {"id": r["trial"], "group": r.get("group") or "Control", "name": r["trial"], "kind": kind, "kind_name": NAMES.get(kind, kind), "outcome": "pass" if r["passed"] else "hold" if kind in HOLDS else "fail",
                 "at": r.get("first_t"), "reading": reading_of(numbers, kind), "line": lines.get(kind, ""), "repeat": f'{rep["same_failure_runs"]} of {rep["of"]}' if rep else "not re-run", "flaky": r["trial"] in flaky,
-                "reason": "", "changes": [], "seed": r.get("seed"), "film": None, "replay": f"lab.html?trial={trials[r['trial']]}" if r["trial"] in trials else None,
+                "reason": "", "changes": [], "seed": r.get("seed"), "film": None, "replay": replay_link(f"lab.html?trial={trials[r['trial']]}") if r["trial"] in trials else None,
                 "bounds": {"gust": w.get("gust_speed_ms"), "wet": w.get("wetness"), "wind": w.get("steady_wind_ms"), "edge": w.get("edge_margin_m")}}
 
     final = short(" " + sims["campaign_dubai_final"][0][:12])
@@ -519,7 +525,8 @@ def main():
     if not shutil.which("node"):
         print("node is needed for World ID signing", file=sys.stderr)
     port = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else PORT
-    HOSTS.update({f"127.0.0.1:{port}", f"localhost:{port}"})
+    if not auth.PUBLIC_ORIGIN:
+        HOSTS.update({f"127.0.0.1:{port}", f"localhost:{port}"})
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
 
 

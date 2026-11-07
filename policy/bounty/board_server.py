@@ -87,6 +87,8 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def allowed(self):
+        if A.PUBLIC_ORIGIN:
+            return A.public_ok(self.headers, self.command)
         return self.headers.get("Origin") in PAGE_ORIGINS and self.headers.get("Host", "") in {f"{HOST}:{PORT}", f"localhost:{PORT}"}
 
     def head(self, status, ctype, length):
@@ -95,7 +97,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Vary", "Origin")
-        if self.allowed():
+        if self.allowed() and self.headers.get("Origin"):
             self.send_header("Access-Control-Allow-Origin", self.headers["Origin"])
         self.send_header("Content-Length", str(length))
 

@@ -1,0 +1,21 @@
+# Allow list. Nothing else enters the image, so never .env, a keystore or design/.
+*
+!Dockerfile
+!package.json
+!deploy/requirements.txt
+!deploy/Caddyfile
+!deploy/start.sh
+!docs/evidence
+!policy/bounty
+!policy/server
+!policy/crashlab
+!policy/highrise
+!policy/highrise5
+!policy/packs/__init__.py
+!policy/packs/window
+!policy/packs/inspection
+!policy/runs/demo
+**/__pycache__
+**/.env*
+**/*.keystore
+**/*.key

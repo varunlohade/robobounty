@@ -1,0 +1,29 @@
+{
+	admin off
+	auto_https off
+}
+:{$PORT} {
+	log
+	header {
+		X-Content-Type-Options nosniff
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	# Vercel sets X-Vercel-Forwarded-For to the visitor's address. The per-address limits read it.
+	handle /site-api/* {
+		reverse_proxy 127.0.0.1:5297 {
+			header_up X-Forwarded-For {header.X-Vercel-Forwarded-For}
+		}
+	}
+	handle_path /board/* {
+		reverse_proxy 127.0.0.1:5298 {
+			header_up X-Forwarded-For {header.X-Vercel-Forwarded-For}
+		}
+	}
+	handle /healthz {
+		respond "ok" 200
+	}
+	handle {
+		respond "CrashLab backend." 404
+	}
+}

@@ -283,7 +283,7 @@ function openRun(id: string) {
       h('div', 'top', h('h2', '', `${w.name}: ${w.kind_name}`), close),
       w.reason ? h('p', '', w.reason) : null,
       dl,
-      w.replay ? link('btn pri wide', w.replay, icon('play'), 'Replay the recorded run') : h('p', 'quiet', 'This run kept its numbers only. It has no stored replay.'),
+      w.replay ? link('btn pri wide', w.replay, icon('play'), 'Replay the recorded run') : h('p', 'quiet', import.meta.env.VITE_HOSTED === '1' ? 'Replay runs on your Mac. Download the GitHub repo to run it.' : 'This run kept its numbers only. It has no stored replay.'),
       h('p', 'quiet', current.note)));
   drawer.classList.add('on');
 }
