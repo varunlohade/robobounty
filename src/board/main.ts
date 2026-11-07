@@ -793,7 +793,7 @@ function openPost(ref: string | null) {
   windowS.value = '60';
   const error = h('span', 'bad');
   let rows: Fixable[] = [];
-  const why = h('div', 'note2', import.meta.env.VITE_HOSTED === '1' ? 'This site runs no simulation. It posts only the recorded campaign, after it checks that the code and worlds match the recorded run byte for byte.' : 'Every stored run replays before a bounty opens, so nobody pays on stale results.');
+  const why = h('div', 'note2', import.meta.env.VITE_HOSTED === '1' ? 'This site runs no simulation. It posts only the recorded campaign, after it checks that the code and worlds match the recorded run byte for byte.' : '');
   why.style.cssText = 'display:none;padding:0 16px 12px;text-align:right';
   const check = () => { const r = rows.find(row => row.ref === select.value); if (r) api.startCheck(r.session, r.cid, r.group).catch(() => undefined); };  // Only to save time. The post runs the check itself if this did not.
   const postLabel = arc ? 'Post and deposit' : 'Post the bounty';
@@ -812,7 +812,7 @@ function openPost(ref: string | null) {
       void api.postCheck(pick.session, pick.cid).then(c => {
         if (send.disabled === false) return;
         const busy = c.state === 'waiting' || c.state === 'running';
-        why.style.display = busy ? '' : 'none';
+        why.style.display = 'none';
         if (busy) send.textContent = c.state === 'waiting' ? 'Waiting for another check' : c.phase === 'export' ? `Preparing public replays: ${c.done} of ${c.total}` : `Checking stored runs: ${c.done} of ${c.total}`;
         else send.textContent = 'Posting';
       }).catch(() => undefined);
