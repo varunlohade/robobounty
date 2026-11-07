@@ -26,6 +26,7 @@ export interface ShellOptions {
   subtitle?: string;
   status?: string;
   statusRight?: string[];
+  quietWho?: boolean; // The side bar names the account and no more.
 }
 
 export interface Shell {
@@ -56,7 +57,7 @@ function payoutButton(who: Who) {
   return b;
 }
 
-function whoRow(box: HTMLElement, who: Who) {
+function whoRow(box: HTMLElement, who: Who, quiet = false) {
   const name = make('div', 'sh-who-name');
   const label = who.kind === 'guest' ? who.verificationLabel : who.label;
   const badge = make('span', 'sh-badge', label.trim().charAt(0).toUpperCase());
@@ -65,8 +66,9 @@ function whoRow(box: HTMLElement, who: Who) {
   box.dataset.level = who.verification;
   const words = who.kind === 'guest' ? who.verificationLabel : who.label;
   name.append(make('span', '', words));
-  if (who.kind !== 'guest') name.append(make('small', '', who.verificationLabel));
-  if (who.kind === 'engineer') name.append(make('small', '', who.screened ? 'Screened. A quiz, not proof of skill.' : 'Not screened yet'), payoutButton(who));
+  if (who.kind !== 'guest' && (!quiet || who.verification === 'world_human')) name.append(make('small', '', who.verificationLabel));
+  if (who.kind === 'engineer' && !quiet) name.append(make('small', '', who.screened ? 'Screened. A quiz, not proof of skill.' : 'Not screened yet'), payoutButton(who));
+  else if (who.kind === 'engineer' && !who.payout.signed) name.append(payoutButton(who));
   box.replaceChildren(badge, name);
   const out = make('button', 'sh-out');
   out.setAttribute('aria-label', 'Sign out');
@@ -157,7 +159,7 @@ export function mountShell(opts: ShellOptions): Shell {
   void who.then(w => {
     if (w.kind === 'none') { location.replace(loginHref(here)); return; }
     if (w.kind === 'engineer' && opts.page !== 'bounties') { location.replace(ENGINEER_HOME); return; }
-    whoRow(whoBox, w);
+    whoRow(whoBox, w, opts.quietWho);
     for (const a of nav.querySelectorAll<HTMLElement>('a.sh-item')) a.hidden = w.kind === 'engineer' && a.dataset.page !== 'bounties';
     if (w.kind === 'engineer' && new URLSearchParams(location.search).get('notice') === 'engineer') head.append(make('p', 'sh-sub', 'That page is for companies. Engineers work from Bounties.'));
   });

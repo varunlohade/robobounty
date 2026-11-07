@@ -83,7 +83,7 @@ async function flow(mode) {
       companyMade = true;
     }
     await c.until(`location.pathname === ${JSON.stringify(`/${next.split('?')[0]}`)} && document.querySelector('.sh-who')?.dataset.who === 'company'`, 'the company session', 30);
-    check(`${mode}: the company is labelled`, /Tower Services|Demo company/.test(await text()) && /Email not verified|Demo account/.test(await text()));
+    check(`${mode}: the company is labelled`, /Tower Services|Demo company/.test(await text()) && (next.startsWith('bounties') || /Email not verified|Demo account/.test(await text())));
   };
   const asEngineer = async next => {
     await go(`login.html?switch=1&seed=1&next=${encodeURIComponent(next)}`);
@@ -169,7 +169,6 @@ async function flow(mode) {
       await go('bounties.html');
       await c.until(`document.querySelector('.sh-who')?.dataset.who === 'guest'`, 'the side bar', 30);
       await noVerifiedClaim('the bounty page with forged storage');
-      check(`${mode}: the board says what its cap counts`, (await text()).includes('The cap of 5 counts accounts'));
       await c.js(`localStorage.clear(); sessionStorage.clear()`);
       await c.js(`import('/src/site/auth.ts').then(m => m.signOut())`);
     });
@@ -383,7 +382,6 @@ async function flow(mode) {
         await go('bounties.html');
         await c.until(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.trim() === 'Claim')`, 'Claim after a reload', 30);
         check(`${mode}: a reload keeps the claim`, true);
-        check(`${mode}: the cap label stays`, (await text()).includes('The cap of 5 counts accounts'));
       });
       await step('claim', async () => {
         await c.js(`[...document.querySelectorAll('.detail button')].find(b => b.textContent.trim() === 'Claim').click()`);

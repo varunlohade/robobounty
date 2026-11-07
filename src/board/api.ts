@@ -22,7 +22,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export interface ArcConfig { on: boolean; asked?: boolean; reason?: string; label: string; real: boolean; chain_id: number; chain_hex: string; rpc_url: string; explorer: string | null; explorer_home: string | null; usdc: string; contract: string; resolver: string; arbiter: string; agent_name: string; cap_usdc: number; demo: boolean; demo_session?: string; recorded_label: string; deploy_tx?: string }
 export interface ArcBalance { address: string; usdc_base_units: string; gas_wei: string; allowance_base_units: string }
-export interface FundPlan { contract: string; usdc: string; resolver: string; arbiter: string; spec_hash: string; cap: string; per_failure: string; top_prize: string; deadline: string; grace: string; dispute_window: string; fee_wei: string; chain_hex: string }
+export interface FundPlan { contract: string; usdc: string; resolver: string; arbiter: string; spec_hash: string; cap: string; approve?: string; per_failure: string; top_prize: string; deadline: string; grace: string; dispute_window: string; fee_wei: string; chain_hex: string }
 export interface ArcSteps { state: string | null; txs: Record<string, string>; tx_links: Record<string, string>; submitter?: string; fingerprint?: string; chain_bounty?: number; amount_base_units?: number; dispute_ends_at?: number | null; chain_now?: number; chain_read_at?: number; recorded?: boolean; message?: string | null; paid?: boolean; paid_by?: string; balance_before?: number; balance_after?: number }
 export interface ArcFunding { label: string; chain_bounty: number; company: string; contract: string; cap_base_units: number; txs: Record<string, string>; tx_links: Record<string, string>; fixes: Record<string, ArcSteps> }
 export interface World { index: number; name: string; scenario: string; verdict: string; reason: string; changes: string[]; seed: number; replay: boolean; numbers: Record<string, number>; events?: { name: string; t: number; value: number }[] }
@@ -41,6 +41,7 @@ export interface Payout { status: string; amount?: number; dispute_ends_at?: num
 export interface Fix { n: number; tester: string; source_sha256: string; state: string; result: FixResult | null; payout: Payout | null; wall_s?: number; used_before: number; wallet?: string | null }
 export interface Sub { n: number; tester: string; seed: number; state: string; used_before: number; result: { accepted: boolean; code: string; reason: string; fingerprint?: string; repeat?: unknown; runs: number } | null; payout: Payout | null; wall_s?: number }
 export interface Fixable { session: string; cid: string; group: string; robot: string; failed: number; worlds: number; posted: boolean; ref: string }
+export interface PostCheck { state: string; phase: string; done: number; total: number }
 export interface Budget { funded: boolean; cap?: number; held?: number; spent?: number; left?: number; stopped?: boolean; per_bounty_max?: number }
 
 // A claim needs the secret that submit returned once. It stays in this tab, so a reload keeps it. The server keeps only its hash.
@@ -59,6 +60,8 @@ export const api = {
   subs: (id: number) => call<{ submissions: Sub[] }>('GET', `/api/bounties/${id}/submissions`),
   source: (id: number) => call<{ source: string; file: string; scope: string }>('GET', `/api/bounties/${id}/source`),
   fixable: () => call<{ fixable: Fixable[] }>('GET', '/api/fixable'),
+  startCheck: (session: string, campaign: string, group: string) => call<PostCheck>('POST', '/api/fixable/check', { session, campaign, group }),
+  postCheck: (session: string, campaign: string) => call<PostCheck>('GET', `/api/fixable/check/${session}/${campaign}`),
   budget: () => call<Budget>('GET', '/api/budget'),
   stop: () => call<Budget>('POST', '/api/budget/stop', {}),
   post: (body: unknown) => call<Bounty>('POST', '/api/bounties/fix', body),

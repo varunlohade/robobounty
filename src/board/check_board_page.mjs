@@ -36,7 +36,7 @@ await clickText('Post the bounty');
 await until(`!document.querySelector('.dialog') && document.querySelector('tr.row')?.innerText.includes('Robot stalls')`, 'the post shows in the list', 90);
 body = await text();
 check('a real post shows, with its real failing worlds', body.includes('strong climb') && body.includes('Stalled'));
-check('hidden worlds show as counts only', body.includes('Hidden worlds') && body.includes('stay hidden') && body.includes('shows only a count'));
+check('hidden worlds show as counts only', body.includes('Hidden worlds') && body.includes('stay hidden'));
 await clickText('Submit a fix');
 await until(`document.querySelector('.dialog textarea')?.value.includes('class Controller')`, 'the controller source fills the form', 10);
 

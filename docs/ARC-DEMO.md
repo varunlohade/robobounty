@@ -4,7 +4,7 @@ This is the shortest path to a film with real wallet popups and real transaction
 
 **What is real on Arc:** the deposit, the proposal, the dispute window, the finalize and the payout.
 
-**What is recorded:** the gate's result. The film uses one stored proof, from a real run of the same fix on the same worlds. The page says "Recorded proof" and "The result comes from a recorded batch. The chain transactions are real." Say the same in the film. Results stay simulated.
+**What is recorded:** the gate's result. The film uses one stored proof, from a real run of the same fix on the same worlds. The page says "Recorded proof", and On chain says "The result comes from a recorded batch. The chain transactions are real." Say the same in the film. Results stay simulated.
 
 ## Who holds what
 
@@ -56,12 +56,12 @@ Then pass `--board-root "$PWD/policy/runs/film2"`.
 ## The film, about 2 minutes
 
 1. **Company.** Open `login.html?seed=1`. Only this address shows the demo buttons. Press Demo company. Open Bounties. Press Connect wallet, and accept the connection and the Arc network. The page shows the address, the balance and "Arc testnet. Test USDC, not real money."
-2. Press Post a bounty. The stored failure is already picked. Keep pay at 1. Press Post the bounty. This takes about 30 s, because the board replays every stored run.
-3. Press Fund from my wallet. **Popup: approve. Popup: create bounty.** The Funded row shows both transaction links.
+2. Press Post a bounty. The stored failure is already picked. Keep pay at 1.
+3. Press Post bounty. That one press connects the wallet if needed, posts, and funds. **Popup: approve. Popup: create bounty.** The approval covers this board's ARC_CAP_USDC, never more, so a later bounty needs only the create popup. The button says "Confirm in your wallet". When the funding lands, the dialog closes on the funded bounty, and step 1 of the story has its tick and link. If you refuse a popup, the box says "Not funded yet", with one button, Try again.
 4. **Engineer.** Switch the wallet to account 2. Sign out. The plain login page has no demo buttons, so open `login.html?seed=1` again and press Demo engineer. Open Bounties. If the wallet line shows Connect wallet, press it and allow account 2. Press Save this wallet. **Popup: sign.** The side bar shows the wallet with "signature checked".
 5. Press Submit a fix, Use the stored good fix, then Run check, then simulation. The recorded proof still replays the stored runs, which takes about 30 s.
-6. The CrashLab agent proposes. A 60 s countdown runs on the Dispute window row. Open a link in the explorer here if you want.
-7. The agent finalizes and pays. The Paid row shows its link, and the engineer's balance rises by 1 test USDC, read from the chain. The engineer presses nothing.
+6. The CrashLab agent proposes. The box says "The fix passed. Paying in 42 s unless the company rejects it." Open On chain for every step and link.
+7. The agent finalizes and pays. The box says "Paid 1 test USDC to 0x...", step 4 shows its link, and the wallet line rises by 1 test USDC, read from the chain. The engineer presses nothing.
 
 To film a rejection, press Reject as the company during the window, with the funding wallet connected. **Popup: sign.** The arbiter sends the rejection, and the page shows its link.
 
@@ -73,14 +73,17 @@ To film a rejection, press Reject as the company during the window, with the fun
 | Your wallet is on another network | Press Switch network |
 | You rejected ... | You pressed reject in the wallet. Nothing moved. Press the button again |
 | ... reverted on chain | The transaction failed, and the page does not mark the step as done |
+| Not funded yet | The wallet refused or failed. Press Try again |
 | ... ARC_CAP_USDC | This board's limit is used up. Raise it in `.env`, or use a new board folder |
-| A red line under the steps | The agent's message, such as too little gas. It tries again every 2 s |
+| A red line in the box | The agent's message, such as too little gas. It tries again every 2 s |
 
 If the agent stays stuck on a finalized fix, the engineer gets a Claim from my wallet button. The contract's `claim` still works, so a stuck agent cannot trap the money.
 
 ## Local check, no keys and no Arc call
 
     node src/board/tools/check_wallet.mjs
+
+WALLET_SLOW_RECEIPTS=1 makes the test wallet never answer a receipt request, as Rabby can.
 
 It runs the whole flow on anvil with a test wallet in headless Chrome. It uses anvil's public dev accounts on the local chain only, and the server refuses those accounts on Arc.
 
@@ -109,7 +112,7 @@ Arc's real USDC, the agent's sends, the page's fee and the explorer links all wo
 
 **Two bugs that anvil hid, both from RPC delay.** A chain read takes about 0.4 s on the public RPC, and one balance read takes about 5 s on the server.
 
-- The page's timers stacked up requests, and Fund from my wallet hung for over 90 s with no message. Timers now wait for their last read. The fork with delay showed the hang before the fix and none after. The real chain has not rerun this fix, because the company has too little USDC.
+- The page's timers stacked up requests, and the fund button hung for over 90 s with no message. Timers now wait for their last read. The fork with delay showed the hang before the fix and none after. The real chain has not rerun this fix, because the company has too little USDC.
 - The countdown showed 68 s on a 60 s window, because it trusted the age of the agent's file. It now compares the two clocks at one moment. Same evidence.
 
 **RPC facts:**

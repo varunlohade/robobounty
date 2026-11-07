@@ -1,5 +1,6 @@
 // The whole wallet flow on a local anvil, with a test wallet injected in headless Chrome. No Arc call. Local only: the wallet forwards to anvil's unlocked public dev accounts.
 // node src/board/tools/check_wallet.mjs [--ports WEB,RUN,SITE,BOARD] [--anvil PORT] [--record-proof]. Saves design/board/wallet-*.png.
+// WALLET_SLOW_RECEIPTS=1 makes the test wallet never answer a receipt request, as Rabby can: the page must read the chain itself.
 // --record-proof keeps the real gate result of this run for the film, when no stored proof matches.
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -77,7 +78,7 @@ const TEST_WALLET = `(() => {
   const listeners = {};
   const refuse = () => Object.assign(new Error('User rejected the request.'), { code: 4001 });
   const forward = async (method, params) => { const r = await fetch(${JSON.stringify(RPC)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) }); const j = await r.json(); if (j.error) throw Object.assign(new Error(j.error.message), { code: j.error.code }); return j.result; };
-  const popup = name => { const log = JSON.parse(localStorage.getItem('testPopups') || '[]'); log.push(name); localStorage.setItem('testPopups', JSON.stringify(log)); };
+  const popup = name => { const log = JSON.parse(localStorage.getItem('testPopups') || '[]'); log.push(name); localStorage.setItem('testPopups', JSON.stringify(log)); if (name.startsWith('tx:') && !localStorage.getItem('testFirstTxAt')) localStorage.setItem('testFirstTxAt', String(Date.now())); };
   window.__wallet = { emit(name, value) { (listeners[name] || []).forEach(f => f(value)); } };
   window.ethereum = {
     on(name, f) { (listeners[name] ||= []).push(f); },
@@ -85,6 +86,7 @@ const TEST_WALLET = `(() => {
     async request({ method, params = [] }) {
       const s = state();
       if (method === 'eth_chainId') return s.chain || '0x1';
+      if (method === 'eth_getTransactionReceipt' && ${process.env.WALLET_SLOW_RECEIPTS === '1'}) return new Promise(() => {});
       if (method === 'eth_accounts') return s.connected ? [s.account] : [];
       if (method === 'eth_requestAccounts') { popup('connect'); if (s.reject === 'connect') throw refuse(); put({ connected: true }); return [s.account]; }
       if (method === 'wallet_switchEthereumChain') { popup('switch'); if (s.reject === 'switch') throw refuse(); if (!s.added && params[0].chainId !== '0x1') throw Object.assign(new Error('Unrecognized chain'), { code: 4902 }); put({ chain: params[0].chainId }); return null; }
@@ -117,7 +119,14 @@ const walletError = async (words, what) => { await c.until(`(document.querySelec
 const stepState = name => c.js(`document.querySelector('[data-step="${name}"]')?.dataset.state ?? null`);
 const stepTx = name => c.js(`[...document.querySelectorAll('[data-step="${name}"] [data-tx]')].map(n => n.dataset.tx)`);
 const shot = async name => { await wait(300); await c.shot(join(OUT, `wallet-${name}.png`)); };
-const showChain = () => c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent === 'On chain')?.scrollIntoView({ block: 'start' })`);
+const showChain = () => c.js(`document.querySelector('.detail').scrollTop = 0`);
+const REMOVED = ['Not real money', 'not real money', 'read from receipts', 'Nobody sees these worlds', 'Demo account', 'The cap of 5 counts', 'No fix yet. A fix runs'];
+const noRemovedWords = async where => { const body = await c.js(`document.body.innerText`); const seen = REMOVED.filter(w => body.includes(w)); check(`${where}: none of the removed words show`, seen.length === 0, seen.join(', ')); };
+// A press stamped in the page, and the wallet's first transaction popup stamped there too.
+const pressTimed = async label => { await c.until(`!!${hasButton(label)} && !${hasButton(label)}.disabled`, `the button "${label}"`, 30); await c.js(`(() => { localStorage.removeItem('testFirstTxAt'); localStorage.setItem('testPressAt', String(Date.now())); ${hasButton(label)}.click(); })()`); };
+const popupSeconds = async () => { await c.until(`!!localStorage.getItem('testFirstTxAt')`, 'the first transaction popup', 60); return Number(await c.js(`(Number(localStorage.getItem('testFirstTxAt')) - Number(localStorage.getItem('testPressAt'))) / 1000`)); };
+const boxSays = () => c.js(`document.querySelector('.nextbox p')?.textContent ?? ''`);
+const primaries = () => c.js(`[...document.querySelectorAll('.detail .btn.pri')].map(b => b.textContent.trim())`);
 const login = async (role, next = 'bounties.html') => {
   await go(`login.html?seed=1&switch=1&next=${encodeURIComponent(next)}`);
   const label = role === 'company' ? 'Demo company' : 'Demo engineer';
@@ -132,10 +141,18 @@ const postBounty = async (title, group, pay) => {
   await press('Post a bounty');
   await c.until(`[...document.querySelectorAll('.overlay select option')].some(o => o.value.endsWith(${JSON.stringify(`/${group}`)}) && o.value.startsWith('0000000000000000000000000a4c0001'))`, `the ${group} failure`, 30);
   await c.js(`(() => { const s = document.querySelector('.overlay select'); s.value = [...s.options].find(o => o.value.startsWith('0000000000000000000000000a4c0001') && o.value.endsWith(${JSON.stringify(`/${group}`)})).value; s.dispatchEvent(new Event('change')); const i = document.querySelectorAll('.overlay input'); i[0].value = ${JSON.stringify(title)}; i[2].value = ${JSON.stringify(String(pay))}; })()`);
+  // The dialog began the stored-run check when it opened. The one-click time is measured once that check is ready.
+  const pick = await c.js(`document.querySelector('.overlay select').value`);
+  const [session, cid] = pick.split('/');
+  const checked = `import('/src/board/api.ts').then(a => a.api.postCheck(${JSON.stringify(session)}, ${JSON.stringify(cid)})).then(r => r.state)`;
+  const t = Date.now();
+  while (Date.now() - t < POST_S * 1000) { const state = await c.js(checked); if (state !== 'waiting' && state !== 'running') break; await wait(500); }
+  console.log(`  stored-run check ready after ${((Date.now() - t) / 1000).toFixed(1)} s`);
   const started = Date.now();
-  await press('Post the bounty');
+  await pressTimed('Post bounty');
+  const popup = await popupSeconds().catch(() => null);
   await c.until(`!document.querySelector('.overlay') && document.querySelector('.detail h1')?.textContent === ${JSON.stringify(title)}`, `the bounty "${title}"`, POST_S);
-  return (Date.now() - started) / 1000;
+  return { post: (Date.now() - started) / 1000, popup };
 };
 // A direct request to the board, with this page's board token, as a hostile page script would send it.
 const boardPost = (path, body) => c.js(`import('/src/site/auth.ts').then(a => a.boardAuth(true)).then(t => fetch(${JSON.stringify(BOARD + path)}, { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} })).then(async r => ({ status: r.status, body: await r.json() }))`);
@@ -146,7 +163,8 @@ try {
   await c.until(`document.readyState === 'complete'`, 'login', 30);
   await setWallet({ none: true });
   await login('company');
-  check('without a wallet, the page still shows the label', (await text('.walletbar')).includes('Local stand-in chain. Not Arc. Not real money.'), await text('.walletbar'));
+  check('without a wallet, the wallet line offers Connect', (await text('.walletbar')).includes('Connect wallet'), await text('.walletbar'));
+  await noRemovedWords('no bounty yet');
   await press('Connect wallet');
   await walletError('No browser wallet found', 'no wallet: a plain message');
   await shot('no-wallet');
@@ -168,27 +186,35 @@ try {
   await c.until(`(document.querySelector('.walletbar')?.innerText ?? '').includes('10.00 test USDC')`, 'the balance from the chain', 30);
   check('the wallet is asked to add the chain, USDC with 18 decimals', (await popups()).some(p => p === 'add:Local stand-in chain:USDC:18'), (await popups()).join());
   const bar = await text('.walletbar');
-  check('connected: address, balance, label', bar.includes('0xf39fd6') && bar.includes('10.00 test USDC') && bar.includes('Not real money'), bar);
+  check('connected: address and balance', bar.includes('0xf39fd6') && bar.includes('10.00 test USDC'), bar);
   await shot('connected');
 
   // Post, then fund with each failure on the way.
-  const postS = await postBounty('The robot stops short near the top', 'stalled', 1);
-  check('a new bounty says it is not funded', (await text('.list')).includes('Not funded'));
+  // One press: post, then the wallet opens with no second button. Here the person refuses the approval, so the retry shows.
+  await clearPopups();
+  const APPROVE = cast('sig', 'approve(address,uint256)'), CREATE = cast('sig', 'createBounty(address,address,bytes32,uint256,uint256,uint256,uint64,uint64,uint64)');
+  await setWallet({ account: COMPANY, chain: CHAIN, connected: true, added: true, rejectTx: APPROVE });
+  const first = await postBounty('The robot stops short near the top', 'stalled', 1);
+  const postS = first.post;
+  check('one press in the dialog opens the wallet', (await popups()).includes(`tx:${APPROVE}`), (await popups()).join());
+  console.log(`  ONE CLICK: press to first wallet popup ${first.popup} s, stored-run check ready`);
+  check('one-click press to popup is under 2 s when the stored-run check is ready', first.popup !== null && first.popup < 2, `${first.popup} s`);
+  await walletError('rejected the USDC approval', 'rejected tx: a plain message');
+  check('rejected tx: nothing on chain', num(read(CONTRACT, 'bountyCount()(uint256)')) === 0n && (await stepState('funded')) === 'live');
+  check('a refused wallet says Not funded yet', (await boxSays()) === 'Not funded yet.', await boxSays());
+  check('the box has one button, Try again', JSON.stringify(await primaries()) === '["Try again"]', JSON.stringify(await primaries()));
+  check('the list says it is not locked', (await text('.list')).includes('Not locked'));
+  check('the box took the focus', await c.js(`document.activeElement?.classList.contains('nextbox')`));
+  await noRemovedWords('a posted bounty');
+  await shot('rejected-tx');
   const shownWorlds = await c.js(`fetch(${JSON.stringify(`${BOARD}/api/bounties/1`)}).then(r => r.json()).then(b => b.public_worlds.map(w => ({ index: w.index, replay: w.replay })))`);
   const worldFile = await c.js(`fetch(${JSON.stringify(`${BOARD}/api/bounties/1/public/`)} + ${JSON.stringify(shownWorlds[0]?.index)} + '/world.json').then(r => r.status)`);
   check('the posted bounty shows its public failing worlds, with replays', shownWorlds.length === 3 && shownWorlds.every(w => w.replay) && worldFile === 200, JSON.stringify(shownWorlds));
   await showChain();
   await shot('not-funded');
-  await clearPopups();
-  const APPROVE = cast('sig', 'approve(address,uint256)'), CREATE = cast('sig', 'createBounty(address,address,bytes32,uint256,uint256,uint256,uint64,uint64,uint64)');
-  await setWallet({ account: COMPANY, chain: CHAIN, connected: true, added: true, rejectTx: APPROVE });
-  await press('Fund from my wallet');
-  await walletError('rejected the USDC approval', 'rejected tx: a plain message');
-  check('rejected tx: nothing on chain', num(read(CONTRACT, 'bountyCount()(uint256)')) === 0n && (await stepState('funded')) === 'live');
-  await shot('rejected-tx');
 
   await setWallet({ account: COMPANY, chain: CHAIN, connected: true, added: true, revertTx: CREATE });
-  await press('Fund from my wallet');
+  await press('Try again');
   await walletError('reverted on chain', 'reverted tx: a plain message');
   check('reverted tx: the page does not show funded', (await stepState('funded')) === 'live' && !existsSync(join(boardRoot, '1/arc_funding.json')));
   await shot('reverted-tx');
@@ -204,13 +230,18 @@ try {
   await setWallet({ account: COMPANY, chain: CHAIN, connected: true, added: true });
   await clearPopups();
   const fundAt = Date.now();
-  await press('Fund from my wallet');
+  await wait(2000); // The box has read its plan ahead by now.
+  await pressTimed('Try again');
+  const planReady = await popupSeconds();
+  console.log(`  RETRY: press to first wallet popup ${planReady} s, plan ready`);
+  check('press to popup is under 1 s when the plan is ready', planReady < 1, `${planReady} s`);
   await c.until(`document.querySelector('[data-step="funded"]')?.dataset.state === 'ok'`, 'funded', 60);
   const funding = (await popups()).filter(p => p.startsWith('tx:')).join();
   check('funding sends two wallet transactions, approve then create', funding === `tx:${APPROVE},tx:${CREATE}`, funding);
   const fundTxs = await stepTx('funded');
   check('funded: approve and create have receipts with status 1', fundTxs.length === 2 && fundTxs.every(t => BigInt(receipt(t).status) === 1n), fundTxs.join());
   check('the contract holds the pay', usdc(CONTRACT) === 1_000_000n && usdc(COMPANY) === 9_000_000n);
+  check('the approval is the board cap, never more: 2 approved, 1 used', num(read(USDC, 'allowance(address,address)(uint256)', COMPANY, CONTRACT)) === 1_000_000n);
   await c.until(`(document.querySelector('.walletbar')?.innerText ?? '').includes('9.00 test USDC')`, 'the company balance after funding', 15);
   await showChain();
   await shot('funded');
@@ -223,7 +254,8 @@ try {
   await setWallet({ account: ENGINEER, chain: CHAIN, connected: true, added: true, reject: 'sign' });
   await login('engineer');
   await c.until(`!!${hasButton('Save this wallet')}`, 'Save this wallet', 30);
-  check('an unproved engineer cannot submit', await c.js(`${hasButton('Submit a fix')}.disabled`));
+  check('an unproved engineer cannot submit', await c.js(`!${hasButton('Submit a fix')} || ${hasButton('Submit a fix')}.disabled`));
+  check('and the box asks for the wallet first', (await boxSays()).includes('Save your wallet'), await boxSays());
   await press('Save this wallet');
   await walletError('rejected the signature', 'rejected signature: a plain message');
   await shot('rejected-signature');
@@ -236,8 +268,8 @@ try {
   await clearPopups();
   await press('Save this wallet');
   await c.until(`(document.querySelector('.walletbar')?.innerText ?? '').includes('Payout wallet saved')`, 'the saved wallet', 30);
-  const side = await text('.sh-who');
-  check('the side bar shows the proved wallet', side.includes('0x7099') && side.includes('signature checked'), side);
+  const side = await text('.walletbar');
+  check('the wallet line shows the proved wallet', side.includes('0x70997') && side.includes('Payout wallet saved'), side);
   await shot('saved');
 
   // The stored good fix. With a stored proof this is seconds, and without one it is a real proof.
@@ -253,13 +285,15 @@ try {
   console.log(`  gate to proposal ${((Date.now() - proofAt) / 1000).toFixed(1)} s`);
   const detail = await text('.detail');
   check('the gate accepted this fix', /The fix holds on the hidden worlds/.test(detail), detail.slice(0, 200));
-  if (hadProof) check('a recorded proof says so on screen', detail.includes('Recorded proof') && detail.includes('The chain transactions are real'));
-  await c.until(`/\\d+ s left/.test(document.querySelector('[data-step="dispute-window"]')?.innerText ?? '')`, 'the countdown', 30);
+  if (hadProof) check('a recorded proof says so on screen', detail.includes('Recorded proof') && (await c.js(`document.querySelector('.chainmore').textContent`)).includes('The chain transactions are real'));
+  await c.until(`/\\d+ s left/.test(document.querySelector('[data-step="dispute-window"]')?.textContent ?? '')`, 'the countdown', 30);
   await showChain();
   await shot('dispute');
-  const firstLeft = Number((await text('[data-step="dispute-window"]')).match(/(\d+) s left/)[1]);
+  const leftNow = () => c.js(`Number(document.querySelector('[data-step="dispute-window"]').textContent.match(/(\\d+) s left/)[1])`);
+  const firstLeft = await leftNow();
+  check('the box counts the same window', /Paying in \d+ s unless/.test(await boxSays()), await boxSays());
   await wait(3000);
-  const nextLeft = Number((await text('[data-step="dispute-window"]')).match(/(\d+) s left/)[1]);
+  const nextLeft = await leftNow();
   check('the countdown moves', nextLeft < firstLeft && firstLeft <= 60, `${firstLeft} then ${nextLeft}`);
   check('nothing is paid during the window', usdc(ENGINEER) === 0n);
     let earlyRefused = false;
@@ -278,6 +312,8 @@ try {
   check('the agent sent them, from the resolver wallet', ['propose', 'finalize', 'payout'].every(k => receipt(steps.txs[k]).from.toLowerCase() === RESOLVER));
   check('the engineer saw only sign popups, and no transaction', !(await popups()).some(p => p.startsWith('tx:')) && (await popups()).includes('sign'), (await popups()).join());
   check('the list says Paid', (await text('.list')).includes('Paid'));
+  check('the box says who got paid', /^Paid 1 test USDC to 0x/.test(await boxSays()), await boxSays());
+  check('all four story steps are ticked', (await c.js(`document.querySelector('.story').dataset.done`)) === '4');
   await showChain();
   await shot('paid');
 
@@ -297,14 +333,19 @@ try {
   await setWallet({ account: ENGINEER, chain: CHAIN, connected: true, added: true });
 
   // The company rejects during the window: a wallet signature, then the arbiter's key.
-  await setWallet({ account: COMPANY, chain: CHAIN, connected: true, added: true });
+  // One press, with no wallet connected yet: it connects, posts and funds. The approval from before covers it, so one transaction popup.
+  await setWallet({ account: COMPANY, chain: CHAIN, connected: false, added: true });
   await login('company');
-  await postBounty('The robot slips on the glass', 'slip_distance', 1);
-  await press('Fund from my wallet');
+  await clearPopups();
+  const second = await postBounty('The robot slips on the glass', 'slip_distance', 1);
+  console.log(`  ONE CLICK, later bounty: press to wallet popup ${second.popup} s, press to funded ${second.post} s`);
   await c.until(`document.querySelector('[data-step="funded"]')?.dataset.state === 'ok'`, 'the second funding', 60);
+  const later = (await popups()).filter(p => p !== 'switch');
+  check('the same press connected the wallet, and a later bounty needs one transaction popup', JSON.stringify(later) === JSON.stringify(['connect', `tx:${CREATE}`]), later.join());
+  check('the post dialog closed on the funded bounty', await c.js(`!document.querySelector('.overlay')`));
   const placed = JSON.parse(execFileSync(PY, [join(ROOT, 'policy/bounty/check_wallet_helper.py'), boardRoot, '2', ENGINEER], { encoding: 'utf8' }));
   check('the check placed a fix with no gate, for this rejection only', Boolean(placed.fingerprint));
-  await c.until(`/\\d+ s left/.test(document.querySelector('[data-step="dispute-window"]')?.innerText ?? '')`, 'the second window', 30);
+  await c.until(`/\\d+ s left/.test(document.querySelector('[data-step="dispute-window"]')?.textContent ?? '')`, 'the second window', 30);
   await press('Reject');
   await c.until(`document.querySelector('[data-step="dispute-window"]')?.dataset.state === 'bad'`, 'the rejection on chain', 30);
   const rejected = JSON.parse(readFileSync(join(boardRoot, '2/fixes/1/arc_steps.json'), 'utf8'));
@@ -327,9 +368,7 @@ try {
 
   // The cap, in code, before any send.
   await postBounty('Third bounty over the cap', 'coverage', 1).catch(() => null);
-  await c.until(`!!${hasButton('Fund from my wallet')}`, 'a third bounty', 10).catch(() => null);
-  if (await c.js(`!!${hasButton('Fund from my wallet')}`)) {
-    await press('Fund from my wallet');
+  if (await c.js(`!!${hasButton('Try again')}`)) {
     await walletError('ARC_CAP_USDC', 'over the cap: refused before any send');
   } else check('over the cap: a third bounty could not be posted to test it', false);
 

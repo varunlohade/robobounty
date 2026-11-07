@@ -226,7 +226,7 @@ const press = async (label, seconds = 60) => { await c.until(`!!${hasButton(labe
 const stepState = name => c.js(`document.querySelector('[data-step="${name}"]')?.dataset.state ?? null`);
 const barHas = words => `(document.querySelector('.walletbar')?.innerText ?? '').includes(${JSON.stringify(words)})`;
 const shot = async name => { await wait(400); await c.shot(join(OUT, `${name}.png`)); };
-const showChain = () => c.js(`[...document.querySelectorAll('.detail h2')].find(n => n.textContent === 'On chain')?.scrollIntoView({ block: 'start' })`);
+const showChain = () => c.js(`document.querySelector('.detail').scrollTop = 0`);
 const stepWords = () => c.js(`[...document.querySelectorAll('[data-step]')].map(n => n.dataset.step + '=' + n.dataset.state).join(' ')`);
 
 async function signIn(role) {
@@ -269,7 +269,7 @@ try {
   await c.until(barHas('test USDC'), 'the balance in the wallet line', 60);
   const bar = await text('.walletbar');
   const companyShown = (Number(await usdc(COMPANY)) / 1e6).toFixed(2);
-  check('connected: the address, the chain balance and the Arc label', bar.includes('0xb922') && bar.includes(`${companyShown} test USDC`) && (FORK || bar.includes('Arc testnet. Test USDC, not real money.')), bar);
+  check('connected: the address and the chain balance', bar.includes('0xb922') && bar.includes(`${companyShown} test USDC`), bar);
   check('the page asks to add Arc: USDC as native, 18 decimals', wallet.addParams?.nativeCurrency.decimals === 18 && wallet.addParams.nativeCurrency.symbol === 'USDC' && wallet.addParams.chainId === CHAIN, JSON.stringify(wallet.addParams?.nativeCurrency));
   if (!FORK) check('the add request names the real RPC and explorer', new URL(wallet.addParams.rpcUrls[0]).hostname === 'rpc.testnet.arc.io' && wallet.addParams.blockExplorerUrls?.[0] === 'https://explorer.testnet.arc.io' && wallet.addParams.chainName === 'Arc Testnet');
   await shot('03-company-connected');
@@ -281,25 +281,18 @@ try {
     check('the post form opens with the stored failure and pay 1', form.pay === '1' && /stalled|stops/i.test(form.failure), JSON.stringify(form));
     await shot('04-post-form');
     const started = Date.now();
-    await press('Post the bounty');
-    await c.until(`!document.querySelector('.overlay') && !!document.querySelector('.detail h1')`, 'the posted bounty', POST_S);
-    console.log(`  post took ${((Date.now() - started) / 1000).toFixed(1)} s`);
-  }
-  await c.until(`!!document.querySelector('[data-step="funded"]')`, 'the chain steps', 60);
-  await showChain();
-  await shot('05-posted-not-funded');
-
-  if (!wasFunded) {
     if (sends.some(s => s.kind === 'create')) throw new Error('A create was sent, but the board has no funding row. Check the hash in .check_sends.json before you spend more.');
-    const started = Date.now();
-    await press('Fund from my wallet');
+    await press('Post bounty'); // One press: it posts, then funds, with no second button.
     await c.until(`${hasButton('Confirm in your wallet')} !== undefined || document.querySelector('[data-step="funded"]')?.dataset.state === 'ok' || !!document.querySelector('.walleterr')`, 'the wallet step', 90);
     if (await c.js(`!!document.querySelector('.walleterr')`)) throw new Error(`Fund failed: ${await text('.walleterr')}`);
-    await showChain();
     await shot('06-funding-confirm-in-wallet');
     await c.until(`document.querySelector('[data-step="funded"]')?.dataset.state === 'ok' || !!document.querySelector('.walleterr')`, 'funded', 240);
     if (await c.js(`!!document.querySelector('.walleterr')`)) throw new Error(`Fund failed: ${await text('.walleterr')}`);
-    console.log(`  fund took ${((Date.now() - started) / 1000).toFixed(1)} s`);
+    console.log(`  post and fund took ${((Date.now() - started) / 1000).toFixed(1)} s`);
+  } else if (!wasFunded) {
+    await press('Try again');
+    await c.until(`document.querySelector('[data-step="funded"]')?.dataset.state === 'ok' || !!document.querySelector('.walleterr')`, 'funded', 240);
+    if (await c.js(`!!document.querySelector('.walleterr')`)) throw new Error(`Fund failed: ${await text('.walleterr')}`);
   }
   const funding = json(fundingPath);
   const funded = {};
@@ -331,8 +324,8 @@ try {
   if (await c.js(`!!${hasButton('Connect wallet')}`)) await press('Connect wallet');
   await press('Save this wallet');
   await c.until(barHas('Payout wallet saved'), 'the saved wallet', 60);
-  const side = await text('.sh-who');
-  check('the side bar shows the proved wallet', side.includes('0x4E58') || side.includes('0x4e58'), side);
+  const side = await text('.walletbar');
+  check('the wallet line shows the proved wallet', side.includes('0x4E58') || side.includes('0x4e58'), side);
   check('saving took a signature', wallet.popups.slice(popupsAtEngineer).includes('sign:engineer'), wallet.popups.slice(popupsAtEngineer).join());
   await showChain();
   await shot('09-engineer-wallet-saved');
@@ -356,10 +349,10 @@ try {
   check('the recorded proof says so on screen', detail.includes('Recorded proof') && detail.includes('The chain transactions are real'));
 
   // The dispute window. Skipped on a rerun that arrives after it closed.
-  if (await c.js(`/\\d+ s left/.test(document.querySelector('[data-step="dispute-window"]')?.innerText ?? '')`)) {
+  if (await c.js(`/\\d+ s left/.test(document.querySelector('[data-step="dispute-window"]')?.textContent ?? '')`)) {
     await showChain();
     await shot('11-dispute-window');
-    const left = async () => Number((await text('[data-step="dispute-window"]')).match(/(\d+) s left/)?.[1] ?? -1);
+    const left = async () => Number((await c.js(`document.querySelector('[data-step="dispute-window"]')?.textContent ?? ''`)).match(/(\d+) s left/)?.[1] ?? -1);
     const first = await left();
     await wait(3000);
     const next = await left();

@@ -94,7 +94,6 @@ tr:hover .show-on-hover,tr:focus-within .show-on-hover{opacity:1}
 .lnums{display:grid;grid-template-columns:repeat(4,1fr);margin-top:8px}
 .lnums b{display:block;font-weight:400;font-size:20px;line-height:28px;letter-spacing:-.01em}
 .lnums span{font-size:12px;line-height:16px;color:var(--t3)}
-.ledger p{margin-top:8px;font-size:12px;line-height:16px;color:var(--t3)}
 .detail{overflow:hidden;padding:0}
 .detail .in{transition:opacity 160ms var(--enter)}
 .detail.swap .in{opacity:.25}
@@ -118,14 +117,6 @@ tr:hover .show-on-hover,tr:focus-within .show-on-hover{opacity:1}
 #d-in .icon-b:hover{background:var(--hover);color:var(--t1)}
 .hidden-w{padding:0 var(--gutter) 12px}
 .hidden-w .cells{height:24px}
-.hidden-w p{font-size:12px;line-height:16px;color:var(--t3);margin-top:8px;white-space:normal}
-.flowline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;padding:0 var(--gutter) 12px}
-.flowline div{padding-top:10px;position:relative;border-top:2px solid var(--active);margin-right:4px}
-.flowline div.d{border-top-color:var(--green)}
-.flowline div.n{border-top-color:var(--t1)}
-.flowline b{display:block;font-weight:400;line-height:16px;font-size:12px}
-.flowline small code{font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.flowline small{display:block;font-size:11px;line-height:14px;color:var(--t3);margin-top:2px}
 
 
 /* Board page, from design/site2/claude. Critic fixes: secondary text lifted, hover apart from selected, one search field. */
@@ -189,3 +180,70 @@ span.txlink{color:var(--t2)}
 a.txlink{text-decoration:underline}
 .chainbalance{min-height:32px;background:var(--raised);margin:4px var(--gutter);padding:0 12px;border-radius:6px}
 .chainbalance b{font-weight:500;color:var(--t1)}
+
+/* One story, one next step, then the data. The box is the one loud thing on the panel. */
+.story{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:4px var(--gutter) 16px}
+.story li{position:relative;min-width:0;display:flex;flex-direction:column}
+.story li:not(:last-child)::before{content:"";position:absolute;left:28px;right:-8px;top:11px;height:2px;background:var(--active)}
+.story li.d:not(:last-child)::before{background:var(--green)}
+.story .dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;line-height:16px;font-weight:500;color:var(--t2);box-shadow:inset 0 0 0 1.5px var(--line2);background:var(--app);margin-bottom:8px}
+.story .d .dot{background:var(--green);box-shadow:none;color:#fff}
+.story .d .dot svg{stroke-width:2.25}
+.story .n .dot{background:var(--t1);box-shadow:none;color:#fff}
+.story .x .dot{background:var(--red);box-shadow:none;color:#fff}
+.story b{font-weight:400;font-size:13px;line-height:18px;color:var(--t2)}
+.story .d b{color:var(--t1)}
+.story .n b,.story .x b{color:var(--t1);font-weight:600}
+.story small{display:block;font-size:12px;line-height:16px;color:var(--t3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.story .tx code{font-size:11px}
+.nextbox{position:relative;margin:0 var(--gutter) 16px;padding:14px 16px;border-radius:8px;background:var(--raised);display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;outline:0}
+.nextbox.go{background:var(--app);box-shadow:inset 0 0 0 1.5px var(--t1)}
+.nextbox.done{background:var(--green-tint)}
+.nextbox.stop{background:var(--red-tint)}
+.nextbox p{flex:1 1 240px;min-width:0;font-size:15px;line-height:22px;font-weight:500;letter-spacing:-.005em}
+.nextacts{display:flex;flex-wrap:wrap;gap:8px}
+.nextbox .walleterr{flex-basis:100%;font-weight:400}
+.nextbox.arrive::after{content:"";position:absolute;inset:-3px;border-radius:11px;box-shadow:0 0 0 2px var(--ring);opacity:0;pointer-events:none;animation:arrive 1200ms var(--enter)}
+@keyframes arrive{0%{opacity:1}100%{opacity:0}}
+.chainmore{margin-top:4px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.chainmore+.dsect{margin-top:8px}
+.chainmore summary{display:flex;align-items:center;gap:8px;height:40px;padding:0 var(--gutter);cursor:pointer;list-style:none;color:var(--t2);transition:background-color 120ms var(--enter)}
+.chainmore summary::-webkit-details-marker{display:none}
+.chainmore summary:hover{background:var(--raised)}
+.chainmore summary svg{transform:rotate(-90deg);transition:transform 160ms var(--enter)}
+.chainmore[open] summary svg{transform:none}
+.chainmore summary h2{color:var(--t1)}
+.chainmore[open]{padding-bottom:8px}
+.chainmore+.chainmore{margin-top:-1px}
+#bt .sub{overflow:visible}
+.arc-on .sh-who .sh-mono{display:none}
+
+@media (max-width:720px){
+  html,body{overflow:hidden}
+  .bty{display:block;overflow:auto;--gutter:16px}
+  .bty .list{border-right:0;border-bottom:1px solid var(--line)}
+  .bty .detail{overflow:visible}
+  .walletbar{--gutter:16px}
+  .filters{flex-wrap:wrap}
+  .filters .field{margin-left:0;width:100%;height:44px}
+  .seg button,.pick{height:44px}
+  #bt th:nth-child(2),#bt td:nth-child(2){display:none}
+  .bty .title,.bty .sub{max-width:190px}
+  .lnums{grid-template-columns:repeat(2,1fr);row-gap:8px}
+  .facts{flex-wrap:wrap;gap:8px 20px}
+  .story{gap:6px}
+  .story li:not(:last-child)::before{right:-6px}
+  .story b{font-size:12px;line-height:16px}
+  .story small{font-size:11px;white-space:normal;overflow-wrap:anywhere}
+  .nextbox p{flex-basis:100%}
+  .nextacts,.nextacts .btn{width:100%}
+  .btn.lg{height:44px}
+  .chainstep{flex-wrap:wrap;padding-top:4px;padding-bottom:4px}
+  .chainstep>span:first-child{white-space:normal}
+  .chainstep .t3{white-space:normal}
+  .chainmore summary{height:44px}
+  .chainmore summary .t3{display:none}
+  .dialog,.dialog.wide{width:calc(100% - 24px)}
+  .dialog .foot{flex-wrap:wrap}
+  .sh-status-r{display:none}
+}

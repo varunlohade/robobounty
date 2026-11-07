@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -130,7 +131,11 @@ def balances(address, root):
     """The wallet's money, read from the chain now."""
     value = need_on(root)
     chain = reader()
-    return {"address": address.lower(), "usdc_base_units": str(chain.read_int(M.USDC, "balanceOf(address)(uint256)", address)), "gas_wei": chain.run("cast", "balance", address, "--rpc-url", chain.rpc), "allowance_base_units": str(chain.read_int(M.USDC, "allowance(address,address)(uint256)", address, value["contract"])), "read_at_block": int(chain.run("cast", "block-number", "--rpc-url", chain.rpc))}
+    with ThreadPoolExecutor(3) as pool:  # Three chain reads at once, so the page does not wait for them in turn.
+        usdc = pool.submit(chain.read_int, M.USDC, "balanceOf(address)(uint256)", address)
+        gas = pool.submit(chain.run, "cast", "balance", address, "--rpc-url", chain.rpc)
+        allowance = pool.submit(chain.read_int, M.USDC, "allowance(address,address)(uint256)", address, value["contract"])
+    return {"address": address.lower(), "usdc_base_units": str(usdc.result()), "gas_wei": gas.result(), "allowance_base_units": str(allowance.result()), "read_at_block": int(chain.run("cast", "block-number", "--rpc-url", chain.rpc))}
 
 
 def signer_ok(address, message, signature):
@@ -193,7 +198,8 @@ def fund_plan(bounty_id, root):
     deadline = chain.now() + A.DEADLINE_S
     with B.locked(folder / ".lock"):
         B.write_json(folder / "arc_plan.json", {"deadlines": plan_deadlines(folder) + [deadline]})
-    return {"contract": value["contract"], "usdc": M.USDC, "resolver": value["resolver"], "arbiter": value["arbiter"], "spec_hash": money["spec_hash"], "cap": str(pay), "per_failure": str(pay), "top_prize": "0",
+    # The approval covers this board's whole ARC_CAP_USDC, never more, so later bounties need one popup. The spender stays this board's contract. check_cap above has already bounded pay by the cap.
+    return {"contract": value["contract"], "usdc": M.USDC, "resolver": value["resolver"], "arbiter": value["arbiter"], "spec_hash": money["spec_hash"], "cap": str(pay), "approve": str(M.cap_units()), "per_failure": str(pay), "top_prize": "0",
             "deadline": str(deadline), "grace": str(A.GRACE_S), "dispute_window": str(money["dispute_window_s"]), "fee_wei": str(chain.fee_wei()), "chain_hex": value["chain_hex"]}
 
 

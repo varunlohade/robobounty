@@ -8,6 +8,9 @@ const provider = (): Provider | null => (window as unknown as { ethereum?: Provi
 export class WalletError extends Error {}
 const NO_WALLET = 'No browser wallet found. Install MetaMask or Rabby, then reload this page.';
 const RECEIPT_MS = 120_000;
+const RECEIPT_POLL_MS = 500;
+const RECEIPT_READ_MS = 3_000;
+let chainRpc: string | null = null; // Set when the page moves to the chain. Only read from: it sends nothing and signs nothing.
 const TIP_WEI = 1_000_000_000n;
 const ARC_TESTNET = '0x4cef52'; // 5042002. Fixed here, so a page or server fault cannot move a send to another chain.
 
@@ -23,7 +26,8 @@ function plain(e: unknown, rejected: string): Error {
 async function ask(method: string, params: unknown[], rejected: string) {
   const p = provider();
   if (!p) throw new WalletError(NO_WALLET);
-  try { return await p.request({ method, params }); } catch (e) { throw plain(e, rejected); }
+  const asked = performance.now();
+  try { return await p.request({ method, params }); } catch (e) { throw plain(e, rejected); } finally { console.info(`[wallet] ${method}: ${((performance.now() - asked) / 1000).toFixed(1)} s`); }
 }
 
 export const hasWallet = () => provider() !== null;
@@ -47,6 +51,7 @@ export async function connect(): Promise<string> {
 const NETWORK = (c: ArcConfig) => ({ chainId: c.chain_hex, chainName: c.real ? 'Arc Testnet' : 'Local stand-in chain', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: [c.rpc_url], ...(c.explorer_home ? { blockExplorerUrls: [c.explorer_home] } : {}) });
 
 export async function useArc(c: ArcConfig) {
+  chainRpc = c.rpc_url ?? null;
   const name = c.real ? 'Arc testnet' : 'the local stand-in chain';
   const rejected = `You rejected the network switch. Your wallet stays on another network, so nothing was sent.`;
   const p = provider();
@@ -74,15 +79,30 @@ async function send(address: string, to: string, data: string, plan: { fee_wei: 
   return ask('eth_sendTransaction', [{ from: address, to, data, chainId: ARC_TESTNET, maxFeePerGas: `0x${fee.toString(16)}`, maxPriorityFeePerGas: `0x${(TIP_WEI < fee ? TIP_WEI : fee).toString(16)}` }], `You rejected the ${what} in your wallet. Nothing was sent.`);
 }
 
+// Rabby can take minutes to answer a receipt request, so the page also reads the chain itself. Whichever sees the receipt first wins, and a slow wallet blocks nothing.
+async function chainReceipt(tx: string) {
+  if (!chainRpc) return null;
+  try {
+    const res = await fetch(chainRpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [tx] }), signal: AbortSignal.timeout(RECEIPT_READ_MS) });
+    return (await res.json()).result ?? null;
+  } catch { return null; }
+}
+
 export async function waitReceipt(tx: string, what: string) {
   const until = Date.now() + RECEIPT_MS;
+  let fromWallet: any = null;
+  let asking = false;
   while (Date.now() < until) {
-    const got = await ask('eth_getTransactionReceipt', [tx], '');
+    if (!asking) {
+      asking = true;
+      void ask('eth_getTransactionReceipt', [tx], '').then(got => { fromWallet = got; }, () => { /* the chain read still runs */ }).finally(() => { asking = false; });
+    }
+    const got = await chainReceipt(tx) ?? fromWallet;
     if (got) {
       if (BigInt(got.status) !== 1n) throw new WalletError(`The ${what} reverted on chain. It moved no money.`);
       return got;
     }
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, RECEIPT_POLL_MS));
   }
   throw new WalletError(`No receipt for the ${what} after ${RECEIPT_MS / 1000} s. It may still land, so check your wallet before you try again.`);
 }
@@ -91,6 +111,6 @@ const APPROVE = [{ type: 'function', name: 'approve', stateMutability: 'nonpayab
 const CREATE = [{ type: 'function', name: 'createBounty', stateMutability: 'nonpayable', inputs: [{ type: 'address', name: 'resolver' }, { type: 'address', name: 'arbiter' }, { type: 'bytes32', name: 'specHash' }, { type: 'uint256', name: 'cap' }, { type: 'uint256', name: 'perFailure' }, { type: 'uint256', name: 'topPrize' }, { type: 'uint64', name: 'deadline' }, { type: 'uint64', name: 'grace' }, { type: 'uint64', name: 'disputeWindow' }], outputs: [{ type: 'uint256' }] }] as const;
 const CLAIM = [{ type: 'function', name: 'claim', stateMutability: 'nonpayable', inputs: [{ type: 'uint256', name: 'bountyId' }, { type: 'bytes32', name: 'fingerprint' }], outputs: [] }] as const;
 
-export const sendApprove = (address: string, plan: FundPlan) => send(address, plan.usdc, encodeFunctionData({ abi: APPROVE, args: [plan.contract as `0x${string}`, BigInt(plan.cap)] }), plan, 'USDC approval');
+export const sendApprove = (address: string, plan: FundPlan) => send(address, plan.usdc, encodeFunctionData({ abi: APPROVE, args: [plan.contract as `0x${string}`, BigInt(plan.approve ?? plan.cap)] }), plan, 'USDC approval');
 export const sendCreate = (address: string, plan: FundPlan) => send(address, plan.contract, encodeFunctionData({ abi: CREATE, args: [plan.resolver as `0x${string}`, plan.arbiter as `0x${string}`, plan.spec_hash as `0x${string}`, BigInt(plan.cap), BigInt(plan.per_failure), BigInt(plan.top_prize), BigInt(plan.deadline), BigInt(plan.grace), BigInt(plan.dispute_window)] }), plan, 'bounty funding');
 export const sendClaim = (address: string, contract: string, chainBounty: number, fingerprint: string, fee_wei: string) => send(address, contract, encodeFunctionData({ abi: CLAIM, args: [BigInt(chainBounty), fingerprint as `0x${string}`] }), { fee_wei }, 'claim');
