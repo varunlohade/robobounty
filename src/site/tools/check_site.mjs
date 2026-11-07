@@ -62,9 +62,9 @@ await shot('live-login');
 // Company path. A real account on the server. The email stays not verified, and the page says so.
 const clickButton = words => ev(`[...document.querySelectorAll('button')].find(b => b.textContent.includes(${JSON.stringify(words)})).click()`);
 await clickButton('Continue with work email');
-await waitText('Email not verified');
+await until(`!!document.querySelector('input[type=email]')`, 'the company step', 20);
 const companyWords = await text();
-say(companyWords.includes('Email not verified'), 'the company step says the email is not verified');
+say(!companyWords.includes('Email not verified'), 'the company step says nothing about verification before an account exists');
 say(await ev(`!!document.querySelector('input[type=email]') && !!document.querySelector('input[type=password]')`), 'the company step asks for email and password');
 say(!companyWords.includes('Send sign-in link') && !companyWords.includes('Use SSO'), 'the company step promises no email or SSO');
 await clickButton('Create account');

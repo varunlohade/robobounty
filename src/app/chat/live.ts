@@ -25,7 +25,7 @@ async function post(path: string, body: unknown): Promise<Response> {
   return fetch(`${SERVER}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...await runHeaders() }, body: JSON.stringify(body), signal: AbortSignal.timeout(REPLY_DEADLINE_MS) });
 }
 
-export interface ServerInfo { sim_sha: string; llm: string; max_procs: number; stream_host?: boolean }
+export interface ServerInfo { sim_sha: string; llm: string; max_procs: number; stream_host?: boolean; recorded_batch?: boolean }
 export const health = async (): Promise<ServerInfo> => (await (await fetch(`${SERVER}/api/health`, { signal: AbortSignal.timeout(REPLY_DEADLINE_MS) })).json());
 
 export type ServerEvent = { type: string; [key: string]: any };

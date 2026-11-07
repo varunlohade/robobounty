@@ -14,5 +14,5 @@ void who.then(w => {
   const out = h('button', 'ov-btn', 'Sign out');
   out.type = 'button';
   out.addEventListener('click', async () => { await signOut(); location.href = 'login.html'; });
-  page.replaceChildren(h('div', 'ov-set', h('dl', '', ...row('Account', w.kind === 'guest' ? 'Local guest' : 'Company'), ...row('Company', w.kind === 'guest' ? 'None' : w.label), ...row('Email', w.verificationLabel)), out));
+  page.replaceChildren(h('div', 'ov-set', h('dl', '', ...row('Account', w.kind === 'guest' ? 'Local guest' : 'Company'), ...row('Company', w.kind === 'guest' ? 'None' : w.label), h('dt', '', 'Email'), h('dd', '', w.email ?? '', h('small', 'ov-set-note', w.verificationLabel))), out));
 });

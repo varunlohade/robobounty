@@ -179,6 +179,27 @@ def ai_checks_on(router, port):
             check("the row does not reach the public reply", "llm_calls" not in reply)
             tools.clear()
             said.clear()
+            recovered = [{"backend": "0g", "line": "0G: request none, failed: it did not answer in time. Claude answered instead.", "say": "0G did not answer this: it did not answer in time. Claude answered instead.", "fell_back": True}]
+            server.job = lambda *_: {"ok": True, "reply": {}, "llm_calls": recovered}
+            server.Session.ai_job(session, {}, "agent")
+            check("a recovered failure: one quiet line in Details, and nothing in the chat", tools == [("details", "", [recovered[0]["line"]])] and not said)
+            tools.clear()
+            sent = []
+
+            def capture(body, _timeout):
+                sent.append(body)
+                raise llm.LLMError("timeout")
+            real_post, llm._zg_post = llm._zg_post, capture
+            os.environ.update(ZG_API_KEY="x", ZG_MODEL="m")
+            for private in (True, False):
+                llm.zg_private = private
+                llm.CALLS.append({})
+                try:
+                    llm._zerog("p", {}, 1)
+                except llm.LLMError:
+                    pass
+            llm.zg_private, llm._zg_post = True, real_post
+            check("private asks for low reasoning, and Fast sends no such field", sent[0]["reasoning_effort"] == "low" and "reasoning_effort" not in sent[1], str([b.get("reasoning_effort") for b in sent]))
             server.job = lambda *_: {"ok": True, "reply": {}}
             server.Session.ai_job(session, {}, "agent")
             check("with 0G off, no Details row and no line", not tools and not said)

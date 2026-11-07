@@ -238,12 +238,12 @@ def new_session(account_id, role, old_token=None, db=None, now=None):
 def _session_row(sha, db, now):
     now = time.time() if now is None else now
     with closing(_open(db)) as d:
-        row = d.execute("SELECT s.token_sha, s.role, s.expires_at, a.id, a.label, a.company, a.tester, a.credential, a.payout, a.email_verified_at, a.world_id, a.screened_at, a.payout_signed_at FROM sessions s LEFT JOIN accounts a ON a.id=s.account_id WHERE s.token_sha=? AND s.expires_at>=?", (sha, now)).fetchone()
+        row = d.execute("SELECT s.token_sha, s.role, s.expires_at, a.id, a.label, a.company, a.tester, a.credential, a.payout, a.email_verified_at, a.world_id, a.screened_at, a.payout_signed_at, a.email FROM sessions s LEFT JOIN accounts a ON a.id=s.account_id WHERE s.token_sha=? AND s.expires_at>=?", (sha, now)).fetchone()
     if not row:
         return None
     role, credential = row[1], row[7]
     level = "none" if role == "guest" else "demo" if credential == "demo" else "email_not_verified" if role == "company" and not row[9] else "email_verified" if role == "company" else f"world_{credential}"
-    return {"sid": row[0], "role": role, "expires_at": row[2], "account_id": row[3], "label": row[4] or "Guest", "company": row[5], "tester": row[6], "credential": credential, "payout": row[8], "verification": level, "world_id": row[10], "screened": bool(row[11]), "payout_signed": bool(row[12])}
+    return {"sid": row[0], "role": role, "expires_at": row[2], "account_id": row[3], "label": row[4] or "Guest", "company": row[5], "tester": row[6], "credential": credential, "payout": row[8], "verification": level, "world_id": row[10], "screened": bool(row[11]), "payout_signed": bool(row[12]), "email": row[13]}
 
 
 def session_of(token, db=None, now=None):
@@ -265,9 +265,9 @@ def csrf_ok(token, sent, db=None):
 
 
 def public(s):
-    """What /site-api/auth/me names. No token and no full address."""
+    """What /site-api/auth/me names, to the signed-in person. No token and no full payout address."""
     level = s["verification"]
-    return {"signed_in": True, "role": s["role"], "label": s["label"], "verification": level, "verification_label": VERIFICATION.get(level, "Email verified"), "demo": level == "demo", "tester": s["tester"], "screened": s["screened"], "expires_at": s["expires_at"],
+    return {"signed_in": True, "role": s["role"], "label": s["label"], "verification": level, "verification_label": VERIFICATION.get(level, "Email verified"), "email": s.get("email"), "demo": level == "demo", "tester": s["tester"], "screened": s["screened"], "expires_at": s["expires_at"],
             "payout": {"set": bool(s["payout"]), "masked": mask(s["payout"]) if s["payout"] else None, "signed": bool(s.get("payout_signed"))}}
 
 

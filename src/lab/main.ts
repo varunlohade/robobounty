@@ -6,7 +6,7 @@ import { LiveBackend, SERVER, health, type ServerEvent } from '../app/chat/live.
 import { Replay, loadMujoco } from '../app/replay.ts';
 import { isV5, loadTrial, loadTrialFrom, type Trial } from '../app/trial.ts';
 import { SimView, restoreOnLoss } from '../app/view.ts';
-import { worldPage } from '../app/world_page.ts';
+import { LABEL, THIS_RUN_LABEL, worldPage } from '../app/world_page.ts';
 import { lookOf } from '../view/real/look.ts';
 import { LabChat, replayNote } from './chat.ts';
 import { CodeTab } from './code_tab.ts';
@@ -131,6 +131,7 @@ async function live(root: HTMLElement) {
   const pack = chosenPack();
   root.dataset.pack = pack ?? 'window';
   const built = buildMemory(() => backend.id);
+  let runLabel = THIS_RUN_LABEL;
   const onEvent = async (e: ServerEvent) => {
     switch (e.type) {
       case 'pose_world': showPoseWorld(e); break;
@@ -302,7 +303,7 @@ async function live(root: HTMLElement) {
         }
         const trial = await fetchTrial(String(how.tid));
         if (!trial) return null;
-        const world = worldPage(trial, statusRight, fixed);
+        const world = worldPage(trial, statusRight, fixed, runLabel);
         return { page: world.page, start: async () => { await world.start(); current = () => world.view; world.viewport.dataset.tid = String(how.tid); }, stop: () => { world.stop(); current = () => null; }, jump: (t: number) => {
           const slider = world.page.querySelector<HTMLInputElement>('.scrub input');
           if (!slider) return;
@@ -406,7 +407,7 @@ async function live(root: HTMLElement) {
     const trial = await fetchTrial(tid);
     if (!trial) return;
     again = () => void showTrial(tid);
-    const world = worldPage(trial, statusRight, fixed);
+    const world = worldPage(trial, statusRight, fixed, runLabel);
     swap(world.page, () => world.stop());
     current = () => world.view;
     await world.start();
@@ -420,6 +421,7 @@ async function live(root: HTMLElement) {
   for (let told = false; ;) {
     try {
       const info = await health();
+      runLabel = info.recorded_batch ? LABEL : THIS_RUN_LABEL;
       llmLine.textContent = routeLine || `LLM: ${info.llm}`;
       root.dataset.server = 'up';
       break;

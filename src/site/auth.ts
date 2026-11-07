@@ -1,12 +1,12 @@
 // The one door to sign-in. The server decides who you are: /site-api/auth/me is the only source. No token or password reaches browser storage.
 export type Role = 'company' | 'engineer' | 'guest';
 export interface Me {
-  signedIn: boolean; role: Role | null; label: string; verification: string; verificationLabel: string; demo: boolean; tester: string | null; screened: boolean;
+  signedIn: boolean; role: Role | null; label: string; verification: string; verificationLabel: string; email: string | null; demo: boolean; tester: string | null; screened: boolean;
   payout: { set: boolean; masked: string | null; signed?: boolean }; expired: boolean; offline: boolean; csrf: string; humanId: string | null; credential: string | null;
 }
 export type AuthResult = { ok: true } | { ok: false; code: string; words: string };
 
-const NOBODY: Me = { signedIn: false, role: null, label: '', verification: 'none', verificationLabel: '', demo: false, tester: null, screened: false, payout: { set: false, masked: null }, expired: false, offline: false, csrf: '', humanId: null, credential: null };
+const NOBODY: Me = { signedIn: false, role: null, label: '', verification: 'none', verificationLabel: '', email: null, demo: false, tester: null, screened: false, payout: { set: false, masked: null }, expired: false, offline: false, csrf: '', humanId: null, credential: null };
 const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('crashlab-auth');
 let csrf = '';
 let boardToken: { value: string; until: number } | null = null;
@@ -14,7 +14,7 @@ let boardToken: { value: string; until: number } | null = null;
 function read(m: Record<string, any>): Me {
   csrf = typeof m.csrf === 'string' ? m.csrf : '';
   if (m.signed_in !== true) return { ...NOBODY, expired: m.expired === true };
-  return { signedIn: true, role: m.role, label: String(m.label ?? ''), verification: String(m.verification ?? 'none'), verificationLabel: String(m.verification_label ?? ''), demo: m.demo === true, tester: m.tester ?? null, screened: m.screened === true,
+  return { signedIn: true, role: m.role, label: String(m.label ?? ''), verification: String(m.verification ?? 'none'), verificationLabel: String(m.verification_label ?? ''), email: m.email ?? null, demo: m.demo === true, tester: m.tester ?? null, screened: m.screened === true,
     payout: m.payout ?? NOBODY.payout, expired: false, offline: false, csrf, humanId: m.human_id ?? null, credential: m.credential ?? null };
 }
 

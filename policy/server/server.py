@@ -814,9 +814,9 @@ class Session:
     def tool(self, title, meta, lines, tool_id=None):
         self.emit(type="tool", id=tool_id, title=title, meta=meta, lines=lines)
 
-    def working(self, text=None):
+    def working(self, text=None, since=None):
         self.working_now = text
-        self.emit(type="working", text=text)
+        self.emit(type="working", text=text, **({"since": since} if since else {}))
 
     def chapter(self, name, note=None):
         self.emit(type="chapter", current=name, index=CHAPTERS.index(name), note=note)
@@ -1236,8 +1236,8 @@ class Session:
                 f.writelines(json.dumps(row) + "\n" for row in rows)
             self.tool("details", "", [row["line"] for row in rows])
             for row in rows:
-                if row.get("say"):
-                    self.say(row["say"], fail=not row.get("fell_back"))
+                if row.get("say") and not row.get("fell_back"):  # A recovered failure stays in the Details row above.
+                    self.say(row["say"], fail=True)
             if self.llm_route:
                 self.emit_llm_route(rows[-1])
         return reply
@@ -2150,7 +2150,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.refuse()
         parts = urlsplit(self.path).path.strip("/").split("/")
         if parts == ["api", "health"]:
-            return self.reply(200, {"ok": True, "sim_sha": sim_hash(), "llm": llm_label(), "max_procs": MAX_PROCS, "llm_session_cap": LLM_LIMIT.session_cap, "pid": os.getpid(), "stream_host": True, "streams": Handler.open_streams})
+            return self.reply(200, {"ok": True, "sim_sha": sim_hash(), "llm": llm_label(), "max_procs": MAX_PROCS, "llm_session_cap": LLM_LIMIT.session_cap, "recorded_batch": bool(BATCH), "pid": os.getpid(), "stream_host": True, "streams": Handler.open_streams})
         if parts == ["api", "packs"]:
             return self.reply(200, {"packs": [{"name": name, "label": row["label"], "robot": PACK_FACTS[name][0], "backend": PACK_FACTS[name][1], "note": PACK_NOTES[name], "viewer": row["viewer"], "max_procs": row["max_procs"]} for name, row in pack_job.PACKS.items()],
                                     "import": {"available": False, "note": "Importing a robot is not built yet."}})

@@ -61,7 +61,7 @@ Ask at the Arc booth: "We wrote and tested the contract in Foundry. Does it qual
 
 Tested on the real 0G Router on 7 Nov 2026. A small select beside the robot name chooses who answers each chat, and you can change it between messages:
 
-- **0G Private** (`ZG_MODEL`, tested with `glm-5.3`) is the default. It is sealed, and our own check of the TEE signature passes. A message takes about 50 to 100 s.
+- **0G Private** (`ZG_MODEL`, tested with `glm-5.3`) is the default. It is sealed, and our own check of the TEE signature passes. We send `reasoning_effort: low` (`ZG_REASONING_EFFORT`). One timed call on the inspection prompt took 12 s at low and 67 s at the default.
 - **0G Fast** (`ZG_FAST_MODEL`, now `gpt-4.1-nano`) answers in about 3 s a call. It is not private and not verified. It sends no private header, and we check no signature. It often gets things wrong: it refused "add snow" five times out of five.
 - **Claude** uses the `claude` CLI, pinned to `claude-opus-5-5`.
 

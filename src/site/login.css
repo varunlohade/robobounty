@@ -39,7 +39,7 @@ html,body{background:#000;margin:0}
 .lg-tabs[data-mode=create] .lg-knob{transform:translateX(100%)}
 .lg-tab{position:relative;border:0;background:none;border-radius:25px;color:var(--grey);font:500 18px/1 "Instrument Sans",Inter,system-ui,sans-serif;letter-spacing:-.01em;cursor:pointer}
 .lg-tab[aria-pressed=true]{color:var(--ink)}
-.lg-submit{display:flex;align-items:center;justify-content:space-between;gap:20px;width:100%}
+.lg-submit{display:flex;align-items:center;justify-content:flex-end;gap:20px;width:100%}
 .lg-honest{padding-left:32px;font-size:20px;color:var(--grey);white-space:nowrap}
 .lg-small.bad{color:var(--bad);align-self:flex-start;padding-left:32px;margin-top:0}
 

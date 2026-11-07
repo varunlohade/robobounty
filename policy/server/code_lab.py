@@ -240,13 +240,15 @@ def run_fix(session, cid, group):
     elif not session.llm_allowed():
         return
     session.say(f"{fix_words(session.pack)} A fix shows here as a diff, and nothing changes until you accept it.")
-    session.working("the AI is editing a copy, then the sandbox tests it on worlds it never saw")
+    session.working("waiting for a free run slot")
     T.slots.take(T.max_procs)
+    stages = FixStages(session, out / "stage.txt")
     try:
         with open(out / "fix.log", "ab") as log:
-            code = T.watched("fix", argv, stdout=log, stderr=subprocess.STDOUT)[0]
+            code = T.watched("fix", argv, tick=stages.tick, stdout=log, stderr=subprocess.STDOUT)[0]
     finally:
         T.slots.give(T.max_procs)
+    stages.end(code == 0)
     session.working()
     report = pack_campaign.read_json(out / "report.json")
     if code != 0 or not report:
@@ -256,6 +258,30 @@ def run_fix(session, cid, group):
         return
     session.tool("code_fix", report["status"], [json.dumps({"group": group, "llm": report["llm"], "sets": report["sets"]})])
     session.emit(type="code_fix", fix=fid, campaign=cid, group=group, **{k: report.get(k) for k in ("status", "words", "diff", "flags", "sets", "pairs", "validation", "limits", "held_back_worlds_shown_to_llm", "proof_wall_s")}, llm_note=(report["llm"] or {}).get("note"), base_sha=report["base_sha256"])
+
+
+class FixStages:
+    """Shows the stage fix.py names in its stage file, with that stage's real start time. A finished stage becomes a step row with its seconds."""
+
+    def __init__(self, session, path):
+        self.session, self.path, self.key, self.words, self.since = session, path, None, None, None
+
+    def tick(self):
+        try:
+            key, words = self.path.read_text().split("\t", 1)
+        except (OSError, ValueError):
+            return
+        if key != self.key:
+            self.end(True)
+            self.key, self.since = key, time.time()
+        if words != self.words:
+            self.words = words
+            self.session.working(words, since=self.since * 1000)
+
+    def end(self, finished):
+        if self.key and finished:
+            self.session.tool(f"fix_{self.key}", f"{round(time.time() - self.since)} s", [])
+        self.key = None
 
 
 def decide_fix(session, cid, fid, accept):

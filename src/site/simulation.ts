@@ -41,7 +41,7 @@ for (const r of ROBOTS) {
 
 const aside = h('aside', '', h('h2', '', 'Choose a robot'), cards, about, facts,
   h('div', '', button('pri lg wide', 'Open Simulation', open), h('p', 'open-note', 'Opens the tool with this robot.')),
-  h('div', 'later', icon('upload', 16), 'Importing a robot file is not built yet.'));
+  h('div', 'later', icon('upload', 16), 'Two robots are ready to test. Importing your own robot is next.'));
 main.append(h('div', 'lab', aside, stage));
 
 function paint() {

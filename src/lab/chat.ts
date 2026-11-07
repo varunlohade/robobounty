@@ -5,6 +5,10 @@ import { SERVER, type LiveBackend, type ServerEvent } from '../app/chat/live.ts'
 // Server tool titles the chat shows, in plain words. Any other title stays hidden.
 const STEP_WORDS: Record<string, string> = {
   read_message: 'Read your message',
+  fix_read: 'Read the failure',
+  fix_ai: 'The AI wrote the change',
+  fix_target: 'Ran the failing worlds',
+  fix_others: 'Ran the other worlds',
   plan_world: 'Planned the change',
   build_world: 'Built the world',
   change_world: 'Changed the world',
@@ -24,6 +28,13 @@ interface PackRow { name: string; label: string }
 interface PackList { packs: PackRow[]; import: { available: boolean; note: string } }
 
 const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+const COUNT_WORDS: Record<string, number> = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20 };
+// The AI's stored reason can name a count from before the code checked its list. A sentence stays only if each number in it is one the card itself shows.
+function reasonWithoutOtherCounts(reason: string, shown: number[]) {
+  const counts = (sentence: string) => [...sentence.matchAll(/\b\d+(?:\.\d+)?\b|\b[a-z]+\b/gi)].map(m => /^\d/.test(m[0]) ? Number(m[0]) : COUNT_WORDS[m[0].toLowerCase()]).filter(n => n !== undefined);
+  return (reason.match(/[^.!?]+(?:[.!?]+(?=\s|$)|$)/g) ?? []).filter(sentence => counts(sentence).every(n => shown.includes(n))).join('').trim();
+}
 
 export class LabChat {
   readonly root = el('section', 'chat');
@@ -175,7 +186,8 @@ export class LabChat {
       void this.backend.act({ action: 'run_campaign' } as ChatAction);
     });
     card.append(el('div', 'chat-card-title', `${e.count} scenarios: ${e.to_run} to run, ${e.held_back} held back`));
-    if (e.count_reason) card.append(el('div', 'chat-card-text', e.count_reason));
+    const reason = reasonWithoutOtherCounts(String(e.count_reason ?? ''), [e.count, (e.groups ?? []).length]);
+    if (reason) card.append(el('div', 'chat-card-text', reason));
     const groups = el('details', 'chat-details');
     groups.append(el('summary', '', `${(e.groups ?? []).length} groups`));
     for (const g of e.groups ?? []) groups.append(el('div', 'chat-group', `${g.name} (${g.count}). ${g.reason}`));
@@ -275,7 +287,7 @@ export class LabChat {
         break;
       }
       case 'working':
-        this.working(event.text);
+        this.working(event.text, (event as { since?: number }).since);
         break;
       case 'retire':
         // A Show it button still works later: it only moves the camera.
@@ -297,15 +309,16 @@ export class LabChat {
     this.log.scrollTop = this.log.scrollHeight;
   }
 
-  private working(text: string | null) {
+  private working(text: string | null, since?: number) {
     clearInterval(this.timer);
     this.live.hidden = !text;
     if (!text) return;
     const words = el('span', '', sentence(text));
-    const clock = el('span', 'chat-clock', '0 s');
+    const t0 = since ?? Date.now();
+    const seconds = () => `${Math.max(0, Math.round((Date.now() - t0) / 1000))} s`;
+    const clock = el('span', 'chat-clock', seconds());
     this.live.replaceChildren(words, clock);
-    const t0 = performance.now();
-    this.timer = window.setInterval(() => { clock.textContent = `${Math.round((performance.now() - t0) / 1000)} s`; }, 1000);
+    this.timer = window.setInterval(() => { clock.textContent = seconds(); }, 1000);
     this.log.scrollTop = this.log.scrollHeight;
   }
 
@@ -328,7 +341,7 @@ export class LabChat {
       steps = el('div', 'chat-steps');
       this.append(steps);
     }
-    steps.append(el('div', 'chat-step', words));
+    steps.append(el('div', 'chat-step', /^\d+ s$/.test(event.meta ?? '') ? `${words}, ${event.meta}` : words));
     this.log.scrollTop = this.log.scrollHeight;
   }
 

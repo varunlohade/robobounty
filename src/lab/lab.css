@@ -162,14 +162,14 @@ button.lab-tab[hidden] { display: none; }
 /* The test run */
 .grid-page { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--lab-raised); overflow: hidden; }
 .page { position: relative; }
-.grid-bar { height: 36px; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 12px; background: var(--lab-panel); border-bottom: 1px solid var(--lab-hair); font-size: 12px; line-height: 16px; white-space: nowrap; }
+.grid-bar { min-height: 36px; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 12px; background: var(--lab-panel); border-bottom: 1px solid var(--lab-hair); font-size: 12px; line-height: 16px; white-space: nowrap; }
 .grid-back { height: 24px; padding: 0 8px; background: var(--lab-hover); border: 0; border-radius: 6px; color: var(--lab-text); }
 .grid-back:hover { background: var(--active); }
 .grid-back[hidden] { display: none; }
 .grid-recorded { flex: none; padding: 2px 8px; border: 1px solid var(--amber); border-radius: 6px; color: var(--amber-t); font-size: 12px; line-height: 16px; }
 .grid-recorded[hidden] { display: none; }
 .grid-bar:has(.grid-back:not([hidden])) .grid-clock { display: none; }
-.grid-counts { display: flex; align-items: center; gap: 12px; min-width: 0; overflow: hidden; }
+.grid-counts { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; min-width: 0; }
 .grid-count[data-status="stuck"][data-some="false"], .grid-page[data-done="true"] .grid-count[data-status="running"], .grid-page[data-done="true"] .grid-count[data-status="queued"], .grid-page[data-done="true"] .grid-clock { display: none; }
 .grid-count { display: inline-flex; align-items: center; gap: 6px; color: var(--lab-muted); }
 .grid-count b { font-weight: 500; color: var(--lab-text-2); }

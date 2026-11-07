@@ -1,5 +1,5 @@
 // Drives the robot menu and the test grid in lab.html in a real browser, with real mouse moves.
-// node src/lab/tools/check_grid.mjs [--out DIR] [--real inspection|window] [--limit N]. Needs vite on port 5199.
+// node src/lab/tools/check_grid.mjs [--out DIR] [--real inspection|window] [--limit N]. Needs vite on port 5199, or on CRASHLAB_WEB_PORT.
 // With no --real it starts fake_lab_server.mjs, whose verdicts are invented. With --real it starts its own real server on a free port with stored AI replies: real physics, real verdicts, no paid call.
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -31,7 +31,7 @@ async function realServer() {
   const port = await freePort();
   const child = spawn(join(ROOT, 'policy/.venv/bin/python'), [join(ROOT, 'policy/server/server.py'), '--port', String(port), '--recorded', join(ROOT, 'policy/server/fixtures'), '--scenario-limit', LIMIT], { stdio: 'ignore' });
   servers.push(child);
-  for (let i = 0; i < 150; i++) { try { await fetch(`http://127.0.0.1:${port}/api/health`, { headers: { Origin: 'http://localhost:5199' } }); break; } catch { await wait(200); } }
+  for (let i = 0; i < 150; i++) { try { await fetch(`http://127.0.0.1:${port}/api/health`, { headers: { Origin: `http://localhost:${process.env.CRASHLAB_WEB_PORT ?? 5199}` } }); break; } catch { await wait(200); } }
   return port;
 }
 
@@ -62,7 +62,7 @@ const SAMPLE = seconds => `new Promise(done => {
 const fmt = t => `mean ${t.mean.toFixed(1)} ms, p95 ${t.p95.toFixed(1)} ms, max ${t.max.toFixed(1)} ms, ${t.over33} of ${t.frames} frames over 33 ms, grid draw ${t.drawMs.toFixed(2)} ms, ${t.running} live`;
 
 const c = await openChrome();
-const page = port => `http://localhost:5199/lab.html?server=${port}`;
+const page = port => `http://localhost:${process.env.CRASHLAB_WEB_PORT ?? 5199}/lab.html?server=${port}`;
 const shot = name => c.shot(join(OUT, REAL && !name.startsWith('grid-real') ? name.replace('grid-', `grid-real-${REAL_PACK}-`) : name));
 const box = sel => c.js(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height }; })()`);
 const clickOn = async sel => { const b = await box(sel); await c.click(b.x, b.y); };

@@ -51,6 +51,12 @@ type Counts = Record<Status | 'safe_hold', number>;
 
 const plainName = (name: string) => { const s = name.replaceAll('_', ' '); return s.charAt(0).toUpperCase() + s.slice(1); };
 
+// The run's numbers in plain words. Slip is the longest slide of the whole run. The judge's line reads a slide at the moment it passed the limit, so the two can differ.
+const NUMBER_WORDS: Record<string, string> = {
+  coverage: 'Glass cleaned (0 to 1)', time_s: 'Run time (s)', slip_m: 'Longest slide, whole run (m)', peak_tether_n: 'Highest tether pull (N)', peak_chassis_contact_n: 'Hardest body contact (N)', min_pressure_pa: 'Lowest suction (Pa)', end_battery: 'Battery at end (0 to 1)', hold_s: 'Time in safe hold (s)', hold_mean_wind_ms: 'Mean wind in safe hold (m/s)',
+  waypoints_reached: 'Waypoints reached', waypoints: 'Waypoints on route', longest_stall_s: 'Longest stall (s)', deviation_max_m: 'Furthest off route (m)', deviation_mean_m: 'Mean distance off route (m)', min_up_z: 'Lowest uprightness (1 is level)', min_clearance_m: 'Lowest body height (m)', object_peak_N: 'Hardest hit on an object (N)', object_contact_s: 'Time touching objects (s)', foot_slip_mps: 'Foot slip (m/s)', body_on_ground_peak_N: 'Hardest body hit on the floor (N)', stuck_t_s: 'Stuck at (s)', fell_t_s: 'Fell at (s)',
+};
+
 export function statusWord(r: Row): string {
   if (r.status === 'held' && r.held_back) return 'Held back';
   if (r.status === 'stuck' && !r.verdict) return 'Stuck';
@@ -761,7 +767,7 @@ export class Grid {
     this.closeReplay();
     const token = this.replayToken;
     this.playingIndex = index;
-    const loading = el('div', 'grid-replay-note', 'Checking the recorded run');
+    const loading = el('div', 'grid-replay-note', 'Checking the run');
     this.replayHost.replaceChildren(loading);
     this.replayHost.hidden = false;
     this.board.hidden = true;
@@ -902,7 +908,7 @@ export class Grid {
     if (d.held_back) out.push(el('div', 'grid-rail-note', 'Kept back as a fresh set for testing a change. It does not run here.'));
     else if (!d.replay) out.push(el('div', 'grid-rail-note', 'The replay comes when this run ends.'));
     const numbers = Object.entries((d.numbers ?? {}) as Record<string, unknown>);
-    if (numbers.length) out.push(section('Numbers', numbers.map(([k, v]) => fact(k.replaceAll('_', ' '), typeof v === 'number' ? String(Number(v.toFixed(3))) : String(v)))));
+    if (numbers.length) out.push(section('Numbers', numbers.map(([k, v]) => fact(NUMBER_WORDS[k] ?? plainName(k), typeof v === 'number' ? String(Number(v.toFixed(3))) : String(v)))));
     if (d.changes?.length) out.push(section('Changes to the world', (d.changes as string[]).map(c => el('div', 'grid-mono', c))));
     if (d.events?.length) {
       out.push(section('Events', (d.events as { name: string; t: number; value?: number }[]).map(ev => {

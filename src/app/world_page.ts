@@ -4,6 +4,7 @@ import { SimView, restoreOnLoss, type OnFix } from './view.ts';
 import { worldFacts, type Trial } from './trial.ts';
 
 export const LABEL = 'Simulated. Replay of a recorded run.';
+export const THIS_RUN_LABEL = 'This run. Simulated.';
 const SPARK_POINTS = 96;
 const OFF_GLASS_M = 0.5;
 const PLAYBACK_STALL_MS = 5_000; // Even the slowest speed moves many frames in this time.
@@ -46,7 +47,7 @@ function sparkline(series: number[], failAt: number | null) {
 
 interface Metric { value: (row: number) => string; series?: number[] }
 
-export function worldPage(trial: Trial, statusRight: HTMLElement, onFix?: OnFix) {
+export function worldPage(trial: Trial, statusRight: HTMLElement, onFix?: OnFix, label = LABEL) {
   const { result, manifest, trace, wind, world } = trial;
   const page = el('div', 'page');
   const body = el('div', 'world-body');
@@ -115,7 +116,7 @@ export function worldPage(trial: Trial, statusRight: HTMLElement, onFix?: OnFix)
   if (fired.length) rail.append(events);
   rail.append(facts);
 
-  viewport.append(el('div', 'sim-tag sim-label', LABEL), el('div', 'sim-tag sim-key', 'Grey is dirt from this run. Bare glass is clean.'));
+  viewport.append(el('div', 'sim-tag sim-label', label), el('div', 'sim-tag sim-key', 'Grey is dirt from this run. Bare glass is clean.'));
   if (manifest.elements?.length) viewport.append(el('div', 'sim-tag sim-elements', `Scene elements: ${manifest.elements.join(', ')}. Not counted in the headline numbers.`));
   const offGlass = el('div', 'sim-tag sim-off fail', 'Robot off the glass. The red line is its recorded path.');
   offGlass.hidden = true;

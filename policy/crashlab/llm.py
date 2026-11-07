@@ -31,6 +31,7 @@ ZG_ROUTER = "https://router-api.0g.ai/v1"
 ZG_TIMEOUT_S = 90
 ZG_CHECK_TIMEOUT_S = 20
 ZG_MAX_TOKENS = 4000
+ZG_REASONING_EFFORT = "low"  # On the real inspection prompt, glm-5.3 at its default spent 3295 of these tokens thinking, 67 s, and went past ZG_TIMEOUT_S under load. At low: 302 tokens, 12 s, valid JSON.
 ZG_CHECK = Path(__file__).resolve().parent.parent / "sponsors" / "zg" / "check.mjs"
 ZG_ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}")
 ZG_CHAT_ID = re.compile(r"[A-Za-z0-9_.:-]{1,200}")
@@ -134,7 +135,7 @@ def _zerog(prompt, schema, timeout):
     if not (os.environ.get("ZG_API_KEY") and os.environ.get("ZG_MODEL")):
         raise LLMError("no_key")
     system = f"{SYSTEM} Reply with one JSON object only, matching this JSON schema: {json.dumps(schema)}"
-    data, chat_header = _zg_post({"model": os.environ["ZG_MODEL"], **({"verify_tee": True} if zg_private else {}), "max_tokens": ZG_MAX_TOKENS, "response_format": {"type": "json_object"},
+    data, chat_header = _zg_post({"model": os.environ["ZG_MODEL"], **({"verify_tee": True, "reasoning_effort": os.environ.get("ZG_REASONING_EFFORT", ZG_REASONING_EFFORT)} if zg_private else {}), "max_tokens": ZG_MAX_TOKENS, "response_format": {"type": "json_object"},
                                   "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}]}, timeout)
     reply = _strict_object(data)
     trace = reply.get("x_0g_trace") if isinstance(reply.get("x_0g_trace"), dict) else {}

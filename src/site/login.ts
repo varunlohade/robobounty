@@ -115,7 +115,7 @@ function companyStep() {
     error.hidden = true;
   }
   setMode('signin');
-  const form = h('form', 'lg-form', tabs, email, password, company, h('div', 'lg-submit', h('p', 'lg-honest', 'Email not verified'), enter), error);
+  const form = h('form', 'lg-form', tabs, email, password, company, h('div', 'lg-submit', enter), error);
   form.addEventListener('submit', e => {
     e.preventDefault();
     error.hidden = true;

@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from collections import Counter
 from pathlib import Path
@@ -771,6 +772,15 @@ def run5(a):
     base_sha = hashlib.sha256(base_text.encode()).hexdigest()
     out = Path(a.out).resolve() if a.out else campaign / "fix5"
     out.mkdir(parents=True, exist_ok=True)
+    stage_lock = threading.Lock()
+
+    def stage(key, words):
+        """What this process does now, for the run server's chat line. Only real steps and real counts."""
+        with stage_lock:
+            (out / "stage.tmp").write_text(f"{key}\t{words}")
+            os.replace(out / "stage.tmp", out / "stage.txt")
+
+    stage("read", "reading the failure")
     plan = json.loads((campaign / "scenarios.json").read_text())
     grid = json.loads((campaign / "grid.json").read_text())
     report = {"schema": "crashlab.fix5.v1", "pack": pack, "campaign": campaign.name, "group": a.group, "base": str(base), "base_sha256": base_sha, "status": None, "words": None, "validation": [], "diff": "", "flags": [], "sets": None, "pairs": [], "llm": None,
@@ -799,6 +809,7 @@ def run5(a):
         shutil.copyfile(a.patch, patched)
         report["llm"] = {"error": None, "from_file": True, "note": a.patch_note}
     else:
+        stage("ai", "the AI is writing the change")
         tmp = Path(tempfile.mkdtemp(prefix="crashlab_fix5_"))
         try:
             shutil.copyfile(base, tmp / base.name)
@@ -846,6 +857,21 @@ def run5(a):
                 have = stored(w)
                 a_jobs[w["index"]] = have or pool.submit(trial5, pack, base, w, out / "a" / f"w{w['index']:03d}", False)
                 b_jobs[w["index"]] = pool.submit(trial5, pack, patched, w, out / "b" / f"w{w['index']:03d}", True)
+
+        def finished(worlds):
+            return sum(all(not isinstance(jobs[w["index"]], cf.Future) or jobs[w["index"]].done() for jobs in (a_jobs, b_jobs)) for w in worlds)
+
+        def show_progress(_=None):
+            rest = passed + fresh + other
+            if finished(target) < len(target):
+                stage("target", f"running the {len(target)} failing worlds: {finished(target)} of {len(target)} done")
+            else:
+                stage("others", f"running the other {len(rest)} worlds: {finished(rest)} of {len(rest)} done")
+
+        show_progress()
+        for job in [*a_jobs.values(), *b_jobs.values()]:
+            if isinstance(job, cf.Future):
+                job.add_done_callback(show_progress)
         a_rows = {k: v.result() if isinstance(v, cf.Future) else v for k, v in a_jobs.items()}
         b_rows = {k: v.result() for k, v in b_jobs.items()}
     report["proof_wall_s"] = round(time.time() - t0, 1)

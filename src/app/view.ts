@@ -26,9 +26,18 @@ const MAX_PIXELS = 3.2e6; // A big window keeps its frame rate: past this, the p
 const FOLLOW_RATE = 2.6; // Per second.
 const FOLLOW_MARGIN_M = 1.5; // A falling robot leaves the frame: the camera stays with the assigned area.
 const FRAME_FROM = new THREE.Vector3(0.42, -0.9, 0.1).normalize(); // Where a framed object is seen from: the street, a little to one side.
+const FRAME_FROM_ROOF = new THREE.Vector3(0.26, -0.45, 0.85).normalize(); // A low object on the roof sits behind the parapet, so it is seen from above it.
+const FRAME_LOW_OBJECT_M = 4;
 const FRAME_GLIDE_MS = 700;
 const FRAME_ABOVE_M = 80;
 const BASE_SUN_LEVEL = 0.7, BASE_HAZE = 0.5, BASE_AZIMUTH = (Math.atan2(-0.45, 0.6) * 180) / Math.PI; // The nominal world's light: at these values the picture is the approved one.
+// New objects that have not built on screen yet. A new run makes a new view, so this outlives one view.
+const unseenObjects = new Set<string>();
+const meshesOf = (model: THREE.Object3D) => {
+  const meshes: THREE.Mesh[] = [];
+  model.traverse(o => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
+  return meshes;
+};
 const BASE_SKY = '0.42,0.58,0.8|0.95,0.82,0.7';
 const GRIME_AMOUNT = 0.42; // How much weather a placed object shows. The same noise as the glass film, so it sits in the same world.
 const WALL_REACH_M = 0.2; // A shape this near the glass throws a contact shadow on it.
@@ -511,11 +520,12 @@ export class SimView {
   /** Moves the camera to a box [x0, y0, z0, x1, y1, z1] the default view cannot show, from the street. Only the focus function calls this: an edit never moves the view. */
   frameOn(box: number[]) {
     const c = new THREE.Vector3((box[0] + box[3]) / 2, (box[1] + box[4]) / 2, (box[2] + box[5]) / 2);
-    const r = Math.max(Math.hypot(box[3] - box[0], box[4] - box[1], box[5] - box[2]) / 2, 1.2);
+    const lowOnRoof = c.y > 0 && box[5] - box[2] < FRAME_LOW_OBJECT_M;
+    const r = Math.max(Math.hypot(box[3] - box[0], box[4] - box[1], box[5] - box[2]) / 2, lowOnRoof ? 2 : 1.2);
     const half = (this.camera.fov * Math.PI) / 360;
     const fit = Math.min(Math.sin(half), Math.sin(Math.atan(Math.tan(half) * this.camera.aspect)));
     const distance = (r / fit) * 1.12;
-    const to = c.clone().addScaledVector(FRAME_FROM, distance);
+    const to = c.clone().addScaledVector(lowOnRoof ? FRAME_FROM_ROOF : FRAME_FROM, distance);
     to.y = Math.min(to.y, -1);
     to.z = Math.max(to.z, FRAME_ABOVE_M); // Above the street's nearest roofs, or a neighbour blocks the view.
     const reach = to.distanceTo(c);
@@ -532,6 +542,7 @@ export class SimView {
       this.host.append(button);
       this.backButton = button;
     }
+    this.buildUnseen(box);
     this.dirty = true;
   }
 
@@ -650,25 +661,57 @@ export class SimView {
     });
   }
 
-  /** Each new object, and only it: a blueprint, then real from the bottom up. The camera stays where it is. */
+  /** Each new object, and only it: a blueprint, then real from the bottom up. The camera stays where it is. An object outside the view waits, and builds when Show it frames it. */
   buildObjects(names: string[]) {
     if (!names.length || reducedMotion()) return;
-    const { model: m, mj } = this.replay;
-    const world = this.trial.world as Record<string, any> | undefined;
-    const generated = new Set(isV5(world) ? (world!.objects as Record<string, any>[]).filter(o => o.kind === 'generated').map(o => o.name as string) : []);
     this.scene.updateMatrixWorld(true);
     const parts: BuildPart[] = [];
     for (const name of names) {
-      if (generated.has(name)) {
+      if (this.generatedNames().has(name)) {
         const model = this.built.children.find(o => o.name === `generated:${name}`);
         if (model) this.buildModel(model); else this.buildingModels.add(name); // Its file is still loading.
         continue;
       }
-      const meshes = this.drawn.filter(({ mesh, geom }) => {
-        const id = mj.mj_id2name?.(m, mj.mjtObj.mjOBJ_GEOM.value, geom) ?? '';
-        return mesh.visible && (id === `obj_${name}` || id.startsWith(`obj_${name}.`));
-      }).map(d => d.mesh);
-      if (meshes.length) parts.push({ meshes, lines: edgeLines(meshes), at: 0, draw: OBJECT_DRAW_S, revealAt: OBJECT_DRAW_S, reveal: OBJECT_REVEAL_S });
+      const meshes = this.objectMeshes(name);
+      if (!meshes.length) continue;
+      if (this.inView(meshes)) parts.push({ meshes, lines: edgeLines(meshes), at: 0, draw: OBJECT_DRAW_S, revealAt: OBJECT_DRAW_S, reveal: OBJECT_REVEAL_S });
+      else unseenObjects.add(name);
+    }
+    if (parts.length) this.startBuild('object', parts);
+  }
+
+  private generatedNames() {
+    const world = this.trial.world as Record<string, any> | undefined;
+    return new Set<string>(isV5(world) ? (world!.objects as Record<string, any>[]).filter(o => o.kind === 'generated').map(o => o.name as string) : []);
+  }
+
+  private objectMeshes(name: string): THREE.Mesh[] {
+    const { model: m, mj } = this.replay;
+    return this.drawn.filter(({ mesh, geom }) => {
+      const id = mj.mj_id2name?.(m, mj.mjtObj.mjOBJ_GEOM.value, geom) ?? '';
+      return mesh.visible && (id === `obj_${name}` || id.startsWith(`obj_${name}.`));
+    }).map(d => d.mesh);
+  }
+
+  private inView(meshes: THREE.Mesh[]) {
+    this.camera.updateMatrixWorld();
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse));
+    return meshes.some(mesh => frustum.intersectsBox(new THREE.Box3().setFromObject(mesh)));
+  }
+
+  /** Objects inside this box that nobody has seen build yet: they stay hidden while the camera glides, then build. */
+  private buildUnseen(box: number[]) {
+    if (reducedMotion()) return;
+    this.scene.updateMatrixWorld(true);
+    const region = new THREE.Box3(new THREE.Vector3(box[0], box[1], box[2]), new THREE.Vector3(box[3], box[4], box[5])).expandByScalar(0.5);
+    const glide = FRAME_GLIDE_MS / 1000;
+    const parts: BuildPart[] = [];
+    for (const name of unseenObjects) {
+      const model = this.built.children.find(o => o.name === `generated:${name}`);
+      const meshes = model ? meshesOf(model) : this.objectMeshes(name);
+      if (!meshes.length || !meshes.some(mesh => region.intersectsBox(new THREE.Box3().setFromObject(mesh)))) continue;
+      unseenObjects.delete(name);
+      parts.push({ meshes, lines: edgeLines(meshes, model ? 40 : 10), at: glide, draw: OBJECT_DRAW_S, revealAt: glide + OBJECT_DRAW_S, reveal: OBJECT_REVEAL_S });
     }
     if (parts.length) this.startBuild('object', parts);
   }
@@ -676,8 +719,8 @@ export class SimView {
   private buildModel(model: THREE.Object3D) {
     if (reducedMotion()) return;
     this.scene.updateMatrixWorld(true);
-    const meshes: THREE.Mesh[] = [];
-    model.traverse(o => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
+    const meshes = meshesOf(model);
+    if (!this.inView(meshes)) { unseenObjects.add(model.name.replace('generated:', '')); return; }
     this.startBuild('object', [{ meshes, lines: edgeLines(meshes, 40), at: 0, draw: OBJECT_DRAW_S, revealAt: OBJECT_DRAW_S, reveal: OBJECT_REVEAL_S }]);
   }
 
