@@ -325,16 +325,29 @@ def watch(p, rule, stdin, paths, tick):
     """Waits for a child. Returns (stdout, None) when it ended, or (None, why) when it missed its deadline."""
     signal_at = output_at = time.monotonic()
     seen, cpu, polls = marks(paths), group_cpu(p.pid) if rule.quiet_s is not None else None, 0
-    send = stdin
+    if stdin is not None and p.stdin:
+        # Its own thread, and it always closes the pipe. A child that starts slowly under load still gets all of it and sees the end.
+        def feed(pipe=p.stdin, data=stdin):
+            try:
+                pipe.write(data)
+            except (BrokenPipeError, ValueError, OSError):
+                pass
+            finally:
+                try:
+                    pipe.close()
+                except (BrokenPipeError, OSError):
+                    pass
+        threading.Thread(target=feed, daemon=True).start()
+        p.stdin = None
     while True:
         beat()
         try:
-            if p.stdout or p.stdin:
-                return p.communicate(send, timeout=POLL_S)[0], None
+            if p.stdout:
+                return p.communicate(timeout=POLL_S)[0], None
             p.wait(POLL_S)
             return None, None
         except subprocess.TimeoutExpired:
-            pass  # The same input goes back in. Without it, a slow child's stdin never closes and it waits forever.
+            pass
         if tick:
             tick()
         now, polls = time.monotonic(), polls + 1
