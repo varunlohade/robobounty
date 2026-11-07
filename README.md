@@ -156,6 +156,14 @@ Failure types: 17 slid too far, 9 came off the glass, 3 reported done when not d
 
 Six worlds went from failed to passed. One went from stalled to a battery stop, which is not a pass. One moved from a slide to a stall. None got worse. The patch also removes the low-pressure guard while cleaning, and this test does not measure that loss. A later live AI try, on 11 check worlds and 12 held-back worlds, got 0 better and 0 worse (`docs/evidence/live_fix_report.json`).
 
+## Hedera: pay per crash test with x402
+
+`policy/x402` is a pay-per-run crash test API. The server answers HTTP 402 with a price, and an agent pays on Hedera testnet with no human approving, within a spending budget. Setup, architecture and the payment flow are in [policy/x402/README.md](policy/x402/README.md).
+
+Settled payment: [1794012072.275315104 on HashScan](https://hashscan.io/testnet/transaction/1794012072.275315104?tid=0.0.7162784-1794012063-937691606). Transaction ID `0.0.7162784-1794012063-937691606`.
+
+Run it: `node policy/x402/run.mjs --budget 0.05`
+
 ## Third-party software and assets
 
 | Item | Licence | Use |
