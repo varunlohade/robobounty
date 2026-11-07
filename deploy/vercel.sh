@@ -9,7 +9,8 @@ cd "$ROOT"
 VITE_HOSTED=1 nice -n 19 node_modules/.bin/vite build --config deploy/vite.hosted.ts --outDir "$OUT" --emptyOutDir
 rm -rf "$OUT/generated" "$OUT/trials"
 for page in lab app crashlab toy; do cp "$OUT/simulation.html" "$OUT/$page.html"; done
-cp site-public/index.html "$OUT/index.html"
+cp "$OUT/login.html" "$OUT/index.html" # The sign-in page is the main page. The old landing stays at /about.html.
+cp site-public/index.html "$OUT/about.html"
 cp -R site-public/fonts site-public/img "$OUT/"
 mkdir "$OUT/.vercel"
 cp site-public/.vercel/project.json "$OUT/.vercel/"
